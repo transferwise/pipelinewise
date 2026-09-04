@@ -74,6 +74,7 @@ dev-project/mongo/initiate-replica-set.sh
 tests/db/tap_mysql_db.sh
 tests/db/tap_oracle_mysql_db.sh
 tests/db/tap_postgres_db.sh
+tests/db/tap_yugabyte_db.sh
 tests/db/tap_mongodb.sh
 tests/db/target_postgres.sh
 
@@ -90,6 +91,7 @@ CONNECTORS=(
   target-postgres
   tap-mysql
   tap-postgres
+  tap-yugabyte
   tap-mongodb
   transform-field
   tap-s3-csv
@@ -176,6 +178,7 @@ echo
 echo "Running containers:"
 echo "   - PipelineWise CLI and connectors"
 echo "   - PostgreSQL server with test database  (From host: localhost:${TAP_POSTGRES_PORT_ON_HOST} - From CLI: ${TAP_POSTGRES_HOST}:${TAP_POSTGRES_PORT})"
+echo "   - YugabyteDB server with test database  (From host: localhost:${TAP_YUGABYTE_PORT_ON_HOST} - From CLI: ${TAP_YUGABYTE_HOST}:${TAP_YUGABYTE_PORT})"
 echo "   - MariaDB server with test database     (From host: localhost:${TAP_MYSQL_PORT_ON_HOST} - From CLI: ${TAP_MYSQL_HOST}:${TAP_MYSQL_PORT})"
 echo "   - MySQL server with test database       (From host: localhost:${TAP_ORACLE_MYSQL_PORT_ON_HOST} - From CLI: ${TAP_ORACLE_MYSQL_HOST}:${TAP_ORACLE_MYSQL_PORT})"
 echo "   - MongoDB replicaSet server with test database (From host: localhost:${TAP_MONGODB_PORT_ON_HOST} - From CLI: ${TAP_MONGODB_HOST}:${TAP_MONGODB_PORT})"

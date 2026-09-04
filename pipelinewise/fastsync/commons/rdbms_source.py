@@ -23,6 +23,11 @@ class RdbmsSnowflakeSource(ABC):
         """Build the PostgreSQL source contract."""
         return PostgresSnowflakeSource(factory, type_mapper)
 
+    @classmethod
+    def yugabyte(cls, factory, type_mapper):
+        """Build the YugabyteDB source contract."""
+        return YugabyteSnowflakeSource(factory, type_mapper)
+
     @abstractmethod
     def create(self, args, iceberg_requested: bool):
         """Create and configure a source connector."""
@@ -121,6 +126,52 @@ class PostgresSnowflakeSource(RdbmsSnowflakeSource):
     def source_engine(self, args) -> str:
         del args
         return 'postgres'
+
+    def bookmark_kwargs(self, args) -> Dict[str, str]:
+        return {'dbname': args.tap.get('dbname')}
+
+    def open(self, source) -> None:
+        source.open_connection()
+
+    def complete_full_export(
+        self,
+        source,
+        table: str,
+        iceberg_requested: bool,
+        validate_types: TypeValidator,
+        inspect_export: ExportInspection,
+    ) -> Tuple[Dict[str, Any], List[str], int]:
+        snowflake_types = source.map_column_types_to_target(table)
+        if iceberg_requested:
+            validate_types(snowflake_types)
+
+        file_parts, size_bytes = inspect_export()
+        source.close_connection()
+        return snowflake_types, file_parts, size_bytes
+
+    def close_partial(self, source) -> None:
+        source.close_connection()
+
+    def close_finally(self, source) -> None:
+        source.close_connection(silent=True)
+
+
+@dataclass(frozen=True)
+class YugabyteSnowflakeSource(RdbmsSnowflakeSource):
+    """YugabyteDB (YSQL) implementation of the shared source contract."""
+
+    factory: Callable[..., Any]
+    type_mapper: Callable[..., str]
+    route_name = 'yugabyte_to_snowflake'
+
+    def create(self, args, iceberg_requested: bool):
+        source = self.factory(args.tap, self.type_mapper)
+        source.hstore_as_json = iceberg_requested
+        return source
+
+    def source_engine(self, args) -> str:
+        del args
+        return 'yugabyte'
 
     def bookmark_kwargs(self, args) -> Dict[str, str]:
         return {'dbname': args.tap.get('dbname')}

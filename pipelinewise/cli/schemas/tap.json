@@ -532,6 +532,7 @@
       "type": "string",
       "enum": [
         "tap-postgres",
+        "tap-yugabyte",
         "tap-mongodb",
         "tap-mysql",
         "tap-oracle",

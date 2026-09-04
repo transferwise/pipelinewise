@@ -24,6 +24,7 @@ tap-mixpanel\
 tap-mongodb\
 tap-mysql\
 tap-postgres\
+tap-yugabyte\
 tap-s3-csv\
 tap-salesforce\
 tap-slack\

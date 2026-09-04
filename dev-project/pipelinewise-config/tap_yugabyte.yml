@@ -1,0 +1,95 @@
+---
+
+# ------------------------------------------------------------------------------
+# General Properties
+# ------------------------------------------------------------------------------
+id: "tap_yugabyte"                     # Unique identifier of the tap
+name: "Sample YugabyteDB Database"     # Name of the tap
+type: "tap-yugabyte"                   # !! THIS SHOULD NOT CHANGE !!
+owner: "somebody@foo.com"              # Data owner to contact
+
+
+# ------------------------------------------------------------------------------
+# Source (Tap) - YugabyteDB YSQL connection details
+# ------------------------------------------------------------------------------
+db_conn:
+  host: "pipelinewise-yugabyte-source"
+  port: 5433                           # YSQL port, not the Postgres default 5432
+  user: "pipelinewise"                 # YSQL user
+  password: "secret"                   # Plain string or vault encrypted
+  dbname: "yugabyte_source_db"         # YSQL database name
+  #filter_schemas: "schema1,schema2"   # Optional: Scan only the required schemas
+                                       #    to improve the performance of
+                                       #    data extraction
+
+
+# ------------------------------------------------------------------------------
+# Destination (Target) - Target properties
+# Connection details should be in the relevant target YAML file
+# ------------------------------------------------------------------------------
+target: "target_postgres"              # ID of the target connector where the data will be loaded
+batch_size_rows: 20000                 # Batch size for the stream to optimise load performance
+stream_buffer_size: 0                  # In-memory buffer size (MB) between taps and targets for asynchronous data pipes
+flush_all_streams: false               # Target to flush all streams if any stream reaches batch_size_rows. Default false
+primary_key_required: false            # Only enforced for INCREMENTAL/LOG_BASED; kept false so no_pk_table stays selectable
+
+
+# ------------------------------------------------------------------------------
+# Source to target Schema mapping for FULL_TABLE and INCREMENTAL replication
+#
+# See tap_yugabyte_logical.yml for LOG_BASED (CDC) replication.
+# ------------------------------------------------------------------------------
+schemas:
+
+  ### SOURCE SCHEMA 1: public
+  - source_schema: "public"               # Source schema in YugabyteDB with tables
+    target_schema: "ppw_dev_tap_yugabyte" # Target schema in the destination Data Warehouse
+    # target_schema_select_permissions:   # Optional: Grant SELECT on schema and tables that created
+    #  - grp_read_only
+
+    tables:
+
+      ### Table with INCREMENTAL replication
+      - table_name: "city"
+        replication_method: "INCREMENTAL"
+        replication_key: "id"
+
+      ### Table with FULL_TABLE replication
+      - table_name: "country"
+        replication_method: "FULL_TABLE"
+
+      ### Table with no primary key
+      - table_name: "no_pk_table"
+        replication_method: "FULL_TABLE"
+
+      ### Table with reserved words and columns and special characters
+      - table_name: "edgydata"
+        replication_method: "INCREMENTAL"
+        replication_key: "cid"
+
+      ### Table with reserved word
+      - table_name: "order"
+        replication_method: "INCREMENTAL"
+        replication_key: "id"
+
+      ### Table with space and mixed upper and lowercase characters
+      - table_name: "table_with_space and UPPERCase"
+        replication_method: "FULL_TABLE"
+
+      ### Table with reserved words as column names
+      - table_name: "table_with_reserved_words"
+        replication_method: "FULL_TABLE"
+
+  ### SOURCE SCHEMA 2: public2
+  - source_schema: "public2"
+    target_schema: "ppw_dev_tap_yugabyte_public2"
+
+    tables:
+      ### Table with FULL_TABLE replication
+      - table_name: "wearehere"
+        replication_method: "FULL_TABLE"
+
+      ### Table with reserved words and columns and special characters
+      - table_name: "public2_edgydata"
+        replication_method: "INCREMENTAL"
+        replication_key: "cid"
