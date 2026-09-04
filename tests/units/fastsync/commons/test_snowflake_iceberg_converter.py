@@ -438,7 +438,8 @@ def test_native_mode_keeps_companion(tmp_path):
     assert not _manifest_files(tmp_path)
     create_sql = next(sql for sql, _, _ in snowflake.queries if sql.startswith('CREATE'))
     assert "CATALOG = 'SNOWFLAKE' ICEBERG_VERSION = 3" in create_sql
-    assert "TARGET_FILE_SIZE = '16MB'" in create_sql
+    assert "TARGET_FILE_SIZE = 'AUTO'" in create_sql
+    assert "STORAGE_SERIALIZATION_POLICY = 'COMPATIBLE'" in create_sql
     assert 'OR REPLACE' not in create_sql
     assert create_sql.startswith(
         'CREATE ICEBERG TABLE "DATABASE"."SCHEMA"."TABLE_ICEBERG"'

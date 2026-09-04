@@ -62,8 +62,10 @@ Snowflake prerequisites
 PipelineWise creates explicit v3 tables with ``CATALOG = 'SNOWFLAKE'`` and no
 ``EXTERNAL_VOLUME`` clause. Snowflake therefore uses the effective schema,
 database, or account default, or Snowflake-managed storage when no other default
-is set. New tables use one day of data retention, a 16 MB target file size, and
-automatic data compaction; these values are not configurable per tap.
+is set. New tables use one day of data retention, Snowflake's automatic target
+file sizing, compatible storage serialization, and automatic data compaction;
+these values are not configurable per tap. Compatible serialization prioritizes
+Parquet encoding and compression that interoperates with third-party engines.
 
 PipelineWise sets the required table parameter on every managed v3 table it
 creates or replaces. Snowflake ``UPDATE``, ``DELETE``, and ``MERGE`` therefore

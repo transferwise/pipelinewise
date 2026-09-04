@@ -48,6 +48,11 @@ def test_v3_registry_entry_is_a_complete_contract():
         'timestamp_ntz',
         'variant',
     }
+    assert contract.table_option_semantics['TARGET_FILE_SIZE'] == 'AUTO'
+    assert (
+        contract.table_option_semantics['STORAGE_SERIALIZATION_POLICY']
+        == 'COMPATIBLE'
+    )
     assert contract.table_option_semantics['ICEBERG_MERGE_ON_READ_BEHAVIOR'] == 'DISABLED'
     assert contract.copy_on_write_level == 'TABLE'
     assert callable(contract.canonical_type)
@@ -355,7 +360,8 @@ def test_v3_contract_drives_type_mapping_and_table_options():
         '("ID" number(38,0), PRIMARY KEY("ID")) '
         "CATALOG='SNOWFLAKE' ICEBERG_VERSION=3 "
         'DATA_RETENTION_TIME_IN_DAYS=1 '
-        "TARGET_FILE_SIZE='16MB' ENABLE_DATA_COMPACTION=TRUE "
+        "TARGET_FILE_SIZE='AUTO' STORAGE_SERIALIZATION_POLICY='COMPATIBLE' "
+        'ENABLE_DATA_COMPACTION=TRUE '
         "ICEBERG_MERGE_ON_READ_BEHAVIOR='DISABLED'"
     )
 

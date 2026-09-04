@@ -289,6 +289,20 @@ class TestManagedIcebergV3Integration(unittest.TestCase):
         self.assertEqual(len(merge_on_read_rows), 1)
         self.assertEqual(str(merge_on_read_rows[0]['value']).upper(), 'DISABLED')
         self.assertEqual(str(merge_on_read_rows[0]['level']).upper(), 'TABLE')
+        target_file_size_rows = self.snowflake.query(
+            "SHOW PARAMETERS LIKE 'TARGET_FILE_SIZE' "
+            f'IN TABLE {table_fqtn}'
+        )
+        self.assertEqual(len(target_file_size_rows), 1)
+        self.assertEqual(str(target_file_size_rows[0]['value']).upper(), 'AUTO')
+        self.assertEqual(str(target_file_size_rows[0]['level']).upper(), 'TABLE')
+        serialization_rows = self.snowflake.query(
+            "SHOW PARAMETERS LIKE 'STORAGE_SERIALIZATION_POLICY' "
+            f'IN TABLE {table_fqtn}'
+        )
+        self.assertEqual(len(serialization_rows), 1)
+        self.assertEqual(str(serialization_rows[0]['value']).upper(), 'COMPATIBLE')
+        self.assertEqual(str(serialization_rows[0]['level']).upper(), 'TABLE')
         column_types = self.snowflake.query(
             'SELECT "COLUMN_NAME", "DATA_TYPE" '
             f'FROM {self._quote_identifier(self.database)}."INFORMATION_SCHEMA"."COLUMNS" '

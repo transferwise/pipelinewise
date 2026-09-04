@@ -425,7 +425,8 @@ MANAGED_ICEBERG_V3_SPEC = ManagedIcebergVersionSpec(
     logical_to_physical_types=_V3_LOGICAL_TO_PHYSICAL_TYPES,
     table_options={
         'DATA_RETENTION_TIME_IN_DAYS': 1,
-        'TARGET_FILE_SIZE': '16MB',
+        'TARGET_FILE_SIZE': 'AUTO',
+        'STORAGE_SERIALIZATION_POLICY': 'COMPATIBLE',
         'ENABLE_DATA_COMPACTION': True,
         ICEBERG_MERGE_ON_READ_BEHAVIOR: 'DISABLED',
     },
