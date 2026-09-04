@@ -10,7 +10,7 @@ DEFAULT_CHUNK_SIZE_MB = 1000
 DEFAULT_MAX_CHUNKS = 20
 
 # Detecting compressed file size at write time is not possible by GzipFile.
-# The data hase to be written into the file first before the actual compression performed.
+# The data has to be written into the file first before the actual compression performed.
 # We need to use a good estimate for a text gzip file to split the file at write time.
 EST_COMPR_RATE = 0.12
 
@@ -34,7 +34,7 @@ def open(
         max_chunks: Max number of chunks. If set to 0 then splitting is disabled and one single
                     file will be created (Default: 20)
         est_compr_rate: Detecting compressed file size at write time is not possible by GzipFile.
-                        The data hase to be written into the file first before the actual compression performed.
+                        The data has to be written into the file first before the actual compression performed.
                         We need to use a good estimate for a text gzip file to split the file at write time.
                         (Default 0.12)
 
