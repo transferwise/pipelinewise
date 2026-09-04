@@ -50,6 +50,8 @@ jobs:
             test_target: unit_test_cov
           - connector: tap-postgres
             test_target: unit_test_cov
+          - connector: tap-yugabyte
+            test_target: unit_test_cov
           - connector: target-snowflake
             test_target: unit_test
 

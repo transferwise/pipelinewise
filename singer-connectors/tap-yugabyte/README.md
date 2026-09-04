@@ -171,8 +171,13 @@ to the tap for the next sync.
 
 You can make use of the local docker-compose to spin up a test database by running `make start_db`. The
 `yugabytedb/yugabyte` image entrypoint is `yugabyted`, not the PostgreSQL entrypoint, so only the bootstrap
-`yugabyte` superuser and database exist on a fresh container - see `tests/integration/env` for the default test
-credentials that match that stack.
+`yugabyte` superuser and database exist on a fresh container.
+
+`make integration_test` sources `tests/integration/env`, which is git-ignored so that local credentials cannot
+be committed. Seed it from the checked-in defaults that match the compose stack:
+```
+  cp tests/integration/env.template tests/integration/env
+```
 
 Test objects will be created in the `yugabyte` database.
 

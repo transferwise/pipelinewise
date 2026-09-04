@@ -19,7 +19,7 @@ unit_test:
 
 unit_test_cov: unit_test
 	. ./venv/bin/activate ;\
-	coverage report --data-file=.coverage.unit --fail-under=0
+	coverage report --data-file=.coverage.unit --fail-under=65
 
 integration_test:
 	. ./venv/bin/activate ;\
