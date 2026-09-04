@@ -542,6 +542,12 @@ PipelineWise transformations</p></li>
 </ul>
 <p>Durations compose the units <code class="docutils literal notranslate"><span class="pre">s</span></code>, <code class="docutils literal notranslate"><span class="pre">min</span></code>, <code class="docutils literal notranslate"><span class="pre">h</span></code>, <code class="docutils literal notranslate"><span class="pre">d</span></code>, <code class="docutils literal notranslate"><span class="pre">w</span></code>: <code class="docutils literal notranslate"><span class="pre">&quot;-15h&quot;</span></code> is 15
 hours before fire time, and <code class="docutils literal notranslate"><span class="pre">&quot;1d6h&quot;</span></code> is valid too.</p>
+<p>For <code class="docutils literal notranslate"><span class="pre">tap-mysql</span></code> sources, data-diff uses <code class="docutils literal notranslate"><span class="pre">db_conn.engine</span></code> when it is set. If
+it is omitted, data-diff infers MariaDB or MySQL from the connected server’s
+handshake. This fallback applies only to data-diff; Singer <code class="docutils literal notranslate"><span class="pre">tap-mysql</span></code> and
+FastSync continue to default an omitted engine to <code class="docutils literal notranslate"><span class="pre">mysql</span></code>. Set
+<code class="docutils literal notranslate"><span class="pre">engine:</span> <span class="pre">mariadb</span></code> explicitly for MariaDB, especially with GTID, managed
+Iceberg v3 JSON aliases, or proxies that hide the server identity.</p>
 </section>
 <section id="choosing-a-frequency-and-window">
 <h3>Choosing a frequency and window<a class="headerlink" href="#choosing-a-frequency-and-window" title="Link to this heading"></a></h3>
