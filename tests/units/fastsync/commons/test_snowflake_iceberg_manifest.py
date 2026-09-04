@@ -447,10 +447,15 @@ def test_conversion_payload_and_rollback_transition_are_explicit(spec):
 
 def test_version_strategy_is_immutable_and_complete():
     """A future strategy cannot omit CoW or silently mutate v3 semantics."""
+    assert MANAGED_ICEBERG_V3_SPEC.table_options['TARGET_FILE_SIZE'] == 'AUTO'
+    assert (
+        MANAGED_ICEBERG_V3_SPEC.table_options['STORAGE_SERIALIZATION_POLICY']
+        == 'COMPATIBLE'
+    )
     with pytest.raises(TypeError):
         MANAGED_ICEBERG_V3_SPEC.table_options['TARGET_FILE_SIZE'] = '64MB'
     with pytest.raises(ValueError, match='incomplete'):
         replace(
             MANAGED_ICEBERG_V3_SPEC,
-            table_options={'TARGET_FILE_SIZE': '16MB'},
+            table_options={'TARGET_FILE_SIZE': 'AUTO'},
         )

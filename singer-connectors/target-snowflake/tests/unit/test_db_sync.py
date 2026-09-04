@@ -1724,12 +1724,14 @@ class TestDBSync(unittest.TestCase):
             'CREATE ICEBERG TABLE IF NOT EXISTS dummy-schema."TABLE1" '
             '("ID" number(38,0), "NAME" varchar(134217728), "PAYLOAD" variant, PRIMARY KEY("ID")) '
             "CATALOG='SNOWFLAKE' ICEBERG_VERSION=3 DATA_RETENTION_TIME_IN_DAYS=1 "
-            "TARGET_FILE_SIZE='16MB' ENABLE_DATA_COMPACTION=TRUE "
+            "TARGET_FILE_SIZE='AUTO' STORAGE_SERIALIZATION_POLICY='COMPATIBLE' "
+            'ENABLE_DATA_COMPACTION=TRUE '
             "ICEBERG_MERGE_ON_READ_BEHAVIOR='DISABLED'",
         )
         self.assertIn('CREATE ICEBERG TABLE IF NOT EXISTS', ddl)
         self.assertIn('DATA_RETENTION_TIME_IN_DAYS', ddl)
         self.assertIn('TARGET_FILE_SIZE', ddl)
+        self.assertIn("STORAGE_SERIALIZATION_POLICY='COMPATIBLE'", ddl)
         self.assertIn('ENABLE_DATA_COMPACTION', ddl)
         self.assertIn("ICEBERG_MERGE_ON_READ_BEHAVIOR='DISABLED'", ddl)
         self.assertEqual(

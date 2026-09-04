@@ -80,6 +80,9 @@ Read root `AGENTS.md` first; also use scoped connector, test, E2E, and docs guid
   `ICEBERG_MERGE_ON_READ_BEHAVIOR = 'DISABLED'` in creation, replacement, and
   converter DDL and before writes. Never use deprecated
   `ENABLE_ICEBERG_MERGE_ON_READ`.
+- Create every managed v3 table with `TARGET_FILE_SIZE = 'AUTO'` and
+  `STORAGE_SERIALIZATION_POLICY = 'COMPATIBLE'`; keep FastSync, conversion,
+  target-snowflake, and the dependency-free contract fixture aligned.
 - Map FastSync string-like/fallback MySQL, MariaDB, and PostgreSQL types to
   `VARCHAR(134217728)`. Auto-widen compatible narrow native PartialSync targets
   before DML. target-snowflake uses that width for new native/v3 Singer strings,

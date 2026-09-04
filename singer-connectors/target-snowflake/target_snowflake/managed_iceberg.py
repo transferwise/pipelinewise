@@ -565,7 +565,8 @@ _MANAGED_ICEBERG_V3_CONTRACT = ManagedIcebergContract(
     },
     table_option_semantics={
         'DATA_RETENTION_TIME_IN_DAYS': 1,
-        'TARGET_FILE_SIZE': '16MB',
+        'TARGET_FILE_SIZE': 'AUTO',
+        'STORAGE_SERIALIZATION_POLICY': 'COMPATIBLE',
         'ENABLE_DATA_COMPACTION': True,
         ICEBERG_MERGE_ON_READ_PARAMETER: ICEBERG_COPY_ON_WRITE_VALUE,
     },

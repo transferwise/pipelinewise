@@ -1,3 +1,11 @@
+0.83.0 (2026-09-04)
+-------------------
+
+**Snowflake Iceberg**
+
+- Create managed Iceberg v3 tables with automatic target file sizing and
+  compatible storage serialization for third-party engine interoperability
+
 0.82.0 (2026-09-03)
 -------------------
 

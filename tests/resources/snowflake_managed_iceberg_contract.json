@@ -20,7 +20,8 @@
         },
         "table_options": {
           "DATA_RETENTION_TIME_IN_DAYS": 1,
-          "TARGET_FILE_SIZE": "16MB",
+          "TARGET_FILE_SIZE": "AUTO",
+          "STORAGE_SERIALIZATION_POLICY": "COMPATIBLE",
           "ENABLE_DATA_COMPACTION": true,
           "ICEBERG_MERGE_ON_READ_BEHAVIOR": "DISABLED"
         },
