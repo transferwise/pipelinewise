@@ -1681,6 +1681,8 @@ class PipelineWise:
         # JSON files in a common directory structure
         config = Config.from_yamls(self.config_dir, self.args.dir, self.args.secret)
         selected_taps_id = self.args.taps.split(',')
+        if '*' in selected_taps_id:
+            selected_taps_id = ['*']
         data_diff_definitions = config.get_data_diff_definitions(selected_taps_id)
         config.save(selected_taps_id)
 
@@ -1699,6 +1701,7 @@ class PipelineWise:
         total_taps = 0
         discover_excs = []
         found_selected_taps = set()
+        failed_tap_ids = set()
 
         # Import every tap from every target
         start_time = datetime.now()
@@ -1716,43 +1719,52 @@ class PipelineWise:
                         found_selected_taps.add(tap['id'])
 
             with parallel_backend('threading', n_jobs=-1):
-                # Discover taps in parallel and return the list of exception of the failed ones
-                discover_excs.extend(
-                    list(
-                        filter(
-                            None,
-                            Parallel(verbose=100)(
-                                delayed(self._discover_tap)(tap=tap, target=target)
-                                for tap in selected_taps
-                            ),
-                        )
-                    )
+                discovery_results = Parallel(verbose=100)(
+                    delayed(self._discover_tap)(tap=tap, target=target)
+                    for tap in selected_taps
                 )
+
+            for tap, error in zip(selected_taps, discovery_results, strict=True):
+                if error:
+                    self.logger.error('Tap discovery failed: %s', error)
+                    discover_excs.append(error)
+                    failed_tap_ids.add(tap['id'])
 
         if selected_taps_id != ['*']:
             total_taps = len(selected_taps_id)
             not_found_taps = set(selected_taps_id) - found_selected_taps
             for tap in not_found_taps:
-                discover_excs.append(f'tap "{tap}" not found!')
+                error = f'tap "{tap}" not found!'
+                self.logger.error('Tap not found in project YAML: %s', tap)
+                discover_excs.append(error)
 
         # reloading the new config
         self.load_config()
         deleted_taps_count = self.cleanup_after_deleted_config(old_config)
 
-        end_time = datetime.now()
-
-        if not discover_excs and config.global_config.get('backend_db'):
-            with DataDiffRepository.from_backend_config(
-                config.global_config['backend_db']
-            ) as repository:
-                sync_stats = repository.sync_definitions(
-                    data_diff_definitions,
-                    selected_taps=selected_taps_id,
+        data_diff_sync_failed = False
+        if config.global_config.get('backend_db'):
+            try:
+                with DataDiffRepository.from_backend_config(
+                    config.global_config['backend_db']
+                ) as repository:
+                    sync_stats = repository.sync_definitions(
+                        data_diff_definitions,
+                        selected_taps=selected_taps_id,
+                        excluded_taps=failed_tap_ids,
+                    )
+            except Exception as exc:  # pylint: disable=broad-except
+                data_diff_sync_failed = True
+                self.logger.exception(
+                    'Failed to reconcile data-diff definitions: %s', exc
                 )
-            self.logger.info(
-                'Persisted data-diff definitions: %s',
-                sync_stats,
-            )
+            else:
+                self.logger.info(
+                    'Persisted data-diff definitions: %s',
+                    sync_stats,
+                )
+
+        end_time = datetime.now()
 
         # Log summary
         # pylint: disable=logging-too-many-args
@@ -1776,7 +1788,7 @@ class PipelineWise:
             str(discover_excs),
             end_time - start_time,
         )
-        if len(discover_excs) > 0:
+        if discover_excs or data_diff_sync_failed:
             sys.exit(1)
 
     def _data_diff_repository(self):
@@ -1903,7 +1915,7 @@ class PipelineWise:
             [
                 str(check['check_id']),
                 check['revision'],
-                'yes' if check['current'] else 'no',
+                'yes' if check['is_current'] else 'no',
                 check['target_id'],
                 check['tap_id'],
                 f"{check['source_schema']}.{check['source_table']}",

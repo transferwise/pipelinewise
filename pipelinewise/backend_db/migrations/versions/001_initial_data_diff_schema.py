@@ -18,7 +18,7 @@ SCHEMA = "public"
 def upgrade():
 
     op.execute(f"""
-        CREATE TABLE IF NOT EXISTS {SCHEMA}.dd_checks (
+        CREATE TABLE IF NOT EXISTS {SCHEMA}.dd_check_definitions (
             check_id UUID PRIMARY KEY,
             full_check_name TEXT NOT NULL,
             revision INTEGER NOT NULL,
@@ -43,7 +43,7 @@ def upgrade():
             window_start_seconds BIGINT NOT NULL CHECK (window_start_seconds > 0),
             window_end_seconds BIGINT NOT NULL CHECK (window_end_seconds >= 0),
             statement_timeout_seconds BIGINT NOT NULL CHECK (statement_timeout_seconds > 0),
-            current BOOLEAN NOT NULL,
+            is_current BOOLEAN NOT NULL,
             created_at TIMESTAMPTZ NOT NULL,
             superseded_at TIMESTAMPTZ,
             UNIQUE (full_check_name, revision)
@@ -51,21 +51,21 @@ def upgrade():
     """)
 
     op.execute(f"""
-        CREATE UNIQUE INDEX IF NOT EXISTS dd_one_current_version
-            ON {SCHEMA}.dd_checks(full_check_name)
-            WHERE current
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_dd_check_definitions_is_current_name
+            ON {SCHEMA}.dd_check_definitions(full_check_name)
+            WHERE is_current
     """)
 
     op.execute(f"""
-        CREATE INDEX IF NOT EXISTS dd_current_scope
-            ON {SCHEMA}.dd_checks(current, target_id, tap_id)
+        CREATE INDEX IF NOT EXISTS ix_dd_check_definitions_is_current_scope
+            ON {SCHEMA}.dd_check_definitions(is_current, target_id, tap_id)
     """)
 
     op.execute(f"""
-        CREATE TABLE IF NOT EXISTS {SCHEMA}.dd_preflights (
+        CREATE TABLE IF NOT EXISTS {SCHEMA}.dd_preflight_log (
             preflight_id UUID PRIMARY KEY,
             check_id UUID NOT NULL
-                REFERENCES {SCHEMA}.dd_checks(check_id) ON DELETE RESTRICT,
+                REFERENCES {SCHEMA}.dd_check_definitions(check_id) ON DELETE RESTRICT,
             status TEXT NOT NULL CHECK (status IN ('PASS', 'BLOCKED', 'ERROR')),
             checked_at TIMESTAMPTZ NOT NULL,
             query_fingerprint CHAR(64) NOT NULL,
@@ -81,37 +81,37 @@ def upgrade():
     """)
 
     op.execute(f"""
-        CREATE TABLE IF NOT EXISTS {SCHEMA}.dd_runs (
+        CREATE TABLE IF NOT EXISTS {SCHEMA}.dd_run_attempts (
             run_id UUID PRIMARY KEY,
-            dd_check_id UUID NOT NULL
-                REFERENCES {SCHEMA}.dd_checks(check_id) ON DELETE RESTRICT,
+            check_id UUID NOT NULL
+                REFERENCES {SCHEMA}.dd_check_definitions(check_id) ON DELETE RESTRICT,
             scheduled_for TIMESTAMPTZ NOT NULL,
             window_start TIMESTAMPTZ NOT NULL,
             window_end TIMESTAMPTZ NOT NULL,
             attempt INTEGER NOT NULL,
-            trigger TEXT NOT NULL
-                CONSTRAINT dd_runs_trigger_check
-                CHECK (trigger IN ('SCHEDULED', 'MANUAL', 'RETRY', 'REMEDIATION')),
+            trigger_type TEXT NOT NULL
+                CONSTRAINT ck_dd_run_attempts_trigger_type
+                CHECK (trigger_type IN ('SCHEDULED', 'MANUAL', 'RETRY', 'REMEDIATION')),
             status TEXT NOT NULL CHECK (status IN ('RUNNING', 'PASS', 'FAIL', 'ERROR')),
-            rerun_of_run_id UUID REFERENCES {SCHEMA}.dd_runs(run_id) ON DELETE RESTRICT,
+            rerun_of_run_id UUID REFERENCES {SCHEMA}.dd_run_attempts(run_id) ON DELETE RESTRICT,
             remediation_reference TEXT,
-            preflight_id UUID REFERENCES {SCHEMA}.dd_preflights(preflight_id) ON DELETE RESTRICT,
+            preflight_id UUID REFERENCES {SCHEMA}.dd_preflight_log(preflight_id) ON DELETE RESTRICT,
             started_at TIMESTAMPTZ NOT NULL,
             finished_at TIMESTAMPTZ,
             error TEXT,
             CHECK (window_start < window_end),
-            UNIQUE (dd_check_id, scheduled_for, attempt)
+            UNIQUE (check_id, scheduled_for, attempt)
         )
     """)
 
     op.execute(f"""
-        CREATE INDEX IF NOT EXISTS dd_runs_schedule
-            ON {SCHEMA}.dd_runs(dd_check_id, scheduled_for, status)
+        CREATE INDEX IF NOT EXISTS ix_dd_run_attempts_schedule
+            ON {SCHEMA}.dd_run_attempts(check_id, scheduled_for, status)
     """)
 
     op.execute(f"""
-        CREATE TABLE IF NOT EXISTS {SCHEMA}.dd_results (
-            run_id UUID NOT NULL REFERENCES {SCHEMA}.dd_runs(run_id) ON DELETE RESTRICT,
+        CREATE TABLE IF NOT EXISTS {SCHEMA}.dd_run_results (
+            run_id UUID NOT NULL REFERENCES {SCHEMA}.dd_run_attempts(run_id) ON DELETE RESTRICT,
             check_type TEXT NOT NULL,
             status TEXT NOT NULL CHECK (status IN ('PASS', 'FAIL', 'ERROR')),
             source_value JSONB,
@@ -124,12 +124,12 @@ def upgrade():
     """)
 
     op.execute(f"""
-        CREATE TABLE IF NOT EXISTS {SCHEMA}.dd_effective_attempts (
+        CREATE TABLE IF NOT EXISTS {SCHEMA}.dd_run_slot_state (
             check_id UUID NOT NULL
-                REFERENCES {SCHEMA}.dd_checks(check_id) ON DELETE RESTRICT,
+                REFERENCES {SCHEMA}.dd_check_definitions(check_id) ON DELETE RESTRICT,
             scheduled_for TIMESTAMPTZ NOT NULL,
             run_id UUID NOT NULL UNIQUE
-                REFERENCES {SCHEMA}.dd_runs(run_id) ON DELETE RESTRICT,
+                REFERENCES {SCHEMA}.dd_run_attempts(run_id) ON DELETE RESTRICT,
             attempt INTEGER NOT NULL CHECK (attempt > 0),
             window_start TIMESTAMPTZ NOT NULL,
             window_end TIMESTAMPTZ NOT NULL,
@@ -140,23 +140,23 @@ def upgrade():
     """)
 
     op.execute(f"""
-        CREATE INDEX IF NOT EXISTS dd_effective_coverage_order
-            ON {SCHEMA}.dd_effective_attempts(
+        CREATE INDEX IF NOT EXISTS ix_dd_run_slot_state_coverage_order
+            ON {SCHEMA}.dd_run_slot_state(
                 check_id, window_start, window_end, scheduled_for
             )
     """)
 
     op.execute(f"""
-        CREATE TABLE IF NOT EXISTS {SCHEMA}.dd_coverage_state (
+        CREATE TABLE IF NOT EXISTS {SCHEMA}.dd_watermark_state (
             check_id UUID PRIMARY KEY
-                REFERENCES {SCHEMA}.dd_checks(check_id) ON DELETE RESTRICT,
+                REFERENCES {SCHEMA}.dd_check_definitions(check_id) ON DELETE RESTRICT,
             coverage_start TIMESTAMPTZ NOT NULL,
             verified_through TIMESTAMPTZ NOT NULL,
             max_observed_end TIMESTAMPTZ NOT NULL,
             coverage_status TEXT NOT NULL CHECK (coverage_status IN ('CONTIGUOUS', 'BLOCKED')),
-            blocking_run_id UUID REFERENCES {SCHEMA}.dd_runs(run_id) ON DELETE RESTRICT,
+            blocking_run_id UUID REFERENCES {SCHEMA}.dd_run_attempts(run_id) ON DELETE RESTRICT,
             evaluated_run_id UUID NOT NULL
-                REFERENCES {SCHEMA}.dd_runs(run_id) ON DELETE RESTRICT,
+                REFERENCES {SCHEMA}.dd_run_attempts(run_id) ON DELETE RESTRICT,
             event_type TEXT NOT NULL
                 CHECK (event_type IN ('INITIALIZE', 'ADVANCE', 'INVALIDATE', 'BLOCK', 'CONFIRM')),
             state_version BIGINT NOT NULL CHECK (state_version > 0),
@@ -168,13 +168,13 @@ def upgrade():
     """)
 
     op.execute(f"""
-        CREATE TABLE IF NOT EXISTS {SCHEMA}.dd_coverage_events (
-            coverage_event_id UUID PRIMARY KEY,
+        CREATE TABLE IF NOT EXISTS {SCHEMA}.dd_watermark_events (
+            watermark_event_id UUID PRIMARY KEY,
             event_sequence BIGSERIAL NOT NULL UNIQUE,
             check_id UUID NOT NULL
-                REFERENCES {SCHEMA}.dd_checks(check_id) ON DELETE RESTRICT,
+                REFERENCES {SCHEMA}.dd_check_definitions(check_id) ON DELETE RESTRICT,
             evaluated_run_id UUID NOT NULL UNIQUE
-                REFERENCES {SCHEMA}.dd_runs(run_id) ON DELETE RESTRICT,
+                REFERENCES {SCHEMA}.dd_run_attempts(run_id) ON DELETE RESTRICT,
             event_type TEXT NOT NULL
                 CHECK (event_type IN ('INITIALIZE', 'ADVANCE', 'INVALIDATE', 'BLOCK', 'CONFIRM')),
             coverage_start TIMESTAMPTZ NOT NULL,
@@ -182,7 +182,7 @@ def upgrade():
             verified_through TIMESTAMPTZ NOT NULL,
             max_observed_end TIMESTAMPTZ NOT NULL,
             coverage_status TEXT NOT NULL CHECK (coverage_status IN ('CONTIGUOUS', 'BLOCKED')),
-            blocking_run_id UUID REFERENCES {SCHEMA}.dd_runs(run_id) ON DELETE RESTRICT,
+            blocking_run_id UUID REFERENCES {SCHEMA}.dd_run_attempts(run_id) ON DELETE RESTRICT,
             recorded_at TIMESTAMPTZ NOT NULL,
             reason TEXT NOT NULL,
             CHECK (coverage_start <= verified_through),
@@ -191,29 +191,38 @@ def upgrade():
     """)
 
     op.execute(f"""
-        CREATE INDEX IF NOT EXISTS dd_coverage_history
-            ON {SCHEMA}.dd_coverage_events(check_id, event_sequence DESC)
+        CREATE INDEX IF NOT EXISTS ix_dd_watermark_events_history
+            ON {SCHEMA}.dd_watermark_events(check_id, event_sequence DESC)
     """)
 
     # Table comments
-    op.execute(f"COMMENT ON TABLE {SCHEMA}.dd_checks IS 'Versioned check definitions imported from YAML config'")
     op.execute(
-        f"COMMENT ON TABLE {SCHEMA}.dd_preflights IS "
-        "'Source size and index validation recorded before each check execution'"
-    )
-    op.execute(f"COMMENT ON TABLE {SCHEMA}.dd_runs IS 'Shared execution log — one row per scheduled job attempt'")
-    op.execute(f"COMMENT ON TABLE {SCHEMA}.dd_results IS 'Per-check-type outcome detail for each data-diff run'")
-    op.execute(
-        f"COMMENT ON TABLE {SCHEMA}.dd_effective_attempts IS "
-        "'Latest terminal attempt for each data-diff scheduled slot'"
+        f"COMMENT ON TABLE {SCHEMA}.dd_check_definitions IS "
+        "'Versioned data-diff check definitions imported from YAML configuration'"
     )
     op.execute(
-        f"COMMENT ON TABLE {SCHEMA}.dd_coverage_state IS "
-        "'Materialized current verified-through watermark for each data-diff check'"
+        f"COMMENT ON TABLE {SCHEMA}.dd_preflight_log IS "
+        "'Append-only preflight evidence and early validation errors for run attempts'"
     )
     op.execute(
-        f"COMMENT ON TABLE {SCHEMA}.dd_coverage_events IS "
-        "'Append-only log tracking the data-diff verified-through watermark'"
+        f"COMMENT ON TABLE {SCHEMA}.dd_run_attempts IS "
+        "'Execution attempts updated from RUNNING to a terminal outcome'"
+    )
+    op.execute(
+        f"COMMENT ON TABLE {SCHEMA}.dd_run_results IS "
+        "'Append-only per-check-type outcomes for completed run attempts'"
+    )
+    op.execute(
+        f"COMMENT ON TABLE {SCHEMA}.dd_run_slot_state IS "
+        "'Mutable selected terminal attempt for each check and scheduled slot'"
+    )
+    op.execute(
+        f"COMMENT ON TABLE {SCHEMA}.dd_watermark_state IS "
+        "'Mutable current verified-through watermark for each check definition'"
+    )
+    op.execute(
+        f"COMMENT ON TABLE {SCHEMA}.dd_watermark_events IS "
+        "'Append-only history of verified-through watermark transitions'"
     )
     _grant_application_privileges()
 
@@ -233,13 +242,13 @@ def _grant_application_privileges():
 
     role = _quote_identifier(application_user)
     for table in (
-        "dd_checks", "dd_preflights", "dd_runs", "dd_results",
-        "dd_effective_attempts", "dd_coverage_state", "dd_coverage_events",
+        "dd_check_definitions", "dd_preflight_log", "dd_run_attempts", "dd_run_results",
+        "dd_run_slot_state", "dd_watermark_state", "dd_watermark_events",
     ):
         op.execute(
             f"GRANT SELECT, INSERT, UPDATE ON {SCHEMA}.{table} TO {role}"
         )
-    # dd_coverage_events.event_sequence is a BIGSERIAL: inserting needs the
+    # dd_watermark_events.event_sequence is a BIGSERIAL: inserting needs the
     # sequence, not just the table.
     op.execute(
         f"GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA {SCHEMA} TO {role}"
@@ -257,10 +266,10 @@ def _quote_identifier(name):
 
 
 def downgrade():
-    op.execute(f"DROP TABLE IF EXISTS {SCHEMA}.dd_coverage_events CASCADE")
-    op.execute(f"DROP TABLE IF EXISTS {SCHEMA}.dd_coverage_state CASCADE")
-    op.execute(f"DROP TABLE IF EXISTS {SCHEMA}.dd_effective_attempts CASCADE")
-    op.execute(f"DROP TABLE IF EXISTS {SCHEMA}.dd_results CASCADE")
-    op.execute(f"DROP TABLE IF EXISTS {SCHEMA}.dd_runs CASCADE")
-    op.execute(f"DROP TABLE IF EXISTS {SCHEMA}.dd_preflights CASCADE")
-    op.execute(f"DROP TABLE IF EXISTS {SCHEMA}.dd_checks CASCADE")
+    op.execute(f"DROP TABLE IF EXISTS {SCHEMA}.dd_watermark_events CASCADE")
+    op.execute(f"DROP TABLE IF EXISTS {SCHEMA}.dd_watermark_state CASCADE")
+    op.execute(f"DROP TABLE IF EXISTS {SCHEMA}.dd_run_slot_state CASCADE")
+    op.execute(f"DROP TABLE IF EXISTS {SCHEMA}.dd_run_results CASCADE")
+    op.execute(f"DROP TABLE IF EXISTS {SCHEMA}.dd_run_attempts CASCADE")
+    op.execute(f"DROP TABLE IF EXISTS {SCHEMA}.dd_preflight_log CASCADE")
+    op.execute(f"DROP TABLE IF EXISTS {SCHEMA}.dd_check_definitions CASCADE")

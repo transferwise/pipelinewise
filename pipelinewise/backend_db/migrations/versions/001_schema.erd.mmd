@@ -1,23 +1,23 @@
 %%{init: {"er": {"diagramPadding": 8, "entityPadding": 8}}}%%
 erDiagram
     direction LR
-    dd_checks ||--o{ dd_preflights : check_id
-    dd_checks ||--o{ dd_runs : dd_check_id
-    dd_preflights o|--o{ dd_runs : preflight_id
-    dd_runs o|--o{ dd_runs : rerun_of_run_id
-    dd_runs ||--o{ dd_results : run_id
-    dd_checks ||--o{ dd_effective_attempts : check_id
-    dd_runs ||--o| dd_effective_attempts : run_id
-    dd_checks ||--o{ dd_coverage_events : check_id
-    dd_runs ||--o| dd_coverage_events : evaluated_run_id
-    dd_runs o|--o{ dd_coverage_events : blocking_run_id
-    dd_checks ||--o| dd_coverage_state : check_id
-    dd_runs ||--o{ dd_coverage_state : evaluated_run_id
-    dd_runs o|--o{ dd_coverage_state : blocking_run_id
+    dd_check_definitions ||--o{ dd_preflight_log : check_id
+    dd_check_definitions ||--o{ dd_run_attempts : check_id
+    dd_preflight_log o|--o{ dd_run_attempts : preflight_id
+    dd_run_attempts o|--o{ dd_run_attempts : rerun_of_run_id
+    dd_run_attempts ||--o{ dd_run_results : run_id
+    dd_check_definitions ||--o{ dd_run_slot_state : check_id
+    dd_run_attempts ||--o| dd_run_slot_state : run_id
+    dd_check_definitions ||--o{ dd_watermark_events : check_id
+    dd_run_attempts ||--o| dd_watermark_events : evaluated_run_id
+    dd_run_attempts o|--o{ dd_watermark_events : blocking_run_id
+    dd_check_definitions ||--o| dd_watermark_state : check_id
+    dd_run_attempts ||--o{ dd_watermark_state : evaluated_run_id
+    dd_run_attempts o|--o{ dd_watermark_state : blocking_run_id
 
-    dd_checks["dd_checks<br/>Versioned check definitions<br/>imported from YAML config"] {
+    dd_check_definitions["dd_check_definitions<br/>Versioned data-diff check definitions<br/>imported from YAML configuration"] {
         UUID check_id PK
-        TEXT full_check_name "UQ with revision; UQ when current"
+        TEXT full_check_name "UQ with revision; UQ when is_current"
         INTEGER revision "UQ with full_check_name"
         CHAR(64) config_hash
         JSONB canonical_config
@@ -40,12 +40,12 @@ erDiagram
         BIGINT window_start_seconds "greater than 0"
         BIGINT window_end_seconds "at least 0"
         BIGINT statement_timeout_seconds "greater than 0"
-        BOOLEAN current
+        BOOLEAN is_current
         TIMESTAMPTZ created_at
         TIMESTAMPTZ superseded_at "nullable"
     }
 
-    dd_preflights["dd_preflights<br/>Source size and index validation<br/>recorded before each check execution"] {
+    dd_preflight_log["dd_preflight_log<br/>Append-only preflight evidence and<br/>early validation errors for run attempts"] {
         UUID preflight_id PK
         UUID check_id FK
         TEXT status "PASS, BLOCKED, or ERROR"
@@ -59,14 +59,14 @@ erDiagram
         BOOLEAN has_leading_index "nullable"
     }
 
-    dd_runs["dd_runs<br/>Shared execution log<br/>one row per scheduled job attempt"] {
+    dd_run_attempts["dd_run_attempts<br/>Execution attempts updated from RUNNING<br/>to a terminal outcome"] {
         UUID run_id PK
-        UUID dd_check_id FK
-        TIMESTAMPTZ scheduled_for "UQ with dd_check_id and attempt"
+        UUID check_id FK
+        TIMESTAMPTZ scheduled_for "UQ with check_id and attempt"
         TIMESTAMPTZ window_start "before window_end"
         TIMESTAMPTZ window_end
-        INTEGER attempt "UQ with dd_check_id and scheduled_for"
-        TEXT trigger "SCHEDULED, MANUAL, RETRY, or REMEDIATION"
+        INTEGER attempt "UQ with check_id and scheduled_for"
+        TEXT trigger_type "SCHEDULED, MANUAL, RETRY, or REMEDIATION"
         TEXT status "RUNNING, PASS, FAIL, or ERROR"
         UUID rerun_of_run_id FK "nullable self-reference"
         TEXT remediation_reference "nullable"
@@ -76,7 +76,7 @@ erDiagram
         TEXT error "nullable"
     }
 
-    dd_results["dd_results<br/>Per-check-type outcome detail<br/>for each data-diff run"] {
+    dd_run_results["dd_run_results<br/>Append-only per-check-type outcomes<br/>for completed run attempts"] {
         UUID run_id PK, FK
         TEXT check_type PK
         TEXT status "PASS, FAIL, or ERROR"
@@ -87,7 +87,7 @@ erDiagram
         TEXT error "nullable"
     }
 
-    dd_effective_attempts["dd_effective_attempts<br/>Latest terminal attempt for each<br/>data-diff scheduled slot"] {
+    dd_run_slot_state["dd_run_slot_state<br/>Mutable selected terminal attempt for<br/>each check and scheduled slot"] {
         UUID check_id PK, FK
         TIMESTAMPTZ scheduled_for PK
         UUID run_id FK, UK
@@ -97,7 +97,7 @@ erDiagram
         TEXT status "PASS, FAIL, or ERROR"
     }
 
-    dd_coverage_state["dd_coverage_state<br/>Materialized current verified-through<br/>watermark for each data-diff check"] {
+    dd_watermark_state["dd_watermark_state<br/>Mutable current verified-through watermark<br/>for each check definition"] {
         UUID check_id PK, FK
         TIMESTAMPTZ coverage_start "at most verified_through"
         TIMESTAMPTZ verified_through "at most max_observed_end"
@@ -111,8 +111,8 @@ erDiagram
         TEXT reason
     }
 
-    dd_coverage_events["dd_coverage_events<br/>Append-only log tracking the data-diff<br/>verified-through watermark"] {
-        UUID coverage_event_id PK
+    dd_watermark_events["dd_watermark_events<br/>Append-only history of verified-through<br/>watermark transitions"] {
+        UUID watermark_event_id PK
         BIGSERIAL event_sequence UK
         UUID check_id FK
         UUID evaluated_run_id FK, UK

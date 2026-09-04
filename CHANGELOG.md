@@ -1,11 +1,17 @@
-0.83.0 (2026-09-01)
+0.83.0 (2026-09-04)
 -------------------
 
 **tap-yugabyte**
 
+- Add FULL_TABLE replication, resuming an interrupted sync with parameterized
+  primary-key keyset pagination instead of Postgres heap-specific `xmin`,
+  since YugabyteDB's DocDB storage has no equivalent
+- Fall back to a plain, non-resumable full scan for tables without a primary
+  key
+- Add INCREMENTAL replication, resuming from a persisted replication-key
+  bookmark;
 - Add LOG_BASED (CDC) replication using YugabyteDB's native `HYBRID_TIME`
-  logical-replication slots and the pre-packaged `wal2json` output plugin,
-  replacing the previous hard `NotImplementedError`
+  logical-replication slots and the pre-packaged `wal2json` output plugin
 - Capture replication-slot boundaries as HybridTime values via
   `yb_get_current_hybrid_time_lsn()`/`pg_replication_slots.yb_restart_commit_ht`,
   since YugabyteDB disables `pg_current_wal_lsn` and its LSNs are not
@@ -13,54 +19,92 @@
 - Resume an interrupted LOG_BASED bootstrap with a `bootstrap_in_progress`
   bookmark instead of Postgres's transaction-ID-based `xmin`, which has no
   YugabyteDB equivalent
-- Bootstrap a LOG_BASED stream's initial scan on a `yb_read_time`-pinned
+- Bootstrap a LOG_BASED stream's initial scan on a `yb_read_time` - pinned
   snapshot bound to its replication slot's own restart boundary, so the
   snapshot and the streaming start position are provably consistent
 - Emit periodic WAL-progress heartbeat messages via
   `pg_logical_emit_message` to advance an otherwise-idle slot's restart
   position
 - Add FastSync FullSync support (`yugabyte-to-postgres`,
-  `yugabyte-to-snowflake`) for bulk full-table copies, replacing the
-  row-by-row Singer path for FULL_TABLE syncs
+  `yugabyte-to-snowflake`) for bulk full-table copies
 - Create and drop replication slots from FastSync, retrying a "slot is
   active" error on drop for up to 5 minutes to tolerate YugabyteDB's
   post-disconnect active-slot window
 - Drop a tap's replication slot when its configuration is removed, matching
   existing tap-postgres cleanup behavior
 
-0.82.0 (2026-09-01)
+0.82.0 (2026-09-03)
 -------------------
 
-**tap-yugabyte**
+**Data-diff backend schema**
 
-- Add FULL_TABLE replication, resuming an interrupted sync with parameterized
-  primary-key keyset pagination instead of Postgres heap-specific `xmin`,
-  since YugabyteDB's DocDB storage has no verified equivalent
-- Fall back to a plain, non-resumable full scan for tables without a primary
-  key
-- Add INCREMENTAL replication, resuming from a persisted replication-key
-  bookmark; hard-fail with `NotImplementedError` only for LOG_BASED, since
-  YugabyteDB's CDC is gRPC-based and does not map onto Postgres logical
-  decoding
-- Clamp out-of-range `date` columns to `9999-12-31` before selection, matching
-  the existing `timestamp` clamp, since YSQL dates exceed Python's year-9999
-  ceiling
-- Parse `time with time zone` values carrying microseconds (e.g.
-  `current_timestamp`-derived defaults), which previously raised a
-  `strptime` format error
-- Pass through `json`/`jsonb` column values that psycopg2 already
-  deserialized into `list`/`dict`, instead of always re-parsing as a string
+- Rename the data-diff backend tables, keys, constraints, and indexes to
+  consistently distinguish definitions, attempt/result history, slot state,
+  and watermark state/events; existing backend databases require a coordinated
+  manual schema update before running this release
+- Use `check_id` consistently as the primary and foreign key for check
+  definitions and run attempts
+- Use `is_current` and `trigger_type` instead of cross-database reserved words
+  in the backend schema
+- Reject the unused table-level `data_diff.name` setting instead of silently
+  accepting and ignoring it
 
-Documentation only
-------------------
+**Documentation**
+
+- Update the data-diff ERD, backend reporting queries, and relationship guide
+  for the final migration 001 schema
+
+0.81.2 (2026-09-02)
+-------------------
+
+**Import and data-diff**
+
+- Reconcile data-diff definitions for taps whose discovery succeeds even when
+  other selected taps fail discovery
+- Preserve existing data-diff definitions for taps that fail discovery
+- Deactivate definitions for explicitly selected taps no longer present in
+  project YAML
+- Keep the import summary and non-zero exit when backend definition
+  reconciliation fails
+- Fail the import before data-diff reconciliation when parallel discovery
+  returns incomplete results
+- Treat `*` combined with named tap filters as a full import across generated
+  configuration, discovery, and data-diff reconciliation
+
+**Tests**
+
+- Cover successful and failed tap discovery in the same import
+- Cover explicitly selected taps missing from project YAML
+- Cover removal of a successful tap's data-diff definition when another tap
+  fails discovery
+- Cover wildcard and named tap filters used together
+- Cover backend reconciliation failures
+- Cover incomplete parallel discovery results
+- Verify failed-tap exclusion and deleted-tap deactivation against PostgreSQL
+
+**Documentation**
+
+- Document partial reconciliation, missing-tap cleanup, and backend failures
+
+**Contributor guidance**
+
+- Require verifying the complete branch diff against the CHANGELOG before
+  creating or updating a pull request
+
+0.81.1 (2026-09-02)
+-------------------
 
 **Data-diff**
 
+- Read current coverage directly from `dd_coverage_state` so data-diff commands
+  no longer require the `dd_current_coverage` view
+- Stop creating the unused `dd_current_coverage` and
+  `dd_remediation_history` views in new backend databases
+
+**Documentation**
+
 - Add a dedicated backend database page with configuration, an embedded Mermaid
   ERD, and direct coverage and remediation reporting queries
-
-Tests only
-----------
 
 **Test infrastructure**
 

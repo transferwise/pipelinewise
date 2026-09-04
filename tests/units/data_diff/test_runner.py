@@ -55,7 +55,11 @@ class FakeBackend:
         return 0
 
     def start_run(self, *_args, **_kwargs):
-        return {"run_id": uuid4(), "attempt": 1, "trigger": "SCHEDULED"} if self.start else None
+        return {
+            "run_id": uuid4(),
+            "attempt": 1,
+            "trigger_type": "SCHEDULED",
+        } if self.start else None
 
     def latest_scheduled_for(self, _check_id):
         return self.latest
@@ -155,7 +159,7 @@ def test_remediation_reuses_exact_failed_definition_and_window(mock_run):
     check = _check()
     original = {
         "run_id": uuid4(),
-        "dd_check_id": check["check_id"],
+        "check_id": check["check_id"],
         "scheduled_for": datetime(2026, 7, 22, 13, tzinfo=timezone.utc),
         "window_start": datetime(2026, 7, 22, 6, tzinfo=timezone.utc),
         "window_end": datetime(2026, 7, 22, 7, tzinfo=timezone.utc),
@@ -167,7 +171,7 @@ def test_remediation_reuses_exact_failed_definition_and_window(mock_run):
     backend.start_remediation_run = lambda _original, _reference: {
         "run_id": uuid4(),
         "attempt": 2,
-        "trigger": "REMEDIATION",
+        "trigger_type": "REMEDIATION",
     }
 
     summary = rerun_failed_check(
@@ -316,7 +320,7 @@ def loader(_check):
 execute_started_run(
     Backend(), loader,
     {{"check_id": "c", "full_check_name": "t/p/s/tbl", "statement_timeout_seconds": 60}},
-    {{"run_id": "r", "attempt": 1, "trigger": "SCHEDULED"}},
+    {{"run_id": "r", "attempt": 1, "trigger_type": "SCHEDULED"}},
     datetime(2026, 7, 22, 12, tzinfo=timezone.utc),
     datetime(2026, 7, 22, 11, tzinfo=timezone.utc),
     datetime(2026, 7, 22, 12, tzinfo=timezone.utc),
