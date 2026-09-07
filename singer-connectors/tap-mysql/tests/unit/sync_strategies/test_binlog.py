@@ -75,7 +75,8 @@ class TestBinlogSyncStrategy(TestCase):
         self.assertTrue(binlog.binlog_filename_key('mysql-bin.1000000') > binlog.binlog_filename_key('mysql-bin.999999'))
         self.assertTrue(binlog.binlog_filename_key('mysql-bin.2') > binlog.binlog_filename_key('mysql-bin.1'))
 
-    @patch.dict(os.environ, {'TZ': 'EET'})
+    @patch.dict(os.environ, {'TZ': 'Europe/Helsinki'})
+    @patch('tap_mysql.sync_strategies.binlog.tzlocal.get_localzone', return_value=pytz.timezone('Europe/Helsinki'))
     @patch('tap_mysql.sync_strategies.binlog.calculate_bookmark',
            return_value=('binlog0001', 50))
     @patch('tap_mysql.sync_strategies.binlog.fetch_current_log_file_and_pos',
@@ -856,7 +857,8 @@ class TestBinlogSyncStrategy(TestCase):
 
                 self.assertEqual(1, reader_mock.return_value.close.call_count)
 
-    @patch.dict(os.environ, {'TZ': 'EET'})
+    @patch.dict(os.environ, {'TZ': 'Europe/Helsinki'})
+    @patch('tap_mysql.sync_strategies.binlog.tzlocal.get_localzone', return_value=pytz.timezone('Europe/Helsinki'))
     @patch('tap_mysql.sync_strategies.binlog.calculate_gtid_bookmark',
            return_value='0-123-555')
     @patch('tap_mysql.sync_strategies.binlog.fetch_current_log_file_and_pos',

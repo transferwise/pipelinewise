@@ -1,0 +1,49 @@
+name: Docker Image Builds
+
+on:
+  pull_request:
+    branches: [master]
+
+  workflow_dispatch:
+
+concurrency:
+  group: docker_images-${{ github.event.pull_request.number || github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: main
+            dockerfile: Dockerfile
+            build_args: connectors=all
+          - name: barebone
+            dockerfile: Dockerfile.barebone
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build ${{ matrix.name }} image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          build-args: ${{ matrix.build_args }}
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: pipelinewise-ci:${{ matrix.name }}
+
+      - name: Check ${{ matrix.name }} image
+        run: docker run --rm --platform linux/amd64 pipelinewise-ci:${{ matrix.name }} --version

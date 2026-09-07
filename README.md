@@ -65,7 +65,7 @@ Pin a release tag instead of `latest` in production. To customise the image,
 build it locally:
 
 ```bash
-docker build -t pipelinewise:latest .
+docker build --platform linux/amd64 -t pipelinewise:latest .
 ```
 
 The wrapper persists generated configuration, state, and logs below

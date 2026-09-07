@@ -1,6 +1,16 @@
 0.84.0 (2026-09-07)
 -------------------
 
+**Docker images**
+
+- Build release images and the development environment on Debian Trixie
+- Install Debian 13 MongoDB database tools in the full image and development environment
+- Keep development MySQL and MariaDB setup compatible with Trixie's MariaDB client TLS defaults
+- Stop publishing the redundant default-connector image and remove obsolete Docker build paths
+- Remove stale tap-oracle validation, sample configuration, and image setup
+- Build and document release images explicitly for AMD64
+- Validate the full and barebone image variants in pull requests
+
 **Data-diff backend schema**
 
 - Rename watermark state and event columns through migration 002 to use
