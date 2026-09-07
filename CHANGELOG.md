@@ -30,8 +30,9 @@
 **Development workflow**
 
 - Compact repository agent guidance without changing commands, thresholds,
-  safeguards, or architecture contracts, and require current CHANGELOG dates
-  and direct entry links when opening or updating pull requests
+  safeguards, or architecture contracts; define UTC as the canonical convention
+  for replication and data-diff; and require current CHANGELOG dates and direct
+  entry links when opening or updating pull requests
 
 0.83.1 (2026-09-04)
 -------------------
