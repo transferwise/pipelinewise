@@ -17,6 +17,12 @@
 - Require direct SQL consumers and replicated backend-table copies to adopt the new
   columns; downgrade migration 002 before rolling back to an older PipelineWise version
 
+**Development workflow**
+
+- Compact repository agent guidance without changing commands, thresholds,
+  safeguards, or architecture contracts, and require current CHANGELOG dates
+  and direct entry links when opening or updating pull requests
+
 0.83.1 (2026-09-04)
 -------------------
 
