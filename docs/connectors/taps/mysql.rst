@@ -82,9 +82,9 @@ Configuration
      - Default
      - Effect
    * - ``engine``
-     - With GTID
-     - —
-     - Selects ``mariadb`` or ``mysql`` GTID semantics.
+     - For MariaDB GTID
+     - ``mysql``
+     - Selects MariaDB or MySQL source-specific semantics.
    * - ``use_gtid``
      - No
      - ``false``

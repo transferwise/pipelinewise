@@ -1,4 +1,4 @@
-0.84.0 (2026-09-04)
+0.84.0 (2026-09-07)
 -------------------
 
 **tap-yugabyte**
@@ -32,6 +32,14 @@
   post-disconnect active-slot window
 - Drop a tap's replication slot when its configuration is removed, matching
   existing tap-postgres cleanup behavior
+
+0.83.1 (2026-09-04)
+-------------------
+
+**Data-diff**
+
+- Detect MariaDB sources from the server handshake when ``db_conn.engine`` is
+  omitted, so statement timeouts use MariaDB's supported ``max_statement_time`` session variable.
 
 0.83.0 (2026-09-04)
 -------------------

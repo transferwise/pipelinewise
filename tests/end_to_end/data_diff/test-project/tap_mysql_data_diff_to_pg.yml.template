@@ -11,8 +11,7 @@ db_conn:
   user: "${TAP_MYSQL_USER}"
   password: "${TAP_MYSQL_PASSWORD}"
   dbname: "${TAP_MYSQL_DB}"
-  # The dev container runs MariaDB, which has no max_execution_time variable.
-  engine: mariadb
+  # Deliberately omitted: data-diff must detect MariaDB from the server handshake.
   fastsync_parallelism: 1
 
 target: "data_diff_postgres_dwh"

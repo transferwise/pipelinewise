@@ -153,6 +153,13 @@ inherited from ``data_diff_defaults`` — the table value wins when both exist.
 Durations compose the units ``s``, ``min``, ``h``, ``d``, ``w``: ``"-15h"`` is 15
 hours before fire time, and ``"1d6h"`` is valid too.
 
+For ``tap-mysql`` sources, data-diff uses ``db_conn.engine`` when it is set. If
+it is omitted, data-diff infers MariaDB or MySQL from the connected server's
+handshake. This fallback applies only to data-diff; Singer ``tap-mysql`` and
+FastSync continue to default an omitted engine to ``mysql``. Set
+``engine: mariadb`` explicitly for MariaDB, especially with GTID, managed
+Iceberg v3 JSON aliases, or proxies that hide the server identity.
+
 Choosing a frequency and window
 '''''''''''''''''''''''''''''''
 
