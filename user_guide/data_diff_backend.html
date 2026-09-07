@@ -184,7 +184,7 @@ const runMermaid = async (rerun) => {
                                     // Apply zoom to the now-rendered diagram, matching
                                     // the decoration visible diagrams receive.
                                     if (true) {
-                                        addZoomToSvgs(d3.selectAll(".mermaid[data-zoom-id=id-e3f49029-7b6c-4cd5-a2d7-19c9cd177cab]").select(function() {
+                                        addZoomToSvgs(d3.selectAll(".mermaid[data-zoom-id=id-55497777-d109-4e8a-ab55-91aa03a6b11f]").select(function() {
                                             return this.querySelector("svg");
                                         }));
                                     }
@@ -210,7 +210,7 @@ const runMermaid = async (rerun) => {
     if (true) {
         const mermaids_to_add_zoom = 1 === -1 ? mermaids_active.length : 1;
         if(mermaids_to_add_zoom > 0) {
-            var svgs = d3.selectAll(".mermaid[data-zoom-id=id-e3f49029-7b6c-4cd5-a2d7-19c9cd177cab]").select(function() {
+            var svgs = d3.selectAll(".mermaid[data-zoom-id=id-55497777-d109-4e8a-ab55-91aa03a6b11f]").select(function() {
                 return this.querySelector("svg");
             });
             // Wait until every active (visible) diagram has rendered. Deferred
@@ -759,7 +759,7 @@ credentials when separate roles are not required.</p>
 <section id="schema">
 <h2>Schema<a class="headerlink" href="#schema" title="Link to this heading"></a></h2>
 <figure class="align-center" id="id1">
-<pre data-zoom-id="id-e3f49029-7b6c-4cd5-a2d7-19c9cd177cab" class="mermaid">
+<pre data-zoom-id="id-55497777-d109-4e8a-ab55-91aa03a6b11f" class="mermaid">
         %%{init: {&quot;er&quot;: {&quot;diagramPadding&quot;: 8, &quot;entityPadding&quot;: 8}}}%%
 erDiagram
     direction LR
@@ -774,7 +774,7 @@ erDiagram
     dd_run_attempts ||--o| dd_watermark_events : evaluated_run_id
     dd_run_attempts o|--o{ dd_watermark_events : blocking_run_id
     dd_check_definitions ||--o| dd_watermark_state : check_id
-    dd_run_attempts ||--o{ dd_watermark_state : evaluated_run_id
+    dd_run_attempts ||--o{ dd_watermark_state : last_evaluated_run_id
     dd_run_attempts o|--o{ dd_watermark_state : blocking_run_id
 
     dd_check_definitions[&quot;dd_check_definitions&lt;br/&gt;Versioned data-diff check definitions&lt;br/&gt;imported from YAML configuration&quot;] {
@@ -859,38 +859,38 @@ erDiagram
         TEXT status &quot;PASS, FAIL, or ERROR&quot;
     }
 
-    dd_watermark_state[&quot;dd_watermark_state&lt;br/&gt;Mutable current verified-through watermark&lt;br/&gt;for each check definition&quot;] {
+    dd_watermark_state[&quot;dd_watermark_state&lt;br/&gt;Mutable current verified interval and furthest&lt;br/&gt;observed window for each check definition&quot;] {
         UUID check_id PK, FK
-        TIMESTAMPTZ coverage_start &quot;at most verified_through&quot;
-        TIMESTAMPTZ verified_through &quot;at most max_observed_end&quot;
-        TIMESTAMPTZ max_observed_end
-        TEXT coverage_status &quot;CONTIGUOUS or BLOCKED&quot;
+        TIMESTAMPTZ verified_start &quot;at most verified_end&quot;
+        TIMESTAMPTZ verified_end &quot;at most furthest_observed_end&quot;
+        TIMESTAMPTZ furthest_observed_end
+        TEXT verified_status &quot;CONTIGUOUS or BLOCKED&quot;
         UUID blocking_run_id FK &quot;nullable&quot;
-        UUID evaluated_run_id FK
+        UUID last_evaluated_run_id FK
         TEXT event_type &quot;INITIALIZE, ADVANCE, INVALIDATE, BLOCK, or CONFIRM&quot;
         BIGINT state_version &quot;greater than 0&quot;
         TIMESTAMPTZ updated_at
         TEXT reason
     }
 
-    dd_watermark_events[&quot;dd_watermark_events&lt;br/&gt;Append-only history of verified-through&lt;br/&gt;watermark transitions&quot;] {
+    dd_watermark_events[&quot;dd_watermark_events&lt;br/&gt;Append-only history of verified intervals&lt;br/&gt;and furthest observed window transitions&quot;] {
         UUID watermark_event_id PK
         BIGSERIAL event_sequence UK
         UUID check_id FK
         UUID evaluated_run_id FK, UK
         TEXT event_type &quot;INITIALIZE, ADVANCE, INVALIDATE, BLOCK, or CONFIRM&quot;
-        TIMESTAMPTZ coverage_start &quot;at most verified_through&quot;
-        TIMESTAMPTZ previous_verified_through &quot;nullable&quot;
-        TIMESTAMPTZ verified_through &quot;at most max_observed_end&quot;
-        TIMESTAMPTZ max_observed_end
-        TEXT coverage_status &quot;CONTIGUOUS or BLOCKED&quot;
+        TIMESTAMPTZ verified_start &quot;at most verified_end&quot;
+        TIMESTAMPTZ previous_verified_end &quot;nullable&quot;
+        TIMESTAMPTZ verified_end &quot;at most furthest_observed_end&quot;
+        TIMESTAMPTZ furthest_observed_end
+        TEXT verified_status &quot;CONTIGUOUS or BLOCKED&quot;
         UUID blocking_run_id FK &quot;nullable&quot;
         TIMESTAMPTZ recorded_at
         TEXT reason
     }
 
     </pre><figcaption>
-<p><span class="caption-text">Data-diff backend schema after migration 001</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
+<p><span class="caption-text">Data-diff backend schema after migration 002</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
 </figcaption>
 </figure>
 <p>The schema has two related paths. The first records definitions and execution
@@ -912,24 +912,122 @@ above shows the exact database relationships.</p>
 <p>PipelineWise keeps every attempt in <code class="docutils literal notranslate"><span class="pre">dd_run_attempts</span></code> and every watermark
 transition in <code class="docutils literal notranslate"><span class="pre">dd_watermark_events</span></code>. <code class="docutils literal notranslate"><span class="pre">dd_run_slot_state</span></code> materializes only
 the highest terminal attempt for each scheduled slot, while
-<code class="docutils literal notranslate"><span class="pre">dd_watermark_state</span></code> stores the current watermark. A new chronological slot
-updates that state directly. A replacement or out-of-order slot recalculates it
-from the slot-state rows without rescanning superseded attempts.</p>
+<code class="docutils literal notranslate"><span class="pre">dd_watermark_state</span></code> stores the current verified interval and the furthest
+observed window end. A new chronological slot updates that state directly. A
+replacement or out-of-order slot recalculates it from the slot-state rows
+without rescanning superseded attempts.</p>
 </section>
 <section id="reporting-queries">
 <h2>Reporting queries<a class="headerlink" href="#reporting-queries" title="Link to this heading"></a></h2>
 <p>Run these queries against the PipelineWise backend database.</p>
-<p>Current coverage watermarks:</p>
-<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">SELECT</span><span class="w"> </span><span class="k">state</span><span class="p">.</span><span class="n">check_id</span><span class="p">,</span><span class="w"> </span><span class="n">checks</span><span class="p">.</span><span class="n">full_check_name</span><span class="p">,</span>
-<span class="w">       </span><span class="n">checks</span><span class="p">.</span><span class="n">revision</span><span class="p">,</span><span class="w"> </span><span class="n">checks</span><span class="p">.</span><span class="n">source_schema</span><span class="p">,</span><span class="w"> </span><span class="n">checks</span><span class="p">.</span><span class="n">source_table</span><span class="p">,</span>
-<span class="w">       </span><span class="n">checks</span><span class="p">.</span><span class="n">source_timestamp_column</span><span class="p">,</span><span class="w"> </span><span class="k">state</span><span class="p">.</span><span class="n">coverage_start</span><span class="p">,</span>
-<span class="w">       </span><span class="k">state</span><span class="p">.</span><span class="n">verified_through</span><span class="p">,</span><span class="w"> </span><span class="k">state</span><span class="p">.</span><span class="n">max_observed_end</span><span class="p">,</span>
-<span class="w">       </span><span class="k">state</span><span class="p">.</span><span class="n">coverage_status</span><span class="p">,</span><span class="w"> </span><span class="k">state</span><span class="p">.</span><span class="n">blocking_run_id</span><span class="p">,</span>
-<span class="w">       </span><span class="k">state</span><span class="p">.</span><span class="n">evaluated_run_id</span><span class="p">,</span><span class="w"> </span><span class="k">state</span><span class="p">.</span><span class="n">event_type</span><span class="p">,</span>
-<span class="w">       </span><span class="k">state</span><span class="p">.</span><span class="n">updated_at</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">verified_at</span><span class="p">,</span><span class="w"> </span><span class="k">state</span><span class="p">.</span><span class="n">reason</span>
-<span class="w">  </span><span class="k">FROM</span><span class="w"> </span><span class="k">public</span><span class="p">.</span><span class="n">dd_watermark_state</span><span class="w"> </span><span class="k">state</span>
-<span class="w">  </span><span class="k">JOIN</span><span class="w"> </span><span class="k">public</span><span class="p">.</span><span class="n">dd_check_definitions</span><span class="w"> </span><span class="n">checks</span>
-<span class="w">    </span><span class="k">ON</span><span class="w"> </span><span class="n">checks</span><span class="p">.</span><span class="n">check_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">state</span><span class="p">.</span><span class="n">check_id</span><span class="p">;</span>
+<p>Watermark per table:</p>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">SELECT</span><span class="w"> </span><span class="n">d</span><span class="p">.</span><span class="n">full_check_name</span><span class="p">,</span>
+<span class="w">       </span><span class="n">d</span><span class="p">.</span><span class="n">revision</span><span class="p">,</span>
+<span class="w">       </span><span class="n">d</span><span class="p">.</span><span class="n">source_database</span><span class="p">,</span>
+<span class="w">       </span><span class="n">d</span><span class="p">.</span><span class="n">source_schema</span><span class="p">,</span>
+<span class="w">       </span><span class="n">d</span><span class="p">.</span><span class="n">source_table</span><span class="p">,</span>
+<span class="w">       </span><span class="n">d</span><span class="p">.</span><span class="n">target_database</span><span class="p">,</span>
+<span class="w">       </span><span class="n">d</span><span class="p">.</span><span class="n">target_schema</span><span class="p">,</span>
+<span class="w">       </span><span class="n">d</span><span class="p">.</span><span class="n">target_table</span><span class="p">,</span>
+<span class="w">       </span><span class="k">COALESCE</span><span class="p">(</span><span class="n">w</span><span class="p">.</span><span class="n">verified_status</span><span class="p">,</span><span class="w"> </span><span class="s1">'NOT_RUN'</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">verified_status</span><span class="p">,</span>
+<span class="w">       </span><span class="n">w</span><span class="p">.</span><span class="n">verified_start</span><span class="p">,</span>
+<span class="w">       </span><span class="n">w</span><span class="p">.</span><span class="n">verified_end</span><span class="p">,</span>
+<span class="w">       </span><span class="n">w</span><span class="p">.</span><span class="n">furthest_observed_end</span><span class="p">,</span>
+<span class="w">       </span><span class="k">CURRENT_TIMESTAMP</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">w</span><span class="p">.</span><span class="n">verified_end</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">verification_lag</span><span class="p">,</span>
+<span class="w">       </span><span class="n">w</span><span class="p">.</span><span class="n">blocking_run_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">w</span><span class="p">.</span><span class="n">last_evaluated_run_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">w</span><span class="p">.</span><span class="n">updated_at</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">watermark_updated_at</span><span class="p">,</span>
+<span class="w">       </span><span class="n">w</span><span class="p">.</span><span class="n">reason</span>
+<span class="w">  </span><span class="k">FROM</span><span class="w"> </span><span class="k">public</span><span class="p">.</span><span class="n">dd_check_definitions</span><span class="w"> </span><span class="n">d</span>
+<span class="w">  </span><span class="k">LEFT</span><span class="w"> </span><span class="k">JOIN</span><span class="w"> </span><span class="k">public</span><span class="p">.</span><span class="n">dd_watermark_state</span><span class="w"> </span><span class="n">w</span>
+<span class="w">    </span><span class="k">ON</span><span class="w"> </span><span class="n">w</span><span class="p">.</span><span class="n">check_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">d</span><span class="p">.</span><span class="n">check_id</span>
+<span class="w"> </span><span class="k">WHERE</span><span class="w"> </span><span class="n">d</span><span class="p">.</span><span class="n">is_current</span>
+<span class="w"> </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">d</span><span class="p">.</span><span class="n">target_id</span><span class="p">,</span><span class="w"> </span><span class="n">d</span><span class="p">.</span><span class="n">tap_id</span><span class="p">,</span>
+<span class="w">          </span><span class="n">d</span><span class="p">.</span><span class="n">source_schema</span><span class="p">,</span><span class="w"> </span><span class="n">d</span><span class="p">.</span><span class="n">source_table</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>Successful and failed check results per table per UTC day. Historical definition
+revisions and every attempt, including retries and remediation runs, are included.
+The result counts are per <code class="docutils literal notranslate"><span class="pre">check_type</span></code>; terminal run-level errors without
+result rows are counted separately:</p>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">WITH</span><span class="w"> </span><span class="n">outcomes</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="p">(</span>
+<span class="w">    </span><span class="k">SELECT</span><span class="w"> </span><span class="n">d</span><span class="p">.</span><span class="n">full_check_name</span><span class="p">,</span>
+<span class="w">           </span><span class="n">d</span><span class="p">.</span><span class="n">source_database</span><span class="p">,</span>
+<span class="w">           </span><span class="n">d</span><span class="p">.</span><span class="n">source_schema</span><span class="p">,</span>
+<span class="w">           </span><span class="n">d</span><span class="p">.</span><span class="n">source_table</span><span class="p">,</span>
+<span class="w">           </span><span class="n">d</span><span class="p">.</span><span class="n">target_database</span><span class="p">,</span>
+<span class="w">           </span><span class="n">d</span><span class="p">.</span><span class="n">target_schema</span><span class="p">,</span>
+<span class="w">           </span><span class="n">d</span><span class="p">.</span><span class="n">target_table</span><span class="p">,</span>
+<span class="w">           </span><span class="p">(</span><span class="k">COALESCE</span><span class="p">(</span><span class="n">a</span><span class="p">.</span><span class="n">finished_at</span><span class="p">,</span><span class="w"> </span><span class="n">a</span><span class="p">.</span><span class="n">started_at</span><span class="p">)</span>
+<span class="w">               </span><span class="k">AT</span><span class="w"> </span><span class="k">TIME</span><span class="w"> </span><span class="k">ZONE</span><span class="w"> </span><span class="s1">'UTC'</span><span class="p">)::</span><span class="nb">date</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">check_date</span><span class="p">,</span>
+<span class="w">           </span><span class="n">a</span><span class="p">.</span><span class="n">status</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">run_status</span><span class="p">,</span>
+<span class="w">           </span><span class="n">r</span><span class="p">.</span><span class="n">run_id</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">result_run_id</span><span class="p">,</span>
+<span class="w">           </span><span class="n">r</span><span class="p">.</span><span class="n">status</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">result_status</span>
+<span class="w">      </span><span class="k">FROM</span><span class="w"> </span><span class="k">public</span><span class="p">.</span><span class="n">dd_run_attempts</span><span class="w"> </span><span class="n">a</span>
+<span class="w">      </span><span class="k">JOIN</span><span class="w"> </span><span class="k">public</span><span class="p">.</span><span class="n">dd_check_definitions</span><span class="w"> </span><span class="n">d</span>
+<span class="w">        </span><span class="k">ON</span><span class="w"> </span><span class="n">d</span><span class="p">.</span><span class="n">check_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">a</span><span class="p">.</span><span class="n">check_id</span>
+<span class="w">      </span><span class="k">LEFT</span><span class="w"> </span><span class="k">JOIN</span><span class="w"> </span><span class="k">public</span><span class="p">.</span><span class="n">dd_run_results</span><span class="w"> </span><span class="n">r</span>
+<span class="w">        </span><span class="k">ON</span><span class="w"> </span><span class="n">r</span><span class="p">.</span><span class="n">run_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">a</span><span class="p">.</span><span class="n">run_id</span>
+<span class="w">     </span><span class="k">WHERE</span><span class="w"> </span><span class="n">a</span><span class="p">.</span><span class="n">status</span><span class="w"> </span><span class="k">IN</span><span class="w"> </span><span class="p">(</span><span class="s1">'PASS'</span><span class="p">,</span><span class="w"> </span><span class="s1">'FAIL'</span><span class="p">,</span><span class="w"> </span><span class="s1">'ERROR'</span><span class="p">)</span>
+<span class="p">)</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">full_check_name</span><span class="p">,</span>
+<span class="w">       </span><span class="n">source_database</span><span class="p">,</span>
+<span class="w">       </span><span class="n">source_schema</span><span class="p">,</span>
+<span class="w">       </span><span class="n">source_table</span><span class="p">,</span>
+<span class="w">       </span><span class="n">target_database</span><span class="p">,</span>
+<span class="w">       </span><span class="n">target_schema</span><span class="p">,</span>
+<span class="w">       </span><span class="n">target_table</span><span class="p">,</span>
+<span class="w">       </span><span class="n">check_date</span><span class="p">,</span>
+<span class="w">       </span><span class="k">COUNT</span><span class="p">(</span><span class="o">*</span><span class="p">)</span><span class="w"> </span><span class="n">FILTER</span><span class="w"> </span><span class="p">(</span>
+<span class="w">           </span><span class="k">WHERE</span><span class="w"> </span><span class="n">result_status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'PASS'</span>
+<span class="w">       </span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">successful_check_results</span><span class="p">,</span>
+<span class="w">       </span><span class="k">COUNT</span><span class="p">(</span><span class="o">*</span><span class="p">)</span><span class="w"> </span><span class="n">FILTER</span><span class="w"> </span><span class="p">(</span>
+<span class="w">           </span><span class="k">WHERE</span><span class="w"> </span><span class="n">result_status</span><span class="w"> </span><span class="k">IN</span><span class="w"> </span><span class="p">(</span><span class="s1">'FAIL'</span><span class="p">,</span><span class="w"> </span><span class="s1">'ERROR'</span><span class="p">)</span>
+<span class="w">       </span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">failed_check_results</span><span class="p">,</span>
+<span class="w">       </span><span class="k">COUNT</span><span class="p">(</span><span class="o">*</span><span class="p">)</span><span class="w"> </span><span class="n">FILTER</span><span class="w"> </span><span class="p">(</span>
+<span class="w">           </span><span class="k">WHERE</span><span class="w"> </span><span class="n">result_run_id</span><span class="w"> </span><span class="k">IS</span><span class="w"> </span><span class="k">NULL</span>
+<span class="w">             </span><span class="k">AND</span><span class="w"> </span><span class="n">run_status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'ERROR'</span>
+<span class="w">       </span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">run_level_errors</span>
+<span class="w">  </span><span class="k">FROM</span><span class="w"> </span><span class="n">outcomes</span>
+<span class="w"> </span><span class="k">GROUP</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">full_check_name</span><span class="p">,</span>
+<span class="w">          </span><span class="n">source_database</span><span class="p">,</span><span class="w"> </span><span class="n">source_schema</span><span class="p">,</span><span class="w"> </span><span class="n">source_table</span><span class="p">,</span>
+<span class="w">          </span><span class="n">target_database</span><span class="p">,</span><span class="w"> </span><span class="n">target_schema</span><span class="p">,</span><span class="w"> </span><span class="n">target_table</span><span class="p">,</span>
+<span class="w">          </span><span class="n">check_date</span>
+<span class="w"> </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">check_date</span><span class="w"> </span><span class="k">DESC</span><span class="p">,</span><span class="w"> </span><span class="n">full_check_name</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>Current unresolved failures. Only current check-definition revisions are shown;
+failures belonging to superseded revisions are intentionally excluded:</p>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">SELECT</span><span class="w"> </span><span class="n">d</span><span class="p">.</span><span class="n">full_check_name</span><span class="p">,</span>
+<span class="w">       </span><span class="n">d</span><span class="p">.</span><span class="n">revision</span><span class="p">,</span>
+<span class="w">       </span><span class="n">d</span><span class="p">.</span><span class="n">source_schema</span><span class="p">,</span>
+<span class="w">       </span><span class="n">d</span><span class="p">.</span><span class="n">source_table</span><span class="p">,</span>
+<span class="w">       </span><span class="n">s</span><span class="p">.</span><span class="n">scheduled_for</span><span class="p">,</span>
+<span class="w">       </span><span class="n">s</span><span class="p">.</span><span class="n">window_start</span><span class="p">,</span>
+<span class="w">       </span><span class="n">s</span><span class="p">.</span><span class="n">window_end</span><span class="p">,</span>
+<span class="w">       </span><span class="n">s</span><span class="p">.</span><span class="n">run_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">a</span><span class="p">.</span><span class="n">attempt</span><span class="p">,</span>
+<span class="w">       </span><span class="n">a</span><span class="p">.</span><span class="n">trigger_type</span><span class="p">,</span>
+<span class="w">       </span><span class="k">COALESCE</span><span class="p">(</span><span class="n">r</span><span class="p">.</span><span class="n">check_type</span><span class="p">,</span><span class="w"> </span><span class="s1">'&lt;run-level error&gt;'</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">failed_check</span><span class="p">,</span>
+<span class="w">       </span><span class="k">COALESCE</span><span class="p">(</span><span class="n">r</span><span class="p">.</span><span class="n">status</span><span class="p">,</span><span class="w"> </span><span class="n">s</span><span class="p">.</span><span class="n">status</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">failure_status</span><span class="p">,</span>
+<span class="w">       </span><span class="k">COALESCE</span><span class="p">(</span><span class="n">r</span><span class="p">.</span><span class="n">error</span><span class="p">,</span><span class="w"> </span><span class="n">a</span><span class="p">.</span><span class="n">error</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">error</span><span class="p">,</span>
+<span class="w">       </span><span class="k">COALESCE</span><span class="p">(</span><span class="n">s</span><span class="p">.</span><span class="n">run_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">w</span><span class="p">.</span><span class="n">blocking_run_id</span><span class="p">,</span><span class="w"> </span><span class="k">FALSE</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">blocks_watermark</span><span class="p">,</span>
+<span class="w">       </span><span class="n">a</span><span class="p">.</span><span class="n">finished_at</span>
+<span class="w">  </span><span class="k">FROM</span><span class="w"> </span><span class="k">public</span><span class="p">.</span><span class="n">dd_run_slot_state</span><span class="w"> </span><span class="n">s</span>
+<span class="w">  </span><span class="k">JOIN</span><span class="w"> </span><span class="k">public</span><span class="p">.</span><span class="n">dd_check_definitions</span><span class="w"> </span><span class="n">d</span>
+<span class="w">    </span><span class="k">ON</span><span class="w"> </span><span class="n">d</span><span class="p">.</span><span class="n">check_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">s</span><span class="p">.</span><span class="n">check_id</span>
+<span class="w">  </span><span class="k">JOIN</span><span class="w"> </span><span class="k">public</span><span class="p">.</span><span class="n">dd_run_attempts</span><span class="w"> </span><span class="n">a</span>
+<span class="w">    </span><span class="k">ON</span><span class="w"> </span><span class="n">a</span><span class="p">.</span><span class="n">run_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">s</span><span class="p">.</span><span class="n">run_id</span>
+<span class="w">  </span><span class="k">LEFT</span><span class="w"> </span><span class="k">JOIN</span><span class="w"> </span><span class="k">public</span><span class="p">.</span><span class="n">dd_run_results</span><span class="w"> </span><span class="n">r</span>
+<span class="w">    </span><span class="k">ON</span><span class="w"> </span><span class="n">r</span><span class="p">.</span><span class="n">run_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">s</span><span class="p">.</span><span class="n">run_id</span>
+<span class="w">   </span><span class="k">AND</span><span class="w"> </span><span class="n">r</span><span class="p">.</span><span class="n">status</span><span class="w"> </span><span class="k">IN</span><span class="w"> </span><span class="p">(</span><span class="s1">'FAIL'</span><span class="p">,</span><span class="w"> </span><span class="s1">'ERROR'</span><span class="p">)</span>
+<span class="w">  </span><span class="k">LEFT</span><span class="w"> </span><span class="k">JOIN</span><span class="w"> </span><span class="k">public</span><span class="p">.</span><span class="n">dd_watermark_state</span><span class="w"> </span><span class="n">w</span>
+<span class="w">    </span><span class="k">ON</span><span class="w"> </span><span class="n">w</span><span class="p">.</span><span class="n">check_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">s</span><span class="p">.</span><span class="n">check_id</span>
+<span class="w"> </span><span class="k">WHERE</span><span class="w"> </span><span class="n">d</span><span class="p">.</span><span class="n">is_current</span>
+<span class="w">   </span><span class="k">AND</span><span class="w"> </span><span class="n">s</span><span class="p">.</span><span class="n">status</span><span class="w"> </span><span class="k">IN</span><span class="w"> </span><span class="p">(</span><span class="s1">'FAIL'</span><span class="p">,</span><span class="w"> </span><span class="s1">'ERROR'</span><span class="p">)</span>
+<span class="w"> </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">a</span><span class="p">.</span><span class="n">finished_at</span><span class="w"> </span><span class="k">DESC</span><span class="p">,</span>
+<span class="w">          </span><span class="n">d</span><span class="p">.</span><span class="n">full_check_name</span><span class="p">,</span>
+<span class="w">          </span><span class="n">r</span><span class="p">.</span><span class="n">check_type</span><span class="p">;</span>
 </pre></div>
 </div>
 <p>Failed runs and their remediation attempts:</p>

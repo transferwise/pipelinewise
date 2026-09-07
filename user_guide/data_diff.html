@@ -637,9 +637,9 @@ what keeps the volume sane.</p>
 </section>
 <section id="coverage-and-remediation">
 <h2>Coverage and remediation<a class="headerlink" href="#coverage-and-remediation" title="Link to this heading"></a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">verified_through</span></code> is the end of the contiguous union of successful windows
+<p><code class="docutils literal notranslate"><span class="pre">verified_end</span></code> is the end of the contiguous union of successful windows
 for one definition revision:</p>
-<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>[10:00, 11:00) PASS  → verified_through = 11:00
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>[10:00, 11:00) PASS  → verified_end = 11:00
 [11:00, 12:00) FAIL  → stays 11:00 (blocked)
 [12:00, 13:00) PASS  → stays 11:00
 rerun [11:00, 12:00) PASS → advances to 13:00
