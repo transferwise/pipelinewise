@@ -34,9 +34,10 @@ def test_failed_interval_blocks_later_successful_coverage():
         _run(12, 13, "PASS"),
     ])
 
-    assert coverage["coverage_start"] == _instant(10)
-    assert coverage["verified_through"] == _instant(11)
-    assert coverage["coverage_status"] == "BLOCKED"
+    assert coverage["verified_start"] == _instant(10)
+    assert coverage["verified_end"] == _instant(11)
+    assert coverage["furthest_observed_end"] == _instant(13)
+    assert coverage["verified_status"] == "BLOCKED"
     assert coverage["blocking_run_id"] == failed["run_id"]
 
 
@@ -49,15 +50,15 @@ def test_successful_remediation_fills_gap_and_advances_over_later_passes():
         _run(12, 13, "PASS"),
     ])
 
-    assert coverage["verified_through"] == _instant(13)
-    assert coverage["coverage_status"] == "CONTIGUOUS"
+    assert coverage["verified_end"] == _instant(13)
+    assert coverage["verified_status"] == "CONTIGUOUS"
     assert coverage["blocking_run_id"] is None
 
 
 def test_later_failed_revalidation_invalidates_previous_coverage():
     previous = {
-        "verified_through": _instant(12),
-        "coverage_status": "CONTIGUOUS",
+        "verified_end": _instant(12),
+        "verified_status": "CONTIGUOUS",
     }
     current = calculate_coverage([
         _run(10, 11, "PASS"),
@@ -65,7 +66,7 @@ def test_later_failed_revalidation_invalidates_previous_coverage():
         _run(11, 12, "FAIL", attempt=2),
     ])
 
-    assert current["verified_through"] == _instant(11)
+    assert current["verified_end"] == _instant(11)
     assert coverage_event_type(previous, current) == "INVALIDATE"
 
 
@@ -74,8 +75,8 @@ def test_metadata_only_definition_never_advances_coverage():
         [_run(10, 11, "PASS")], data_checks_enabled=False
     )
 
-    assert coverage["verified_through"] == _instant(10)
-    assert coverage["coverage_status"] == "BLOCKED"
+    assert coverage["verified_end"] == _instant(10)
+    assert coverage["verified_status"] == "BLOCKED"
     assert "Metadata-only" in coverage["reason"]
 
 
@@ -85,7 +86,7 @@ def test_missing_interval_is_reported_as_blocked_without_failure_run():
         _run(12, 13, "PASS"),
     ])
 
-    assert coverage["verified_through"] == _instant(11)
+    assert coverage["verified_end"] == _instant(11)
     assert coverage["blocking_run_id"] is None
     assert "next timestamp interval" in coverage["reason"]
 
@@ -115,7 +116,7 @@ def test_window_narrower_than_cadence_blocks_coverage():
     # what the shipped defaults did before they were widened.
     coverage = calculate_coverage(_schedule(6, 15, 12))
 
-    assert coverage["coverage_status"] == "BLOCKED"
+    assert coverage["verified_status"] == "BLOCKED"
 
 
 def test_window_wider_than_cadence_keeps_coverage_contiguous():
@@ -123,14 +124,14 @@ def test_window_wider_than_cadence_keeps_coverage_contiguous():
     # skipped slot cannot open a gap.
     coverage = calculate_coverage(_schedule(6, 15, 3))
 
-    assert coverage["coverage_status"] == "CONTIGUOUS"
+    assert coverage["verified_status"] == "CONTIGUOUS"
 
 
 def test_overlapping_windows_survive_a_skipped_slot():
     runs = _schedule(6, 15, 3)
     del runs[1]
 
-    assert calculate_coverage(runs)["coverage_status"] == "CONTIGUOUS"
+    assert calculate_coverage(runs)["verified_status"] == "CONTIGUOUS"
 
 
 def test_incremental_coverage_matches_full_calculation_for_appended_slots():

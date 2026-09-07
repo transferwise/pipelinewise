@@ -1,0 +1,128 @@
+%%{init: {"er": {"diagramPadding": 8, "entityPadding": 8}}}%%
+erDiagram
+    direction LR
+    dd_check_definitions ||--o{ dd_preflight_log : check_id
+    dd_check_definitions ||--o{ dd_run_attempts : check_id
+    dd_preflight_log o|--o{ dd_run_attempts : preflight_id
+    dd_run_attempts o|--o{ dd_run_attempts : rerun_of_run_id
+    dd_run_attempts ||--o{ dd_run_results : run_id
+    dd_check_definitions ||--o{ dd_run_slot_state : check_id
+    dd_run_attempts ||--o| dd_run_slot_state : run_id
+    dd_check_definitions ||--o{ dd_watermark_events : check_id
+    dd_run_attempts ||--o| dd_watermark_events : evaluated_run_id
+    dd_run_attempts o|--o{ dd_watermark_events : blocking_run_id
+    dd_check_definitions ||--o| dd_watermark_state : check_id
+    dd_run_attempts ||--o{ dd_watermark_state : last_evaluated_run_id
+    dd_run_attempts o|--o{ dd_watermark_state : blocking_run_id
+
+    dd_check_definitions["dd_check_definitions<br/>Versioned data-diff check definitions<br/>imported from YAML configuration"] {
+        UUID check_id PK
+        TEXT full_check_name "UQ with revision; UQ when is_current"
+        INTEGER revision "UQ with full_check_name"
+        CHAR(64) config_hash
+        JSONB canonical_config
+        TEXT target_id
+        TEXT tap_id
+        TEXT source_type
+        TEXT target_type
+        TEXT source_database
+        TEXT target_database
+        TEXT source_schema
+        TEXT source_table
+        TEXT target_schema
+        TEXT target_table
+        TEXT source_key_column
+        TEXT target_key_column
+        TEXT source_timestamp_column
+        TEXT target_timestamp_column
+        JSONB checks
+        TEXT frequency
+        BIGINT window_start_seconds "greater than 0"
+        BIGINT window_end_seconds "at least 0"
+        BIGINT statement_timeout_seconds "greater than 0"
+        BOOLEAN is_current
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ superseded_at "nullable"
+    }
+
+    dd_preflight_log["dd_preflight_log<br/>Append-only preflight evidence and<br/>early validation errors for run attempts"] {
+        UUID preflight_id PK
+        UUID check_id FK
+        TEXT status "PASS, BLOCKED, or ERROR"
+        TIMESTAMPTZ checked_at
+        CHAR(64) query_fingerprint
+        JSONB index_metadata
+        JSONB findings
+        TEXT error "nullable"
+        BIGINT table_rows "nullable"
+        BIGINT row_limit "nullable"
+        BOOLEAN has_leading_index "nullable"
+    }
+
+    dd_run_attempts["dd_run_attempts<br/>Execution attempts updated from RUNNING<br/>to a terminal outcome"] {
+        UUID run_id PK
+        UUID check_id FK
+        TIMESTAMPTZ scheduled_for "UQ with check_id and attempt"
+        TIMESTAMPTZ window_start "before window_end"
+        TIMESTAMPTZ window_end
+        INTEGER attempt "UQ with check_id and scheduled_for"
+        TEXT trigger_type "SCHEDULED, MANUAL, RETRY, or REMEDIATION"
+        TEXT status "RUNNING, PASS, FAIL, or ERROR"
+        UUID rerun_of_run_id FK "nullable self-reference"
+        TEXT remediation_reference "nullable"
+        UUID preflight_id FK "nullable"
+        TIMESTAMPTZ started_at
+        TIMESTAMPTZ finished_at "nullable"
+        TEXT error "nullable"
+    }
+
+    dd_run_results["dd_run_results<br/>Append-only per-check-type outcomes<br/>for completed run attempts"] {
+        UUID run_id PK, FK
+        TEXT check_type PK
+        TEXT status "PASS, FAIL, or ERROR"
+        JSONB source_value "nullable"
+        JSONB target_value "nullable"
+        DOUBLE_PRECISION source_query_seconds "nullable"
+        DOUBLE_PRECISION target_query_seconds "nullable"
+        TEXT error "nullable"
+    }
+
+    dd_run_slot_state["dd_run_slot_state<br/>Mutable selected terminal attempt for<br/>each check and scheduled slot"] {
+        UUID check_id PK, FK
+        TIMESTAMPTZ scheduled_for PK
+        UUID run_id FK, UK
+        INTEGER attempt "greater than 0"
+        TIMESTAMPTZ window_start "before window_end"
+        TIMESTAMPTZ window_end
+        TEXT status "PASS, FAIL, or ERROR"
+    }
+
+    dd_watermark_state["dd_watermark_state<br/>Mutable current verified interval and furthest<br/>observed window for each check definition"] {
+        UUID check_id PK, FK
+        TIMESTAMPTZ verified_start "at most verified_end"
+        TIMESTAMPTZ verified_end "at most furthest_observed_end"
+        TIMESTAMPTZ furthest_observed_end
+        TEXT verified_status "CONTIGUOUS or BLOCKED"
+        UUID blocking_run_id FK "nullable"
+        UUID last_evaluated_run_id FK
+        TEXT event_type "INITIALIZE, ADVANCE, INVALIDATE, BLOCK, or CONFIRM"
+        BIGINT state_version "greater than 0"
+        TIMESTAMPTZ updated_at
+        TEXT reason
+    }
+
+    dd_watermark_events["dd_watermark_events<br/>Append-only history of verified intervals<br/>and furthest observed window transitions"] {
+        UUID watermark_event_id PK
+        BIGSERIAL event_sequence UK
+        UUID check_id FK
+        UUID evaluated_run_id FK, UK
+        TEXT event_type "INITIALIZE, ADVANCE, INVALIDATE, BLOCK, or CONFIRM"
+        TIMESTAMPTZ verified_start "at most verified_end"
+        TIMESTAMPTZ previous_verified_end "nullable"
+        TIMESTAMPTZ verified_end "at most furthest_observed_end"
+        TIMESTAMPTZ furthest_observed_end
+        TEXT verified_status "CONTIGUOUS or BLOCKED"
+        UUID blocking_run_id FK "nullable"
+        TIMESTAMPTZ recorded_at
+        TEXT reason
+    }
