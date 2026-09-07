@@ -263,12 +263,12 @@ what keeps the volume sane.
 Coverage and remediation
 ------------------------
 
-``verified_through`` is the end of the contiguous union of successful windows
+``verified_end`` is the end of the contiguous union of successful windows
 for one definition revision:
 
 .. code-block:: text
 
-    [10:00, 11:00) PASS  → verified_through = 11:00
+    [10:00, 11:00) PASS  → verified_end = 11:00
     [11:00, 12:00) FAIL  → stays 11:00 (blocked)
     [12:00, 13:00) PASS  → stays 11:00
     rerun [11:00, 12:00) PASS → advances to 13:00

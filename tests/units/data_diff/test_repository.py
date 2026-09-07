@@ -204,6 +204,11 @@ def test_list_checks_exposes_compare_columns_from_version_snapshot():
     assert checks[0]["source_compare_columns"] == ["status", "amount"]
     assert checks[0]["target_compare_columns"] == ["STATUS", "AMOUNT"]
     assert "LEFT JOIN public.dd_watermark_state coverage" in cursor.last_sql
+    assert "coverage.verified_start" in cursor.last_sql
+    assert "coverage.verified_end" in cursor.last_sql
+    assert "coverage.furthest_observed_end" in cursor.last_sql
+    assert "coverage.verified_status" in cursor.last_sql
+    assert "coverage.last_evaluated_run_id" in cursor.last_sql
     assert "coverage.updated_at AS verified_at" in cursor.last_sql
     assert "dd_current_coverage" not in cursor.last_sql
 
@@ -297,10 +302,10 @@ def test_finish_run_updates_coverage_in_same_transaction():
 
 def _coverage_state(start, end, *, status="CONTIGUOUS", blocking_run_id=None):
     return {
-        "coverage_start": start,
-        "verified_through": end,
-        "max_observed_end": end,
-        "coverage_status": status,
+        "verified_start": start,
+        "verified_end": end,
+        "furthest_observed_end": end,
+        "verified_status": status,
         "blocking_run_id": blocking_run_id,
         "reason": "previous coverage state",
         "state_version": 4,
@@ -349,8 +354,8 @@ def test_new_latest_slot_advances_coverage_without_history_scan():
 
     recalculate.assert_not_called()
     coverage = upsert_state.call_args.args[2]
-    assert coverage["verified_through"] == attempt["window_end"]
-    assert coverage["coverage_status"] == "CONTIGUOUS"
+    assert coverage["verified_end"] == attempt["window_end"]
+    assert coverage["verified_status"] == "CONTIGUOUS"
 
 
 def test_replacement_attempt_recalculates_from_effective_slots():
@@ -362,8 +367,8 @@ def test_replacement_attempt_recalculates_from_effective_slots():
     previous = _coverage_state(start, end)
     recalculated = {
         **previous,
-        "verified_through": start,
-        "coverage_status": "BLOCKED",
+        "verified_end": start,
+        "verified_status": "BLOCKED",
         "blocking_run_id": attempt["run_id"],
         "reason": "replacement failed",
     }
@@ -457,7 +462,67 @@ def test_exceptional_recalculation_reads_effective_slots_not_run_history():
     sql = " ".join(cursor.execute.call_args.args[0].split())
     assert "FROM public.dd_run_slot_state" in sql
     assert "FROM public.dd_run_attempts" not in sql
-    assert coverage["coverage_status"] == "CONTIGUOUS"
+    assert coverage["verified_status"] == "CONTIGUOUS"
+
+
+def test_current_watermark_uses_renamed_state_columns():
+    cursor = Mock()
+    start = datetime(2026, 7, 22, 10, tzinfo=timezone.utc)
+    end = start + timedelta(hours=1)
+    definition = {"check_id": uuid4(), "run_id": uuid4()}
+    coverage = _coverage_state(start, end)
+
+    DataDiffRepository._upsert_watermark_state(
+        cursor,
+        definition,
+        coverage,
+        "ADVANCE",
+        5,
+        end,
+    )
+
+    sql = " ".join(cursor.execute.call_args.args[0].split())
+    assert "verified_start, verified_end, furthest_observed_end" in sql
+    assert "verified_status, blocking_run_id, last_evaluated_run_id" in sql
+    assert "coverage_start" not in sql
+    assert "verified_through" not in sql
+    assert "max_observed_end" not in sql
+    assert "coverage_status" not in sql
+    assert "evaluated_run_id" not in sql.replace("last_evaluated_run_id", "")
+
+
+def test_watermark_event_uses_consistent_verified_column_names():
+    cursor = Mock()
+    start = datetime(2026, 7, 22, 10, tzinfo=timezone.utc)
+    end = start + timedelta(hours=1)
+    definition = {"check_id": uuid4(), "run_id": uuid4()}
+    previous = _coverage_state(start, start)
+    coverage = _coverage_state(start, end)
+
+    DataDiffRepository._insert_watermark_event(
+        cursor,
+        definition,
+        previous,
+        coverage,
+        "ADVANCE",
+        end,
+    )
+
+    sql, params = cursor.execute.call_args.args
+    sql = " ".join(sql.split())
+    assert "verified_start, previous_verified_end, verified_end" in sql
+    assert "furthest_observed_end, verified_status" in sql
+    assert "coverage_start" not in sql
+    assert "verified_through" not in sql
+    assert "max_observed_end" not in sql
+    assert "coverage_status" not in sql
+    assert params[4:9] == (
+        coverage["verified_start"],
+        previous["verified_end"],
+        coverage["verified_end"],
+        coverage["furthest_observed_end"],
+        coverage["verified_status"],
+    )
 
 
 def test_repository_builds_the_shared_database_from_backend_config():

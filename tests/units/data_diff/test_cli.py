@@ -50,10 +50,9 @@ def _pipelinewise(**args):
 
 def _stored_check():
     return {
-        "id": uuid4(),
+        "check_id": uuid4(),
         "revision": 2,
         "is_current": True,
-        "enabled": True,
         "target_id": "target",
         "tap_id": "tap",
         "source_schema": "public",
@@ -62,13 +61,12 @@ def _stored_check():
         "source_key_column": "id",
         "source_timestamp_column": "updated_at",
         "source_compare_columns": [],
-        "frequency_seconds": 3600,
-        "duration_seconds": 3600,
-        "settling_delay_seconds": 21600,
-        "name": "payments-check",
-        "full_check_name": "target/tap/public/payments/payments-check",
-        "coverage_status": None,
-        "verified_through": None,
+        "frequency": "0 * * * *",
+        "window_start_seconds": 3600,
+        "window_end_seconds": 0,
+        "full_check_name": "target/tap/public/payments",
+        "verified_status": None,
+        "verified_end": None,
     }
 
 
@@ -100,12 +98,41 @@ def test_list_checks_reads_backend_and_supports_json(capsys):
         pipelinewise.list_data_diff_checks()
 
     payload = json.loads(capsys.readouterr().out)
-    assert payload[0]["name"] == "payments-check"
+    assert payload[0]["full_check_name"] == "target/tap/public/payments"
+    assert "verified_status" in payload[0]
+    assert "verified_end" in payload[0]
+    assert "coverage_status" not in payload[0]
+    assert "verified_through" not in payload[0]
     assert repository.filters == {
         "target_id": "target",
         "tap_id": "tap",
         "include_versioned": True,
     }
+
+
+def test_list_checks_uses_verified_state_names_in_table_output(capsys):
+    check = _stored_check()
+    check["verified_status"] = "CONTIGUOUS"
+    check["verified_end"] = datetime(2026, 7, 22, 13, tzinfo=timezone.utc)
+    repository = RepositoryContext([check])
+    pipelinewise = _pipelinewise(
+        target="target",
+        tap="tap",
+        output_format="table",
+        include_versioned=False,
+    )
+
+    with patch(
+        "pipelinewise.cli.pipelinewise.DataDiffRepository.from_backend_config",
+        return_value=repository,
+    ):
+        pipelinewise.list_data_diff_checks()
+
+    output = capsys.readouterr().out
+    assert "Verified status" in output
+    assert "Verified end" in output
+    assert "CONTIGUOUS" in output
+    assert "2026-07-22T13:00:00+00:00" in output
 
 
 def test_run_checks_prints_utc_window_and_returns_on_pass(capsys):
@@ -119,7 +146,7 @@ def test_run_checks_prints_utc_window_and_returns_on_pass(capsys):
     ):
         pipelinewise.run_data_diff_checks()
 
-    assert "payments-check" in capsys.readouterr().out
+    assert "target/tap/public/payments" in capsys.readouterr().out
     pipelinewise.alert_sender.send_to_all_handlers.assert_not_called()
 
 

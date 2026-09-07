@@ -1,3 +1,28 @@
+0.84.0 (2026-09-07)
+-------------------
+
+**Data-diff backend schema**
+
+- Rename watermark state and event columns through migration 002 to use
+  ``verified_start``, ``verified_end``, ``furthest_observed_end``, and
+  ``verified_status`` while preserving existing state and event history
+- Use ``previous_verified_end`` for the earlier event boundary and
+  ``last_evaluated_run_id`` for mutable state while retaining ``evaluated_run_id``
+  as the causal run on each event
+- Align data-diff runtime state, CLI output, documentation, and the backend ERD with
+  the new names
+- Update reporting queries for renamed watermark columns and current unresolved
+  failures, add daily per-table check-result and run-level-error counts, and retain
+  remediation-history reporting
+- Require direct SQL consumers and replicated backend-table copies to adopt the new
+  columns; downgrade migration 002 before rolling back to an older PipelineWise version
+
+**Development workflow**
+
+- Compact repository agent guidance without changing commands, thresholds,
+  safeguards, or architecture contracts, and require current CHANGELOG dates
+  and direct entry links when opening or updating pull requests
+
 0.83.1 (2026-09-04)
 -------------------
 
