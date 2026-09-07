@@ -10,6 +10,7 @@
 - Remove stale tap-oracle validation, sample configuration, and image setup
 - Build and document release images explicitly for AMD64
 - Validate the full and barebone image variants in pull requests
+- Pass custom connector selections safely to Docker image builds
 
 **Data-diff backend schema**
 

@@ -30,7 +30,7 @@ COPY Makefile /app
 RUN echo "setup connectors" \
     && cd /app \
     && if [ "$connectors" = "all" ]; then make all_connectors -e pw_acceptlicenses=y; fi\
-    && if [ "$connectors" != "all" ] && [ "$connectors" != "none" ] && [ ! -z $connectors ]; then make connectors -e pw_connector=$connectors -e pw_acceptlicenses=y; fi
+    && if [ "$connectors" != "all" ] && [ "$connectors" != "none" ] && [ -n "$connectors" ]; then make connectors -e "pw_connector=$connectors" -e pw_acceptlicenses=y; fi
 
 COPY . /app
 
