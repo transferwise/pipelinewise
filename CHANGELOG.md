@@ -1,5 +1,23 @@
-0.84.0 (2026-09-07)
+0.84.0 (2026-09-08)
 -------------------
+
+**Docker images**
+
+- Build release images and the development environment on Debian Trixie
+- Install Debian 13 MongoDB tools in the full image for MongoDB FastSync and in
+  the development environment for MongoDB fixtures
+- Keep development MySQL and MariaDB setup compatible with the stricter TLS
+  defaults in Trixie's MariaDB client
+- Stop publishing the duplicate default-connector image and remove its obsolete
+  build paths
+- Remove stale tap-oracle validation, sample configuration, and image setup
+- Make AMD64 the explicit platform for published and development Docker images
+  because MongoDB FastSync requires Debian 13 tools that are only available for
+  x86-64
+- Remove unused GnuPG tooling from the barebone image
+- Build and smoke-test the full and barebone image variants in pull requests
+- Preserve space- and comma-separated custom connector selections when passing
+  them to Docker builds
 
 **Data-diff backend schema**
 
@@ -20,8 +38,9 @@
 **Development workflow**
 
 - Compact repository agent guidance without changing commands, thresholds,
-  safeguards, or architecture contracts, and require current CHANGELOG dates
-  and direct entry links when opening or updating pull requests
+  safeguards, or architecture contracts; define UTC as the canonical convention
+  for replication and data-diff; and require current CHANGELOG dates and direct
+  entry links when opening or updating pull requests
 
 0.83.1 (2026-09-04)
 -------------------

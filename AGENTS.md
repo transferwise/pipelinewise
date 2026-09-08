@@ -25,6 +25,9 @@ preserve the link.
   aliases `sync_tables` and `import`.
 - FastSync optimizes native full/filtered bulk transfer; it is not a replication
   method. Singer handles INCREMENTAL/LOG_BASED and non-FastSync FULL_TABLE streams.
+- Treat UTC as the canonical convention for replication and data-diff timestamps
+  and windows. Interpret source timezones correctly before normalizing; never
+  rely on the host or container timezone for correctness.
 
 ## Environment
 

@@ -534,7 +534,6 @@
         "tap-postgres",
         "tap-mongodb",
         "tap-mysql",
-        "tap-oracle",
         "tap-zendesk",
         "tap-kafka",
         "tap-s3-csv",

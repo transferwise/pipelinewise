@@ -27,6 +27,7 @@ echo "SETTING UP MYSQL PRIMARY SERVER FOR REPLICATION"
 
 mysql --protocol TCP \
 --ssl \
+--disable-ssl-verify-server-cert \
 --host ${TAP_MYSQL_HOST} \
 --port ${TAP_MYSQL_PORT} \
 --user root \
@@ -35,7 +36,10 @@ mysql --protocol TCP \
 
 echo "SET UP MYSQL REPLICA SERVER FOR REPLICATION"
 
+# Admin connections to the disposable replica are plaintext because it has no
+# TLS configuration; its replication link to the primary still uses TLS.
 mysql --protocol TCP \
+--disable-ssl \
 --host ${TAP_MYSQL_REPLICA_HOST} \
 --port ${TAP_MYSQL_REPLICA_PORT} \
 --user root \
@@ -44,13 +48,14 @@ mysql --protocol TCP \
 
 echo "GETTING MYSQL PRIMARY SERVER LOG INFO"
 
-MASTER_LOG_STATUS=`mysql --protocol TCP --ssl --host ${TAP_MYSQL_HOST} --port ${TAP_MYSQL_PORT} --user root --password=${TAP_MYSQL_ROOT_PASSWORD} -e "SHOW MASTER STATUS;"`
+MASTER_LOG_STATUS=`mysql --protocol TCP --ssl --disable-ssl-verify-server-cert --host ${TAP_MYSQL_HOST} --port ${TAP_MYSQL_PORT} --user root --password=${TAP_MYSQL_ROOT_PASSWORD} -e "SHOW MASTER STATUS;"`
 CURRENT_LOG=`echo $MASTER_LOG_STATUS | awk '{print $5}'`
 CURRENT_POS=`echo $MASTER_LOG_STATUS | awk '{print $6}'`
 
 echo "STARTING MYSQL REPLICATION"
 
 mysql --protocol TCP \
+--disable-ssl \
 --host=${TAP_MYSQL_REPLICA_HOST} \
 --port ${TAP_MYSQL_REPLICA_PORT} \
 --user ${TAP_MYSQL_REPLICA_USER} \
@@ -62,6 +67,7 @@ echo "DUMPING DATA INTO PRIMARY MYSQL DATABASE"
 
 mysql --protocol TCP \
 --ssl \
+--disable-ssl-verify-server-cert \
 --host ${TAP_MYSQL_HOST} \
 --port ${TAP_MYSQL_PORT} \
 --user ${TAP_MYSQL_USER} \
@@ -72,6 +78,7 @@ echo "DUMPING DATA INTO PRIMARY MYSQL DATABASE2"
 
 mysql --protocol TCP \
 --ssl \
+--disable-ssl-verify-server-cert \
 --host ${TAP_MYSQL_HOST} \
 --port ${TAP_MYSQL_PORT} \
 --user ${TAP_MYSQL_USER} \
