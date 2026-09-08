@@ -4,14 +4,20 @@
 **Docker images**
 
 - Build release images and the development environment on Debian Trixie
-- Install Debian 13 MongoDB database tools in the full image and development environment
-- Keep development MySQL and MariaDB setup compatible with Trixie's MariaDB client TLS defaults
-- Stop publishing the redundant default-connector image and remove obsolete Docker build paths
+- Install Debian 13 MongoDB tools in the full image for MongoDB FastSync and in
+  the development environment for MongoDB fixtures
+- Keep development MySQL and MariaDB setup compatible with the stricter TLS
+  defaults in Trixie's MariaDB client
+- Stop publishing the duplicate default-connector image and remove its obsolete
+  build paths
 - Remove stale tap-oracle validation, sample configuration, and image setup
-- Build and document Docker images for AMD64 because MongoDB does not publish Debian 13 ARM64 database tools
+- Make AMD64 the explicit platform for published and development Docker images
+  because MongoDB FastSync requires Debian 13 tools that are only available for
+  x86-64
 - Remove unused GnuPG tooling from the barebone image
-- Validate the full and barebone image variants in pull requests
-- Pass custom connector selections safely to Docker image builds
+- Build and smoke-test the full and barebone image variants in pull requests
+- Preserve space- and comma-separated custom connector selections when passing
+  them to Docker builds
 
 **Data-diff backend schema**
 
