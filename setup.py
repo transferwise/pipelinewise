@@ -7,7 +7,7 @@ with open('README.md') as f:
 
 setup(name='pipelinewise',
       python_requires='==3.12.*',
-      version='0.83.1',
+      version='0.84.0',
       description='PipelineWise',
       long_description=LONG_DESCRIPTION,
       long_description_content_type='text/markdown',
@@ -70,7 +70,8 @@ setup(name='pipelinewise',
               'yugabyte-to-postgres=pipelinewise.fastsync.yugabyte_to_postgres:main',
               'yugabyte-to-snowflake=pipelinewise.fastsync.yugabyte_to_snowflake:main',
               'partial-mysql-to-snowflake=pipelinewise.fastsync.partialsync.mysql_to_snowflake:main',
-              'partial-postgres-to-snowflake=pipelinewise.fastsync.partialsync.postgres_to_snowflake:main'
+              'partial-postgres-to-snowflake=pipelinewise.fastsync.partialsync.postgres_to_snowflake:main',
+              'partial-yugabyte-to-snowflake=pipelinewise.fastsync.partialsync.yugabyte_to_snowflake:main'
           ]
       },
       packages=find_packages(exclude=['tests*']),

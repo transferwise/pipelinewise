@@ -32,6 +32,9 @@
   post-disconnect active-slot window
 - Drop a tap's replication slot when its configuration is removed, matching
   existing tap-postgres cleanup behavior
+- Add native PartialSync support (`partial-yugabyte-to-snowflake`) for
+  bounded-range resyncs to Snowflake, reusing PostgreSQL's dialect-safe
+  boundary predicate since YSQL follows PostgreSQL identifier-quoting rules
 
 0.83.1 (2026-09-04)
 -------------------

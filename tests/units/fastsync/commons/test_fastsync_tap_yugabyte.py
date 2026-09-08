@@ -9,6 +9,9 @@ from unittest.mock import MagicMock, Mock, patch
 
 from pipelinewise.fastsync.commons.tap_yugabyte import FastSyncTapYugabyte
 from pipelinewise.fastsync.commons import tap_yugabyte
+from pipelinewise.fastsync.commons.partial_sync_boundary import (
+    PartialSyncBoundary,
+)
 
 
 class TestFastSyncTapYugabyte(TestCase):  # pylint: disable=too-many-public-methods
@@ -318,6 +321,87 @@ class TestFastSyncTapYugabyte(TestCase):  # pylint: disable=too-many-public-meth
                 self.yugabyte.copy_table('public.missing_table', 'unused.csv')
 
         self.assertEqual('public.missing_table table not found.', str(context.exception))
+
+    def test_copy_table_mogrifies_only_the_structured_boundary(self):
+        """COPY keeps projection percent signs outside placeholder parsing."""
+        table_columns = [{
+            0: 'rate%s',
+            1: 'text',
+            2: 'to_char("event_date", \'%Y-%m-01\')',
+            3: None,
+            'safe_sql_value': 'to_char("event_date", \'%Y-%m-01\')',
+        }]
+        self.yugabyte.curr = MagicMock()
+        self.yugabyte.curr.connection.encoding = 'UTF8'
+        self.yugabyte.curr.mogrify.return_value = (
+            b' WHERE "rate%s" >= \'x\\\'\' OR 1=1 --\''
+        )
+        boundary = PartialSyncBoundary('rate%s', "x' OR 1=1 --")
+
+        with patch.object(
+            self.yugabyte, 'get_table_columns', return_value=table_columns
+        ), patch.object(
+            tap_yugabyte.split_gzip, 'open', return_value=io.BytesIO()
+        ):
+            self.yugabyte.copy_table(
+                'public.my_table', 'unused.csv', boundary=boundary
+            )
+
+        self.yugabyte.curr.mogrify.assert_called_once_with(
+            ' WHERE "rate%%s" >= %s',
+            ("x' OR 1=1 --",),
+        )
+        export_sql = self.yugabyte.curr.copy_expert.call_args.args[0]
+        self.assertIn('to_char("event_date", \'%Y-%m-01\')', export_sql)
+        self.assertIn(
+            ' WHERE "rate%s" >= \'x\\\'\' OR 1=1 --\'', export_sql
+        )
+
+    def test_copy_table_without_boundary_omits_where_clause(self):
+        """No boundary means the exported COPY statement has no WHERE clause."""
+        table_columns = [{'safe_sql_value': '"id"'}]
+        self.yugabyte.curr = MagicMock()
+
+        with patch.object(
+            self.yugabyte, 'get_table_columns', return_value=table_columns
+        ), patch.object(tap_yugabyte.split_gzip, 'open', return_value=io.BytesIO()):
+            self.yugabyte.copy_table('public.my_table', 'unused.csv')
+
+        self.yugabyte.curr.mogrify.assert_not_called()
+        export_sql = self.yugabyte.curr.copy_expert.call_args.args[0]
+        self.assertNotIn('WHERE', export_sql)
+
+    def test_export_source_table_data_delegates_to_copy_table(self):
+        """export_source_table_data builds the export path and forwards the boundary."""
+        args = Mock()
+        args.table = 'public.my_table'
+        args.temp_dir = '/tmp/exports'
+        args.target = {
+            'split_large_files': False,
+            'split_file_chunk_size_mb': 1000,
+            'split_file_max_chunks': 20,
+        }
+        boundary = PartialSyncBoundary('id', 1)
+
+        with patch.object(
+            tap_yugabyte.utils, 'gen_export_filename', return_value='export_file.csv'
+        ), patch.object(self.yugabyte, 'copy_table') as copy_table_mock, patch.object(
+            tap_yugabyte.glob, 'glob', return_value=['/tmp/exports/export_file.csv']
+        ) as glob_mock:
+            file_parts = self.yugabyte.export_source_table_data(
+                args, 'test_tap', boundary=boundary
+            )
+
+        copy_table_mock.assert_called_once_with(
+            'public.my_table',
+            '/tmp/exports/export_file.csv',
+            split_large_files=False,
+            split_file_chunk_size_mb=1000,
+            split_file_max_chunks=20,
+            boundary=boundary,
+        )
+        glob_mock.assert_called_once_with('/tmp/exports/export_file.csv*')
+        self.assertEqual(['/tmp/exports/export_file.csv'], file_parts)
 
     def test_get_table_columns_hstore_projection_depends_on_hstore_as_json(self):
         """hstore_as_json toggles the hstore_to_json projection in generated SQL"""

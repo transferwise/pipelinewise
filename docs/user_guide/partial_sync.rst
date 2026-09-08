@@ -4,8 +4,8 @@ PartialSync behaviour
 =====================
 
 PartialSync exports a bounded source range, loads a temporary target table, and
-merges that range into the existing target. It is available from MariaDB/MySQL or
-PostgreSQL to Snowflake.
+merges that range into the existing target. It is available from MariaDB/MySQL,
+PostgreSQL, or YugabyteDB to Snowflake.
 
 
 Range semantics

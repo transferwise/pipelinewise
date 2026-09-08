@@ -17,7 +17,7 @@ wire protocol.
      - Bulk transfer
    * - YugabyteDB
      - Experimental
-     - FullSync to PostgreSQL or Snowflake; no PartialSync
+     - FullSync to PostgreSQL or Snowflake; PartialSync to Snowflake
 
 
 Prerequisites

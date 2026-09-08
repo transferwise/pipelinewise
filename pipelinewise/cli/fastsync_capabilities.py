@@ -73,7 +73,7 @@ _FASTSYNC_CAPABILITIES: Mapping[CapabilityKey, FastSyncCapabilities] = MappingPr
         TABLE_FORMAT_NATIVE,
         ConnectorType.TAP_YUGABYTE,
         ConnectorType.TARGET_SNOWFLAKE,
-    ): FastSyncCapabilities(full_sync=True),
+    ): FastSyncCapabilities(full_sync=True, partial_sync=True),
     (
         TABLE_FORMAT_NATIVE,
         ConnectorType.TAP_YUGABYTE,
