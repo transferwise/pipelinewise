@@ -57,8 +57,6 @@ The local tag is required because ``bin/pipelinewise-docker`` runs
      - Contents
    * - ``transferwiseworkspace/pipelinewise:<version>``
      - PipelineWise with every packaged connector.
-   * - ``transferwiseworkspace/pipelinewise:<version>-default``
-     - PipelineWise with only the default connector subset.
    * - ``transferwiseworkspace/pipelinewise-barebone:<version>``
      - PipelineWise without pre-installed connector environments.
 
@@ -81,7 +79,7 @@ instead of pulling one:
 
 .. code-block:: bash
 
-    docker build -t pipelinewise:latest .
+    docker build --platform linux/amd64 -t pipelinewise:latest .
 
 
 .. _building_from_source:

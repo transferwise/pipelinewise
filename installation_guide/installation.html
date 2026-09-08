@@ -426,10 +426,7 @@ docker<span class="w"> </span>tag<span class="w"> </span>transferwiseworkspace/p
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">transferwiseworkspace/pipelinewise:&lt;version&gt;</span></code></p></td>
 <td><p>PipelineWise with every packaged connector.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">transferwiseworkspace/pipelinewise:&lt;version&gt;-default</span></code></p></td>
-<td><p>PipelineWise with only the default connector subset.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">transferwiseworkspace/pipelinewise-barebone:&lt;version&gt;</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">transferwiseworkspace/pipelinewise-barebone:&lt;version&gt;</span></code></p></td>
 <td><p>PipelineWise without pre-installed connector environments.</p></td>
 </tr>
 </tbody>
@@ -446,7 +443,7 @@ pipelinewise<span class="w"> </span>status
 generated configuration, state, and logs below <code class="docutils literal notranslate"><span class="pre">~/.pipelinewise</span></code> on the host.</p>
 <p>To customise system packages or connector selection, build a local image
 instead of pulling one:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>docker<span class="w"> </span>build<span class="w"> </span>-t<span class="w"> </span>pipelinewise:latest<span class="w"> </span>.
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>docker<span class="w"> </span>build<span class="w"> </span>--platform<span class="w"> </span>linux/amd64<span class="w"> </span>-t<span class="w"> </span>pipelinewise:latest<span class="w"> </span>.
 </pre></div>
 </div>
 </section>
