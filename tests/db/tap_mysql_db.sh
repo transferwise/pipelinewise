@@ -36,6 +36,8 @@ mysql --protocol TCP \
 
 echo "SET UP MYSQL REPLICA SERVER FOR REPLICATION"
 
+# Admin connections to the disposable replica are plaintext because it has no
+# TLS configuration; its replication link to the primary still uses TLS.
 mysql --protocol TCP \
 --disable-ssl \
 --host ${TAP_MYSQL_REPLICA_HOST} \

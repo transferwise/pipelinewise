@@ -15,6 +15,7 @@ RUN apt-get -qq update \
     && rm -rf /var/lib/apt/lists/* \
     && pip install -U --no-cache-dir pip
 
+# MongoDB does not publish Debian 13 ARM64 database tools.
 RUN wget -q \
         "https://fastdl.mongodb.org/tools/db/mongodb-database-tools-debian13-x86_64-${MONGODB_TOOLS_VERSION}.deb" \
         -O /tmp/mongodb-database-tools.deb \

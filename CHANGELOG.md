@@ -1,4 +1,4 @@
-0.84.0 (2026-09-07)
+0.84.0 (2026-09-08)
 -------------------
 
 **Docker images**
@@ -8,7 +8,8 @@
 - Keep development MySQL and MariaDB setup compatible with Trixie's MariaDB client TLS defaults
 - Stop publishing the redundant default-connector image and remove obsolete Docker build paths
 - Remove stale tap-oracle validation, sample configuration, and image setup
-- Build and document release images explicitly for AMD64
+- Build and document Docker images for AMD64 because MongoDB does not publish Debian 13 ARM64 database tools
+- Remove unused GnuPG tooling from the barebone image
 - Validate the full and barebone image variants in pull requests
 - Pass custom connector selections safely to Docker image builds
 

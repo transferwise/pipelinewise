@@ -4,7 +4,6 @@ RUN apt-get -qq update \
     && apt-get -qqy --no-install-recommends install \
         apt-utils \
         gettext-base \
-        gnupg \
         make \
         wget \
     && rm -rf /var/lib/apt/lists/* \
