@@ -815,7 +815,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
     finally:
         try:
             if finalize_state:
-                if lsn_last_processed:
+                if lsn_last_processed is not None:
                     if target_acknowledged_lsn > lsn_last_processed:
                         LOGGER.info('Current lsn_last_processed %s is older than target-acknowledged lsn %s',
                                     int_to_lsn(lsn_last_processed),

@@ -17,8 +17,8 @@
   emission so unavailable markers do not create expected source-database errors
 - Use the LSN returned by PostgreSQL logical-message emission and the first
   decoded commit at or beyond it as the idle-WAL bookmark boundary
-- Reject zero as a newly emitted marker boundary while preserving general
-  conversion of valid low LSN values
+- Reject zero as a newly emitted marker boundary while preserving conversion and
+  final bookmark updates for valid low LSN values
 - Emit the marker-boundary state only once in continuous mode and close logical
   replication resources on every exit path
 
@@ -26,8 +26,8 @@
 
 - Verify the PostgreSQL 11.2 source-connection boundary, cleanup-only slot
   removal, current WAL functions, LOG_BASED progress, marker capability fallback,
-  one-time continuous checkpoints, marker validation, and replication resource
-  cleanup
+  one-time continuous checkpoints, marker validation, zero-LSN finalization, and
+  replication resource cleanup
 
 0.84.0 (2026-09-08)
 -------------------

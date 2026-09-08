@@ -1596,6 +1596,26 @@ class TestLogicalReplicationFeedback(unittest.TestCase):
         self.assertEqual(220, state['bookmarks']['foo-bar']['lsn'])
         self.assertEqual(self._expected_feedback(100), feedback)
 
+    def test_finalization_writes_zero_lsn_to_every_stream(self):
+        """A valid zero LSN is distinct from the uninitialized sentinel."""
+        streams = [self._stream('foo-bar', 'foo_table'), self._stream('foo-baz', 'baz_table')]
+        state = self._state({'foo-bar': 0, 'foo-baz': 5})
+        state_reader = mock_open(read_data=json.dumps(state))
+        messages = [self._message('B', 0), self._message('B', 1)]
+
+        feedback, error, termination, written_messages = self._run_sync(
+            state,
+            messages,
+            state_reader,
+            logical_streams=streams,
+        )
+
+        self.assertIs(error, termination)
+        self.assertEqual(0, state['bookmarks']['foo-bar']['lsn'])
+        self.assertEqual(0, state['bookmarks']['foo-baz']['lsn'])
+        self.assertEqual(self._expected_feedback(0), feedback)
+        self.assertEqual(0, written_messages[-1].args[0].value['bookmarks']['foo-baz']['lsn'])
+
     def test_commit_before_marker_position_does_not_end_current_sync(self):
         """A commit older than the emitted marker cannot satisfy the boundary."""
         state = self._state({'foo-bar': 100})
