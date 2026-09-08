@@ -1,3 +1,8 @@
+0.85.0 (2026-09-08)
+-------------------
+
+- Switch base image to Debian Trixie, as Bullseye is now deprecated
+
 0.84.0 (2026-09-07)
 -------------------
 
