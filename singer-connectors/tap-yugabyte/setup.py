@@ -19,7 +19,9 @@ setup(name='pipelinewise-tap-yugabyte',
       python_requires=">=3.12.0, <3.13",
       install_requires=[
           'pipelinewise-singer-python==3.0.2',
-          'psycopg2-binary==2.9.12',
+          # YugabyteDB's native-load-balancing psycopg2 fork; drop-in compatible with psycopg2-binary
+          "psycopg2-yugabytedb-binary==2.9.3.5.post1; sys_platform == 'darwin'",
+          "psycopg2-yugabytedb-binary==2.9.3.5; sys_platform == 'linux'",
           'strict-rfc3339==0.7',
           'simplejson==4.1.1'
       ],

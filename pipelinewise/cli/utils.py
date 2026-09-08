@@ -463,6 +463,13 @@ def get_tap_default_replication_method(tap):
     return get_tap_property(tap, 'default_replication_method')
 
 
+# YugabyteDB FastSync/PartialSync executables run from their own venv so they can use
+# YugabyteDB's native-load-balancing psycopg2 fork without affecting the psycopg2-binary
+# used by backend_db, data-diff, and PostgreSQL/MariaDB/MongoDB FastSync.
+def _fastsync_venv_name(tap_type):
+    return 'fastsync-yugabyte' if tap_type == 'tap-yugabyte' else 'pipelinewise'
+
+
 def get_fastsync_bin(venv_dir, tap_type, target_type):
     """
     Get the absolute path of a fastsync executable
@@ -471,7 +478,7 @@ def get_fastsync_bin(venv_dir, tap_type, target_type):
     target = target_type.replace('target-', '')
     fastsync_name = f'{source}-to-{target}'
 
-    return os.path.join(venv_dir, 'pipelinewise', 'bin', fastsync_name)
+    return os.path.join(venv_dir, _fastsync_venv_name(tap_type), 'bin', fastsync_name)
 
 
 def get_partialsync_bin(venv_dir, tap_type, target_type):
@@ -480,7 +487,7 @@ def get_partialsync_bin(venv_dir, tap_type, target_type):
     target = target_type.replace('target-', '')
     partialsync_name = f'partial-{source}-to-{target}'
 
-    return os.path.join(venv_dir, 'pipelinewise', 'bin', partialsync_name)
+    return os.path.join(venv_dir, _fastsync_venv_name(tap_type), 'bin', partialsync_name)
 
 
 def get_pipelinewise_python_bin(venv_dir: str) -> str:

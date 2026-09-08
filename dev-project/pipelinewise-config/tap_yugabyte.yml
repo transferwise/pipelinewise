@@ -21,6 +21,8 @@ db_conn:
   #filter_schemas: "schema1,schema2"   # Optional: Scan only the required schemas
                                        #    to improve the performance of
                                        #    data extraction
+  #load_balance: "true"                # Optional: Enable YugabyteDB native client-side load balancing
+  #topology_keys: "cloud1.region1.zone1,cloud1.region1.zone2" # Optional: with load_balance: "any"
 
 
 # ------------------------------------------------------------------------------

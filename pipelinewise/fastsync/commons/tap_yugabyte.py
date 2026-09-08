@@ -132,6 +132,12 @@ class FastSyncTapYugabyte:
         if connection_config.get('ssl') == 'true':
             conn_string += " sslmode='require'"
 
+        if connection_config.get('load_balance'):
+            conn_string += f" load_balance='{connection_config['load_balance']}'"
+
+        if connection_config.get('topology_keys'):
+            conn_string += f" topology_keys='{connection_config['topology_keys']}'"
+
         conn = psycopg2.connect(conn_string)
 
         # Set connection to autocommit

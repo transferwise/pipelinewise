@@ -1,10 +1,47 @@
 import unittest
+from unittest.mock import patch
 
 from tap_yugabyte import db
 
 
 class TestDbFunctions(unittest.TestCase):
     maxDiff = None
+
+    def test_open_connection_without_load_balance(self):
+        """open_connection must not pass load_balance/topology_keys when unset"""
+        conn_config = {
+            'host': 'my_host',
+            'dbname': 'my_db',
+            'user': 'my_user',
+            'password': 'my_password',
+            'port': 5433,
+        }
+
+        with patch.object(db.psycopg2, 'connect') as connect_mock:
+            db.open_connection(conn_config)
+
+        _, kwargs = connect_mock.call_args
+        self.assertNotIn('load_balance', kwargs)
+        self.assertNotIn('topology_keys', kwargs)
+
+    def test_open_connection_with_load_balance_and_topology_keys(self):
+        """open_connection must forward load_balance/topology_keys to psycopg2.connect"""
+        conn_config = {
+            'host': 'my_host',
+            'dbname': 'my_db',
+            'user': 'my_user',
+            'password': 'my_password',
+            'port': 5433,
+            'load_balance': 'any',
+            'topology_keys': 'cloud1.region1.zone1,cloud1.region1.zone2',
+        }
+
+        with patch.object(db.psycopg2, 'connect') as connect_mock:
+            db.open_connection(conn_config)
+
+        _, kwargs = connect_mock.call_args
+        self.assertEqual('any', kwargs['load_balance'])
+        self.assertEqual('cloud1.region1.zone1,cloud1.region1.zone2', kwargs['topology_keys'])
 
     def test_value_to_singer_value(self):
         """Every element is converted from its sql_datatype to the correct singer type"""

@@ -76,6 +76,12 @@ def open_connection(conn_config, logical_replication=False):
     if conn_config.get('sslmode'):
         cfg['sslmode'] = conn_config['sslmode']
 
+    if conn_config.get('load_balance'):
+        cfg['load_balance'] = conn_config['load_balance']
+
+    if conn_config.get('topology_keys'):
+        cfg['topology_keys'] = conn_config['topology_keys']
+
     if logical_replication:
         cfg['connection_factory'] = psycopg2.extras.LogicalReplicationConnection
 

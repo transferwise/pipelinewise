@@ -86,6 +86,14 @@ if ! make pipelinewise -e pw_acceptlicenses=y; then
     exit 1
 fi
 
+# Isolated venv for the YugabyteDB FastSync executables so they get the
+# native-load-balancing psycopg2 driver instead of the main venv's psycopg2-binary.
+if ! make fastsync-yugabyte -e pw_acceptlicenses=y; then
+    echo
+    echo "ERROR: Docker container not started. Failed to install the YugabyteDB FastSync venv."
+    exit 1
+fi
+
 CONNECTORS=(
   target-snowflake
   target-postgres

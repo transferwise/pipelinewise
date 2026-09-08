@@ -186,6 +186,24 @@ class TestUtils:
             cli.utils.get_fastsync_bin(VIRTUALENVS_DIR, 'mysql', 'snowflake') == \
             '{}/pipelinewise/bin/mysql-to-snowflake'.format(VIRTUALENVS_DIR)
 
+    def test_fastsync_bin_routes_yugabyte_to_its_own_venv(self):
+        """YugabyteDB FastSync must resolve against the isolated fastsync-yugabyte venv"""
+        assert \
+            cli.utils.get_fastsync_bin(VIRTUALENVS_DIR, 'tap-yugabyte', 'snowflake') == \
+            '{}/fastsync-yugabyte/bin/yugabyte-to-snowflake'.format(VIRTUALENVS_DIR)
+
+    def test_partialsync_bin_routes_yugabyte_to_its_own_venv(self):
+        """YugabyteDB PartialSync must resolve against the isolated fastsync-yugabyte venv"""
+        assert \
+            cli.utils.get_partialsync_bin(VIRTUALENVS_DIR, 'tap-yugabyte', 'snowflake') == \
+            '{}/fastsync-yugabyte/bin/partial-yugabyte-to-snowflake'.format(VIRTUALENVS_DIR)
+
+    def test_partialsync_bin_keeps_other_taps_on_the_main_venv(self):
+        """Non-YugabyteDB PartialSync must keep resolving against the main pipelinewise venv"""
+        assert \
+            cli.utils.get_partialsync_bin(VIRTUALENVS_DIR, 'tap-postgres', 'snowflake') == \
+            '{}/pipelinewise/bin/partial-postgres-to-snowflake'.format(VIRTUALENVS_DIR)
+
     def test_vault(self):
         """Test vault encrypt and decrypt functionalities"""
         # Encrypting with not existing file with secret should exit

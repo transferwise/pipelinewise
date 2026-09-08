@@ -240,6 +240,45 @@ class TestFastSyncTapYugabyte(TestCase):  # pylint: disable=too-many-public-meth
             "sslmode='require'"
         )
 
+    def test_get_connection_with_load_balance(self):
+        """get_connection must append load_balance when set in connection_config"""
+        creds = {
+            'host': 'my_host',
+            'user': 'my_user',
+            'password': 'my_password',
+            'dbname': 'my_db',
+            'port': 'my_port',
+            'load_balance': 'true',
+        }
+
+        with patch.object(tap_yugabyte.psycopg2, 'connect') as connect_mock:
+            FastSyncTapYugabyte.get_connection(creds)
+
+        connect_mock.assert_called_once_with(
+            "host='my_host' port='my_port' user='my_user' password='my_password' dbname='my_db' "
+            "load_balance='true'"
+        )
+
+    def test_get_connection_with_topology_keys(self):
+        """get_connection must append topology_keys when set in connection_config"""
+        creds = {
+            'host': 'my_host',
+            'user': 'my_user',
+            'password': 'my_password',
+            'dbname': 'my_db',
+            'port': 'my_port',
+            'load_balance': 'any',
+            'topology_keys': 'cloud1.region1.zone1,cloud1.region1.zone2',
+        }
+
+        with patch.object(tap_yugabyte.psycopg2, 'connect') as connect_mock:
+            FastSyncTapYugabyte.get_connection(creds)
+
+        connect_mock.assert_called_once_with(
+            "host='my_host' port='my_port' user='my_user' password='my_password' dbname='my_db' "
+            "load_balance='any' topology_keys='cloud1.region1.zone1,cloud1.region1.zone2'"
+        )
+
     def test_drop_slot_retries_while_slot_is_active(self):
         """drop_slot must retry on 'slot is active' and eventually succeed"""
         slot_active_error = _psycopg2_error('replication slot "my_db_tap_test" is active')

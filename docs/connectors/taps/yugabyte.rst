@@ -101,6 +101,19 @@ Configuration
      - No
      - Connector default
      - Uses YSQL ``sslmode=require`` when set to ``"true"``.
+   * - ``load_balance``
+     - No
+     - Off
+     - Enables YugabyteDB's client-side load balancing across cluster nodes
+       for this connection. ``"true"`` distributes connections uniformly;
+       ``"any"`` is required together with ``topology_keys`` for
+       topology-aware placement.
+   * - ``topology_keys``
+     - No
+     - None
+     - Comma-separated ``cloud.region.zone[:preference]`` list restricting
+       ``load_balance: "any"`` to the given placements. Ignored unless
+       ``load_balance`` is set.
    * - ``itersize``
      - No
      - ``20000``
@@ -118,6 +131,11 @@ Configuration
      - No
      - CPU count
      - Controls concurrent FastSync table exports.
+
+``load_balance`` and ``topology_keys`` apply to every connection opened for
+this tap, including FastSync FullSync/PartialSync bulk exports and LOG_BASED
+streaming, since both connect through YugabyteDB's native-load-balancing
+psycopg2 driver.
 
 Common tap settings are documented in :ref:`yaml_configuration`. Generate the
 full template with ``pipelinewise init``.
