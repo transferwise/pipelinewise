@@ -16,6 +16,7 @@ class TestIncremental(TestCase):
         super(TestIncremental, cls).setUpClass()
         cls.patcher = patch('psycopg2.connect')
         mocked_connect = cls.patcher.start()
+        mocked_connect.return_value.server_version = 110002
         mocked_connect.return_value.__enter__.return_value = MockedConnect()
 
     @classmethod

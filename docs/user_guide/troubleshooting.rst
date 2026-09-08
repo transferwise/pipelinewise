@@ -325,7 +325,7 @@ interval before changing timeouts or state.
 * **If the source or network terminated the connection,** correct that cause and
   restart the same tap without advancing state.
 
-* **For PostgreSQL versions before 12, consider upgrading.** PostgreSQL 12 and
+* **For PostgreSQL 11, consider upgrading.** PostgreSQL 12 and
   later support the session-level ``wal_sender_timeout`` that PipelineWise sets.
 
 * **If the PostgreSQL log reports a sender timeout,** check the effective value:
@@ -356,8 +356,8 @@ or concurrent transactions, or several PipelineWise replications consuming slots
 on the same PostgreSQL cluster can increase both spill I/O and total memory demand.
 
 *How to diagnose:*
-Check the configured value. PostgreSQL versions before 13 return no row because
-they do not provide this setting:
+Check the configured value. PostgreSQL 11 and 12 return no row because they do
+not provide this setting:
 
 .. code-block:: sql
 

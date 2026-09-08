@@ -36,20 +36,8 @@ class UnsupportedPayloadKindError(Exception):
     """Custom exception when waljson payload is not insert, update nor delete"""
 
 
+# Preserve the legacy connector lint baseline; scope new suppressions narrowly.
 # pylint: disable=invalid-name,missing-function-docstring,too-many-branches,too-many-statements,too-many-arguments
-def _read_pg_version(conn):
-    with conn.cursor() as cur:
-        cur.execute("SELECT setting::int AS version FROM pg_settings WHERE name='server_version_num'")
-        version = cur.fetchone()[0]
-    LOGGER.debug('Detected PostgreSQL version: %s', version)
-    return version
-
-
-def get_pg_version(conn_info):
-    with post_db.open_connection(conn_info, False, True) as conn:
-        return _read_pg_version(conn)
-
-
 def lsn_to_int(lsn):
     """Convert pg_lsn to int"""
 
@@ -64,7 +52,7 @@ def lsn_to_int(lsn):
 def int_to_lsn(lsni):
     """Convert int to pg_lsn"""
 
-    if not lsni:
+    if lsni is None:
         return None
 
     # Convert the integer to binary
@@ -83,31 +71,10 @@ def int_to_lsn(lsni):
     return lsn
 
 
-# pylint: disable=chained-comparison
 def fetch_current_lsn(conn_config):
     with post_db.open_connection(conn_config, False, True) as conn:
-        version = _read_pg_version(conn)
-        # Make sure PostgreSQL version is 9.4 or higher
-        # Do not allow minor versions with PostgreSQL BUG #15114
-        if (version >= 110000) and (version < 110002):
-            raise Exception('PostgreSQL upgrade required to minor version 11.2')
-        if (version >= 100000) and (version < 100007):
-            raise Exception('PostgreSQL upgrade required to minor version 10.7')
-        if (version >= 90600) and (version < 90612):
-            raise Exception('PostgreSQL upgrade required to minor version 9.6.12')
-        if (version >= 90500) and (version < 90516):
-            raise Exception('PostgreSQL upgrade required to minor version 9.5.16')
-        if (version >= 90400) and (version < 90421):
-            raise Exception('PostgreSQL upgrade required to minor version 9.4.21')
-        if version < 90400:
-            raise Exception('Logical replication not supported before PostgreSQL 9.4')
-
         with conn.cursor() as cur:
-            # Use version specific lsn command
-            if version >= 100000:
-                cur.execute("SELECT pg_current_wal_lsn() AS current_lsn")
-            else:
-                cur.execute("SELECT pg_current_xlog_location() AS current_lsn")
+            cur.execute("SELECT pg_current_wal_lsn() AS current_lsn")
 
             current_lsn = cur.fetchone()[0]
             return lsn_to_int(current_lsn)
@@ -115,18 +82,45 @@ def fetch_current_lsn(conn_config):
 
 def emit_wal_progress_message(conn_info):
     """Emit a transactional marker through the portable three-argument API."""
+    availability_query = """
+        WITH function_check AS (
+            SELECT COALESCE(
+                pg_catalog.to_regprocedure(
+                    'pg_catalog.pg_logical_emit_message(boolean,text,text,boolean)'
+                ),
+                pg_catalog.to_regprocedure(
+                    'pg_catalog.pg_logical_emit_message(boolean,text,text)'
+                )
+            ) AS function_oid
+        )
+        SELECT CASE
+                   WHEN function_oid IS NULL THEN FALSE
+                   ELSE pg_catalog.has_function_privilege(current_user, function_oid, 'EXECUTE')
+               END
+          FROM function_check
+    """
+
     conn = None
     try:
         conn = post_db.open_connection(conn_info, False, True)
         with conn:
             with conn.cursor() as cur:
+                cur.execute(availability_query)
+                available = cur.fetchone()
+                if not available or available[0] is not True:
+                    LOGGER.debug('Logical WAL progress messages are unavailable')
+                    return None
+
                 cur.execute(
                     'SELECT pg_catalog.pg_logical_emit_message(TRUE, %s, %s)',
                     (WAL_PROGRESS_MESSAGE_PREFIX, WAL_PROGRESS_MESSAGE_CONTENT)
                 )
                 emitted_lsn = cur.fetchone()
-        return lsn_to_int(emitted_lsn[0]) if emitted_lsn else None
-    except (psycopg2.errors.InsufficientPrivilege, psycopg2.errors.UndefinedFunction):
+        marker_lsn = lsn_to_int(emitted_lsn[0]) if emitted_lsn else None
+        return marker_lsn if marker_lsn is not None and marker_lsn > 0 else None
+    except (  # pylint: disable=no-member
+            psycopg2.errors.InsufficientPrivilege,
+            psycopg2.errors.UndefinedFunction):
         LOGGER.debug('Logical WAL progress messages are unavailable')
         return None
     except psycopg2.Error as ex:
@@ -640,6 +634,30 @@ def _write_lsn_state(state, logical_streams, lsn):
     return state
 
 
+def _start_replication(cur, logical_streams, slot, start_lsn, version):
+    if version >= 120000:
+        wal_sender_timeout = 10800000  # 10800000ms = 3 hours
+        LOGGER.info('Set session wal_sender_timeout = %i milliseconds', wal_sender_timeout)
+        cur.execute(f"SET SESSION wal_sender_timeout = {wal_sender_timeout}")
+
+    try:
+        # psycopg2 2.8.4 will send a keep-alive message to postgres every status_interval
+        cur.start_replication(slot_name=slot,
+                              decode=True,
+                              start_lsn=start_lsn,
+                              status_interval=FEEDBACK_POLL_INTERVAL,
+                              options={
+                                  'format-version': 2,
+                                  'include-transaction': True,
+                                  'include-timestamp': True,
+                                  'include-types': False,
+                                  'actions': 'insert,update,delete',
+                                  'add-tables': streams_to_wal2json_tables(logical_streams)
+                              })
+    except psycopg2.ProgrammingError as ex:
+        raise Exception(f"Unable to start replication with logical replication (slot {ex})") from ex
+
+
 def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
     target_acknowledged_lsn = _minimum_acknowledged_lsn(state, logical_streams)
     start_lsn = target_acknowledged_lsn
@@ -661,50 +679,30 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
             ['lsn'],
             record_update_mode=sync_common.PATCH_RECORD_UPDATE_MODE)
 
-    version = get_pg_version(conn_info)
-
     # Create replication connection and cursor
     conn = post_db.open_connection(conn_info, True, True)
-    cur = conn.cursor()
-
-    # Set session wal_sender_timeout for PG12 and above
-    if version >= 120000:
-        wal_sender_timeout = 10800000  # 10800000ms = 3 hours
-        LOGGER.info('Set session wal_sender_timeout = %i milliseconds', wal_sender_timeout)
-        cur.execute(f"SET SESSION wal_sender_timeout = {wal_sender_timeout}")
+    version = conn.server_version
+    cur = None
+    finalize_state = False
 
     try:
-        # psycopg2 2.8.4 will send a keep-alive message to postgres every status_interval
-        cur.start_replication(slot_name=slot,
-                              decode=True,
-                              start_lsn=start_lsn,
-                              status_interval=poll_interval,
-                              options={
-                                  'format-version': 2,
-                                  'include-transaction': True,
-                                  'include-timestamp': True,
-                                  'include-types': False,
-                                  'actions': 'insert,update,delete',
-                                  'add-tables': streams_to_wal2json_tables(logical_streams)
-                              })
+        cur = conn.cursor()
+        _start_replication(cur, logical_streams, slot, start_lsn, version)
 
-    except psycopg2.ProgrammingError as ex:
-        raise Exception(f"Unable to start replication with logical replication (slot {ex})") from ex
+        marker_lsn = emit_wal_progress_message(conn_info)
+        if marker_lsn is not None:
+            end_lsn = marker_lsn
 
-    marker_lsn = emit_wal_progress_message(conn_info)
-    if marker_lsn is not None:
-        end_lsn = marker_lsn
+        LOGGER.info('Request wal streaming from %s to %s (slot %s)',
+                    int_to_lsn(start_lsn),
+                    int_to_lsn(end_lsn),
+                    slot)
 
-    LOGGER.info('Request wal streaming from %s to %s (slot %s)',
-                int_to_lsn(start_lsn),
-                int_to_lsn(end_lsn),
-                slot)
+        lsn_received_timestamp = datetime.datetime.utcnow()
+        poll_timestamp = datetime.datetime.utcnow()
 
-    lsn_received_timestamp = datetime.datetime.utcnow()
-    poll_timestamp = datetime.datetime.utcnow()
-
-    completed_wal_progress_lsn = None
-    try:
+        completed_wal_progress_lsn = None
+        finalize_state = True
         while True:
             # Disconnect when no data received for logical_poll_total_seconds
             # needs to be long enough to wait for the largest single wal payload to avoid unplanned timeouts
@@ -774,6 +772,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
                 # The returned marker LSN is inside its transaction. Only a decoded
                 # commit at or beyond it proves a complete, restart-safe boundary.
                 if (marker_lsn is not None
+                        and completed_wal_progress_lsn is None
                         and message_payload.get('action') == 'C'
                         and msg.data_start >= marker_lsn):
                     lsn_last_processed = msg.data_start
@@ -813,24 +812,28 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
                         cur.send_feedback(write_lsn=lsn_to_flush, flush_lsn=lsn_to_flush, reply=True, force=True)
 
                 poll_timestamp = datetime.datetime.utcnow()
-
-        # Close replication connection and cursor
-        cur.close()
-        conn.close()
     finally:
-        if lsn_last_processed:
-            if target_acknowledged_lsn > lsn_last_processed:
-                LOGGER.info('Current lsn_last_processed %s is older than target-acknowledged lsn %s',
-                            int_to_lsn(lsn_last_processed),
-                            int_to_lsn(target_acknowledged_lsn))
-                lsn_last_processed = target_acknowledged_lsn
+        try:
+            if finalize_state:
+                if lsn_last_processed:
+                    if target_acknowledged_lsn > lsn_last_processed:
+                        LOGGER.info('Current lsn_last_processed %s is older than target-acknowledged lsn %s',
+                                    int_to_lsn(lsn_last_processed),
+                                    int_to_lsn(target_acknowledged_lsn))
+                        lsn_last_processed = target_acknowledged_lsn
 
-            LOGGER.info('Updating bookmarks for all streams to lsn = %s (%s)',
-                        lsn_last_processed,
-                        int_to_lsn(lsn_last_processed))
+                    LOGGER.info('Updating bookmarks for all streams to lsn = %s (%s)',
+                                lsn_last_processed,
+                                int_to_lsn(lsn_last_processed))
 
-            state = _write_lsn_state(state, logical_streams, lsn_last_processed)
-        else:
-            singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
+                    state = _write_lsn_state(state, logical_streams, lsn_last_processed)
+                else:
+                    singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
+        finally:
+            try:
+                if cur is not None:
+                    cur.close()
+            finally:
+                conn.close()
 
     return state

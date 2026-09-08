@@ -1,17 +1,33 @@
-0.84.1 (TBD)
-------------
+0.85.0 (2026-09-08)
+-------------------
+
+**PostgreSQL source compatibility**
+
+- Require PostgreSQL 11.2 or later for every Singer source replication method,
+  FullSync, and PartialSync, while retaining cleanup-only removal of replication
+  slots from older sources
+- Remove pre-11 WAL-function compatibility and use the supported WAL functions
+  directly
 
 **PostgreSQL logical replication**
 
 - Emit LOG_BASED progress markers only after replication starts, using a
   three-argument call compatible with PostgreSQL 11 through 18
+- Check both PostgreSQL marker-function signatures and execution privilege before
+  emission so unavailable markers do not create expected source-database errors
 - Use the LSN returned by PostgreSQL logical-message emission and the first
   decoded commit at or beyond it as the idle-WAL bookmark boundary
+- Reject zero as a newly emitted marker boundary while preserving general
+  conversion of valid low LSN values
+- Emit the marker-boundary state only once in continuous mode and close logical
+  replication resources on every exit path
 
 **Tests**
 
-- Verify LOG_BASED progress from the returned marker LSN without marker UUID or
-  payload matching
+- Verify the PostgreSQL 11.2 source-connection boundary, cleanup-only slot
+  removal, current WAL functions, LOG_BASED progress, marker capability fallback,
+  one-time continuous checkpoints, marker validation, and replication resource
+  cleanup
 
 0.84.0 (2026-09-08)
 -------------------

@@ -109,4 +109,7 @@ class TestCli2:
         assert silentremove.call_args_list == [ call(f'{CONFIG_DIR}/target_two/tap_four')]
 
         # called because the deleted tap is a tap-postgres
-        drop_slot.assert_called_once()
+        drop_slot.assert_called_once_with(
+            {'host': 'localhost'},
+            allow_unsupported_version_for_config_removal=True,
+        )
