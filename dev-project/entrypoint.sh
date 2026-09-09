@@ -3,7 +3,8 @@
 set -e
 
 MONGOSH_VERSION=2.2.9
-MONGODB_TOOLS_VERSION=100.9.5
+MONGODB_TOOLS_VERSION=100.18.0
+MONGODB_TOOLS_SHA256=a65b3104c87a6a0b9bf15fb748763af8b58c51c60f770e85c885d96cbb28ddda
 
 # The repo root is bind-mounted here, so downloads go to /tmp to keep the
 # developer's working tree clean.
@@ -51,12 +52,11 @@ apt_retry apt-get install -y --no-install-recommends \
   make \
   mariadb-client \
   mbuffer \
-  postgresql-client \
-  python3 python3.12-venv
+  postgresql-client
 
 # Do a bunch of Mongo things
 MONGOSH_DEB=mongodb-mongosh_${MONGOSH_VERSION}_amd64.deb
-MONGODB_TOOLS_DEB=mongodb-database-tools-ubuntu2004-x86_64-${MONGODB_TOOLS_VERSION}.deb
+MONGODB_TOOLS_DEB=mongodb-database-tools-debian13-x86_64-${MONGODB_TOOLS_VERSION}.deb
 
 net_retry wget -q -O "${DOWNLOAD_DIR}/${MONGOSH_DEB}" \
   "https://downloads.mongodb.com/compass/${MONGOSH_DEB}"
@@ -65,6 +65,7 @@ rm -f "${DOWNLOAD_DIR}/${MONGOSH_DEB}"
 
 net_retry wget -q -O "${DOWNLOAD_DIR}/${MONGODB_TOOLS_DEB}" \
   "https://fastdl.mongodb.org/tools/db/${MONGODB_TOOLS_DEB}"
+echo "${MONGODB_TOOLS_SHA256}  ${DOWNLOAD_DIR}/${MONGODB_TOOLS_DEB}" | sha256sum -c -
 apt_retry apt-get install -y "${DOWNLOAD_DIR}/${MONGODB_TOOLS_DEB}"
 rm -f "${DOWNLOAD_DIR}/${MONGODB_TOOLS_DEB}"
 

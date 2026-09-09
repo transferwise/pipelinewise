@@ -2,12 +2,68 @@ import decimal
 import unittest
 
 import datetime
+from unittest.mock import MagicMock, patch
 
 from tap_postgres import db
 
 
 class TestDbFunctions(unittest.TestCase):
     maxDiff = None
+
+    def setUp(self):
+        self.conn_config = {
+            'host': 'primary.example.com',
+            'dbname': 'source_db',
+            'user': 'pipelinewise',
+            'password': 'secret',
+            'port': 5432,
+            'use_secondary': False,
+        }
+
+    @patch('tap_postgres.db.psycopg2.connect')
+    def test_open_connection_rejects_postgres_before_11_2(self, connect):
+        """Every connector connection rejects an unsupported source."""
+        connection = connect.return_value
+        connection.server_version = 110001
+
+        with self.assertRaisesRegex(
+                db.UnsupportedPostgresVersionError,
+                'PostgreSQL 11.2 or later is required; '
+                'connected server reports server_version_num 110001',
+        ):
+            db.open_connection(self.conn_config)
+
+        connection.close.assert_called_once_with()
+
+    @patch('tap_postgres.db.psycopg2.connect')
+    def test_open_connection_accepts_supported_versions(self, connect):
+        """The exact support floor and newer logical connections are accepted."""
+        cases = ((110002, False), (110002, True), (180000, True))
+
+        for server_version, logical_replication in cases:
+            with self.subTest(
+                    server_version=server_version,
+                    logical_replication=logical_replication,
+            ):
+                connect.reset_mock()
+                connection = MagicMock()
+                connection.server_version = server_version
+                connect.return_value = connection
+
+                result = db.open_connection(
+                    self.conn_config,
+                    logical_replication=logical_replication,
+                )
+
+                self.assertIs(connection, result)
+                connection.close.assert_not_called()
+                if logical_replication:
+                    self.assertIs(
+                        db.psycopg2.extras.LogicalReplicationConnection,
+                        connect.call_args.kwargs['connection_factory'],
+                    )
+                else:
+                    self.assertNotIn('connection_factory', connect.call_args.kwargs)
 
     def test_value_to_singer_value(self):
         """Test if every element converted from sql_datatype to the correct singer type"""
@@ -220,4 +276,3 @@ class TestDbFunctions(unittest.TestCase):
         expected_output = "foo AND n.nspname in ('bar_1','bar_2')"
         actual_output = db.filter_schemas_sql_clause(sql, filter_schemas)
         self.assertEqual(expected_output, actual_output)
-

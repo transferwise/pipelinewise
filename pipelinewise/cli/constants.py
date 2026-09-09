@@ -13,7 +13,6 @@ class ConnectorType(enum.Enum):
     TAP_MIXPANEL = 'tap-mixpanel'
     TAP_MONGODB = 'tap-mongodb'
     TAP_MYSQL = 'tap-mysql'
-    TAP_ORACLE = 'tap-oracle'
     TAP_POSTGRES = 'tap-postgres'
     TAP_S3_CSV = 'tap-s3-csv'
     TAP_SALESFORCE = 'tap-salesforce'

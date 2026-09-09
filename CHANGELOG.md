@@ -1,4 +1,4 @@
-0.85.0 (2026-09-08)
+0.86.0 (2026-09-09)
 -------------------
 
 **tap-yugabyte**
@@ -56,6 +56,81 @@
 - Add native PartialSync support (`partial-yugabyte-to-snowflake`) for
   bounded-range resyncs to Snowflake, reusing PostgreSQL's dialect-safe
   boundary predicate since YSQL follows PostgreSQL identifier-quoting rules
+
+0.85.0 (2026-09-08)
+-------------------
+
+**PostgreSQL source compatibility**
+
+- Require PostgreSQL 11.2 or later for every Singer source replication method,
+  FullSync, and PartialSync, while retaining cleanup-only removal of replication
+  slots from older sources
+- Remove pre-11 WAL-function compatibility and use the supported WAL functions
+  directly
+
+**PostgreSQL logical replication**
+
+- Emit LOG_BASED progress markers only after replication starts, using a
+  three-argument call compatible with PostgreSQL 11 through 18
+- Check both PostgreSQL marker-function signatures and execution privilege before
+  emission so unavailable markers do not create expected source-database errors
+- Use the LSN returned by PostgreSQL logical-message emission and the first
+  decoded commit at or beyond it as the idle-WAL bookmark boundary
+- Reject zero as a newly emitted marker boundary while preserving conversion and
+  final bookmark updates for valid low LSN values
+- Emit the marker-boundary state only once in continuous mode and close logical
+  replication resources on every exit path
+
+**Tests**
+
+- Verify the PostgreSQL 11.2 source-connection boundary, cleanup-only slot
+  removal, current WAL functions, LOG_BASED progress, marker capability fallback,
+  one-time continuous checkpoints, marker validation, zero-LSN finalization, and
+  replication resource cleanup
+
+0.84.0 (2026-09-08)
+-------------------
+
+**Docker images**
+
+- Build release images and the development environment on Debian Trixie
+- Install Debian 13 MongoDB tools in the full image for MongoDB FastSync and in
+  the development environment for MongoDB fixtures
+- Keep development MySQL and MariaDB setup compatible with the stricter TLS
+  defaults in Trixie's MariaDB client
+- Stop publishing the duplicate default-connector image and remove its obsolete
+  build paths
+- Remove stale tap-oracle validation, sample configuration, and image setup
+- Make AMD64 the explicit platform for published and development Docker images
+  because MongoDB FastSync requires Debian 13 tools that are only available for
+  x86-64
+- Remove unused GnuPG tooling from the barebone image
+- Build and smoke-test the full and barebone image variants in pull requests
+- Preserve space- and comma-separated custom connector selections when passing
+  them to Docker builds
+
+**Data-diff backend schema**
+
+- Rename watermark state and event columns through migration 002 to use
+  ``verified_start``, ``verified_end``, ``furthest_observed_end``, and
+  ``verified_status`` while preserving existing state and event history
+- Use ``previous_verified_end`` for the earlier event boundary and
+  ``last_evaluated_run_id`` for mutable state while retaining ``evaluated_run_id``
+  as the causal run on each event
+- Align data-diff runtime state, CLI output, documentation, and the backend ERD with
+  the new names
+- Update reporting queries for renamed watermark columns and current unresolved
+  failures, add daily per-table check-result and run-level-error counts, and retain
+  remediation-history reporting
+- Require direct SQL consumers and replicated backend-table copies to adopt the new
+  columns; downgrade migration 002 before rolling back to an older PipelineWise version
+
+**Development workflow**
+
+- Compact repository agent guidance without changing commands, thresholds,
+  safeguards, or architecture contracts; define UTC as the canonical convention
+  for replication and data-diff; and require current CHANGELOG dates and direct
+  entry links when opening or updating pull requests
 
 0.83.1 (2026-09-04)
 -------------------

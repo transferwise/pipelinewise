@@ -23,9 +23,9 @@ def calculate_coverage(runs: list, *, data_checks_enabled: bool = True) -> dict:
     if not effective:
         return {}
 
-    coverage_start = min(run["window_start"] for run in effective)
-    max_observed_end = max(run["window_end"] for run in effective)
-    cursor = coverage_start
+    verified_start = min(run["window_start"] for run in effective)
+    furthest_observed_end = max(run["window_end"] for run in effective)
+    cursor = verified_start
     blocking_runs = sorted(
         (run for run in effective if run["status"] != "PASS"),
         key=lambda item: (item["window_start"], item["window_end"]),
@@ -49,9 +49,11 @@ def calculate_coverage(runs: list, *, data_checks_enabled: bool = True) -> dict:
     blocking_run = None
     if barrier is not None and barrier <= cursor:
         blocking_run = blocking_runs[0]
-    status = "CONTIGUOUS" if cursor >= max_observed_end else "BLOCKED"
+    verified_status = (
+        "CONTIGUOUS" if cursor >= furthest_observed_end else "BLOCKED"
+    )
     if not data_checks_enabled:
-        status = "BLOCKED"
+        verified_status = "BLOCKED"
 
     if not data_checks_enabled:
         reason = "Metadata-only checks cannot advance table coverage"
@@ -60,16 +62,16 @@ def calculate_coverage(runs: list, *, data_checks_enabled: bool = True) -> dict:
             f"Run {blocking_run['run_id']} has status {blocking_run['status']} at the "
             "coverage boundary"
         )
-    elif status == "BLOCKED":
+    elif verified_status == "BLOCKED":
         reason = "No successful run covers the next timestamp interval"
     else:
         reason = "All observed timestamp intervals are covered by successful runs"
 
     return {
-        "coverage_start": coverage_start,
-        "verified_through": cursor,
-        "max_observed_end": max_observed_end,
-        "coverage_status": status,
+        "verified_start": verified_start,
+        "verified_end": cursor,
+        "furthest_observed_end": furthest_observed_end,
+        "verified_status": verified_status,
         "blocking_run_id": blocking_run["run_id"] if blocking_run else None,
         "reason": reason,
     }
@@ -84,55 +86,57 @@ def advance_coverage(previous: dict, run: dict, *, data_checks_enabled: bool = T
     if not previous:
         return calculate_coverage([run], data_checks_enabled=data_checks_enabled)
 
-    coverage_start = previous["coverage_start"]
-    verified_through = previous["verified_through"]
-    max_observed_end = max(previous["max_observed_end"], run["window_end"])
+    verified_start = previous["verified_start"]
+    verified_end = previous["verified_end"]
+    furthest_observed_end = max(
+        previous["furthest_observed_end"], run["window_end"]
+    )
     blocking_run_id = previous.get("blocking_run_id")
 
     if not data_checks_enabled:
         return {
-            "coverage_start": coverage_start,
-            "verified_through": verified_through,
-            "max_observed_end": max_observed_end,
-            "coverage_status": "BLOCKED",
+            "verified_start": verified_start,
+            "verified_end": verified_end,
+            "furthest_observed_end": furthest_observed_end,
+            "verified_status": "BLOCKED",
             "blocking_run_id": None,
             "reason": "Metadata-only checks cannot advance table coverage",
         }
 
-    if previous["coverage_status"] == "BLOCKED":
+    if previous["verified_status"] == "BLOCKED":
         return {
-            "coverage_start": coverage_start,
-            "verified_through": verified_through,
-            "max_observed_end": max_observed_end,
-            "coverage_status": "BLOCKED",
+            "verified_start": verified_start,
+            "verified_end": verified_end,
+            "furthest_observed_end": furthest_observed_end,
+            "verified_status": "BLOCKED",
             "blocking_run_id": blocking_run_id,
             "reason": previous["reason"],
         }
 
     if run["status"] == "PASS":
-        if run["window_start"] <= verified_through:
-            verified_through = max(verified_through, run["window_end"])
-    elif run["window_start"] <= verified_through:
-        verified_through = run["window_start"]
+        if run["window_start"] <= verified_end:
+            verified_end = max(verified_end, run["window_end"])
+    elif run["window_start"] <= verified_end:
+        verified_end = run["window_start"]
         blocking_run_id = run["run_id"]
 
-    coverage_status = (
-        "CONTIGUOUS" if verified_through >= max_observed_end else "BLOCKED"
+    verified_status = (
+        "CONTIGUOUS" if verified_end >= furthest_observed_end else "BLOCKED"
     )
     if blocking_run_id:
         reason = (
             f"Run {blocking_run_id} has status {run['status']} at the coverage boundary"
         )
-    elif coverage_status == "BLOCKED":
+    elif verified_status == "BLOCKED":
         reason = "No successful run covers the next timestamp interval"
     else:
         reason = "All observed timestamp intervals are covered by successful runs"
 
     return {
-        "coverage_start": coverage_start,
-        "verified_through": verified_through,
-        "max_observed_end": max_observed_end,
-        "coverage_status": coverage_status,
+        "verified_start": verified_start,
+        "verified_end": verified_end,
+        "furthest_observed_end": furthest_observed_end,
+        "verified_status": verified_status,
         "blocking_run_id": blocking_run_id,
         "reason": reason,
     }
@@ -142,12 +146,12 @@ def coverage_event_type(previous: dict, current: dict) -> str:
     """Describe how a newly evaluated run changed the coverage watermark."""
     if not previous:
         return "INITIALIZE"
-    old_value = previous["verified_through"]
-    new_value = current["verified_through"]
+    old_value = previous["verified_end"]
+    new_value = current["verified_end"]
     if new_value > old_value:
         return "ADVANCE"
     if new_value < old_value:
         return "INVALIDATE"
-    if current["coverage_status"] == "BLOCKED":
+    if current["verified_status"] == "BLOCKED":
         return "BLOCK"
     return "CONFIRM"

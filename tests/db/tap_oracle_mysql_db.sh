@@ -20,14 +20,14 @@ done
 
 echo "Building genuine MySQL test database..."
 
-mysql --protocol TCP --ssl \
+mysql --protocol TCP --ssl --disable-ssl-verify-server-cert \
   --host "${TAP_ORACLE_MYSQL_HOST}" \
   --port "${TAP_ORACLE_MYSQL_PORT}" \
   --user root \
   --password="${TAP_ORACLE_MYSQL_ROOT_PASSWORD}" \
   -e "GRANT REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO '${TAP_ORACLE_MYSQL_USER}'@'%'; FLUSH PRIVILEGES;"
 
-mysql --protocol TCP --ssl \
+mysql --protocol TCP --ssl --disable-ssl-verify-server-cert \
   --host "${TAP_ORACLE_MYSQL_HOST}" \
   --port "${TAP_ORACLE_MYSQL_PORT}" \
   --user "${TAP_ORACLE_MYSQL_USER}" \

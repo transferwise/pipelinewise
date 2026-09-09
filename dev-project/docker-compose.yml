@@ -1,10 +1,10 @@
 services:
   ### Primary container with PipelineWise CLI
   pipelinewise:
-    # entrypoint.sh installs amd64-only .debs (mongosh, mongodb-database-tools),
-    # so arm64 hosts emulate.
+    # MongoDB does not publish Debian 13 ARM64 database tools, so development
+    # uses the same AMD64 packages as release images and emulates on ARM64 hosts.
     platform: linux/amd64
-    image: ubuntu:24.04
+    image: python:3.12-slim-trixie
     container_name: pipelinewise
     working_dir: /opt/pipelinewise
     entrypoint: /opt/pipelinewise/dev-project/entrypoint.sh

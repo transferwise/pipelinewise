@@ -17,6 +17,7 @@ from .partial_sync_boundary import PartialSyncBoundary
 from ...utils import safe_column_name
 
 LOGGER = logging.getLogger(__name__)
+MIN_SUPPORTED_POSTGRES_VERSION = 110002
 
 
 class FastSyncTapPostgres:
@@ -99,17 +100,30 @@ class FastSyncTapPostgres:
         return slot_name
 
     @classmethod
-    def drop_slot(cls, connection_config: Dict) -> None:
+    def drop_slot(
+        cls,
+        connection_config: Dict,
+        *,
+        allow_unsupported_version_for_config_removal: bool = False,
+    ) -> None:
         """
         Dropping the logical replication slot from primary server
 
         Args:
             connection_config: Dictionary with db credentials
+            allow_unsupported_version_for_config_removal: Permit cleanup of a
+                removed tap whose source predates the supported version floor.
         """
         LOGGER.info('Attempting to drop slot ...')
 
         LOGGER.debug('Creating a connection to Primary server ..')
-        connection = cls.get_connection(connection_config, prioritize_primary=True)
+        connection = cls.get_connection(
+            connection_config,
+            prioritize_primary=True,
+            allow_unsupported_version_for_config_removal=(
+                allow_unsupported_version_for_config_removal
+            ),
+        )
         LOGGER.debug('Connection to Primary server created.')
 
         try:
@@ -130,7 +144,13 @@ class FastSyncTapPostgres:
             connection.close()
 
     @classmethod
-    def get_connection(cls, connection_config: Dict, prioritize_primary: bool = False):
+    def get_connection(
+        cls,
+        connection_config: Dict,
+        prioritize_primary: bool = False,
+        *,
+        allow_unsupported_version_for_config_removal: bool = False,
+    ):
         """
         Class method to create a pg connection instance with autocommit enabled
         Connection is either to the primary or a replica if its credentials are given
@@ -138,6 +158,8 @@ class FastSyncTapPostgres:
         Args:
             prioritize_primary: boolean to control whether to connect to primary or replica
             connection_config: Dictionary containing the db connection details
+            allow_unsupported_version_for_config_removal: Permit only removed-tap
+                cleanup to connect below the supported version floor.
         Returns:
             pg Connection instance
         """
@@ -173,6 +195,19 @@ class FastSyncTapPostgres:
             conn_string += " sslmode='require'"
 
         conn = psycopg2.connect(conn_string)
+
+        if (
+            not allow_unsupported_version_for_config_removal
+            and conn.server_version < MIN_SUPPORTED_POSTGRES_VERSION
+        ):
+            server_version = conn.server_version
+            try:
+                conn.close()
+            finally:
+                raise RuntimeError(
+                    'PostgreSQL 11.2 or later is required; '
+                    f'connected server reports server_version_num {server_version}'
+                )
 
         # Set connection to autocommit
         conn.autocommit = True
@@ -288,7 +323,7 @@ class FastSyncTapPostgres:
             else:
                 raise exc
 
-    # pylint: disable=too-many-branches,no-member,chained-comparison
+    # pylint: disable=no-member
     def fetch_current_log_pos(self):
         """
         Get the actual wal position in Postgres
@@ -299,28 +334,6 @@ class FastSyncTapPostgres:
             self.connection_config, prioritize_primary=True
         )
         try:
-            # Make sure PostgreSQL version is 9.4 or higher
-            # pylint: disable=assignment-from-no-return
-            result = self.primary_host_query(
-                "SELECT setting::int AS version FROM pg_settings WHERE name='server_version_num'"
-            )
-            # pylint: disable=unsubscriptable-object
-            version = result[0].get('version')
-
-            # Do not allow minor versions with PostgreSQL BUG #15114
-            if (version >= 110000) and (version < 110002):
-                raise Exception('PostgreSQL upgrade required to minor version 11.2')
-            if (version >= 100000) and (version < 100007):
-                raise Exception('PostgreSQL upgrade required to minor version 10.7')
-            if (version >= 90600) and (version < 90612):
-                raise Exception('PostgreSQL upgrade required to minor version 9.6.12')
-            if (version >= 90500) and (version < 90516):
-                raise Exception('PostgreSQL upgrade required to minor version 9.5.16')
-            if (version >= 90400) and (version < 90421):
-                raise Exception('PostgreSQL upgrade required to minor version 9.4.21')
-            if version < 90400:
-                raise Exception('Logical replication not supported before PostgreSQL 9.4')
-
             # Create replication slot
             self.create_replication_slot()
         finally:
@@ -329,26 +342,10 @@ class FastSyncTapPostgres:
         # is replica_host set ?
         if self.connection_config.get('replica_host'):
             # Get latest applied lsn from replica_host
-            if version >= 100000:
-                result = self.query('SELECT pg_last_wal_replay_lsn() AS current_lsn')
-            elif version >= 90400:
-                result = self.query(
-                    'SELECT pg_last_xlog_replay_location() AS current_lsn'
-                )
-            else:
-                raise Exception(
-                    'Logical replication not supported before PostgreSQL 9.4'
-                )
+            result = self.query('SELECT pg_last_wal_replay_lsn() AS current_lsn')
         else:
             # Get current lsn from primary host
-            if version >= 100000:
-                result = self.query('SELECT pg_current_wal_lsn() AS current_lsn')
-            elif version >= 90400:
-                result = self.query('SELECT pg_current_xlog_location() AS current_lsn')
-            else:
-                raise Exception(
-                    'Logical replication not supported before PostgreSQL 9.4'
-                )
+            result = self.query('SELECT pg_current_wal_lsn() AS current_lsn')
 
         current_lsn = result[0].get('current_lsn')
         file, index = current_lsn.split('/')

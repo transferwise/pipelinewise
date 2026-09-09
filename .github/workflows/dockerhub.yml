@@ -9,11 +9,14 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v7
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v4
 
     - name: Generate tag
       uses: frabert/replace-string-action@v2.5
@@ -35,6 +38,7 @@ jobs:
       with:
         file: ./Dockerfile
         context: .
+        platforms: linux/amd64
         push: true
         tags: |
           transferwiseworkspace/pipelinewise:${{ steps.genTag.outputs.replaced }}
@@ -46,26 +50,13 @@ jobs:
       with:
         file: ./Dockerfile.barebone
         context: .
+        platforms: linux/amd64
         push: true
         tags: |
           transferwiseworkspace/pipelinewise-barebone:${{ steps.genTag.outputs.replaced }}
           transferwiseworkspace/pipelinewise-barebone:latest
           
-    - name: Build and push main image with only default connectors
-      id: docker_build_default
-      uses: docker/build-push-action@v7
-      with:
-        file: ./Dockerfile
-        context: .
-        build_args: |
-          "connectors=default"
-        push: true
-        tags: |
-          transferwiseworkspace/pipelinewise:${{ steps.genTag.outputs.replaced }}-default
-          transferwiseworkspace/pipelinewise:latest-default
-
     - name: Image digests
       run: |
         echo ${{ steps.docker_build_main.outputs.digest }}
         echo ${{ steps.docker_build_barebone.outputs.digest }}
-        echo ${{ steps.docker_build_default.outputs.digest }}

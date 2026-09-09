@@ -8,6 +8,10 @@
 
 This is a [PipelineWise](https://transferwise.github.io/pipelinewise) compatible tap connector.
 
+PostgreSQL 11.2 or later is required for every Singer replication method and for
+PipelineWise FullSync/PartialSync. This source minimum does not constrain
+PostgreSQL targets or the PipelineWise backend database.
+
 ## How to use it
 
 The recommended method of running this tap is to use it from [PipelineWise](https://transferwise.github.io/pipelinewise). When running it from PipelineWise you don't need to configure this tap with JSON files and most of things are automated. Please check the related documentation at [Tap Postgres](https://transferwise.github.io/pipelinewise/connectors/taps/postgres.html)
@@ -115,15 +119,6 @@ The tap will write bookmarks to stdout which can be captured and passed as an op
 to the tap for the next sync.
 
 ### Log Based replication requirements
-
-* PostgreSQL databases running **PostgreSQL versions 9.4.x or greater**. To avoid a critical PostgreSQL bug,
-  use at least one of the following minor versions:
-   - PostgreSQL 12.0
-   - PostgreSQL 11.2
-   - PostgreSQL 10.7
-   - PostgreSQL 9.6.12
-   - PostgreSQL 9.5.16
-   - PostgreSQL 9.4.21
 
 * **A connection to the master instance**. Log-based replication will only work by connecting to the master instance.
 

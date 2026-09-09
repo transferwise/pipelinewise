@@ -242,11 +242,12 @@ class DataDiffRepository:
             cursor.execute(
                 f"""
                 SELECT checks.*,
-                       coverage.coverage_start, coverage.verified_through,
-                       coverage.max_observed_end, coverage.coverage_status,
+                       coverage.verified_start, coverage.verified_end,
+                       coverage.furthest_observed_end,
+                       coverage.verified_status,
                        coverage.blocking_run_id,
                        coverage.updated_at AS verified_at,
-                       coverage.evaluated_run_id AS coverage_run_id,
+                       coverage.last_evaluated_run_id,
                        coverage.reason AS coverage_reason
                   FROM {SCHEMA}.dd_check_definitions checks
                   LEFT JOIN {SCHEMA}.dd_watermark_state coverage
@@ -277,11 +278,12 @@ class DataDiffRepository:
             cursor.execute(
                 f"""
                 SELECT checks.*,
-                       coverage.coverage_start, coverage.verified_through,
-                       coverage.max_observed_end, coverage.coverage_status,
+                       coverage.verified_start, coverage.verified_end,
+                       coverage.furthest_observed_end,
+                       coverage.verified_status,
                        coverage.blocking_run_id,
                        coverage.updated_at AS verified_at,
-                       coverage.evaluated_run_id AS coverage_run_id,
+                       coverage.last_evaluated_run_id,
                        coverage.reason AS coverage_reason
                   FROM {SCHEMA}.dd_check_definitions checks
                   LEFT JOIN {SCHEMA}.dd_watermark_state coverage
@@ -553,8 +555,8 @@ class DataDiffRepository:
             coverage = {
                 key: previous[key]
                 for key in (
-                    "coverage_start", "verified_through", "max_observed_end",
-                    "coverage_status", "blocking_run_id", "reason",
+                    "verified_start", "verified_end", "furthest_observed_end",
+                    "verified_status", "blocking_run_id", "reason",
                 )
             }
         else:
@@ -587,7 +589,10 @@ class DataDiffRepository:
     def _watermark_state_for_update(cursor, check_id):
         cursor.execute(
             f"""
-            SELECT *
+            SELECT check_id, verified_start, verified_end,
+                   furthest_observed_end, verified_status, blocking_run_id,
+                   last_evaluated_run_id, event_type, state_version,
+                   updated_at, reason
               FROM {SCHEMA}.dd_watermark_state
              WHERE check_id = %s
              FOR UPDATE
@@ -677,26 +682,26 @@ class DataDiffRepository:
         cursor.execute(
             f"""
             INSERT INTO {SCHEMA}.dd_watermark_state(
-                check_id, coverage_start, verified_through, max_observed_end,
-                coverage_status, blocking_run_id, evaluated_run_id, event_type,
-                state_version, updated_at, reason
+                check_id, verified_start, verified_end, furthest_observed_end,
+                verified_status, blocking_run_id, last_evaluated_run_id,
+                event_type, state_version, updated_at, reason
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (check_id) DO UPDATE
-               SET coverage_start = EXCLUDED.coverage_start,
-                   verified_through = EXCLUDED.verified_through,
-                   max_observed_end = EXCLUDED.max_observed_end,
-                   coverage_status = EXCLUDED.coverage_status,
+               SET verified_start = EXCLUDED.verified_start,
+                   verified_end = EXCLUDED.verified_end,
+                   furthest_observed_end = EXCLUDED.furthest_observed_end,
+                   verified_status = EXCLUDED.verified_status,
                    blocking_run_id = EXCLUDED.blocking_run_id,
-                   evaluated_run_id = EXCLUDED.evaluated_run_id,
+                   last_evaluated_run_id = EXCLUDED.last_evaluated_run_id,
                    event_type = EXCLUDED.event_type,
                    state_version = EXCLUDED.state_version,
                    updated_at = EXCLUDED.updated_at,
                    reason = EXCLUDED.reason
             """,
             (
-                definition["check_id"], coverage["coverage_start"],
-                coverage["verified_through"], coverage["max_observed_end"],
-                coverage["coverage_status"], coverage["blocking_run_id"],
+                definition["check_id"], coverage["verified_start"],
+                coverage["verified_end"], coverage["furthest_observed_end"],
+                coverage["verified_status"], coverage["blocking_run_id"],
                 definition["run_id"], event_type, state_version, recorded_at,
                 coverage["reason"],
             ),
@@ -715,17 +720,17 @@ class DataDiffRepository:
             f"""
             INSERT INTO {SCHEMA}.dd_watermark_events(
                 watermark_event_id, check_id, evaluated_run_id, event_type,
-                coverage_start, previous_verified_through, verified_through,
-                max_observed_end, coverage_status, blocking_run_id,
+                verified_start, previous_verified_end, verified_end,
+                furthest_observed_end, verified_status, blocking_run_id,
                 recorded_at, reason
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 uuid.uuid4(), definition["check_id"], definition["run_id"],
-                event_type, coverage["coverage_start"],
-                previous["verified_through"] if previous else None,
-                coverage["verified_through"], coverage["max_observed_end"],
-                coverage["coverage_status"], coverage["blocking_run_id"],
+                event_type, coverage["verified_start"],
+                previous["verified_end"] if previous else None,
+                coverage["verified_end"], coverage["furthest_observed_end"],
+                coverage["verified_status"], coverage["blocking_run_id"],
                 recorded_at, coverage["reason"],
             ),
         )

@@ -1926,9 +1926,9 @@ class PipelineWise:
                 check['frequency'],
                 check['window_start_seconds'],
                 check['window_end_seconds'],
-                check.get('coverage_status') or '',
-                check['verified_through'].isoformat()
-                if check.get('verified_through') else '',
+                check.get('verified_status') or '',
+                check['verified_end'].isoformat()
+                if check.get('verified_end') else '',
             ]
             for check in checks
         ]
@@ -1939,7 +1939,7 @@ class PipelineWise:
                     'Check ID', 'Rev', 'Current', 'Target',
                     'Tap', 'Source table', 'Checks', 'Key', 'Timestamp',
                     'Compare columns', 'Frequency', 'Window start (s)',
-                    'Window end (s)', 'Coverage', 'Verified through',
+                    'Window end (s)', 'Verified status', 'Verified end',
                 ],
             )
         )
@@ -2637,7 +2637,10 @@ TAP RUN SUMMARY
             ))
             if tap_config:
                 if tap_type == 'tap-postgres':
-                    FastSyncTapPostgres.drop_slot(tap_config)
+                    FastSyncTapPostgres.drop_slot(
+                        tap_config,
+                        allow_unsupported_version_for_config_removal=True,
+                    )
                 else:
                     FastSyncTapYugabyte.drop_slot(tap_config)
 

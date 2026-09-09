@@ -230,8 +230,9 @@ class TestPostgresToPostgresDataDiff:
 
         initial_coverage = self.run_backend_query(
             f"""
-            SELECT coverage_status, blocking_run_id::text,
-                   evaluated_run_id::text, verified_through
+            SELECT verified_status, blocking_run_id::text,
+                   last_evaluated_run_id::text, verified_start, verified_end,
+                   furthest_observed_end
               FROM public.dd_watermark_state
              WHERE check_id = '{check_id}'
             """
@@ -240,6 +241,8 @@ class TestPostgresToPostgresDataDiff:
             'CONTIGUOUS',
             None,
             pass_run_id,
+            pass_window_start,
+            pass_window_end,
             pass_window_end,
         )
         assert self.run_backend_query(
@@ -251,7 +254,7 @@ class TestPostgresToPostgresDataDiff:
         ) == [(pass_run_id, 1, 'PASS')]
         assert self.run_backend_query(
             f"""
-            SELECT state_version, evaluated_run_id::text
+            SELECT state_version, last_evaluated_run_id::text
               FROM public.dd_watermark_state
              WHERE check_id = '{check_id}'
             """
@@ -320,7 +323,8 @@ class TestPostgresToPostgresDataDiff:
 
         blocked_coverage = self.run_backend_query(
             f"""
-            SELECT coverage_status, blocking_run_id::text, verified_through
+            SELECT verified_status, blocking_run_id::text, verified_end,
+                   furthest_observed_end
               FROM public.dd_watermark_state
              WHERE check_id = '{check_id}'
             """
@@ -329,6 +333,7 @@ class TestPostgresToPostgresDataDiff:
             'BLOCKED',
             failed_run_id,
             failed_window_start,
+            failed_window_end,
         )
         assert self.run_backend_query(
             f"""
@@ -339,7 +344,7 @@ class TestPostgresToPostgresDataDiff:
         ) == [(failed_run_id, failed_attempt, 'FAIL')]
         assert self.run_backend_query(
             f"""
-            SELECT state_version, evaluated_run_id::text
+            SELECT state_version, last_evaluated_run_id::text
               FROM public.dd_watermark_state
              WHERE check_id = '{check_id}'
             """
@@ -424,8 +429,8 @@ class TestPostgresToPostgresDataDiff:
 
         final_coverage = self.run_backend_query(
             f"""
-            SELECT coverage_status, blocking_run_id::text,
-                   evaluated_run_id::text, verified_through
+            SELECT verified_status, blocking_run_id::text,
+                   last_evaluated_run_id::text, verified_end
               FROM public.dd_watermark_state
              WHERE check_id = '{check_id}'
             """
@@ -445,7 +450,7 @@ class TestPostgresToPostgresDataDiff:
         ) == [(remediation_run_id, remediation_attempt, 'PASS')]
         assert self.run_backend_query(
             f"""
-            SELECT state_version, evaluated_run_id::text
+            SELECT state_version, last_evaluated_run_id::text
               FROM public.dd_watermark_state
              WHERE check_id = '{check_id}'
             """
@@ -485,8 +490,8 @@ class TestPostgresToPostgresDataDiff:
         ]
         assert self.run_backend_query(
             f"""
-            SELECT state_version, evaluated_run_id::text,
-                   verified_through, event_type
+            SELECT state_version, last_evaluated_run_id::text,
+                   verified_end, event_type
               FROM public.dd_watermark_state
              WHERE check_id = '{check_id}'
             """
@@ -585,9 +590,44 @@ class TestPostgresToPostgresDataDiff:
                 'dd_current_coverage', 'dd_remediation_history',
             }.isdisjoint(tables)
 
+            watermark_columns = {
+                row[0] for row in self.run_backend_query(
+                    "SELECT column_name FROM information_schema.columns"
+                    " WHERE table_schema = 'public'"
+                    " AND table_name = 'dd_watermark_state'"
+                )
+            }
+            assert {
+                'verified_start', 'verified_end', 'furthest_observed_end',
+                'verified_status', 'last_evaluated_run_id',
+            } <= watermark_columns
+            assert {
+                'coverage_start', 'verified_through', 'max_observed_end',
+                'coverage_status', 'evaluated_run_id',
+            }.isdisjoint(watermark_columns)
+
+            watermark_event_columns = {
+                row[0] for row in self.run_backend_query(
+                    "SELECT column_name FROM information_schema.columns"
+                    " WHERE table_schema = 'public'"
+                    " AND table_name = 'dd_watermark_events'"
+                )
+            }
+            assert {
+                'verified_start', 'previous_verified_end', 'verified_end',
+                'furthest_observed_end', 'verified_status', 'evaluated_run_id',
+            } <= watermark_event_columns
+            assert {
+                'coverage_start', 'previous_verified_through',
+                'verified_through', 'max_observed_end', 'coverage_status',
+            }.isdisjoint(watermark_event_columns)
+
             assert self.e2e.run_ddl_pipelinewise_backend(
                 "SELECT to_regclass(quote_ident(current_user) || '.alembic_version')"
             )[0][0] is None
+            assert self.run_backend_query(
+                'SELECT version_num FROM public.alembic_version'
+            ) == [('002',)]
             # Alembic stamped its version, so a second import is a no-op migration.
             assert self.run_backend_query(
                 'SELECT COUNT(*) FROM public.alembic_version'
