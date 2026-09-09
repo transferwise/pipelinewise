@@ -14,6 +14,10 @@
   run the native-load-balancing driver, while backend_db, data-diff, and
   PostgreSQL/MariaDB FastSync keep the stock `psycopg2-binary` in the main
   `pipelinewise` virtualenv
+- Force-reinstall `psycopg2-yugabytedb-binary` in `make fastsync-yugabyte`, so
+  the driver swap is not silently skipped when a Docker anonymous volume
+  already has files at the shared install path from a prior `psycopg2-binary`
+  install
 
 0.84.0 (2026-09-07)
 -------------------
