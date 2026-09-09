@@ -166,9 +166,9 @@ fastsync-yugabyte: .check_gettext .pw_logo
 	@echo "Swapping psycopg2 driver in fastsync-yugabyte for YugabyteDB native load balancing..."
 	@$(VENV_DIR)/fastsync-yugabyte/bin/python3 -m pip uninstall -y psycopg2-binary
 	@if [ "$$(uname -s)" = "Darwin" ]; then \
-		$(VENV_DIR)/fastsync-yugabyte/bin/python3 -m pip install --use-pep517 psycopg2-yugabytedb-binary==2.9.3.5.post1; \
+		$(VENV_DIR)/fastsync-yugabyte/bin/python3 -m pip install --use-pep517 --force-reinstall --no-cache-dir psycopg2-yugabytedb-binary==2.9.3.5.post1; \
 	else \
-		$(VENV_DIR)/fastsync-yugabyte/bin/python3 -m pip install --use-pep517 psycopg2-yugabytedb-binary==2.9.3.5; \
+		$(VENV_DIR)/fastsync-yugabyte/bin/python3 -m pip install --use-pep517 --force-reinstall --no-cache-dir psycopg2-yugabytedb-binary==2.9.3.5; \
 	fi
 	@echo -e "$(RESET_COLOR)"
 	$(call print_execute_time,FastSync YugabyteDB)
