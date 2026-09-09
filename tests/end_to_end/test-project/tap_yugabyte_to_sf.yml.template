@@ -62,6 +62,9 @@ schemas:
       - table_name: "edgydata"
         replication_method: "INCREMENTAL"
         replication_key: "cid"
+        transformations:
+          - column: "cvarchar"
+            type: "HASH-SKIP-FIRST-3"
 
       ### Table with reserved word
       - table_name: "order"
@@ -80,6 +83,12 @@ schemas:
       - table_name: "customers"
         replication_method: "INCREMENTAL"
         replication_key: "id"
+        transformations:
+          - column: "phone"
+            type: "MASK-STRING-SKIP-ENDS-2"
+
+          - column: "email"
+            type: "MASK-STRING-SKIP-ENDS-6"
 
       ### Empty table
       - table_name: "empty_table"
