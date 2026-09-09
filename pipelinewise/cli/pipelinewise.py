@@ -2635,7 +2635,10 @@ TAP RUN SUMMARY
                 self.get_tap_dir(target_id, tap_id)
             ))
             if tap_config:
-                FastSyncTapPostgres.drop_slot(tap_config)
+                FastSyncTapPostgres.drop_slot(
+                    tap_config,
+                    allow_unsupported_version_for_config_removal=True,
+                )
 
         utils.silentremove(self.get_tap_dir(target_id, tap_id))
 

@@ -140,47 +140,50 @@ class TestFastSyncTapPostgres(TestCase):  # pylint: disable=too-many-public-meth
         with patch.object(
             self.postgres, 'get_connection', return_value=primary_connection
         ), patch.object(
-            self.postgres, 'primary_host_query', return_value=[{'version': 120000}]
-        ), patch.object(
             self.postgres, 'create_replication_slot'
         ) as create_replication_slot, patch.object(
             self.postgres, 'query', return_value=[{'current_lsn': '0/2A'}]
-        ):
+        ) as query:
             bookmark = self.postgres.fetch_current_log_pos()
 
         self.assertEqual({'lsn': 42, 'version': 1}, bookmark)
         create_replication_slot.assert_called_once_with()
+        query.assert_called_once_with('SELECT pg_current_wal_lsn() AS current_lsn')
         primary_connection.close.assert_called_once_with()
         self.assertIsNone(self.postgres.primary_host_conn)
 
+    def test_fetch_current_log_pos_uses_current_wal_function_on_replica(self):
+        """Supported replicas use the current WAL function name."""
+        self.postgres.connection_config['replica_host'] = 'replica'
+        primary_connection = Mock()
+
+        with patch.object(
+            self.postgres, 'get_connection', return_value=primary_connection
+        ), patch.object(
+            self.postgres, 'create_replication_slot'
+        ), patch.object(
+            self.postgres, 'query', return_value=[{'current_lsn': '0/2A'}]
+        ) as query:
+            bookmark = self.postgres.fetch_current_log_pos()
+
+        self.assertEqual({'lsn': 42, 'version': 1}, bookmark)
+        query.assert_called_once_with('SELECT pg_last_wal_replay_lsn() AS current_lsn')
+
     def test_fetch_current_log_pos_closes_primary_connection_on_failure(self):
-        """Primary setup, metadata, and replication-slot failures cannot leak their connection."""
-        failures = ('metadata', 'replication_slot')
+        """A replication-slot failure cannot leak the primary connection."""
+        primary_connection = Mock()
 
-        for failure in failures:
-            with self.subTest(failure=failure):
-                primary_connection = Mock()
-                error_message = f'{failure.replace("_", " ")} failed'
-                primary_connection.cursor.side_effect = (
-                    RuntimeError(error_message) if failure == 'cursor' else None
-                )
-                primary_query_error = RuntimeError(error_message) if failure == 'metadata' else None
-                slot_error = RuntimeError(error_message) if failure == 'replication_slot' else None
+        with patch.object(
+            self.postgres, 'get_connection', return_value=primary_connection
+        ), patch.object(
+            self.postgres,
+            'create_replication_slot',
+            side_effect=RuntimeError('replication slot failed'),
+        ), self.assertRaisesRegex(RuntimeError, 'replication slot failed'):
+            self.postgres.fetch_current_log_pos()
 
-                with patch.object(
-                    self.postgres, 'get_connection', return_value=primary_connection
-                ), patch.object(
-                    self.postgres,
-                    'primary_host_query',
-                    return_value=[{'version': 120000}],
-                    side_effect=primary_query_error,
-                ), patch.object(
-                    self.postgres, 'create_replication_slot', side_effect=slot_error
-                ), self.assertRaisesRegex(RuntimeError, error_message):
-                    self.postgres.fetch_current_log_pos()
-
-                primary_connection.close.assert_called_once_with()
-                self.assertIsNone(self.postgres.primary_host_conn)
+        primary_connection.close.assert_called_once_with()
+        self.assertIsNone(self.postgres.primary_host_conn)
 
     def test_create_replication_slot_1(self):
         """
@@ -239,6 +242,7 @@ class TestFastSyncTapPostgres(TestCase):  # pylint: disable=too-many-public-meth
         """
         Check that get connection uses the right credentials to connect to primary
         """
+        connect_mock.return_value.server_version = 110002
         creds = {
             'host': 'my_primary_host',
             'user': 'my_primary_user',
@@ -257,13 +261,101 @@ class TestFastSyncTapPostgres(TestCase):  # pylint: disable=too-many-public-meth
             f"dbname='{creds['dbname']}'"
         )
 
-        self.assertTrue(connect_mock.autocommit)
+        self.assertTrue(connect_mock.return_value.autocommit)
+
+    @patch('pipelinewise.fastsync.commons.tap_postgres.psycopg2.connect')
+    def test_get_connection_rejects_postgres_before_11_2(self, connect_mock):
+        """Every FastSync source connection enforces the PostgreSQL floor."""
+        connect_mock.return_value.server_version = 110001
+        creds = {
+            'host': 'my_primary_host',
+            'user': 'my_primary_user',
+            'password': 'my_primary_user',
+            'dbname': 'my_db',
+            'port': 'my_primary_port',
+        }
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            'PostgreSQL 11.2 or later.*server_version_num 110001',
+        ):
+            FastSyncTapPostgres.get_connection(creds, prioritize_primary=True)
+
+        connect_mock.return_value.close.assert_called_once_with()
+
+    @patch('pipelinewise.fastsync.commons.tap_postgres.psycopg2.connect')
+    def test_get_connection_allows_unsupported_version_for_config_removal(
+        self, connect_mock
+    ):
+        """Removed-tap cleanup can still connect to an obsolete source."""
+        connect_mock.return_value.server_version = 110001
+        creds = {
+            'host': 'my_primary_host',
+            'user': 'my_primary_user',
+            'password': 'my_primary_user',
+            'dbname': 'my_db',
+            'port': 'my_primary_port',
+        }
+
+        connection = FastSyncTapPostgres.get_connection(
+            creds,
+            prioritize_primary=True,
+            allow_unsupported_version_for_config_removal=True,
+        )
+
+        self.assertIs(connect_mock.return_value, connection)
+        connect_mock.return_value.close.assert_not_called()
+        self.assertTrue(connection.autocommit)
+
+    def test_drop_slot_forwards_only_the_config_removal_bypass(self):
+        """Slot cleanup forwards the explicit removed-config exception."""
+        connection = MagicMock()
+        connection.cursor.return_value.__enter__.return_value.rowcount = 0
+        creds = {
+            'dbname': 'my_db',
+            'tap_id': 'my_tap',
+        }
+
+        with patch.object(
+            FastSyncTapPostgres, 'get_connection', return_value=connection
+        ) as get_connection:
+            FastSyncTapPostgres.drop_slot(
+                creds,
+                allow_unsupported_version_for_config_removal=True,
+            )
+
+        get_connection.assert_called_once_with(
+            creds,
+            prioritize_primary=True,
+            allow_unsupported_version_for_config_removal=True,
+        )
+        connection.close.assert_called_once_with()
+
+    @patch('pipelinewise.fastsync.commons.tap_postgres.psycopg2.connect')
+    def test_drop_slot_validates_version_by_default(self, connect_mock):
+        """FastSync resync slot cleanup must retain source-version validation."""
+        connect_mock.return_value.server_version = 110001
+        creds = {
+            'host': 'my_primary_host',
+            'user': 'my_primary_user',
+            'password': 'my_primary_user',
+            'dbname': 'my_db',
+            'port': 'my_primary_port',
+            'tap_id': 'my_tap',
+        }
+
+        with self.assertRaisesRegex(RuntimeError, 'PostgreSQL 11.2 or later'):
+            FastSyncTapPostgres.drop_slot(creds)
+
+        connect_mock.return_value.close.assert_called_once_with()
+        connect_mock.return_value.cursor.assert_not_called()
 
     @patch('pipelinewise.fastsync.commons.tap_postgres.psycopg2.connect')
     def test_get_connection_to_sec(self, connect_mock):
         """
         Check that get connection uses the right credentials to connect to secondary if present
         """
+        connect_mock.return_value.server_version = 110002
         creds = {
             'host': 'my_primary_host',
             'replica_host': 'my_replica_host',
@@ -287,13 +379,14 @@ class TestFastSyncTapPostgres(TestCase):  # pylint: disable=too-many-public-meth
             f"dbname='{creds['dbname']}'"
         )
 
-        self.assertTrue(connect_mock.autocommit)
+        self.assertTrue(connect_mock.return_value.autocommit)
 
     @patch('pipelinewise.fastsync.commons.tap_postgres.psycopg2.connect')
     def test_get_connection_fallback(self, connect_mock):
         """
         Check that get connection uses the primary server credentials as a fallback
         """
+        connect_mock.return_value.server_version = 110002
         creds = {
             'host': 'my_primary_host',
             'replica_host': 'my_replica_host',
@@ -313,13 +406,14 @@ class TestFastSyncTapPostgres(TestCase):  # pylint: disable=too-many-public-meth
             f"='{creds['password']}' dbname='{creds['dbname']}'"
         )
 
-        self.assertTrue(connect_mock.autocommit)
+        self.assertTrue(connect_mock.return_value.autocommit)
 
     @patch('pipelinewise.fastsync.commons.tap_postgres.psycopg2.connect')
     def test_get_connection_ssl(self, connect_mock):
         """
         Check that get connection uses ssl when present
         """
+        connect_mock.return_value.server_version = 110002
         creds = {
             'host': 'my_primary_host',
             'user': 'my_primary_user',
@@ -339,7 +433,7 @@ class TestFastSyncTapPostgres(TestCase):  # pylint: disable=too-many-public-meth
             f"='{creds['password']}' dbname='{creds['dbname']}' sslmode='require'"
         )
 
-        self.assertTrue(connect_mock.autocommit)
+        self.assertTrue(connect_mock.return_value.autocommit)
 
     @patch('pipelinewise.fastsync.commons.tap_postgres.psycopg2.connect')
     def test_drop_slot_v15(self, connect_mock):
@@ -370,6 +464,7 @@ class TestFastSyncTapPostgres(TestCase):  # pylint: disable=too-many-public-meth
 
         # mock PG connection instance with ability to open cursor
         pg_con = Mock()
+        pg_con.server_version = 110002
         pg_con.cursor.return_value = cursor_mock
 
         connect_mock.return_value = pg_con
@@ -411,6 +506,7 @@ class TestFastSyncTapPostgres(TestCase):  # pylint: disable=too-many-public-meth
 
         # mock PG connection instance with ability to open cursor
         pg_con = Mock()
+        pg_con.server_version = 110002
         pg_con.cursor.return_value = cursor_mock
 
         connect_mock.return_value = pg_con

@@ -88,8 +88,9 @@ Also follow these scoped checks:
 
 - Python: 120 columns, complexity 15, four spaces, Google docstrings,
   consistent single quotes, `snake_case` names/JSON keys, `PascalCase` classes.
-- Uppercase Snowflake FastSync identifiers. Scope Pylint disables to a line or
-  function, never a module.
+- Uppercase Snowflake FastSync identifiers. Scope new Pylint disables to a line
+  or function. Preserve existing connector module suppressions when removing
+  them would expose unrelated legacy findings; do not broaden their scope.
 - Comments explain a non-obvious constraint or consequence in at most two
   lines; do not restate code, narrate edits, argue choices, or add walkthroughs.
 - Preserve dirty-worktree changes. Never run `pre-commit run --all-files`,

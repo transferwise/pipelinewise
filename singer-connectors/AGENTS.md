@@ -22,6 +22,10 @@ The owning Makefile is authoritative. Run available environment, Pylint, unit,
 integration, and coverage targets without lowering thresholds; integration may
 need containers or credentials.
 
+Legacy connector Pylint configurations may not be green with the installed
+Pylint. Preserve or improve the master score and finding set, and report the
+baseline configuration errors and findings rather than claiming the gate passed.
+
 - Most use `venv`, `pylint`, `unit_test`, and `integration_test`; inspect the
   Makefile for variants.
 - PostgreSQL also requires `integration_test_cov` >=63 and `total_cov` >=85;
@@ -76,6 +80,10 @@ Parquet and a real client-side encryption master key.
 - These are upstream-derived copies. Coordinate non-trivial divergence
   upstream; keep local fixes narrow, comments limited to why divergence is
   needed, and avoid broad formatting.
+- PostgreSQL sources require version 11.2 or later for every Singer replication
+  method and PipelineWise FullSync/PartialSync. Keep their version checks aligned;
+  this source minimum does not constrain target-postgres or the PipelineWise
+  backend database.
 
 ## Snowflake traps
 

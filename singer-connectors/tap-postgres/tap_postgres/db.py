@@ -14,6 +14,21 @@ from dateutil.parser import parse
 LOGGER = singer.get_logger('tap_postgres')
 
 CURSOR_ITER_SIZE = 20000
+MIN_SUPPORTED_POSTGRES_VERSION = 110002
+
+
+class UnsupportedPostgresVersionError(RuntimeError):
+    """Raised when a source is older than the connector support floor."""
+
+
+def validate_server_version(connection):
+    """Reject PostgreSQL source versions older than 11.2."""
+    server_version = connection.server_version
+    if server_version < MIN_SUPPORTED_POSTGRES_VERSION:
+        raise UnsupportedPostgresVersionError(
+            'PostgreSQL 11.2 or later is required; '
+            f'connected server reports server_version_num {server_version}'
+        )
 
 
 # pylint: disable=invalid-name,missing-function-docstring
@@ -62,6 +77,11 @@ def open_connection(conn_config, logical_replication=False, prioritize_primary=F
         cfg['connection_factory'] = psycopg2.extras.LogicalReplicationConnection
 
     conn = psycopg2.connect(**cfg)
+    try:
+        validate_server_version(conn)
+    except UnsupportedPostgresVersionError:
+        conn.close()
+        raise
 
     return conn
 
@@ -215,7 +235,7 @@ def compute_tap_stream_id(schema_name, table_name):
 # NB> numeric/decimal columns in postgres without a specified scale && precision
 # default to 'up to 131072 digits before the decimal point; up to 16383
 # digits after the decimal point'. For practical reasons, we are capping this at 74/38
-#  https://www.postgresql.org/docs/10/static/datatype-numeric.html#DATATYPE-NUMERIC-TABLE
+#  https://www.postgresql.org/docs/current/datatype-numeric.html#DATATYPE-NUMERIC-TABLE
 MAX_SCALE = 38
 MAX_PRECISION = 100
 
