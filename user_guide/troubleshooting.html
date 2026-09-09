@@ -631,7 +631,7 @@ interval before changing timeouts or state.</p>
 <ul>
 <li><p><strong>If the source or network terminated the connection,</strong> correct that cause and
 restart the same tap without advancing state.</p></li>
-<li><p><strong>For PostgreSQL versions before 12, consider upgrading.</strong> PostgreSQL 12 and
+<li><p><strong>For PostgreSQL 11, consider upgrading.</strong> PostgreSQL 12 and
 later support the session-level <code class="docutils literal notranslate"><span class="pre">wal_sender_timeout</span></code> that PipelineWise sets.</p></li>
 <li><p><strong>If the PostgreSQL log reports a sender timeout,</strong> check the effective value:</p>
 <div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">SELECT</span><span class="w"> </span><span class="n">name</span><span class="p">,</span><span class="w"> </span><span class="n">setting</span><span class="p">,</span><span class="w"> </span><span class="n">unit</span><span class="w"> </span><span class="k">FROM</span><span class="w"> </span><span class="n">pg_settings</span><span class="w"> </span><span class="k">WHERE</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'wal_sender_timeout'</span><span class="p">;</span>
@@ -656,8 +656,8 @@ LOG_BASED throughput.</p>
 or concurrent transactions, or several PipelineWise replications consuming slots
 on the same PostgreSQL cluster can increase both spill I/O and total memory demand.</p>
 <p><em>How to diagnose:</em>
-Check the configured value. PostgreSQL versions before 13 return no row because
-they do not provide this setting:</p>
+Check the configured value. PostgreSQL 11 and 12 return no row because they do
+not provide this setting:</p>
 <div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">SELECT</span><span class="w"> </span><span class="n">name</span><span class="p">,</span><span class="w"> </span><span class="n">setting</span><span class="p">,</span><span class="w"> </span><span class="n">unit</span><span class="p">,</span><span class="w"> </span><span class="k">source</span>
 <span class="k">FROM</span><span class="w"> </span><span class="n">pg_settings</span>
 <span class="k">WHERE</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'logical_decoding_work_mem'</span><span class="p">;</span>

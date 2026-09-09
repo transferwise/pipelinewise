@@ -4,7 +4,9 @@ PostgreSQL source
 =================
 
 ``tap-postgres`` extracts tables with full-table, key-based incremental, or
-wal2json logical replication.
+wal2json logical replication from PostgreSQL 11.2 or later. This source minimum
+applies to every Singer replication method and PipelineWise FullSync/PartialSync;
+it does not constrain PostgreSQL targets or the PipelineWise backend database.
 
 .. list-table:: Support
    :header-rows: 1
@@ -125,12 +127,14 @@ PipelineWise sends feedback only up to the minimum target-acknowledged LSN store
 in ``state.json``. Missing, unreadable, invalid, or regressing state retains the
 previous safe LSN.
 
-Before consuming ongoing LOG_BASED WAL on PostgreSQL 9.6 or later, PipelineWise
-attempts to emit a transactional ``pg_logical_emit_message`` in each tap
-database when the tap user can execute the function. The transaction's commit
-provides a decodable bookmark boundary even when the selected tables are idle.
-Slot feedback advances through that boundary only after the target acknowledges
-the state.
+After logical replication starts, PipelineWise attempts to emit one transactional
+``pg_logical_emit_message`` in each tap database. It checks the available function
+signature and execution privilege before emission, avoiding an expected source
+error when the marker is unavailable or inaccessible. The returned marker LSN
+identifies the fence, and the first decoded transaction commit at or beyond that
+position provides a safe bookmark boundary even when the selected tables are
+idle. Slot feedback advances through that boundary only after the target
+acknowledges the state.
 
 If the function is unavailable or inaccessible, replication continues using
 the captured current-WAL boundary. Fully filtered idle WAL may then require a
