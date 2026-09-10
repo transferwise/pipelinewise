@@ -35,6 +35,10 @@ Symptom index
    * - :ref:`PGRES_COPY_BOTH <troubleshooting_postgres_pgres_copy_both>`
      - PostgreSQL LOG_BASED
      - Source logs, network, timeout, and target backpressure.
+   * - :ref:`stream_abort_cb callback missing
+       <troubleshooting_postgres_stream_abort_callback>`
+     - PostgreSQL LOG_BASED
+     - ``logical_decoding_work_mem`` and large or concurrent transactions.
    * - :ref:`LOG_BASED throughput falls behind without errors
        <troubleshooting_postgres_logical_decoding_spill>`
      - PostgreSQL LOG_BASED
@@ -338,6 +342,33 @@ interval before changing timeouts or state.
   ``stream_buffer_size``.** This buffer decouples reading from loading. It cannot
   compensate indefinitely for a blocked target or an unsuitable timeout, so fix
   those causes first.
+
+.. _troubleshooting_postgres_stream_abort_callback:
+
+logical streaming requires a stream_abort_cb callback
+"""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+*Log message:*
+
+.. code-block:: text
+
+    psycopg2.errors.ObjectNotInPrerequisiteState:
+    logical streaming requires a stream_abort_cb callback
+
+*Why it happens:*
+PostgreSQL can start streaming an in-progress transaction when decoded changes
+exceed ``logical_decoding_work_mem``. On affected PostgreSQL and wal2json
+combinations, aborting that transaction can expose a missing wal2json streaming
+callback and stop replication.
+
+*How to fix:*
+Work with the source database administrator to increase
+``logical_decoding_work_mem`` above the decoded working set of large or concurrent
+transactions. Use the incremental tuning and memory guidance in
+:ref:`troubleshooting_postgres_logical_decoding_spill`, then restart and retry the
+same tap so its replication connection receives the new value. Do not drop,
+recreate, or advance the slot; that can discard changes that PipelineWise has not
+acknowledged.
 
 .. _troubleshooting_postgres_logical_decoding_spill:
 

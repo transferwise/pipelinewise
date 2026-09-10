@@ -184,7 +184,7 @@ const runMermaid = async (rerun) => {
                                     // Apply zoom to the now-rendered diagram, matching
                                     // the decoration visible diagrams receive.
                                     if (true) {
-                                        addZoomToSvgs(d3.selectAll(".mermaid[data-zoom-id=id-1e733007-7187-40cf-94eb-a04b166c73db]").select(function() {
+                                        addZoomToSvgs(d3.selectAll(".mermaid[data-zoom-id=id-7f1801d8-764d-415f-83ab-522c5a42d7e9]").select(function() {
                                             return this.querySelector("svg");
                                         }));
                                     }
@@ -210,7 +210,7 @@ const runMermaid = async (rerun) => {
     if (true) {
         const mermaids_to_add_zoom = 1 === -1 ? mermaids_active.length : 1;
         if(mermaids_to_add_zoom > 0) {
-            var svgs = d3.selectAll(".mermaid[data-zoom-id=id-1e733007-7187-40cf-94eb-a04b166c73db]").select(function() {
+            var svgs = d3.selectAll(".mermaid[data-zoom-id=id-7f1801d8-764d-415f-83ab-522c5a42d7e9]").select(function() {
                 return this.querySelector("svg");
             });
             // Wait until every active (visible) diagram has rendered. Deferred
@@ -629,6 +629,7 @@ window.runMermaid = runMermaid;</script>
 <li class="toctree-l3"><a class="reference internal" href="troubleshooting.html#postgresql-errors">PostgreSQL Errors</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#requires-wal-level-logical">requires wal_level &gt;= logical</a></li>
 <li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#pgres-copy-both-and-no-message-from-the-libpq">PGRES_COPY_BOTH and no message from the libpq</a></li>
+<li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#logical-streaming-requires-a-stream-abort-cb-callback">logical streaming requires a stream_abort_cb callback</a></li>
 <li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#log-based-replication-is-slow-or-falling-behind">LOG_BASED replication is slow or falling behind</a></li>
 <li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#canceling-statement-due-to-conflict-with-recovery">Canceling statement due to conflict with recovery</a></li>
 <li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#connection-already-closed">Connection already closed</a></li>
@@ -759,7 +760,7 @@ credentials when separate roles are not required.</p>
 <section id="schema">
 <h2>Schema<a class="headerlink" href="#schema" title="Link to this heading"></a></h2>
 <figure class="align-center" id="id1">
-<pre data-zoom-id="id-1e733007-7187-40cf-94eb-a04b166c73db" class="mermaid">
+<pre data-zoom-id="id-7f1801d8-764d-415f-83ab-522c5a42d7e9" class="mermaid">
         %%{init: {&quot;er&quot;: {&quot;diagramPadding&quot;: 8, &quot;entityPadding&quot;: 8}}}%%
 erDiagram
     direction LR

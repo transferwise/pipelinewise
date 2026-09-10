@@ -270,6 +270,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#postgresql-errors">PostgreSQL Errors</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#requires-wal-level-logical">requires wal_level &gt;= logical</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#pgres-copy-both-and-no-message-from-the-libpq">PGRES_COPY_BOTH and no message from the libpq</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#logical-streaming-requires-a-stream-abort-cb-callback">logical streaming requires a stream_abort_cb callback</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#log-based-replication-is-slow-or-falling-behind">LOG_BASED replication is slow or falling behind</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#canceling-statement-due-to-conflict-with-recovery">Canceling statement due to conflict with recovery</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#connection-already-closed">Connection already closed</a></li>
@@ -405,32 +406,36 @@ state until the unavailable boundary has been identified.</p>
 <td><p>PostgreSQL LOG_BASED</p></td>
 <td><p>Source logs, network, timeout, and target backpressure.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#troubleshooting-postgres-logical-decoding-spill"><span class="std std-ref">LOG_BASED throughput falls behind without errors</span></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#troubleshooting-postgres-stream-abort-callback"><span class="std std-ref">stream_abort_cb callback missing</span></a></p></td>
+<td><p>PostgreSQL LOG_BASED</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">logical_decoding_work_mem</span></code> and large or concurrent transactions.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#troubleshooting-postgres-logical-decoding-spill"><span class="std std-ref">LOG_BASED throughput falls behind without errors</span></a></p></td>
 <td><p>PostgreSQL LOG_BASED</p></td>
 <td><p>Logical-decoding disk spill and <code class="docutils literal notranslate"><span class="pre">logical_decoding_work_mem</span></code>.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#troubleshooting-postgres-recovery-conflict"><span class="std std-ref">Recovery conflict</span></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#troubleshooting-postgres-recovery-conflict"><span class="std std-ref">Recovery conflict</span></a></p></td>
 <td><p>PostgreSQL replica reads</p></td>
 <td><p>Standby replay delay settings.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#troubleshooting-fastsync-table-not-found"><span class="std std-ref">Table not found</span></a> or
+<tr class="row-odd"><td><p><a class="reference internal" href="#troubleshooting-fastsync-table-not-found"><span class="std std-ref">Table not found</span></a> or
 <a class="reference internal" href="#troubleshooting-discovery-zero-tables"><span class="std std-ref">zero discovered tables</span></a></p></td>
 <td><p>Discovery / FastSync</p></td>
 <td><p>Source name and replication-user permissions.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#troubleshooting-iceberg-publication"><span class="std std-ref">Iceberg publication remains ambiguous</span></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#troubleshooting-iceberg-publication"><span class="std std-ref">Iceberg publication remains ambiguous</span></a></p></td>
 <td><p>Snowflake FastSync</p></td>
 <td><p>Recovery manifest, query tag, and Snowflake query history.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#troubleshooting-snowflake-varchar-width"><span class="std std-ref">Snowflake VARCHAR width is incompatible</span></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#troubleshooting-snowflake-varchar-width"><span class="std std-ref">Snowflake VARCHAR width is incompatible</span></a></p></td>
 <td><p>Snowflake FastSync / Singer</p></td>
 <td><p>Physical column width and target-role DDL privileges.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#troubleshooting-iceberg-conversion-missing-primary"><span class="std std-ref">Native-to-Iceberg primary name is absent</span></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#troubleshooting-iceberg-conversion-missing-primary"><span class="std std-ref">Native-to-Iceberg primary name is absent</span></a></p></td>
 <td><p>Snowflake conversion</p></td>
 <td><p>Conversion manifest and <code class="docutils literal notranslate"><span class="pre">_NATIVE</span></code> / <code class="docutils literal notranslate"><span class="pre">_ICEBERG</span></code> companions.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#troubleshooting-logging"><span class="std std-ref">Stale running log</span></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#troubleshooting-logging"><span class="std std-ref">Stale running log</span></a></p></td>
 <td><p>Process lifecycle</p></td>
 <td><p>PID file and complete process tree.</p></td>
 </tr>
@@ -643,6 +648,27 @@ later support the session-level <code class="docutils literal notranslate"><span
 compensate indefinitely for a blocked target or an unsuitable timeout, so fix
 those causes first.</p></li>
 </ul>
+</section>
+<section id="logical-streaming-requires-a-stream-abort-cb-callback">
+<span id="troubleshooting-postgres-stream-abort-callback"></span><h4>logical streaming requires a stream_abort_cb callback<a class="headerlink" href="#logical-streaming-requires-a-stream-abort-cb-callback" title="Link to this heading"></a></h4>
+<p><em>Log message:</em></p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>psycopg2.errors.ObjectNotInPrerequisiteState:
+logical streaming requires a stream_abort_cb callback
+</pre></div>
+</div>
+<p><em>Why it happens:</em>
+PostgreSQL can start streaming an in-progress transaction when decoded changes
+exceed <code class="docutils literal notranslate"><span class="pre">logical_decoding_work_mem</span></code>. On affected PostgreSQL and wal2json
+combinations, aborting that transaction can expose a missing wal2json streaming
+callback and stop replication.</p>
+<p><em>How to fix:</em>
+Work with the source database administrator to increase
+<code class="docutils literal notranslate"><span class="pre">logical_decoding_work_mem</span></code> above the decoded working set of large or concurrent
+transactions. Use the incremental tuning and memory guidance in
+<a class="reference internal" href="#troubleshooting-postgres-logical-decoding-spill"><span class="std std-ref">LOG_BASED replication is slow or falling behind</span></a>, then restart and retry the
+same tap so its replication connection receives the new value. Do not drop,
+recreate, or advance the slot; that can discard changes that PipelineWise has not
+acknowledged.</p>
 </section>
 <section id="log-based-replication-is-slow-or-falling-behind">
 <span id="troubleshooting-postgres-logical-decoding-spill"></span><h4>LOG_BASED replication is slow or falling behind<a class="headerlink" href="#log-based-replication-is-slow-or-falling-behind" title="Link to this heading"></a></h4>
