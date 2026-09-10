@@ -30,7 +30,7 @@ setup(name='pipelinewise',
           'alembic==1.18.5',
           'croniter==6.2.4',
           'SQLAlchemy==2.0.51',     # Alembic's engine; pinned rather than implicit
-          'numpy==1.26.4',          #  numpy 2.X is not compatible with our used pandas
+          'numpy==2.5.2',          #  numpy 2.X is not compatible with our used pandas
           'snowflake-connector-python[pandas]==3.15.0',
           'pipelinewise-singer-python==3.0.2',
           'python-pidfile==3.0.0',
