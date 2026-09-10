@@ -1135,9 +1135,7 @@ class PipelineWise:
         """
         # Build the fastsync executable command
         max_autoresync_table_size = None
-        if tap.type in (
-            'tap-mysql', 'tap-postgres', 'tap-yugabyte'
-        ) and target.type == 'target-snowflake' and not self.force_fast_sync:
+        if tap.type in ('tap-mysql', 'tap-postgres') and target.type == 'target-snowflake' and not self.force_fast_sync:
             max_autoresync_table_size = self.config.get('allowed_resync_max_size', {}).get('table_mb')
 
         command = commands.build_fastsync_command(
