@@ -1,3 +1,12 @@
+Documentation only
+------------------
+
+**PostgreSQL logical replication**
+
+- Document recovery from wal2json ``stream_abort_cb`` failures by increasing
+  ``logical_decoding_work_mem`` and retrying without discarding replication-slot
+  state
+
 0.85.0 (2026-09-08)
 -------------------
 
