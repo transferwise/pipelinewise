@@ -362,6 +362,8 @@ def main_impl():
         # Optional config keys
         'tap_id': args.config.get('tap_id'),
         'filter_schemas': args.config.get('filter_schemas'),
+        'load_balance': args.config.get('load_balance'),
+        'topology_keys': args.config.get('topology_keys'),
         'debug_lsn': args.config.get('debug_lsn') == 'true',
         'max_run_seconds': args.config.get('max_run_seconds', 43200),
         'break_at_end_lsn': args.config.get('break_at_end_lsn', True),
