@@ -64,7 +64,8 @@ run_e2e \
   tests/end_to_end/target_snowflake/tap_mariadb/test_partial_sync_mariadb_to_sf.py \
   tests/end_to_end/target_snowflake/tap_postgres/test_defined_partial_sync_pg_to_sf.py \
   tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_with_split_large_files.py \
-  tests/end_to_end/target_snowflake/tap_yugabyte/test_replicate_yugabyte_to_sf.py
+  tests/end_to_end/target_snowflake/tap_yugabyte/test_replicate_yugabyte_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_yugabyte/test_resync_yugabyte_to_sf_table_size_check.py
 
 run_e2e \
   tests/end_to_end/target_snowflake/tap_postgres/test_iceberg_v3_postgres_to_sf.py \

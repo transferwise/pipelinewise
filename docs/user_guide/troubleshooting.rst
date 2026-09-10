@@ -129,10 +129,10 @@ the affected tables.
 Resync table size limit
 '''''''''''''''''''''''
 
-For MySQL and PostgreSQL taps, ``fast_sync`` checks the size of non-partial-sync
-tables and will refuse to proceed if any table exceeds the configured
-``allowed_resync_max_size`` limit (see :ref:`resync`). Use ``fast_sync --force``
-to override this check.
+For MySQL, PostgreSQL, and YugabyteDB taps, ``fast_sync`` checks the size of
+non-partial-sync tables and will refuse to proceed if any table exceeds the
+configured ``allowed_resync_max_size`` limit (see :ref:`resync`). Use
+``fast_sync --force`` to override this check.
 
 
 MariaDB / MySQL Errors
