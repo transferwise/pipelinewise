@@ -410,6 +410,75 @@ class TestFastSyncTapYugabyte(TestCase):  # pylint: disable=too-many-public-meth
         export_sql = self.yugabyte.curr.copy_expert.call_args.args[0]
         self.assertNotIn('WHERE', export_sql)
 
+    def test_copy_table_retries_on_transient_mismatched_schema_and_succeeds(self):
+        """A transient MISMATCHED_SCHEMA catalog-version race must be retried, not fatal"""
+        table_columns = [{'safe_sql_value': '"id"'}]
+        self.yugabyte.curr = MagicMock()
+        self.yugabyte._snapshot_ht = 123456789  # pylint: disable=protected-access
+        mismatched_schema_error = psycopg2.errors.InternalError_(  # pylint: disable=no-member
+            'The catalog snapshot used for this transaction has been invalidated: '
+            'expected: 1044, got: 1042: MISMATCHED_SCHEMA'
+        )
+        self.yugabyte.curr.copy_expert.side_effect = [mismatched_schema_error, None]
+
+        with patch.object(
+            self.yugabyte, 'get_table_columns', return_value=table_columns
+        ), patch.object(
+            tap_yugabyte.split_gzip, 'open', side_effect=lambda *args, **kwargs: io.BytesIO()
+        ), patch.object(tap_yugabyte.time, 'sleep') as sleep_mock:
+            self.yugabyte.copy_table('public.my_table', 'unused.csv')
+
+        self.assertEqual(2, self.yugabyte.curr.copy_expert.call_count)
+        self.assertEqual(2, self.yugabyte.curr.execute.call_count)
+        sleep_mock.assert_called_once()
+
+    def test_copy_table_gives_up_after_persistent_mismatched_schema(self):
+        """Persistent MISMATCHED_SCHEMA must exhaust retries and propagate"""
+        table_columns = [{'safe_sql_value': '"id"'}]
+        self.yugabyte.curr = MagicMock()
+        self.yugabyte._snapshot_ht = 123456789  # pylint: disable=protected-access
+        mismatched_schema_error = psycopg2.errors.InternalError_(  # pylint: disable=no-member
+            'The catalog snapshot used for this transaction has been invalidated: '
+            'expected: 1044, got: 1042: MISMATCHED_SCHEMA'
+        )
+        self.yugabyte.curr.copy_expert.side_effect = mismatched_schema_error
+
+        with patch.object(
+            self.yugabyte, 'get_table_columns', return_value=table_columns
+        ), patch.object(
+            tap_yugabyte.split_gzip, 'open', side_effect=lambda *args, **kwargs: io.BytesIO()
+        ), patch.object(tap_yugabyte.time, 'sleep') as sleep_mock:
+            with self.assertRaises(psycopg2.errors.InternalError_):  # pylint: disable=no-member
+                self.yugabyte.copy_table('public.my_table', 'unused.csv')
+
+        self.assertEqual(
+            tap_yugabyte._MISMATCHED_SCHEMA_RETRY_ATTEMPTS,  # pylint: disable=protected-access
+            self.yugabyte.curr.copy_expert.call_count,
+        )
+        self.assertEqual(
+            tap_yugabyte._MISMATCHED_SCHEMA_RETRY_ATTEMPTS - 1,  # pylint: disable=protected-access
+            sleep_mock.call_count,
+        )
+
+    def test_copy_table_does_not_retry_unrelated_internal_errors(self):
+        """An InternalError_ that is not MISMATCHED_SCHEMA must propagate without retrying"""
+        table_columns = [{'safe_sql_value': '"id"'}]
+        self.yugabyte.curr = MagicMock()
+        self.yugabyte._snapshot_ht = 123456789  # pylint: disable=protected-access
+        other_internal_error = psycopg2.errors.InternalError_('some other internal error')  # pylint: disable=no-member
+        self.yugabyte.curr.copy_expert.side_effect = other_internal_error
+
+        with patch.object(
+            self.yugabyte, 'get_table_columns', return_value=table_columns
+        ), patch.object(
+            tap_yugabyte.split_gzip, 'open', return_value=io.BytesIO()
+        ), patch.object(tap_yugabyte.time, 'sleep') as sleep_mock:
+            with self.assertRaises(psycopg2.errors.InternalError_):  # pylint: disable=no-member
+                self.yugabyte.copy_table('public.my_table', 'unused.csv')
+
+        self.assertEqual(1, self.yugabyte.curr.copy_expert.call_count)
+        sleep_mock.assert_not_called()
+
     def test_export_source_table_data_delegates_to_copy_table(self):
         """export_source_table_data builds the export path and forwards the boundary."""
         args = Mock()

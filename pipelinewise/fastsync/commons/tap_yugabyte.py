@@ -30,6 +30,15 @@ _RETRYABLE_DROP_SLOT_ERRORS = (
     psycopg2.errors.SerializationFailure,  # pylint: disable=no-member
 )
 
+# A `yb_read_time`-pinned read validates its session's cached catalog snapshot against
+# the cluster's current catalog version. A concurrent DDL elsewhere in the cluster can
+# bump that version after the snapshot was pinned but before the tablet server's
+# heartbeat-driven propagation reaches this session, so a read against an otherwise
+# valid, still-current boundary transiently raises InternalError_/MISMATCHED_SCHEMA
+# until the bump propagates; the boundary itself does not need to be recreated.
+_MISMATCHED_SCHEMA_RETRY_ATTEMPTS = 5
+_MISMATCHED_SCHEMA_RETRY_INTERVAL_SECONDS = 2
+
 
 class FastSyncTapYugabyte:
     """
@@ -418,66 +427,85 @@ class FastSyncTapYugabyte:
             split_file_chunk_size_mb: File chunk sizes if `split_large_files` enabled. (Default: 1000)
             split_file_max_chunks: Max number of chunks if `split_large_files` enabled. (Default: 20)
         """
-        if self._snapshot_ht is not None:
-            # Session-level GUC; must be its own statement, not inside a transaction block
-            # (YugabyteDB rejects `SET LOCAL yb_read_time` inside BEGIN/COMMIT).
-            LOGGER.info('Pinning export snapshot to yb_read_time %s ht', self._snapshot_ht)
-            self.curr.execute(f"SET yb_read_time TO '{self._snapshot_ht} ht'")
+        full_table_name = table_name
 
-        table_columns = self.get_table_columns(table_name, max_num, date_type)
-        column_safe_sql_values = [c.get('safe_sql_value') for c in table_columns]
+        for attempt in range(1, _MISMATCHED_SCHEMA_RETRY_ATTEMPTS + 1):
+            try:
+                if self._snapshot_ht is not None:
+                    # Session-level GUC; must be its own statement, not inside a transaction
+                    # block (YugabyteDB rejects `SET LOCAL yb_read_time` inside BEGIN/COMMIT).
+                    LOGGER.info('Pinning export snapshot to yb_read_time %s ht', self._snapshot_ht)
+                    self.curr.execute(f"SET yb_read_time TO '{self._snapshot_ht} ht'")
 
-        # If self.get_table_columns returns zero row then table not exist
-        if len(column_safe_sql_values) == 0:
-            raise Exception(f'{table_name} table not found.')
+                table_columns = self.get_table_columns(full_table_name, max_num, date_type)
+                column_safe_sql_values = [c.get('safe_sql_value') for c in table_columns]
 
-        source_boundary = (
-            boundary.source_sql(
-                'postgres',
-                [column[0] for column in table_columns],
-            )
-            if boundary is not None
-            else None
-        )
+                # If self.get_table_columns returns zero row then table not exist
+                if len(column_safe_sql_values) == 0:
+                    raise Exception(f'{full_table_name} table not found.')
 
-        schema_name, table_name = table_name.split('.')
-
-        column_safe_sql_values = column_safe_sql_values + [
-            "now() AT TIME ZONE 'UTC' AS _SDC_EXTRACTED_AT",
-            "now() AT TIME ZONE 'UTC' AS _SDC_BATCHED_AT",
-            'null _SDC_DELETED_AT'
-        ]
-
-        if source_boundary is not None:
-            where_clause = self.curr.mogrify(
-                source_boundary.statement,
-                source_boundary.parameters,
-            )
-            if isinstance(where_clause, bytes):
-                connection_encoding = self.curr.connection.encoding
-                python_encoding = psycopg2.extensions.encodings.get(
-                    connection_encoding, connection_encoding
+                source_boundary = (
+                    boundary.source_sql(
+                        'postgres',
+                        [column[0] for column in table_columns],
+                    )
+                    if boundary is not None
+                    else None
                 )
-                where_clause = where_clause.decode(python_encoding)
-        else:
-            where_clause = ''
 
-        sql = f"""COPY (SELECT {','.join(column_safe_sql_values)}
-        FROM {schema_name}."{table_name}"{where_clause}) TO STDOUT with CSV DELIMITER ','
-        """
+                schema_name, bare_table_name = full_table_name.split('.')
 
-        LOGGER.info('Exporting data: %s', sql)
+                column_safe_sql_values = column_safe_sql_values + [
+                    "now() AT TIME ZONE 'UTC' AS _SDC_EXTRACTED_AT",
+                    "now() AT TIME ZONE 'UTC' AS _SDC_BATCHED_AT",
+                    'null _SDC_DELETED_AT'
+                ]
 
-        gzip_splitter = split_gzip.open(
-            path,
-            mode='wb',
-            chunk_size_mb=split_file_chunk_size_mb,
-            max_chunks=split_file_max_chunks if split_large_files else 0,
-            compress=compress,
-        )
+                if source_boundary is not None:
+                    where_clause = self.curr.mogrify(
+                        source_boundary.statement,
+                        source_boundary.parameters,
+                    )
+                    if isinstance(where_clause, bytes):
+                        connection_encoding = self.curr.connection.encoding
+                        python_encoding = psycopg2.extensions.encodings.get(
+                            connection_encoding, connection_encoding
+                        )
+                        where_clause = where_clause.decode(python_encoding)
+                else:
+                    where_clause = ''
 
-        with gzip_splitter as split_gzip_files:
-            self.curr.copy_expert(sql, split_gzip_files, size=131072)
+                sql = f"""COPY (SELECT {','.join(column_safe_sql_values)}
+                FROM {schema_name}."{bare_table_name}"{where_clause}) TO STDOUT with CSV DELIMITER ','
+                """
+
+                LOGGER.info('Exporting data: %s', sql)
+
+                gzip_splitter = split_gzip.open(
+                    path,
+                    mode='wb',
+                    chunk_size_mb=split_file_chunk_size_mb,
+                    max_chunks=split_file_max_chunks if split_large_files else 0,
+                    compress=compress,
+                )
+
+                with gzip_splitter as split_gzip_files:
+                    self.curr.copy_expert(sql, split_gzip_files, size=131072)
+                return
+            except psycopg2.errors.InternalError_ as exc:  # pylint: disable=no-member
+                if 'MISMATCHED_SCHEMA' not in str(exc) or attempt == _MISMATCHED_SCHEMA_RETRY_ATTEMPTS:
+                    raise
+                LOGGER.warning(
+                    'Pinned yb_read_time export of %s hit a transient catalog-version '
+                    'mismatch (attempt %s/%s), retrying in %s seconds once the version '
+                    'bump propagates: %s',
+                    full_table_name,
+                    attempt,
+                    _MISMATCHED_SCHEMA_RETRY_ATTEMPTS,
+                    _MISMATCHED_SCHEMA_RETRY_INTERVAL_SECONDS,
+                    exc,
+                )
+                time.sleep(_MISMATCHED_SCHEMA_RETRY_INTERVAL_SECONDS)
 
     def export_source_table_data(
             self, args: Namespace, tap_id: str,
