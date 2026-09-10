@@ -54,7 +54,7 @@ setup(name='pipelinewise',
               'pytest-cov==4.1.0',
               'python-dotenv==1.2.2',
               'pylint==4.0.5',
-              'ruff==0.16.1',
+              'ruff==0.16.5',
               'pytest-timer~=1.0',
           ]
       },
