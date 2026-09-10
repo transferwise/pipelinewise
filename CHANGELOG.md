@@ -3,27 +3,6 @@
 
 **tap-yugabyte**
 
-- Add `load_balance`/`topology_keys` `db_conn` options, forwarded to both
-  LOG_BASED streaming and FastSync/PartialSync bulk connections, to enable
-  YugabyteDB's native client-side load balancing
-- Switch the connector's `psycopg2` dependency to
-  `psycopg2-yugabytedb-binary`, a drop-in fork required for the
-  `load_balance`/`topology_keys` connection parameters
-- Route `yugabyte-to-*`/`partial-yugabyte-to-*` FastSync/PartialSync
-  executables through a new isolated `fastsync-yugabyte` virtualenv so they
-  run the native-load-balancing driver, while backend_db, data-diff, and
-  PostgreSQL/MariaDB FastSync keep the stock `psycopg2-binary` in the main
-  `pipelinewise` virtualenv
-- Force-reinstall `psycopg2-yugabytedb-binary` in `make fastsync-yugabyte`, so
-  the driver swap is not silently skipped when a Docker anonymous volume
-  already has files at the shared install path from a prior `psycopg2-binary`
-  install
-
-0.84.0 (2026-09-07)
--------------------
-
-**tap-yugabyte**
-
 - Add FULL_TABLE replication, resuming an interrupted sync with parameterized
   primary-key keyset pagination instead of Postgres heap-specific `xmin`,
   since YugabyteDB's DocDB storage has no equivalent
@@ -56,6 +35,21 @@
 - Add native PartialSync support (`partial-yugabyte-to-snowflake`) for
   bounded-range resyncs to Snowflake, reusing PostgreSQL's dialect-safe
   boundary predicate since YSQL follows PostgreSQL identifier-quoting rules
+- Add `load_balance`/`topology_keys` `db_conn` options, forwarded to both
+  LOG_BASED streaming and FastSync/PartialSync bulk connections, to enable
+  YugabyteDB's native client-side load balancing
+- Switch the connector's `psycopg2` dependency to
+  `psycopg2-yugabytedb-binary`, a drop-in fork required for the
+  `load_balance`/`topology_keys` connection parameters
+- Route `yugabyte-to-*`/`partial-yugabyte-to-*` FastSync/PartialSync
+  executables through a new isolated `fastsync-yugabyte` virtualenv so they
+  run the native-load-balancing driver, while backend_db, data-diff, and
+  PostgreSQL/MariaDB FastSync keep the stock `psycopg2-binary` in the main
+  `pipelinewise` virtualenv
+- Force-reinstall `psycopg2-yugabytedb-binary` in `make fastsync-yugabyte`, so
+  the driver swap is not silently skipped when a Docker anonymous volume
+  already has files at the shared install path from a prior `psycopg2-binary`
+  install
 
 0.85.0 (2026-09-08)
 -------------------
