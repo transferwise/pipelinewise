@@ -24,6 +24,7 @@ Availability is directional and independent of packaging. See
    taps/mixpanel
    taps/salesforce
    taps/twilio
+   taps/yugabyte
 
 .. list-table:: Available
     :header-rows: 1
@@ -68,3 +69,5 @@ Availability is directional and independent of packaging. See
       - :ref:`tap-salesforce`
     * - Twilio
       - :ref:`tap-twilio`
+    * - YugabyteDB
+      - :ref:`tap-yugabyte`

@@ -20,10 +20,11 @@ TAP_MARIADB_REPLICA_ID = 'mariadb_replica_to_pg'
 TAP_MONGODB_ID = 'mongo_to_pg'
 TAP_POSTGRES_ID = 'postgres_to_pg'
 TAP_S3_CSV_ID = 's3_csv_to_pg'
+TAP_YUGABYTE_ID = 'yugabyte_to_pg'
 TARGET_ID = 'postgres_dwh'
 
 
-# pylint: disable=attribute-defined-outside-init
+# pylint: disable=attribute-defined-outside-init,too-many-instance-attributes
 class TestTargetPostgres:
     """
     End to end tests for Target Postgres
@@ -42,6 +43,7 @@ class TestTargetPostgres:
         self.run_query_tap_mysql = self.e2e.run_query_tap_mysql
         self.run_query_tap_mysql_2 = self.e2e.run_query_tap_mysql_2
         self.run_query_tap_postgres = self.e2e.run_query_tap_postgres
+        self.run_query_tap_yugabyte = self.e2e.run_query_tap_yugabyte
         self.run_query_target_postgres = self.e2e.run_query_target_postgres
         self.mongodb_con = self.e2e.get_tap_mongodb_connection()
 
@@ -77,6 +79,7 @@ class TestTargetPostgres:
         # Setup and clean source and target databases
         self.e2e.setup_tap_mysql()
         self.e2e.setup_tap_postgres()
+        self.e2e.setup_tap_yugabyte()
         if self.e2e.env['TAP_S3_CSV']['is_configured']:
             self.e2e.setup_tap_s3_csv()
         self.e2e.setup_tap_mongodb()
@@ -343,6 +346,77 @@ class TestTargetPostgres:
         )[0][0]
 
         assert result == datetime(9999, 12, 31, 23, 59, 59, 999000)
+
+    @pytest.mark.dependency(depends=['import_config'])
+    def test_replicate_yugabyte_to_pg(self):
+        """Replicate data from YugabyteDB to Postgres DWH"""
+        # 1. Run tap first time - both fastsync and a singer should be triggered
+        assertions.assert_run_tap_success(
+            TAP_YUGABYTE_ID, TARGET_ID, ['fastsync', 'singer']
+        )
+        assertions.assert_row_counts_equal(
+            self.run_query_tap_yugabyte, self.run_query_target_postgres
+        )
+        assertions.assert_all_columns_exist(
+            self.run_query_tap_yugabyte, self.run_query_target_postgres
+        )
+
+        # 2. Make changes in the YugabyteDB source database
+        #  INCREMENTAL
+        self.run_query_tap_yugabyte(
+            'INSERT INTO public.city (id, name, countrycode, district, population) '
+            "VALUES (4080, 'Bath', 'GBR', 'England', 88859)"
+        )
+        self.run_query_tap_yugabyte(
+            'UPDATE public.edgydata SET '
+            "cjson = json '{\"data\": 1234}', "
+            "cjsonb = jsonb '{\"data\": 2345}', "
+            "cvarchar = 'Liewe Maatjies UPDATED' WHERE cid = 23"
+        )
+        #  FULL_TABLE (now via FastSync bulk-copy)
+        self.run_query_tap_yugabyte("DELETE FROM public.country WHERE code = 'UMI'")
+
+        #  LOG_BASED - DDL first, DML last: on YugabyteDB a DML immediately followed
+        #  by a DDL statement on the same session can silently drop the DML's wal2json
+        #  change event, so schema changes on a CDC-streamed table must never precede
+        #  the DML that depends on them within the same connection.
+        self.run_query_tap_yugabyte(
+            'ALTER TABLE logical1.logical1_table1 ADD COLUMN bool_col bool;'
+        )
+        self.run_query_tap_yugabyte(
+            'ALTER TABLE logical1.logical1_table1 RENAME COLUMN cvarchar2 to varchar_col;'
+        )
+        self.run_query_tap_yugabyte(
+            'INSERT INTO logical1.logical1_table1 (cvarchar, varchar_col, bool_col) values '
+            '(\'insert after alter table\', \'this is renamed column\', true);'
+        )
+
+        # 3. Run tap second time - both fastsync and a singer should be triggered, there are some FULL_TABLE
+        assertions.assert_run_tap_success(
+            TAP_YUGABYTE_ID, TARGET_ID, ['fastsync', 'singer']
+        )
+        assertions.assert_row_counts_equal(
+            self.run_query_tap_yugabyte, self.run_query_target_postgres
+        )
+        assertions.assert_all_columns_exist(
+            self.run_query_tap_yugabyte, self.run_query_target_postgres
+        )
+
+        result = self.run_query_target_postgres(
+            'SELECT name FROM ppw_e2e_tap_yugabyte."city" WHERE id = 4080;'
+        )[0][0]
+        assert result == 'Bath'
+
+        result = self.run_query_target_postgres(
+            'SELECT count(1) FROM ppw_e2e_tap_yugabyte."country" WHERE code = \'UMI\';'
+        )[0][0]
+        assert result == 0
+
+        result = self.run_query_target_postgres(
+            'SELECT varchar_col, bool_col FROM ppw_e2e_tap_yugabyte_logical1."logical1_table1" '
+            'WHERE cvarchar = \'insert after alter table\';'
+        )[0]
+        assert result == ('this is renamed column', True)
 
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_s3_to_pg(self):

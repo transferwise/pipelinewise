@@ -24,6 +24,7 @@ tap-mixpanel\
 tap-mongodb\
 tap-mysql\
 tap-postgres\
+tap-yugabyte\
 tap-s3-csv\
 tap-salesforce\
 tap-slack\
@@ -128,6 +129,9 @@ help: .check_gettext .pw_logo
 	@echo "     pipelinewise                                               Install the main PipelineWise component"
 	@echo "     pipelinewise_no_test_extras                                Install the main Pipelinewise component without test extras"
 	@echo
+	@echo "     fastsync-yugabyte                                          Install the isolated YugabyteDB FastSync venv (native load balancing driver)"
+	@echo "     fastsync-yugabyte_no_test_extras                           Same, without test extras"
+	@echo
 	@echo "     all_connectors                                             Install all connectors"
 	@echo "     connectors -e pw_connector=connector1,connector2,...       Install specific connector(s)"
 	@echo
@@ -151,6 +155,25 @@ pipelinewise: .check_gettext .pw_logo
 	$(call print_execute_time,PipelineWise)
 
 pipelinewise_no_test_extras: .set_pip_args pipelinewise
+
+# Isolated venv for the YugabyteDB FastSync/PartialSync executables (yugabyte-to-*,
+# partial-yugabyte-to-*) so they can run YugabyteDB's native-load-balancing psycopg2
+# fork while the main pipelinewise venv keeps plain psycopg2-binary for backend_db,
+# data-diff, and PostgreSQL/MariaDB/MongoDB FastSync.
+fastsync-yugabyte: .check_gettext .pw_logo
+	$(call make_pipelinewise,fastsync-yugabyte,.)
+	@echo -e -n "$(YELLOW)"
+	@echo "Swapping psycopg2 driver in fastsync-yugabyte for YugabyteDB native load balancing..."
+	@$(VENV_DIR)/fastsync-yugabyte/bin/python3 -m pip uninstall -y psycopg2-binary
+	@if [ "$$(uname -s)" = "Darwin" ]; then \
+		$(VENV_DIR)/fastsync-yugabyte/bin/python3 -m pip install --use-pep517 --force-reinstall --no-cache-dir psycopg2-yugabytedb-binary==2.9.3.5.post1; \
+	else \
+		$(VENV_DIR)/fastsync-yugabyte/bin/python3 -m pip install --use-pep517 --force-reinstall --no-cache-dir psycopg2-yugabytedb-binary==2.9.3.5; \
+	fi
+	@echo -e "$(RESET_COLOR)"
+	$(call print_execute_time,FastSync YugabyteDB)
+
+fastsync-yugabyte_no_test_extras: .set_pip_args fastsync-yugabyte
 
 connectors:
 ifeq ($(pw_connector),)

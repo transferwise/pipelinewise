@@ -222,6 +222,7 @@ def test_snowflake_e2e_matrix_contract():
                 'tests/end_to_end/target_snowflake/tap_postgres/test_partial_sync_pg_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_with_custom_buffer_size.py',
                 'tests/end_to_end/data_diff/test_postgres_to_snowflake.py',
+                'tests/end_to_end/target_snowflake/tap_yugabyte/test_partial_sync_yugabyte_to_sf.py',
             ),
         ),
         'mariadb-partial': (
@@ -230,6 +231,7 @@ def test_snowflake_e2e_matrix_contract():
                 'tests/end_to_end/target_snowflake/tap_mariadb/test_partial_sync_mariadb_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_postgres/test_defined_partial_sync_pg_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_with_split_large_files.py',
+                'tests/end_to_end/target_snowflake/tap_yugabyte/test_replicate_yugabyte_to_sf.py',
             ),
         ),
         'pg-iceberg': (

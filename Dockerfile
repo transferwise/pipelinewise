@@ -38,6 +38,7 @@ COPY . /app
 RUN echo "setup pipelinewise" \
     && cd /app \
     && make pipelinewise_no_test_extras -e pw_acceptlicenses=y\
+    && make fastsync-yugabyte_no_test_extras -e pw_acceptlicenses=y\
     && ln -s /root/.pipelinewise /app/.pipelinewise
 
 ENTRYPOINT ["/app/entrypoint.sh"]

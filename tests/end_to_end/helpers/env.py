@@ -121,6 +121,35 @@ class E2EEnv:
                 },
             },
             # ------------------------------------------------------------------
+            # Tap YugabyteDB is a REQUIRED test connector and test database with test data
+            # available in the docker environment
+            # ------------------------------------------------------------------
+            'TAP_YUGABYTE': {
+                'template_patterns': ['tap_yugabyte'],
+                'vars': {
+                    'HOST': {
+                        'value': os.environ.get('TAP_YUGABYTE_HOST'),
+                        'required': True,
+                    },
+                    'PORT': {
+                        'value': os.environ.get('TAP_YUGABYTE_PORT'),
+                        'required': True,
+                    },
+                    'USER': {
+                        'value': os.environ.get('TAP_YUGABYTE_USER'),
+                        'required': True,
+                    },
+                    'PASSWORD': {
+                        'value': os.environ.get('TAP_YUGABYTE_PASSWORD'),
+                        'required': True,
+                    },
+                    'DB': {
+                        'value': os.environ.get('TAP_YUGABYTE_DB'),
+                        'required': True,
+                    },
+                },
+            },
+            # ------------------------------------------------------------------
             # Tap MySQL is a REQUIRED test connector and test database with test data available
             # in the docker environment
             # ------------------------------------------------------------------
@@ -333,6 +362,9 @@ class E2EEnv:
         self.env['TAP_POSTGRES']['is_configured'] = self._is_env_connector_configured(
             'TAP_POSTGRES'
         )
+        self.env['TAP_YUGABYTE']['is_configured'] = self._is_env_connector_configured(
+            'TAP_YUGABYTE'
+        )
         self.env['TAP_MYSQL']['is_configured'] = self._is_env_connector_configured(
             'TAP_MYSQL'
         )
@@ -487,6 +519,18 @@ class E2EEnv:
             params=params,
         )
 
+    def run_query_tap_yugabyte(self, query, params=None):
+        """Run and SQL query in tap yugabyte database"""
+        return db.run_query_postgres(
+            query,
+            host=self.get_conn_env_var('TAP_YUGABYTE', 'HOST'),
+            port=self.get_conn_env_var('TAP_YUGABYTE', 'PORT'),
+            user=self.get_conn_env_var('TAP_YUGABYTE', 'USER'),
+            password=self.get_conn_env_var('TAP_YUGABYTE', 'PASSWORD'),
+            database=self.get_conn_env_var('TAP_YUGABYTE', 'DB'),
+            params=params,
+        )
+
     def get_tap_mongodb_connection(self):
         """Create and returns tap mongodb database instance to run queries on"""
         return db.get_mongodb_connection(
@@ -610,6 +654,12 @@ class E2EEnv:
         db_script = os.path.join(DIR, '..', '..', 'db', 'tap_postgres_db.sh')
         self._run_command(db_script)
 
+    def setup_tap_yugabyte(self):
+        """Clean YugabyteDB source database and prepare for test run
+        Creating initial tables is defined in Docker entrypoint.sh"""
+        db_script = os.path.join(DIR, '..', '..', 'db', 'tap_yugabyte_db.sh')
+        self._run_command(db_script)
+
     def setup_tap_mongodb(self):
         """Clean postgres source database and prepare for test run
         Creating initial tables is defined in Docker entrypoint.sh"""
@@ -677,6 +727,15 @@ class E2EEnv:
         )
         self.run_query_target_postgres(
             'DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres_logical2 CASCADE'
+        )
+        self.run_query_target_postgres(
+            'DROP SCHEMA IF EXISTS ppw_e2e_tap_yugabyte CASCADE'
+        )
+        self.run_query_target_postgres(
+            'DROP SCHEMA IF EXISTS ppw_e2e_tap_yugabyte_public2 CASCADE'
+        )
+        self.run_query_target_postgres(
+            'DROP SCHEMA IF EXISTS ppw_e2e_tap_yugabyte_logical1 CASCADE'
         )
         self.run_query_target_postgres(
             'DROP SCHEMA IF EXISTS ppw_e2e_tap_mysql CASCADE'
