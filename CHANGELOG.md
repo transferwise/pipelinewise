@@ -1,11 +1,43 @@
-Documentation only
-------------------
+0.85.1 (2026-09-12)
+-------------------
+
+**PostgreSQL FastSync**
+
+- Restore PostgreSQL source-slot reset for explicit unfiltered ``fast_sync`` on
+  taps containing LOG_BASED tables, with or without ``--force``: preflight the
+  resync and source slot, back up and clear every tap bookmark, then drop and
+  recreate the tap-specific slot once before workers start
+- Reject legacy database-wide, active, and incompatible slots before changing
+  state, preventing a resync from dropping a slot shared by other taps
+- Preserve unique pre-reset state backups across retries and report the failed
+  reset phase without restoring stale bookmarks after a failed or ambiguous drop
+- Retain the slot when ``--tables`` or a non-default ``--replication_method_only``
+  is specified, even if every table is listed; also retain it for automatic
+  initial loads, standalone PartialSync, and taps without LOG_BASED tables
+- Preflight the PostgreSQL-to-Snowflake FullSync size limit before resetting the
+  slot or bookmarks; keep ``--force`` as the size-limit override and honour
+  configured ``sync_start_from`` ranges with or without it
+- Refuse a managed-Iceberg slot reset while publication or conversion recovery
+  is pending, without changing source or state, so the corresponding filtered
+  FastSync or conversion command can finish recovery before the whole-tap resync
+  is retried
 
 **PostgreSQL logical replication**
 
 - Document recovery from wal2json ``stream_abort_cb`` failures by increasing
   ``logical_decoding_work_mem`` and retrying without discarding replication-slot
   state
+
+**Tests**
+
+- Verify that only an explicit unfiltered PostgreSQL ``fast_sync`` resets the
+  tap-specific logical replication slot, including source preflight, legacy-slot
+  isolation, durable backups, drop/create failures and lost responses,
+  managed-Iceberg recovery guards, retained-slot paths, pre-reset size checks,
+  and unchanged PartialSync selection with or without ``--force``
+- Keep the PostgreSQL split-file E2E tap within the source-slot name limit and
+  verify acceptance at 63 characters and rejection at 64 before mutation
+- Expose FastSync preflight failures in E2E output before checking worker logs
 
 0.85.0 (2026-09-08)
 -------------------

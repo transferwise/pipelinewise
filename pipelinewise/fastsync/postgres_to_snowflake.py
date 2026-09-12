@@ -99,13 +99,33 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
     )
 
 
+def get_resync_size_errors(tap_config, tables, maximum_table_size):
+    """Check selected FullSync tables before either slot reset or worker loading."""
+    if not maximum_table_size or not tables:
+        return []
+    errors = []
+    tap_obj = FastSyncTapPostgres(tap_config, tap_type_to_target_type)
+    try:
+        for schema in get_schemas_of_tables_set(tables):
+            all_tables_in_this_schema = get_tables_size(schema, tap_obj)
+            only_selected_tables = filter_out_selected_tables(all_tables_in_this_schema, tables)
+            table_with_maximum_size = get_maximum_value_from_list_of_dicts(only_selected_tables, 'table_size')
+            if table_with_maximum_size.get('table_size') > float(maximum_table_size):
+                errors.append(
+                    f're-sync can not be done because size of table '
+                    f'`{table_with_maximum_size["table_name"]}` is greater than `{maximum_table_size}`!'
+                    f' Use --force argument to force fast_sync!')
+    finally:
+        tap_obj.close_connection(silent=True)
+    return errors
+
+
 def main_impl():
     """Main sync logic"""
     args = utils.parse_args(REQUIRED_CONFIG_KEYS)
     iceberg_routes.validate_route_config(args.target)
     pool_size = utils.get_pool_size(args.tap)
     start_time = datetime.now()
-    table_sync_excs = []
 
     # Log start info
     LOGGER.info(
@@ -123,27 +143,10 @@ def main_impl():
         pool_size,
     )
 
-    can_run_sync = True
-    if args.autoresync_size:
-        schemas = get_schemas_of_tables_set(args.tables)
-        tap_obj = FastSyncTapPostgres(args.tap, tap_type_to_target_type)
-        for schema in schemas:
-            all_tables_in_this_schema = get_tables_size(schema, tap_obj)
-            only_selected_tables = filter_out_selected_tables(all_tables_in_this_schema, args.tables)
-            table_with_maximum_size = get_maximum_value_from_list_of_dicts(only_selected_tables, 'table_size')
-            if table_with_maximum_size.get('table_size') > float(args.autoresync_size):
-                can_run_sync = False
-                table_sync_excs.append(
-                    f're-sync can not be done because size of table '
-                    f'`{table_with_maximum_size["table_name"]}` is greater than `{args.autoresync_size}`!'
-                    f' Use --force argument to force fast_sync!')
-
-    # if internal arg drop_pg_slot is set to True, then we drop the slot before starting resync
-    if args.drop_pg_slot:
-        FastSyncTapPostgres.drop_slot(args.tap)
+    table_sync_excs = get_resync_size_errors(args.tap, args.tables, args.autoresync_size)
 
     # Start loading tables in parallel in spawning processes
-    if can_run_sync:
+    if not table_sync_excs:
         with multiprocessing.Pool(pool_size) as proc:
             table_sync_excs = list(
                 filter(

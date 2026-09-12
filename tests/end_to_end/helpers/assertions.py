@@ -27,7 +27,7 @@ def assert_run_tap_success(
         command = f'{command} --profiler'
 
     [return_code, stdout, stderr] = tasks.run_command(command)
-    _assert_run_tap_command_success(return_code, stdout, stderr)
+    _assert_sync_command_success(return_code, stdout, stderr)
     tasks.assert_run_tap_log_engines(stdout, sync_engines)
 
     for sync_engine in sync_engines:
@@ -58,7 +58,7 @@ def assert_run_tap_success(
         )
 
 
-def _assert_run_tap_command_success(return_code, stdout, stderr):
+def _assert_sync_command_success(return_code, stdout, stderr):
     """Expose all failed engine logs before asserting the expected engine set."""
     if return_code == 0 and stderr == '':
         return
@@ -95,6 +95,7 @@ def assert_resync_tables_success(
         command = f'{command} --profiler'
 
     [return_code, stdout, stderr] = tasks.run_command(command)
+    _assert_sync_command_success(return_code, stdout, stderr)
     tasks.assert_run_tap_log_engines(stdout, sync_engines)
 
     if expected_state_streams is None and expected_streams is not None:

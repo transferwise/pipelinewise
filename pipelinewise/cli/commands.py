@@ -413,7 +413,6 @@ def build_fastsync_command(
     tables: str = None,
     profiling_mode: bool = False,
     profiling_dir: str = None,
-    drop_pg_slot: bool = False,
     autoresync_size: int = None
 ) -> str:
     """
@@ -421,7 +420,6 @@ def build_fastsync_command(
     given target with optional transformations.
 
     Args:
-        drop_pg_slot: flag for fastsync to indicate whether to drop or not PG replication slot
         profiling_dir: directory where profiling output should be dumped
         profiling_mode: Flag to indicate whether build the command with profiling
         tap: NamedTuple with tap properties
@@ -452,7 +450,6 @@ def build_fastsync_command(
                     if transform.config and os.path.isfile(transform.config)
                     else '',
                     f'--tables {tables}' if tables else '',
-                    '--drop_pg_slot' if drop_pg_slot else '',
                     f'--autoresync_size {autoresync_size}' if autoresync_size else ''
                 ],
             )
