@@ -429,12 +429,6 @@ def _get_args_parser_for_partialsync():
     parser.add_argument(
         '--temp_dir', help='Temporary directory required for CSV exports'
     )
-    parser.add_argument(
-        '--drop_pg_slot',
-        help='Drop pg replication slot before starting resync',
-        action='store_true',
-    )
-
     return parser
 
 

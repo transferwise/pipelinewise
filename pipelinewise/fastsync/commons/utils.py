@@ -735,7 +735,6 @@ def parse_args(required_config_keys: Dict) -> argparse.Namespace:
     --transform         Transformations Config file
     --tables            Tables to sync. (Separated by comma)
     --temp_dir          Directory to create temporary csv exports. Defaults to current work dir.
-    --drop_pg_slot      flag to drop or not the Postgres replication slot before starting the resync
 
     Returns the parsed args object from argparse. For each argument that
     point to JSON files (tap, state, properties, target, transform),
@@ -750,11 +749,6 @@ def parse_args(required_config_keys: Dict) -> argparse.Namespace:
     parser.add_argument('--tables', help='Sync only specific tables')
     parser.add_argument(
         '--temp_dir', help='Temporary directory required for CSV exports'
-    )
-    parser.add_argument(
-        '--drop_pg_slot',
-        help='Drop pg replication slot before starting resync',
-        action='store_true',
     )
     parser.add_argument('--autoresync_size', help='maximum value for table size to resync', )
 

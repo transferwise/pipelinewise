@@ -8,6 +8,7 @@ from pipelinewise.fastsync.postgres_to_snowflake import (
     tap_type_to_target_type,
     sync_table,
     main_impl,
+    get_resync_size_errors,
 )
 from pipelinewise.fastsync.commons.snowflake_iceberg import (
     QueryHistoryLookupError,
@@ -25,6 +26,28 @@ class PostgresToSnowflake(unittest.TestCase):  # pylint: disable=too-many-public
     """
     Unit tests for fastsync postgres to snowflake
     """
+
+    def test_resync_size_check_only_inspects_selected_fullsync_tables(self):
+        with patch(f'{PACKAGE_IN_SCOPE}.get_tables_size', return_value=[
+            {'table_name': 'public.full', 'table_size': 10},
+            {'table_name': 'public.partial', 'table_size': 999},
+        ]) as sizes:
+            self.assertEqual(get_resync_size_errors({}, ['public.full'], 10), [])
+        sizes.assert_called_once()
+
+    def test_resync_size_check_skips_unlimited_or_partial_only_runs(self):
+        with patch(f'{PACKAGE_IN_SCOPE}.get_tables_size') as sizes:
+            self.assertEqual(get_resync_size_errors({}, ['public.full'], None), [])
+            self.assertEqual(get_resync_size_errors({}, [], 10), [])
+        sizes.assert_not_called()
+
+    def test_resync_size_check_closes_source_after_inspection_failure(self):
+        with patch(f'{PACKAGE_IN_SCOPE}.get_tables_size', side_effect=RuntimeError('inspection failed')), patch(
+            f'{PACKAGE_IN_SCOPE}.FastSyncTapPostgres',
+        ) as source:
+            with self.assertRaisesRegex(RuntimeError, 'inspection failed'):
+                get_resync_size_errors({}, ['public.full'], 10)
+        source.return_value.close_connection.assert_called_once_with(silent=True)
 
     def test_tap_type_to_target_type_with_defined_tap_type_returns_equivalent_target_type(
         self,

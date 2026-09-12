@@ -894,15 +894,12 @@ def assert_main_impl_exit_normally_on_success(
         with patch(objects_to_mock.full_target_class_nm):
             with patch(objects_to_mock.sync_table_fn_nm):
                 with patch(objects_to_mock.multiproc_module_nm) as multiproc_mock:
-                    with patch(objects_to_mock.full_tap_class_nm) as tap_mock:
-                        tap_mock.return_value.drop_slot.side_effect = None
-
+                    with patch(objects_to_mock.full_tap_class_nm):
                         ns = Namespace(
                             **{
                                 'tables': ['table_1', 'table_2', 'table_3', 'table_4'],
                                 'target': {},
                                 'transform': None,
-                                'drop_pg_slot': False,
                                 'tap': {},
                                 'autoresync_size': None
                             }
@@ -934,7 +931,6 @@ def assert_main_impl_exit_normally_on_success(
                         multiproc_mock.Pool.assert_called_once_with(10)
                         assert utils_mock.parse_args.call_count == 1
                         assert mock_enter.return_value.map.call_count == 1
-                        assert tap_mock.return_value.drop_slot.call_count == 0
 
 
 # pylint: disable=missing-function-docstring,unused-variable,invalid-name
@@ -949,15 +945,12 @@ def assert_main_impl_should_exit_with_error_on_failure(
         with patch(objects_to_mock.full_target_class_nm):
             with patch(objects_to_mock.sync_table_fn_nm):
                 with patch(objects_to_mock.multiproc_module_nm) as multiproc_mock:
-                    with patch(objects_to_mock.full_tap_class_nm) as tap_mock:
-                        tap_mock.return_value.drop_slot.side_effect = None
-
+                    with patch(objects_to_mock.full_tap_class_nm):
                         ns = Namespace(
                             **{
                                 'tables': ['table_1', 'table_2', 'table_3', 'table_4'],
                                 'target': {},
                                 'transform': None,
-                                'drop_pg_slot': True,
                                 'tap': {
                                     'fastsync_parallelism': 4,
                                 },
@@ -986,13 +979,12 @@ def assert_main_impl_should_exit_with_error_on_failure(
                         with pytest.raises(SystemExit):
                             main_impl()
 
-                            # assertions
-                            assert utils_mock.parse_args.call_count == 1
-                            assert mock_enter.return_value.map.call_count == 1
-                            assert tap_mock.return_value.drop_slot.call_count == 1
-                            utils_mock.get_pool_size.assert_called_once_with(
-                                {
-                                    'fastsync_parallelism': 4,
-                                }
-                            )
-                            multiproc_mock.Pool.assert_called_once_with(10)
+                        # assertions
+                        assert utils_mock.parse_args.call_count == 1
+                        assert mock_enter.return_value.map.call_count == 1
+                        utils_mock.get_pool_size.assert_called_once_with(
+                            {
+                                'fastsync_parallelism': 4,
+                            }
+                        )
+                        multiproc_mock.Pool.assert_called_once_with(10)

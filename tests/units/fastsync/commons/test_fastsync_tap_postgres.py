@@ -3,7 +3,7 @@ import io
 
 from decimal import Decimal
 from unittest import TestCase
-from unittest.mock import MagicMock, Mock, PropertyMock, patch
+from unittest.mock import MagicMock, Mock, PropertyMock, call, patch
 
 from pipelinewise.fastsync.commons.tap_postgres import FastSyncTapPostgres
 from pipelinewise.fastsync.commons import tap_postgres
@@ -349,6 +349,80 @@ class TestFastSyncTapPostgres(TestCase):  # pylint: disable=too-many-public-meth
 
         connect_mock.return_value.close.assert_called_once_with()
         connect_mock.return_value.cursor.assert_not_called()
+
+    def test_reset_slot_drops_only_current_slot_after_state_invalidation(self):
+        """Only the preflighted tap-specific slot is dropped, after state is durable."""
+        connection = MagicMock()
+        cursor = connection.cursor.return_value.__enter__.return_value
+        cursor.fetchall.return_value = [('pipelinewise_my_db_my_tap', 'my_db', 'wal2json', False)]
+        creds = {'dbname': 'my_db', 'tap_id': 'my_tap'}
+        before_reset = MagicMock(return_value='state.backup')
+        calls = MagicMock()
+        calls.attach_mock(cursor.execute, 'execute')
+        calls.attach_mock(before_reset, 'before_reset')
+
+        with patch.object(
+            FastSyncTapPostgres, 'get_connection', return_value=connection
+        ) as get_connection:
+            FastSyncTapPostgres.reset_slot(creds, before_reset=before_reset)
+
+        get_connection.assert_called_once_with(creds, prioritize_primary=True)
+        assert calls.mock_calls == [
+            call.execute(
+                'SELECT slot_name, database, plugin, active FROM pg_replication_slots '
+                'WHERE slot_name IN (%s, %s)',
+                ('pipelinewise_my_db', 'pipelinewise_my_db_my_tap'),
+            ),
+            call.before_reset(),
+            call.execute('SELECT pg_drop_replication_slot(%s)', ('pipelinewise_my_db_my_tap',)),
+            call.execute(
+                'SELECT * FROM pg_create_logical_replication_slot(%s, %s)',
+                ('pipelinewise_my_db_my_tap', 'wal2json'),
+            ),
+        ]
+        connection.close.assert_called_once_with()
+
+    def test_reset_slot_rejects_legacy_active_and_incompatible_slots_before_state_changes(self):
+        """Legacy lookup takes precedence even when an inactive tap-specific slot also exists."""
+        current = ('pipelinewise_my_db_my_tap', 'my_db', 'wal2json', False)
+        cases = [
+            ([('pipelinewise_my_db', 'my_db', 'wal2json', active)] + modern, 'legacy')
+            for active in (False, True) for modern in ([], [current])
+        ] + [
+            ([(current[0], database, plugin, active)], 'must be inactive')
+            for database, plugin, active in (
+                ('my_db', 'wal2json', True), ('other_db', 'wal2json', False), ('my_db', 'pgoutput', False),
+            )
+        ]
+        for rows, message in cases:
+            with self.subTest(rows=rows):
+                connection = MagicMock()
+                cursor = connection.cursor.return_value.__enter__.return_value
+                cursor.fetchall.return_value = rows
+                before_reset = MagicMock()
+                with patch.object(FastSyncTapPostgres, 'get_connection', return_value=connection):
+                    with self.assertRaisesRegex(RuntimeError, message):
+                        FastSyncTapPostgres.reset_slot(
+                            {'dbname': 'my_db', 'tap_id': 'my_tap'}, before_reset=before_reset,
+                        )
+                before_reset.assert_not_called()
+                self.assertEqual(cursor.execute.call_count, 1)
+                connection.close.assert_called_once_with()
+
+    def test_reset_slot_creates_missing_slot_without_dropping_any_slot(self):
+        """A missing slot still requires state invalidation before creation."""
+        connection = MagicMock()
+        cursor = connection.cursor.return_value.__enter__.return_value
+        cursor.fetchall.return_value = []
+        before_reset = MagicMock(return_value=None)
+        with patch.object(FastSyncTapPostgres, 'get_connection', return_value=connection):
+            FastSyncTapPostgres.reset_slot({'dbname': 'my_db', 'tap_id': 'my_tap'}, before_reset=before_reset)
+        before_reset.assert_called_once_with()
+        self.assertEqual(cursor.execute.call_count, 2)
+        cursor.execute.assert_called_with(
+            'SELECT * FROM pg_create_logical_replication_slot(%s, %s)', ('pipelinewise_my_db_my_tap', 'wal2json'),
+        )
+        connection.close.assert_called_once_with()
 
     @patch('pipelinewise.fastsync.commons.tap_postgres.psycopg2.connect')
     def test_get_connection_to_sec(self, connect_mock):
