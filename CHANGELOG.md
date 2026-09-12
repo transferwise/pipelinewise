@@ -35,6 +35,9 @@
   isolation, durable backups, drop/create failures and lost responses,
   managed-Iceberg recovery guards, retained-slot paths, pre-reset size checks,
   and unchanged PartialSync selection with or without ``--force``
+- Keep the PostgreSQL split-file E2E tap within the source-slot name limit and
+  verify acceptance at 63 characters and rejection at 64 before mutation
+- Expose FastSync preflight failures in E2E output before checking worker logs
 
 0.85.0 (2026-09-08)
 -------------------
