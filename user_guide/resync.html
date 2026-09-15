@@ -218,7 +218,11 @@
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Resync and repair</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#choose-an-operation">Choose an operation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#preflight">Preflight</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#full-resync">Full resync</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#full-resync">Full resync</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#postgresql-source-slot-reset">PostgreSQL source-slot reset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#configured-partialsync-and-replicas">Configured PartialSync and replicas</a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="#partial-repair">Partial repair</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#failure-and-validation">Failure and validation</a></li>
 </ul>
@@ -432,10 +436,83 @@ requires it.</p></li>
 <p>The command requires a FullSync-capable route and fails rather than falling back
 to Singer. <code class="docutils literal notranslate"><span class="pre">--replication_method_only</span> <span class="pre">&lt;method&gt;</span></code> filters by configured method.
 <code class="docutils literal notranslate"><span class="pre">--force</span></code> overrides <code class="docutils literal notranslate"><span class="pre">allowed_resync_max_size</span></code> after the operator accepts the
-source and target impact.</p>
+source and target impact. It does not override <code class="docutils literal notranslate"><span class="pre">sync_start_from</span></code> or change a
+configured PartialSync into a full-table reload.</p>
+<section id="postgresql-source-slot-reset">
+<span id="resync-postgres-slot-reset"></span><h3>PostgreSQL source-slot reset<a class="headerlink" href="#postgresql-source-slot-reset" title="Link to this heading"></a></h3>
+<p>For a PostgreSQL tap containing LOG_BASED tables, this command drops and
+recreates the tap-specific source slot once before any worker starts:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pipelinewise<span class="w"> </span>fast_sync<span class="w"> </span>--tap<span class="w"> </span>&lt;tap_id&gt;<span class="w"> </span>--target<span class="w"> </span>&lt;target_id&gt;
+</pre></div>
+</div>
+<p>Omit <code class="docutils literal notranslate"><span class="pre">--tables</span></code> and leave <code class="docutils literal notranslate"><span class="pre">--replication_method_only</span></code> at its <code class="docutils literal notranslate"><span class="pre">*</span></code> default
+so every selected table is rebuilt. The deprecated <code class="docutils literal notranslate"><span class="pre">sync_tables</span></code> alias has
+the same behaviour. <code class="docutils literal notranslate"><span class="pre">--force</span></code> is not required for the reset: it only bypasses
+the resync size limit. Taps without LOG_BASED tables do not reset a slot.</p>
+<table class="docutils align-default" id="id1">
+<caption><span class="caption-text">PostgreSQL slot behaviour during replication</span><a class="headerlink" href="#id1" title="Link to this table"></a></caption>
+<thead>
+<tr class="row-odd"><th class="head"><p>Command or operation</p></th>
+<th class="head"><p>Source slot</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Unfiltered <code class="docutils literal notranslate"><span class="pre">fast_sync</span></code> (with or without <code class="docutils literal notranslate"><span class="pre">--force</span></code>)</p></td>
+<td><p>Drop and recreate once, after safety checks.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fast_sync</span> <span class="pre">--tables</span> <span class="pre">...</span></code> (even if every table is listed, or <code class="docutils literal notranslate"><span class="pre">--force</span></code> is supplied)</p></td>
+<td><p>Retain.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fast_sync</span> <span class="pre">--replication_method_only</span> <span class="pre">log_based</span></code> (or another non-default filter, with or without <code class="docutils literal notranslate"><span class="pre">--force</span></code>)</p></td>
+<td><p>Retain.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">partial_sync_table</span></code> or automatic initial sync of individual/new tables</p></td>
+<td><p>Retain.</p></td>
+</tr>
+</tbody>
+</table>
+<p>PipelineWise validates local configuration, preflights the FullSync size limit
+unless <code class="docutils literal notranslate"><span class="pre">--force</span></code> is supplied, and checks the source connection and slot before
+changing state. A preflight size-limit rejection leaves the slot and bookmarks
+unchanged. An active slot or a slot with an unexpected database
+or output plugin blocks the reset. Any legacy database-wide slot
+(<code class="docutils literal notranslate"><span class="pre">pipelinewise_&lt;dbname&gt;</span></code>) also blocks it, even if a tap-specific slot exists:
+the legacy slot may serve other taps and is preferred by the replication reader.
+Coordinate any legacy-slot migration with your DBA and all affected taps; this
+command does not migrate or delete a legacy slot.</p>
+<p>After these checks, PipelineWise saves a unique
+<code class="docutils literal notranslate"><span class="pre">state.json.before-slot-reset-&lt;id&gt;.bak</span></code> alongside the state file, clears every
+tap bookmark, then drops and recreates the tap-specific slot. Backups are retained
+across retries. No FullSync or configured PartialSync worker starts until slot
+creation succeeds.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Dropping and recreating a slot is not atomic. A source error, lost response,
+or process interruption after state invalidation can leave the slot unchanged,
+absent, or replaced; bookmarks remain cleared. Keep scheduled replication
+stopped, resolve the error, then retry the unfiltered <code class="docutils literal notranslate"><span class="pre">fast_sync</span></code>
+and complete the whole-tap resync. A state backup cannot recover discarded
+WAL: never restore old LOG_BASED bookmarks after a completed or uncertain drop.
+Reset errors report the failed phase and backup path when available.
+Add <code class="docutils literal notranslate"><span class="pre">--force</span></code> only if the resync size limit needs to be bypassed.</p>
+</div>
+<p>For managed Iceberg, a pending publication or conversion recovery stops the
+whole-tap reset before source or state changes. Resume the corresponding filtered
+FastSync or conversion command to finish recovery, then retry the unfiltered
+<code class="docutils literal notranslate"><span class="pre">fast_sync</span></code>.</p>
+<p>Separately, <code class="docutils literal notranslate"><span class="pre">import_config</span></code> removes a deleted PostgreSQL tap’s source slot
+when it removes that tap’s runtime configuration; this is cleanup, not a resync.</p>
+</section>
+<section id="configured-partialsync-and-replicas">
+<h3>Configured PartialSync and replicas<a class="headerlink" href="#configured-partialsync-and-replicas" title="Link to this heading"></a></h3>
 <p>A table with <code class="docutils literal notranslate"><span class="pre">sync_start_from</span></code> uses PartialSync instead of FullSync. MariaDB,
 MySQL, and PostgreSQL sources can use <code class="docutils literal notranslate"><span class="pre">replica_host</span></code> for the FastSync read while
 ongoing LOG_BASED replication remains on the primary.</p>
+<p><code class="docutils literal notranslate"><span class="pre">--force</span></code> preserves that configured range and loading method. Existing rows
+outside the range remain unless <code class="docutils literal notranslate"><span class="pre">drop_target_table:</span> <span class="pre">true</span></code> is configured.
+A whole-tap PostgreSQL resync still resets the shared WAL position, so ensure
+the configured ranges cover the changes that need rebuilding; retained rows
+outside those ranges are not revalidated or refreshed.</p>
 <p>For a managed Iceberg v3 target, an exactly compatible table uses
 <code class="docutils literal notranslate"><span class="pre">INSERT</span> <span class="pre">OVERWRITE</span></code> and retains its object identity. A new nullable column is
 added before overwrite. Other mismatches require guarded replacement by the
@@ -443,6 +520,7 @@ table’s current owning account role; database-role ownership is not supported.
 Ownership is retained, but the new object resets history and can change its base
 location; visible unsupported dependencies stop the operation first. See
 <a class="reference internal" href="../connectors/targets/snowflake_iceberg.html#snowflake-iceberg"><span class="std std-ref">Snowflake Iceberg tables</span></a>.</p>
+</section>
 </section>
 <section id="partial-repair">
 <h2>Partial repair<a class="headerlink" href="#partial-repair" title="Link to this heading"></a></h2>

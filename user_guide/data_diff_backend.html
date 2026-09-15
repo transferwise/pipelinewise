@@ -184,7 +184,7 @@ const runMermaid = async (rerun) => {
                                     // Apply zoom to the now-rendered diagram, matching
                                     // the decoration visible diagrams receive.
                                     if (true) {
-                                        addZoomToSvgs(d3.selectAll(".mermaid[data-zoom-id=id-7f1801d8-764d-415f-83ab-522c5a42d7e9]").select(function() {
+                                        addZoomToSvgs(d3.selectAll(".mermaid[data-zoom-id=id-65dc61e7-fde5-406e-a68f-e3b96627e78a]").select(function() {
                                             return this.querySelector("svg");
                                         }));
                                     }
@@ -210,7 +210,7 @@ const runMermaid = async (rerun) => {
     if (true) {
         const mermaids_to_add_zoom = 1 === -1 ? mermaids_active.length : 1;
         if(mermaids_to_add_zoom > 0) {
-            var svgs = d3.selectAll(".mermaid[data-zoom-id=id-7f1801d8-764d-415f-83ab-522c5a42d7e9]").select(function() {
+            var svgs = d3.selectAll(".mermaid[data-zoom-id=id-65dc61e7-fde5-406e-a68f-e3b96627e78a]").select(function() {
                 return this.querySelector("svg");
             });
             // Wait until every active (visible) diagram has rendered. Deferred
@@ -577,7 +577,11 @@ window.runMermaid = runMermaid;</script>
 <li class="toctree-l1"><a class="reference internal" href="resync.html">Resync and repair</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="resync.html#choose-an-operation">Choose an operation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="resync.html#preflight">Preflight</a></li>
-<li class="toctree-l2"><a class="reference internal" href="resync.html#full-resync">Full resync</a></li>
+<li class="toctree-l2"><a class="reference internal" href="resync.html#full-resync">Full resync</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="resync.html#postgresql-source-slot-reset">PostgreSQL source-slot reset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="resync.html#configured-partialsync-and-replicas">Configured PartialSync and replicas</a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="resync.html#partial-repair">Partial repair</a></li>
 <li class="toctree-l2"><a class="reference internal" href="resync.html#failure-and-validation">Failure and validation</a></li>
 </ul>
@@ -760,7 +764,7 @@ credentials when separate roles are not required.</p>
 <section id="schema">
 <h2>Schema<a class="headerlink" href="#schema" title="Link to this heading"></a></h2>
 <figure class="align-center" id="id1">
-<pre data-zoom-id="id-7f1801d8-764d-415f-83ab-522c5a42d7e9" class="mermaid">
+<pre data-zoom-id="id-65dc61e7-fde5-406e-a68f-e3b96627e78a" class="mermaid">
         %%{init: {&quot;er&quot;: {&quot;diagramPadding&quot;: 8, &quot;entityPadding&quot;: 8}}}%%
 erDiagram
     direction LR

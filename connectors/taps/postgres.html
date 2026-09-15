@@ -218,7 +218,11 @@
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/resync.html">Resync and repair</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/resync.html#choose-an-operation">Choose an operation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/resync.html#preflight">Preflight</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../user_guide/resync.html#full-resync">Full resync</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/resync.html#full-resync">Full resync</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/resync.html#postgresql-source-slot-reset">PostgreSQL source-slot reset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/resync.html#configured-partialsync-and-replicas">Configured PartialSync and replicas</a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/resync.html#partial-repair">Partial repair</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/resync.html#failure-and-validation">Failure and validation</a></li>
 </ul>
@@ -409,9 +413,14 @@ tables must be discovered automatically.</p>
 version 2 support; and</p></li>
 <li><p>permission to create and consume a logical replication slot.</p></li>
 </ul>
-<p>PipelineWise creates one slot for the tap database. PostgreSQL retains WAL needed
+<p>PipelineWise creates one tap-specific slot in the source database. PostgreSQL retains WAL needed
 by that slot, so monitor retained WAL and do not remove the slot while the tap is
 active.</p>
+<p>An explicit, unfiltered <code class="docutils literal notranslate"><span class="pre">fast_sync</span></code> on a tap containing LOG_BASED tables
+resets the tap-specific slot once before workers start, with or without
+<code class="docutils literal notranslate"><span class="pre">--force</span></code>. Filtered FastSync, automatic initial loads, and standalone PartialSync
+retain it. See <a class="reference internal" href="../../user_guide/resync.html#resync-postgres-slot-reset"><span class="std std-ref">PostgreSQL source-slot reset</span></a> for exact commands, legacy-slot
+safety, state backups, pending-Iceberg guards, and non-atomic reset recovery.</p>
 </section>
 <section id="configuration">
 <h2>Configuration<a class="headerlink" href="#configuration" title="Link to this heading"></a></h2>

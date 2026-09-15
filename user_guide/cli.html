@@ -218,7 +218,11 @@
 <li class="toctree-l1"><a class="reference internal" href="resync.html">Resync and repair</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="resync.html#choose-an-operation">Choose an operation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="resync.html#preflight">Preflight</a></li>
-<li class="toctree-l2"><a class="reference internal" href="resync.html#full-resync">Full resync</a></li>
+<li class="toctree-l2"><a class="reference internal" href="resync.html#full-resync">Full resync</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="resync.html#postgresql-source-slot-reset">PostgreSQL source-slot reset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="resync.html#configured-partialsync-and-replicas">Configured PartialSync and replicas</a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="resync.html#partial-repair">Partial repair</a></li>
 <li class="toctree-l2"><a class="reference internal" href="resync.html#failure-and-validation">Failure and validation</a></li>
 </ul>
@@ -586,7 +590,8 @@ state after an unexpected interruption.</p>
 <td><p>Limits work to comma-separated source <code class="docutils literal notranslate"><span class="pre">schema.table</span></code> names.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">--force</span></code></p></td>
-<td><p>Overrides <code class="docutils literal notranslate"><span class="pre">allowed_resync_max_size</span></code>.</p></td>
+<td><p>Overrides <code class="docutils literal notranslate"><span class="pre">allowed_resync_max_size</span></code> only. Does not override
+<code class="docutils literal notranslate"><span class="pre">sync_start_from</span></code> or bypass slot-reset safety checks.</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">--replication_method_only</span></code></p></td>
 <td><p>Selects tables with <code class="docutils literal notranslate"><span class="pre">full_table</span></code>, <code class="docutils literal notranslate"><span class="pre">incremental</span></code>, or <code class="docutils literal notranslate"><span class="pre">log_based</span></code>.</p></td>
@@ -595,7 +600,13 @@ state after an unexpected interruption.</p>
 </table>
 <p>The command fails when FullSync is unavailable for the route. It never falls
 back to Singer. A table with <code class="docutils literal notranslate"><span class="pre">sync_start_from</span></code> uses PartialSync. <code class="docutils literal notranslate"><span class="pre">sync_tables</span></code>
-remains a deprecated alias.</p>
+remains a deprecated alias. Supplying <code class="docutils literal notranslate"><span class="pre">--tables</span></code> or setting
+<code class="docutils literal notranslate"><span class="pre">--replication_method_only</span></code> to anything other than <code class="docutils literal notranslate"><span class="pre">*</span></code> makes the resync
+filtered and retains the PostgreSQL replication slot, even if <code class="docutils literal notranslate"><span class="pre">--tables</span></code> lists
+every table. An unfiltered whole-tap PostgreSQL run with LOG_BASED tables resets
+its tap-specific slot once before workers start, with or without <code class="docutils literal notranslate"><span class="pre">--force</span></code>.
+See <a class="reference internal" href="resync.html#resync-postgres-slot-reset"><span class="std std-ref">PostgreSQL source-slot reset</span></a> for safety checks, backups, pending-Iceberg
+guards, and non-atomic reset recovery.</p>
 </section>
 <section id="partial-sync-table">
 <span id="cli-partial-sync-table"></span><h3><code class="docutils literal notranslate"><span class="pre">partial_sync_table</span></code><a class="headerlink" href="#partial-sync-table" title="Link to this heading"></a></h3>

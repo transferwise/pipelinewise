@@ -218,7 +218,11 @@
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/resync.html">Resync and repair</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/resync.html#choose-an-operation">Choose an operation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/resync.html#preflight">Preflight</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../user_guide/resync.html#full-resync">Full resync</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/resync.html#full-resync">Full resync</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/resync.html#postgresql-source-slot-reset">PostgreSQL source-slot reset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/resync.html#configured-partialsync-and-replicas">Configured PartialSync and replicas</a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/resync.html#partial-repair">Partial repair</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/resync.html#failure-and-validation">Failure and validation</a></li>
 </ul>
@@ -521,6 +525,12 @@ its declared width. See <a class="reference internal" href="../connectors/target
 </div>
 <p>This operation can replace target data and reset replication bookmarks. Review
 <a class="reference internal" href="../user_guide/resync.html#resync"><span class="std std-ref">Resync and repair</span></a> before running it against a large or actively written table.</p>
+<p>An unfiltered PostgreSQL <code class="docutils literal notranslate"><span class="pre">fast_sync</span></code> containing LOG_BASED tables resets the
+tap-specific slot once before workers start, with or without <code class="docutils literal notranslate"><span class="pre">--force</span></code>.
+Filtered FastSync, automatic initial loads, and standalone PartialSync retain
+it. <code class="docutils literal notranslate"><span class="pre">--force</span></code> only bypasses the resync size limit; configured
+<code class="docutils literal notranslate"><span class="pre">sync_start_from</span></code> ranges remain in effect. See <a class="reference internal" href="../user_guide/resync.html#resync-postgres-slot-reset"><span class="std std-ref">PostgreSQL source-slot reset</span></a>
+for exact commands, safety checks, pending-Iceberg guards, and failure recovery.</p>
 </section>
 <section id="configured-partialsync">
 <span id="defined-partial-sync"></span><h2>Configured PartialSync<a class="headerlink" href="#configured-partialsync" title="Link to this heading"></a></h2>

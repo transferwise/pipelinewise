@@ -218,7 +218,11 @@
 <li class="toctree-l1"><a class="reference internal" href="resync.html">Resync and repair</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="resync.html#choose-an-operation">Choose an operation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="resync.html#preflight">Preflight</a></li>
-<li class="toctree-l2"><a class="reference internal" href="resync.html#full-resync">Full resync</a></li>
+<li class="toctree-l2"><a class="reference internal" href="resync.html#full-resync">Full resync</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="resync.html#postgresql-source-slot-reset">PostgreSQL source-slot reset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="resync.html#configured-partialsync-and-replicas">Configured PartialSync and replicas</a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="resync.html#partial-repair">Partial repair</a></li>
 <li class="toctree-l2"><a class="reference internal" href="resync.html#failure-and-validation">Failure and validation</a></li>
 </ul>
@@ -788,12 +792,20 @@ Point the tap at the primary server, or increase <cite>max_standby_streaming_del
 <section id="unable-to-find-replication-slot">
 <span id="troubleshooting-postgres-missing-slot"></span><h4>Unable to find replication slot<a class="headerlink" href="#unable-to-find-replication-slot" title="Link to this heading"></a></h4>
 <p><em>How to fix:</em>
-Run <code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">fast_sync</span> <span class="pre">--tap</span> <span class="pre">&lt;tap_id&gt;</span> <span class="pre">--target</span> <span class="pre">&lt;target_id&gt;</span></code> to resync the
-tap and recreate the replication slot. See <a class="reference internal" href="resync.html#resync"><span class="std std-ref">Resync and repair</span></a> before proceeding.</p>
+Run <code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">fast_sync</span> <span class="pre">--tap</span> <span class="pre">&lt;tap_id&gt;</span> <span class="pre">--target</span> <span class="pre">&lt;target_id&gt;</span></code> with
+no <code class="docutils literal notranslate"><span class="pre">--tables</span></code> and the default <code class="docutils literal notranslate"><span class="pre">--replication_method_only</span> <span class="pre">'*'</span></code> to resync the
+whole tap and recreate its slot. Add <code class="docutils literal notranslate"><span class="pre">--force</span></code> only to bypass the resync size
+limit; <code class="docutils literal notranslate"><span class="pre">sync_start_from</span></code> remains effective either way. See
+<a class="reference internal" href="resync.html#resync-postgres-slot-reset"><span class="std std-ref">PostgreSQL source-slot reset</span></a> for preflight checks, backups, and
+pending-Iceberg recovery before proceeding.</p>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
-<p>Triggering a resync of a PostgreSQL tap using <code class="docutils literal notranslate"><span class="pre">fast_sync</span></code> will drop the
-replication slot.</p>
+<p>This command drops an existing tap-specific slot, with or without <code class="docutils literal notranslate"><span class="pre">--force</span></code>.
+Slot replacement is not atomic: a failure during drop or recreation leaves
+bookmarks invalidated, and the slot may be absent or replaced.
+Stop scheduled replication and complete
+the whole-tap resync; do not restore old LOG_BASED bookmarks after a completed
+or uncertain drop.</p>
 </div>
 </section>
 </section>
