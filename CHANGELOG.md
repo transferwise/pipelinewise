@@ -1,11 +1,14 @@
-Unreleased (AP-3290: Preserve multiline text)
--------------------------------------------
+0.86.0 (2026-09-15)
+-------------------
 
 **Breaking compatibility**
 
 - Require target-snowflake named CSV formats to use the required multiline-safe
   options, including `NULL_IF = ()`, and reject incompatible formats before
   loading
+- Default `flush_all_streams` to `true` in PipelineWise-generated Singer
+  configuration, allowing smaller, more frequent loads; retain explicit `false`
+  overrides and re-run `import_config` to adopt the default for existing taps
 
 **Fixes**
 
@@ -19,6 +22,8 @@ Unreleased (AP-3290: Preserve multiline text)
 
 - Verify PostgreSQL Snowflake FastSync and target-snowflake retain multiline
   strings and literal escape sequences
+- Include native MariaDB, MySQL, and PostgreSQL multiline regression tests in
+  the Snowflake E2E shards, with exact-once coverage enforced by the CI contract
 
 0.85.1 (2026-09-12)
 -------------------

@@ -78,7 +78,7 @@ Full list of options in `config.json`:
 | password                            | String  | Yes        | PostgreSQL password                                           |
 | dbname                              | String  | Yes        | PostgreSQL database name                                      |
 | batch_size_rows                     | Integer |            | (Default: 100000) Maximum number of rows in each batch. At the end of each batch, the rows in the batch are loaded into Postgres. |
-| flush_all_streams                   | Boolean |            | (Default: False) Flush and load every stream into Postgres when one batch is full. Warning: This may trigger the COPY command to use files with low number of records. |
+| flush_all_streams                   | Boolean |            | (Standalone default: False; PipelineWise default: True) Flush and load every buffered stream into Postgres when one batch is full. Set `false` to flush only that stream. Enabling this can produce smaller, more frequent COPY loads. |
 | parallelism                         | Integer |            | (Default: 0) The number of threads used to flush tables. 0 will create a thread for each stream, up to parallelism_max. -1 will create a thread for each CPU core. Any other positive number will create that number of threads, up to parallelism_max. |
 | max_parallelism                     | Integer |            | (Default: 16) Max number of parallel threads to use when flushing tables. |
 | default_target_schema               | String  |            | Name of the schema where the tables will be created. If `schema_mapping` is not defined then every stream sent by the tap is loaded into this schema.    |

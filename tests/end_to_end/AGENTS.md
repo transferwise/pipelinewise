@@ -56,6 +56,7 @@ run_e2e \
 
 run_e2e \
   tests/end_to_end/target_snowflake/tap_postgres/test_partial_sync_pg_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_postgres/test_multiline_native_pg_to_sf.py \
   tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_with_custom_buffer_size.py \
   tests/end_to_end/data_diff/test_postgres_to_snowflake.py
 
@@ -76,6 +77,7 @@ run_e2e \
 
 run_e2e \
   tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_mysql/test_multiline_native_mysql_to_sf.py \
   tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_table_size_check.py \
   tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf.py \
   tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf_with_archive_load_files.py
@@ -83,6 +85,7 @@ run_e2e \
 run_e2e \
   tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_table_size_check.py \
   tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_mariadb/test_multiline_native_mariadb_to_sf.py \
   tests/end_to_end/target_snowflake/tap_mariadb/test_defined_partial_sync_mariadb_to_sf.py \
   tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_with_split_large_files.py
 ```
@@ -100,15 +103,8 @@ through native and explicit-v3 FullSync/PartialSync for MariaDB, MySQL, and
 PostgreSQL. Reuse `target_snowflake/multiline_values.py`; do not normalize values
 in assertions. Connector integration separately covers Singer CSV loading.
 
-The native multiline files below are not yet included in the CI groups above;
-run them additionally, serially, until they are assigned to CI shards:
-
-```bash
-run_e2e \
-  tests/end_to_end/target_snowflake/tap_mariadb/test_multiline_native_mariadb_to_sf.py \
-  tests/end_to_end/target_snowflake/tap_mysql/test_multiline_native_mysql_to_sf.py \
-  tests/end_to_end/target_snowflake/tap_postgres/test_multiline_native_pg_to_sf.py
-```
+Native multiline coverage runs in the PostgreSQL partial, MySQL Iceberg, and
+MariaDB native CI groups above; the matrix contract enforces exact-once coverage.
 
 ## Credentials and destructive scope
 

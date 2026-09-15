@@ -67,24 +67,9 @@ FastSync does not use this named object; it supplies its own inline CSV options.
 Changing the named format therefore affects Singer ``target-snowflake`` loads,
 not FastSync loads.
 
-To migrate an existing CSV format, stop its PipelineWise loads and apply the
-same settings before retrying:
-
-.. code-block:: sql
-
-   ALTER FILE FORMAT <database>.<schema>.<file_format> SET
-     RECORD_DELIMITER = '0x0A'
-     FIELD_DELIMITER = '0x2C'
-     ESCAPE = '0x5C'
-     FIELD_OPTIONALLY_ENCLOSED_BY = '0x22'
-     SKIP_HEADER = 0
-     PARSE_HEADER = FALSE
-     SKIP_BLANK_LINES = FALSE
-     TRIM_SPACE = FALSE
-     EMPTY_FIELD_AS_NULL = TRUE
-     ENCODING = 'UTF8'
-     MULTI_LINE = TRUE
-     NULL_IF = ();
+To migrate an existing CSV format, stop all loads sharing it and apply the
+required settings shown above before resuming. Deploy the updated target writer
+as well; changing the format alone does not fix older writers' text handling.
 
 Changing the format affects later loads only. If earlier replication normalized
 or removed control characters, run a source resync for each affected table;

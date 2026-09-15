@@ -196,8 +196,10 @@ Tap configuration
      - Currently ineffective: PipelineWise emits this name, but the PostgreSQL
        and Snowflake targets read ``max_parallelism`` instead.
    * - ``flush_all_streams``
-     - ``false``
+     - ``true``
      - Flushes every buffered stream when one stream reaches its batch boundary.
+       Set ``false`` to flush only that stream. Flushing all streams can create
+       smaller, more frequent loads and increase loading cost.
    * - ``primary_key_required``
      - ``true``
      - Rejects streams without a target merge key when enabled.
@@ -242,6 +244,12 @@ Tap configuration
    * - ``archive_load_files_s3_bucket`` / ``archive_load_files_s3_prefix``
      - None
      - Selects the archive destination when load-file archiving is enabled.
+
+``flush_all_streams`` controls Singer loading into PostgreSQL and Snowflake;
+it does not affect FastSync or PartialSync. Run ``import_config`` after upgrading
+to apply the new default to existing generated configs. Explicit YAML
+``flush_all_streams: false`` remains an opt-out. Standalone target connectors
+retain their ``false`` default.
 
 .. important::
 
