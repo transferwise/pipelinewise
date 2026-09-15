@@ -8,12 +8,14 @@ import signal
 import sys
 import json
 import copy
+from contextlib import ExitStack, contextmanager
 
 import psutil
 import pidfile
 
 from datetime import datetime
 from time import time
+from uuid import uuid4
 from typing import Dict, Optional, List, Any, NoReturn, Tuple
 from joblib import Parallel, delayed, parallel_backend
 from tabulate import tabulate
@@ -37,6 +39,7 @@ from .errors import (
 )
 
 from pipelinewise.fastsync.commons.tap_postgres import FastSyncTapPostgres
+from pipelinewise.fastsync.commons import utils as fastsync_utils
 from pipelinewise.cli.multiprocess import Process
 from pipelinewise.data_diff.repository import DataDiffRepository
 from pipelinewise.data_diff.runner import rerun_failed_check, run_due_checks
@@ -64,7 +67,6 @@ class PipelineWise:
 
         self.profiling_mode = args.profiler
         self.profiling_dir = profiling_dir
-        self.drop_pg_slot = False
         self.args = args
         self.logger = logging.getLogger(__name__)
         self.config_dir = config_dir
@@ -1133,9 +1135,7 @@ class PipelineWise:
         Generating and running shell command to sync tables using the native fastsync components
         """
         # Build the fastsync executable command
-        max_autoresync_table_size = None
-        if tap.type in ('tap-mysql', 'tap-postgres') and target.type == 'target-snowflake' and not self.force_fast_sync:
-            max_autoresync_table_size = self.config.get('allowed_resync_max_size', {}).get('table_mb')
+        max_autoresync_table_size = self._get_fastsync_size_limit(tap.type, target.type)
 
         command = commands.build_fastsync_command(
             tap=tap,
@@ -1146,7 +1146,6 @@ class PipelineWise:
             tables=self.args.tables,
             profiling_mode=self.profiling_mode,
             profiling_dir=self.profiling_dir,
-            drop_pg_slot=self.drop_pg_slot,
             autoresync_size=max_autoresync_table_size
         )
 
@@ -1414,12 +1413,35 @@ class PipelineWise:
         self.force_fast_sync = self.args.force
         try:
             with pidfile.PIDFile(self.tap['files']['pidfile']):
-                self.do_sync_tables()
+                self.do_sync_tables(
+                    reset_postgres_slot=self._should_reset_postgres_slot_for_fast_sync()
+                )
         except pidfile.AlreadyRunningError as exc:
             self.logger.error('Another instance of the tap is already running.')
             raise SystemExit(1) from exc
 
-    def do_sync_tables(self, fastsync_stream_ids=None):
+    def _get_fastsync_size_limit(self, tap_type, target_type):
+        """Use the same size-limit policy for preflight and the FullSync worker."""
+        if tap_type in ('tap-mysql', 'tap-postgres') and target_type == 'target-snowflake' and not self.force_fast_sync:
+            return self.config.get('allowed_resync_max_size', {}).get('table_mb')
+        return None
+
+    def _should_reset_postgres_slot_for_fast_sync(self) -> bool:
+        """Return whether this command is an unfiltered PostgreSQL resync."""
+        if (
+            self.tap['type'] != ConnectorType.TAP_POSTGRES.value
+            or self.args.tables is not None
+            or self.args.replication_method_only != '*'
+        ):
+            return False
+
+        selection = utils.load_json(self.tap['files']['selection']) or {}
+        return any(
+            table.get('replication_method') == self.LOG_BASED
+            for table in selection.get('selection', [])
+        )
+
+    def do_sync_tables(self, fastsync_stream_ids=None, reset_postgres_slot: bool = False):
         """
         syncing tables by using fast sync
         """
@@ -1435,6 +1457,14 @@ class PipelineWise:
             self._check_target_table_format_supports_fastsync('partial_sync')
         if selected_tables['full_sync']:
             self._check_target_table_format_supports_fastsync('full_sync')
+
+        if reset_postgres_slot:
+            tap_config, target_config = self._preflight_postgres_slot_reset(selected_tables)
+            with self._guard_postgres_slot_reset_from_iceberg_recovery(selected_tables, target_config):
+                FastSyncTapPostgres.reset_slot(
+                    tap_config,
+                    before_reset=self._clear_tap_bookmarks_before_postgres_slot_reset,
+                )
 
         processes_list = []
         if selected_tables['partial_sync']:
@@ -1457,6 +1487,125 @@ class PipelineWise:
                 raise Exception(error)
             if process.exitcode != 0:
                 raise SystemExit(process.exitcode)
+
+    def _preflight_postgres_slot_reset(self, selected_tables):
+        """Validate every local reset dependency before changing source or state."""
+        # pylint: disable=import-outside-toplevel
+        self._check_if_tap_is_enabled()
+
+        tap_type = self.tap['type']
+        target_type = self.target['type']
+        if selected_tables['partial_sync']:
+            self._check_supporting_tap_and_target_for_partial_sync()
+        for operation, get_bin in (
+            ('partial_sync', utils.get_partialsync_bin),
+            ('full_sync', utils.get_fastsync_bin),
+        ):
+            if selected_tables[operation]:
+                self._check_if_complete_tap_configuration(
+                    get_bin(self.venv_dir, tap_type, target_type), tap_type, target_type,
+                )
+
+        tap_config = self._load_required_json_object(self.tap['files']['config'], 'tap configuration')
+        target_config = self._load_required_json_object(self.target['files']['config'], 'target configuration')
+        target_config.update(self._load_required_json_object(
+            self.tap['files']['inheritable_config'], 'tap inheritable configuration',
+        ))
+        properties = self._load_required_json_object(self.tap['files']['properties'], 'tap catalog')
+        self._validate_tap_catalog(properties, self.tap['files']['properties'])
+        catalog_tables = fastsync_utils.get_tables_from_properties(properties)
+        requested_tables = set(selected_tables['full_sync']) | set(selected_tables['partial_sync'])
+        for table in sorted(requested_tables):
+            if table not in catalog_tables:
+                raise fastsync_utils.NotSelectedTableException(table, catalog_tables)
+
+        if target_type == ConnectorType.TARGET_SNOWFLAKE.value:
+            # Local imports keep route entry points out of CLI module initialization.
+            from pipelinewise.fastsync import postgres_to_snowflake
+            from pipelinewise.fastsync.commons import snowflake_iceberg_routes
+
+            required_config = postgres_to_snowflake.REQUIRED_CONFIG_KEYS
+            snowflake_iceberg_routes.validate_route_config(target_config)
+        elif target_type == ConnectorType.TARGET_POSTGRES.value:
+            from pipelinewise.fastsync import postgres_to_postgres
+
+            required_config = postgres_to_postgres.REQUIRED_CONFIG_KEYS
+        else:
+            raise PreRunChecksException(f'Unsupported target for PostgreSQL slot reset: {target_type}')
+
+        fastsync_utils.check_config(tap_config, required_config['tap'])
+        fastsync_utils.check_config(target_config, required_config['target'])
+        if target_type == ConnectorType.TARGET_SNOWFLAKE.value:
+            size_errors = postgres_to_snowflake.get_resync_size_errors(
+                tap_config, selected_tables['full_sync'], self._get_fastsync_size_limit(tap_type, target_type),
+            )
+            if size_errors:
+                raise PreRunChecksException('\n'.join(size_errors) + ' No source or state changes were made.')
+        return tap_config, target_config
+
+    @staticmethod
+    def _load_required_json_object(path, description):
+        """Load a generated JSON object or fail before a source-side reset."""
+        value = utils.load_json(path)
+        if not isinstance(value, dict):
+            raise PreRunChecksException(
+                f'Missing or invalid {description}: {path}. No source changes were made.'
+            )
+        return value
+
+    @contextmanager
+    def _guard_postgres_slot_reset_from_iceberg_recovery(  # pylint: disable=import-outside-toplevel
+        self, selected_tables, target_config,
+    ):
+        """Hold selected Iceberg target locks and reject persisted recovery state."""
+        if target_config.get('target_table_format') != Config.TABLE_FORMAT_ICEBERG:
+            yield
+            return
+
+        # Local imports avoid a CLI import cycle through FastSync state helpers.
+        from pipelinewise.fastsync.commons.snowflake_iceberg_coordination import RecoveryCoordinator
+        from pipelinewise.fastsync.commons.snowflake_iceberg_model import SnowflakeObjectName
+
+        targets = sorted({
+            SnowflakeObjectName(
+                target_config['dbname'].upper(),
+                fastsync_utils.get_target_schema(target_config, table).upper(),
+                fastsync_utils.tablename_to_dict(table)['table_name'].upper(),
+            )
+            for table in set(selected_tables['full_sync']) | set(selected_tables['partial_sync'])
+        }, key=lambda target: target.key)
+
+        coordinator = RecoveryCoordinator(self.get_target_dir(self.target['id']))
+        with ExitStack() as locks:
+            for target in targets:
+                locks.enter_context(coordinator.table_lock(target))
+
+            for target in targets:
+                store = coordinator.recovery_store(target)
+                if store.load_locked() is not None or store.load_fastsync_target_pointer() is not None:
+                    raise PreRunChecksException(
+                        'Cannot reset the PostgreSQL replication slot while an '
+                        'Iceberg publication or conversion attempt is pending. '
+                        'Complete it with the corresponding filtered FastSync or '
+                        'conversion command, then rerun the unfiltered fast_sync. '
+                        'No source or state changes were made.'
+                    )
+            yield
+
+    def _clear_tap_bookmarks_before_postgres_slot_reset(self):
+        """Durably back up and invalidate state before replacing the tap-wide slot."""
+        state_path = self.tap['files']['state']
+        if not os.path.exists(state_path):
+            return None
+        state = self._load_required_json_object(state_path, 'tap state')
+        # Unique backups preserve the original bookmarks even after a failed reset is retried.
+        backup_path = f'{state_path}.before-slot-reset-{uuid4().hex}.bak'
+        fastsync_utils.save_dict_to_json(backup_path, state)
+        self.logger.info('Pre-reset tap state backed up to %s', backup_path)
+        state['bookmarks'] = {}
+        state['currently_syncing'] = None
+        fastsync_utils.save_dict_to_json(state_path, state)
+        return backup_path
 
     def sync_tables_fast_sync(self, selected_tables):
         """
@@ -1499,10 +1648,6 @@ class PipelineWise:
             tap_state = self.tap['files']['state']
             tap_transformation = self.tap['files']['transformation']
             target_config = self.target['files']['config']
-
-            # Set drop_pg_slot to True if we want to sync the whole tap
-            # This flag will be used by FastSync PG to (PG/SF)
-            self.drop_pg_slot = bool(not self.args.tables)
 
             # Some target attributes can be passed and override by tap (aka. inheritable config)
             # We merge the two configs and use that with the target
@@ -2112,8 +2257,6 @@ class PipelineWise:
             tap_state = self.tap['files']['state']
             tap_transformation = self.tap['files']['transformation']
             target_config = self.target['files']['config']
-
-            self.drop_pg_slot = False
 
             cons_target_config = self.create_consumable_target_config(
                 target_config, tap_inheritable_config

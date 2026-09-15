@@ -525,13 +525,21 @@ Unable to find replication slot
 """""""""""""""""""""""""""""""
 
 *How to fix:*
-Run ``pipelinewise fast_sync --tap <tap_id> --target <target_id>`` to resync the
-tap and recreate the replication slot. See :ref:`resync` before proceeding.
+Run ``pipelinewise fast_sync --tap <tap_id> --target <target_id>`` with
+no ``--tables`` and the default ``--replication_method_only '*'`` to resync the
+whole tap and recreate its slot. Add ``--force`` only to bypass the resync size
+limit; ``sync_start_from`` remains effective either way. See
+:ref:`resync_postgres_slot_reset` for preflight checks, backups, and
+pending-Iceberg recovery before proceeding.
 
 .. warning::
 
-    Triggering a resync of a PostgreSQL tap using ``fast_sync`` will drop the
-    replication slot.
+    This command drops an existing tap-specific slot, with or without ``--force``.
+    Slot replacement is not atomic: a failure during drop or recreation leaves
+    bookmarks invalidated, and the slot may be absent or replaced.
+    Stop scheduled replication and complete
+    the whole-tap resync; do not restore old LOG_BASED bookmarks after a completed
+    or uncertain drop.
 
 
 FastSync Errors

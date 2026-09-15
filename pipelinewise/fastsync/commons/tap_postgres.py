@@ -9,7 +9,7 @@ import psycopg2
 import psycopg2.extras
 
 from argparse import Namespace
-from typing import Dict
+from typing import Callable, Dict, Optional
 
 
 from . import utils, split_gzip
@@ -142,6 +142,70 @@ class FastSyncTapPostgres:
 
         finally:
             connection.close()
+
+    @classmethod
+    def reset_slot(cls, connection_config: Dict, *, before_reset: Callable[[], Optional[str]]) -> None:
+        """Validate one tap-specific slot, invalidate state, then replace the slot."""
+        LOGGER.info('Attempting to reset slot ...')
+
+        connection = cls.get_connection(connection_config, prioritize_primary=True)
+        try:
+            with connection.cursor() as cur:
+                slot_name, slot_exists = cls._preflight_slot_reset(cur, connection_config)
+                # State must be durable before DROP: losing its response cannot restore the old WAL boundary.
+                backup_path = before_reset()
+                phase = 'drop' if slot_exists else 'create'
+                try:
+                    if slot_exists:
+                        LOGGER.info('Dropping the slot "%s"', slot_name)
+                        cur.execute('SELECT pg_drop_replication_slot(%s)', (slot_name,))
+                    phase = 'create'
+                    LOGGER.info('Creating the slot "%s"', slot_name)
+                    cur.execute(
+                        'SELECT * FROM pg_create_logical_replication_slot(%s, %s)',
+                        (slot_name, 'wal2json'),
+                    )
+                except psycopg2.Error as exc:
+                    raise RuntimeError(
+                        f'PostgreSQL slot reset failed during {phase} for "{slot_name}"; '
+                        'the source-side outcome may be uncertain. Tap bookmarks remain invalidated. '
+                        f'Pre-reset state backup: {backup_path or "no previous state file"}. '
+                        'Keep scheduled replication stopped, resolve the source error, and rerun '
+                        'the unfiltered fast_sync (adding --force only to bypass the size limit). '
+                        'Do not restore old LOG_BASED bookmarks '
+                        'after a completed or uncertain slot drop.'
+                    ) from exc
+        finally:
+            connection.close()
+
+    @classmethod
+    def _preflight_slot_reset(cls, cursor, connection_config):
+        """Reject shared, active, or incompatible slots before invalidating state."""
+        database = connection_config['dbname']
+        legacy_name = cls.generate_replication_slot_name(database)
+        slot_name = cls.generate_replication_slot_name(database, connection_config['tap_id'])
+        if slot_name == legacy_name or len(slot_name) > 63:
+            raise RuntimeError('Slot reset requires a distinct tap-specific slot name of at most 63 characters.')
+        cursor.execute(
+            'SELECT slot_name, database, plugin, active FROM pg_replication_slots '
+            'WHERE slot_name IN (%s, %s)',
+            (legacy_name, slot_name),
+        )
+        slots = {row[0]: row[1:] for row in cursor.fetchall()}
+        if legacy_name in slots:
+            raise RuntimeError(
+                f'Cannot reset legacy PostgreSQL slot "{legacy_name}": it may be shared by other taps. '
+                'Coordinate migration to tap-specific slots with your DBA before retrying. '
+                'No source or state changes were made.'
+            )
+        if slot_name in slots:
+            slot_database, plugin, active = slots[slot_name]
+            if active or slot_database != database or plugin != 'wal2json':
+                raise RuntimeError(
+                    f'Cannot reset PostgreSQL slot "{slot_name}": it must be inactive, use wal2json, '
+                    'and belong to the configured database. No source or state changes were made.'
+                )
+        return slot_name, slot_name in slots
 
     @classmethod
     def get_connection(

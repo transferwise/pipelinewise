@@ -278,7 +278,7 @@ def main():
     parser.add_argument('--target', type=str, default='*', help='Name of the target')
     parser.add_argument('--tap', type=str, default='*', help='Name of the tap')
     parser.add_argument('--taps', type=str, default='*', help='Comma separated list of tap IDs to import')
-    parser.add_argument('--tables', type=str, help='List of tables to sync')
+    parser.add_argument('--tables', type=str, help='List of tables to sync; specifying it retains the PostgreSQL slot')
     parser.add_argument(
         '--dir', type=str, default='*', help='Path to directory with config'
     )
@@ -340,7 +340,8 @@ def main():
     parser.add_argument('--start_value', type=str, default='*', help='Start value of the column to partial sync')
     parser.add_argument('--end_value', type=str, default=None, help='End value of the column to partial sync')
     parser.add_argument('--force', default=False, required=False,
-                        help='Force fast_sync or a completed data-diff slot',
+                        help='Override fast_sync size limits without overriding sync_start_from, '
+                             'or rerun a completed data-diff slot',
                         action='store_true'
                         )
     parser.add_argument('--replication_method_only', default='*', type=str,

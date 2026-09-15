@@ -857,7 +857,6 @@ class TestFastSyncUtils(TestCase):  # pylint: disable=too-many-public-methods
                 'tap': './tap.yml',
                 'properties': './prop.json',
                 'transform': None,
-                'drop_pg_slot': True,
                 'target': './target.yml',
                 'tables': 'schema.table_1,schema.table_2',
                 'temp_dir': './',
@@ -878,7 +877,6 @@ class TestFastSyncUtils(TestCase):  # pylint: disable=too-many-public-methods
             vars(args),
             {
                 'tables': {'schema.table_1', 'schema.table_2'},
-                'drop_pg_slot': True,
                 'tap': {},
                 'target': {},
                 'transform': {},
@@ -896,7 +894,7 @@ class TestFastSyncUtils(TestCase):  # pylint: disable=too-many-public-methods
     ):
         """
         test args parsing:
-            one table is specified out of 2, this should return a drop_pg_slot = False
+            one table is specified out of 2
         """
         mock_args.return_value = argparse.Namespace(
             **{

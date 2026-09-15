@@ -38,9 +38,15 @@ LOG_BASED replication also requires:
   version 2 support; and
 - permission to create and consume a logical replication slot.
 
-PipelineWise creates one slot for the tap database. PostgreSQL retains WAL needed
+PipelineWise creates one tap-specific slot in the source database. PostgreSQL retains WAL needed
 by that slot, so monitor retained WAL and do not remove the slot while the tap is
 active.
+
+An explicit, unfiltered ``fast_sync`` on a tap containing LOG_BASED tables
+resets the tap-specific slot once before workers start, with or without
+``--force``. Filtered FastSync, automatic initial loads, and standalone PartialSync
+retain it. See :ref:`resync_postgres_slot_reset` for exact commands, legacy-slot
+safety, state backups, pending-Iceberg guards, and non-atomic reset recovery.
 
 
 Configuration

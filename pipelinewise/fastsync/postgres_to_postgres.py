@@ -170,10 +170,6 @@ def main_impl():
         pool_size,
     )
 
-    # if internal arg drop_pg_slot is set to True, then we drop the slot before starting resync
-    if args.drop_pg_slot:
-        FastSyncTapPostgres.drop_slot(args.tap)
-
     # Create target schemas sequentially, Postgres doesn't like it running in parallel
     postgres_target = FastSyncTargetPostgres(args.target, args.transform)
     postgres_target.create_schemas(args.tables)
