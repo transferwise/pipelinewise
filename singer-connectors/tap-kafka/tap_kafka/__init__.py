@@ -85,10 +85,15 @@ def validate_config(config) -> None:
         try:
             sync.iso_timestamp_to_epoch(config.get('initial_start_time'))
         except InvalidTimestampException:
-            raise InvalidConfigException("Invalid config. initial_start_time needs to be one of 'beginning', 'earliest', 'latest' or an ISO-8601 formatted timestamp string")
+            raise InvalidConfigException(
+                "Invalid config. initial_start_time needs to be one of 'beginning', 'earliest', 'latest' "
+                "or an ISO-8601 formatted timestamp string"
+            )
 
     if not isinstance(config.get('partitions'), list):
-        raise InvalidConfigException(f"Invalid config. 'partitions' must be a python 'list', not a {type(config.get('partitions'))}")
+        raise InvalidConfigException(
+            f"Invalid config. 'partitions' must be a python 'list', not a {type(config.get('partitions'))}"
+        )
 
     if config.get('message_format') not in ['json', 'protobuf']:
         raise InvalidConfigException("Invalid config. 'message_format' needs to be one of 'json' or 'protobuf'")

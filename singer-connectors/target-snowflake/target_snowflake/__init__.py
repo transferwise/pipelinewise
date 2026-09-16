@@ -85,7 +85,7 @@ def get_snowflake_statics(config):
 
 
 
-def persist_lines(config, lines, table_cache=None, file_format_type: FileFormatTypes = None) -> None:
+def persist_lines(config, lines, table_cache=None, file_format_type: FileFormatTypes = None) -> None:  # noqa: C901
     """Main loop to read and consume singer messages from stdin
 
     Params:

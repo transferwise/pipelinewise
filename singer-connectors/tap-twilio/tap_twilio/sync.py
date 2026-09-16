@@ -154,7 +154,7 @@ def get_dates(state, stream_name, start_date, bookmark_field, bookmark_query_fie
 
 # Sync a specific parent or child endpoint.
 
-def sync_endpoint(
+def sync_endpoint(  # noqa: C901
         client,
         config,
         catalog,
@@ -192,8 +192,11 @@ def sync_endpoint(
 
 
     while start_window < now_datetime:
-        LOGGER.info('START Sync for Stream: %s%s', stream_name,
-                    ', Date window from: {} to {}'.format(start_window, end_window) if bookmark_query_field_from else '')
+        LOGGER.info(
+            'START Sync for Stream: %s%s',
+            stream_name,
+            ', Date window from: {} to {}'.format(start_window, end_window) if bookmark_query_field_from else '',
+        )
 
         params = static_params  # adds in endpoint specific, sort, filter params
 

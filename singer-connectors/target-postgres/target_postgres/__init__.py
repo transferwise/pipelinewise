@@ -82,7 +82,7 @@ def emit_state(state):
 
 
 
-def persist_lines(config, lines) -> None:
+def persist_lines(config, lines) -> None:  # noqa: C901
     """Read singer messages and process them line by line"""
     state = None
     flushed_state = None

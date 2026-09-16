@@ -42,7 +42,7 @@ def flatten_key(k, parent_key, sep):
 
 
 
-def flatten_schema(d, parent_key=None, sep='__', level=0, max_level=0):
+def flatten_schema(d, parent_key=None, sep='__', level=0, max_level=0):  # noqa: C901
     """
 
     Params:
@@ -106,7 +106,9 @@ def flatten_schema(d, parent_key=None, sep='__', level=0, max_level=0):
             # Preserve fields with no type declaration (e.g. Salesforce anyType) as text.
             items.append((new_key, {'type': ['null', 'string']}))
 
-    key_func = lambda item: item[0]
+    def key_func(item):
+        return item[0]
+
     sorted_items = sorted(items, key=key_func)
     for k, g in itertools.groupby(sorted_items, key=key_func):
         if len(list(g)) > 1:

@@ -166,7 +166,10 @@ def select_all_of_stream(stream):
     old_md.update({'selected': True})
     for col_name, col_schema in stream['schema']['properties'].items():
         #explicitly select column if it is not automatic
-        if new_md.get(('properties', col_name)).get('inclusion') != 'automatic' and new_md.get(('properties', col_name)).get('inclusion') != 'unsupported':
+        if (
+            new_md.get(('properties', col_name)).get('inclusion') != 'automatic'
+            and new_md.get(('properties', col_name)).get('inclusion') != 'unsupported'
+        ):
             old_md = new_md.get(('properties', col_name))
             old_md.update({'selected' : True})
 

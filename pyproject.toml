@@ -32,8 +32,6 @@ max-complexity = 15
 # The former root complexity gate inspected production code only.
 "tests/**/*.py" = ["C901", "E721"]
 "tests/units/cli/test_cli.py" = ["E501"]
-# Keep the first connector-wide Ruff pass focused on actionable errors, without unrelated legacy cleanup.
-"singer-connectors/**/*.py" = ["C901", "E501", "E731", "Q002"]
 "singer-connectors/**/__init__.py" = ["F401"]
 "singer-connectors/tap-github/setup.py" = ["F401"]
 "singer-connectors/tap-kafka/tap_kafka/serialization/protobuf.py" = ["F401"]

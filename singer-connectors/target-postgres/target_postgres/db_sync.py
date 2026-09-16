@@ -123,7 +123,9 @@ def flatten_schema(d, parent_key=[], sep='__', level=0, max_level=0):
                     list(v.values())[0][0]['type'] = ['null', 'object']
                     items.append((new_key, list(v.values())[0][0]))
 
-    key_func = lambda item: item[0]
+    def key_func(item):
+        return item[0]
+
     sorted_items = sorted(items, key=key_func)
     for k, g in itertools.groupby(sorted_items, key=key_func):
         if len(list(g)) > 1:

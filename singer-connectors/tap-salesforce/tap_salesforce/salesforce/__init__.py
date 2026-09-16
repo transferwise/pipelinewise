@@ -216,7 +216,9 @@ class Salesforce():
         self.quota_percent_total = float(
             quota_percent_total) if quota_percent_total is not None else 80
         self.is_sandbox = is_sandbox is True or (isinstance(is_sandbox, str) and is_sandbox.lower() == 'true')
-        self.select_fields_by_default = select_fields_by_default is True or (isinstance(select_fields_by_default, str) and select_fields_by_default.lower() == 'true')
+        self.select_fields_by_default = select_fields_by_default is True or (
+            isinstance(select_fields_by_default, str) and select_fields_by_default.lower() == 'true'
+        )
         self.default_start_date = default_start_date
         self.rest_requests_attempted = 0
         self.jobs_completed = 0
@@ -302,7 +304,12 @@ class Salesforce():
 
         resp = None
         try:
-            resp = self._make_request("POST", login_url, body=login_body, headers={"Content-Type": "application/x-www-form-urlencoded"})
+            resp = self._make_request(
+                "POST",
+                login_url,
+                body=login_body,
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
 
             LOGGER.info("OAuth2 login successful")
 

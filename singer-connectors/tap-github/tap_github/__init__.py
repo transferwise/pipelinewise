@@ -152,7 +152,9 @@ def translate_state(state, catalog, repositories):
       }
     }
     '''
-    nested_dict = lambda: collections.defaultdict(nested_dict)
+    def nested_dict():
+        return collections.defaultdict(nested_dict)
+
     new_state = nested_dict()
 
     for stream in catalog['streams']:
@@ -192,10 +194,17 @@ def raise_for_error(resp, source):
         details = ERROR_CODE_EXCEPTION_MAPPING.get(error_code).get("message")
         if source == "teams":
             details += ' or it is a personal account repository'
-        message = "HTTP-error-code: 404, Error: {}. Please refer \'{}\' for more details.".format(details, response_json.get("documentation_url"))
+        message = (
+            "HTTP-error-code: 404, Error: {}. Please refer \'{}\' "
+            "for more details."
+        ).format(details, response_json.get("documentation_url"))
     else:
         message = "HTTP-error-code: {}, Error: {}".format(
-            error_code, ERROR_CODE_EXCEPTION_MAPPING.get(error_code, {}).get("message", "Unknown Error") if response_json == {} else response_json)
+            error_code,
+            ERROR_CODE_EXCEPTION_MAPPING.get(error_code, {}).get("message", "Unknown Error")
+            if response_json == {}
+            else response_json,
+        )
 
     exc = ERROR_CODE_EXCEPTION_MAPPING.get(error_code, {}).get("raise_exception", GithubException)
     raise exc(message) from None
@@ -214,15 +223,26 @@ def rate_throttling(response):
         if retry_after_header.isdigit():
             retry_after = int(retry_after_header)
         else:
-            retry_after = int((parsedate_to_datetime(retry_after_header) - datetime.datetime.now(datetime.timezone.utc)).total_seconds())
+            retry_after = int(
+                (
+                    parsedate_to_datetime(retry_after_header)
+                    - datetime.datetime.now(datetime.timezone.utc)
+                ).total_seconds()
+            )
 
         if retry_after > 0:
             seconds_to_sleep = retry_after + RATE_THROTTLING_EXTRA_WAITING_TIME
             if seconds_to_sleep > MAX_RATE_LIMIT_WAIT_SECONDS:
-                message = f"API secondary rate limit exceeded. Retry-After: {seconds_to_sleep} seconds exceeds max wait time of {MAX_RATE_LIMIT_WAIT_SECONDS} seconds."
+                message = (
+                    f"API secondary rate limit exceeded. Retry-After: {seconds_to_sleep} seconds "
+                    f"exceeds max wait time of {MAX_RATE_LIMIT_WAIT_SECONDS} seconds."
+                )
                 raise RateLimitExceeded(message) from None
 
-            logger.warning(f"API secondary rate limit exceeded. Tap will retry data collection after {seconds_to_sleep} seconds.")
+            logger.warning(
+                "API secondary rate limit exceeded. Tap will retry data collection "
+                f"after {seconds_to_sleep} seconds."
+            )
             time.sleep(seconds_to_sleep)
             return True
 
@@ -241,7 +261,10 @@ def rate_throttling(response):
                           f"Time to reset {rate_limit_reset_time.isoformat()}"
                 raise RateLimitExceeded(message) from None
 
-            logger.warning(f"API rate limit exceeded. User limit per hour: {rate_limit_user}, Remaining requests: {remaining_requests_per_hour}")
+            logger.warning(
+                f"API rate limit exceeded. User limit per hour: {rate_limit_user}, "
+                f"Remaining requests: {remaining_requests_per_hour}"
+            )
             logger.warning(f"Time to reset rate limit: {rate_limit_reset_time.isoformat()}")
             logger.warning(f"Tap will retry data collection after {str(datetime.timedelta(seconds=seconds_to_sleep))}")
             time.sleep(seconds_to_sleep)
@@ -375,7 +398,10 @@ def verify_repo_access(url_for_repo, repo):
         authed_get("verifying repository access", url_for_repo, do_rate_throttling=False)
     except NotFoundException:
         # throwing user-friendly error message as it checks token access
-        message = "HTTP-error-code: 404, Error: Please check the repository name \'{}\' or you do not have sufficient permissions to access this repository.".format(repo)
+        message = (
+            "HTTP-error-code: 404, Error: Please check the repository name \'{}\' "
+            "or you do not have sufficient permissions to access this repository."
+        ).format(repo)
         raise NotFoundException(message) from None
 
 def verify_access_for_repo(config):
@@ -421,12 +447,21 @@ def get_all_teams(schemas, repo_path, state, mdata, _start_date):
                 counter.increment()
 
                 if schemas.get('team_members'):
-                    for team_members_rec in get_all_team_members(team_slug, schemas['team_members'], repo_path, state, mdata):
+                    for team_members_rec in get_all_team_members(
+                            team_slug, schemas['team_members'], repo_path, state, mdata
+                    ):
                         singer.write_record('team_members', team_members_rec, time_extracted=extraction_time)
-                        singer.write_bookmark(state, repo_path, 'team_members', {'since': singer.utils.strftime(extraction_time)})
+                        singer.write_bookmark(
+                            state,
+                            repo_path,
+                            'team_members',
+                            {'since': singer.utils.strftime(extraction_time)},
+                        )
 
                 if schemas.get('team_memberships'):
-                    for team_memberships_rec in get_all_team_memberships(team_slug, schemas['team_memberships'], repo_path, state, mdata):
+                    for team_memberships_rec in get_all_team_memberships(
+                            team_slug, schemas['team_memberships'], repo_path, state, mdata
+                    ):
                         singer.write_record('team_memberships', team_memberships_rec, time_extracted=extraction_time)
 
     return state
@@ -503,7 +538,12 @@ def get_all_issue_events(schemas, repo_path, state, mdata, start_date):
                 with singer.Transformer() as transformer:
                     rec = transformer.transform(event, schemas, metadata=metadata.to_map(mdata))
                 singer.write_record('issue_events', rec, time_extracted=extraction_time)
-                singer.write_bookmark(state, repo_path, 'issue_events', {'since': singer.utils.strftime(extraction_time)})
+                singer.write_bookmark(
+                    state,
+                    repo_path,
+                    'issue_events',
+                    {'since': singer.utils.strftime(extraction_time)},
+                )
                 counter.increment()
 
     return state
@@ -578,7 +618,12 @@ def get_all_issue_milestones(schemas, repo_path, state, mdata, start_date):
                 with singer.Transformer() as transformer:
                     rec = transformer.transform(r, schemas, metadata=metadata.to_map(mdata))
                 singer.write_record('issue_milestones', rec, time_extracted=extraction_time)
-                singer.write_bookmark(state, repo_path, 'issue_milestones', {'since': singer.utils.strftime(extraction_time)})
+                singer.write_bookmark(
+                    state,
+                    repo_path,
+                    'issue_milestones',
+                    {'since': singer.utils.strftime(extraction_time)},
+                )
                 counter.increment()
 
     return state
@@ -602,7 +647,12 @@ def get_all_issue_labels(schemas, repo_path, state, mdata, _start_date):
                 with singer.Transformer() as transformer:
                     rec = transformer.transform(r, schemas, metadata=metadata.to_map(mdata))
                 singer.write_record('issue_labels', rec, time_extracted=extraction_time)
-                singer.write_bookmark(state, repo_path, 'issue_labels', {'since': singer.utils.strftime(extraction_time)})
+                singer.write_bookmark(
+                    state,
+                    repo_path,
+                    'issue_labels',
+                    {'since': singer.utils.strftime(extraction_time)},
+                )
                 counter.increment()
 
     return state
@@ -638,7 +688,12 @@ def get_all_commit_comments(schemas, repo_path, state, mdata, start_date):
                 with singer.Transformer() as transformer:
                     rec = transformer.transform(r, schemas, metadata=metadata.to_map(mdata))
                 singer.write_record('commit_comments', rec, time_extracted=extraction_time)
-                singer.write_bookmark(state, repo_path, 'commit_comments', {'since': singer.utils.strftime(extraction_time)})
+                singer.write_bookmark(
+                    state,
+                    repo_path,
+                    'commit_comments',
+                    {'since': singer.utils.strftime(extraction_time)},
+                )
                 counter.increment()
 
     return state
@@ -680,16 +735,40 @@ def get_all_projects(schemas, repo_path, state, mdata, start_date):
 
                 # sync project_columns if that schema is present (only there if selected)
                 if schemas.get('project_columns'):
-                    for project_column_rec in get_all_project_columns(project_id, schemas['project_columns'], repo_path, state, mdata, start_date):
+                    for project_column_rec in get_all_project_columns(
+                            project_id,
+                            schemas['project_columns'],
+                            repo_path,
+                            state,
+                            mdata,
+                            start_date,
+                    ):
                         singer.write_record('project_columns', project_column_rec, time_extracted=extraction_time)
-                        singer.write_bookmark(state, repo_path, 'project_columns', {'since': singer.utils.strftime(extraction_time)})
+                        singer.write_bookmark(
+                            state,
+                            repo_path,
+                            'project_columns',
+                            {'since': singer.utils.strftime(extraction_time)},
+                        )
 
                         # sync project_cards if that schema is present (only there if selected)
                         if schemas.get('project_cards'):
                             column_id = project_column_rec['id']
-                            for project_card_rec in get_all_project_cards(column_id, schemas['project_cards'], repo_path, state, mdata, start_date):
+                            for project_card_rec in get_all_project_cards(
+                                    column_id,
+                                    schemas['project_cards'],
+                                    repo_path,
+                                    state,
+                                    mdata,
+                                    start_date,
+                            ):
                                 singer.write_record('project_cards', project_card_rec, time_extracted=extraction_time)
-                                singer.write_bookmark(state, repo_path, 'project_cards', {'since': singer.utils.strftime(extraction_time)})
+                                singer.write_bookmark(
+                                    state,
+                                    repo_path,
+                                    'project_cards',
+                                    {'since': singer.utils.strftime(extraction_time)},
+                                )
     return state
 
 
@@ -780,9 +859,9 @@ def get_all_releases(schemas, repo_path, state, mdata, _start_date):
     return state
 
 def get_all_pull_requests(schemas, repo_path, state, mdata, start_date):
-    '''
+    """
     https://developer.github.com/v3/pulls/#list-pull-requests
-    '''
+    """
 
     bookmark_value = get_bookmark(state, repo_path, "pull_requests", "since", start_date)
     if bookmark_value:
@@ -816,22 +895,39 @@ def get_all_pull_requests(schemas, repo_path, state, mdata, start_date):
                     with singer.Transformer() as transformer:
                         rec = transformer.transform(pr, schemas['pull_requests'], metadata=metadata.to_map(mdata))
                     singer.write_record('pull_requests', rec, time_extracted=extraction_time)
-                    singer.write_bookmark(state, repo_path, 'pull_requests', {'since': singer.utils.strftime(extraction_time)})
+                    singer.write_bookmark(
+                        state,
+                        repo_path,
+                        'pull_requests',
+                        {'since': singer.utils.strftime(extraction_time)},
+                    )
                     counter.increment()
 
                     # sync reviews if that schema is present (only there if selected)
                     if schemas.get('reviews'):
                         for review_rec in get_reviews_for_pr(pr_num, schemas['reviews'], repo_path, state, mdata):
                             singer.write_record('reviews', review_rec, time_extracted=extraction_time)
-                            singer.write_bookmark(state, repo_path, 'reviews', {'since': singer.utils.strftime(extraction_time)})
+                            singer.write_bookmark(
+                                state,
+                                repo_path,
+                                'reviews',
+                                {'since': singer.utils.strftime(extraction_time)},
+                            )
 
                             reviews_counter.increment()
 
                     # sync review comments if that schema is present (only there if selected)
                     if schemas.get('review_comments'):
-                        for review_comment_rec in get_review_comments_for_pr(pr_num, schemas['review_comments'], repo_path, state, mdata):
+                        for review_comment_rec in get_review_comments_for_pr(
+                                pr_num, schemas['review_comments'], repo_path, state, mdata
+                        ):
                             singer.write_record('review_comments', review_comment_rec, time_extracted=extraction_time)
-                            singer.write_bookmark(state, repo_path, 'review_comments', {'since': singer.utils.strftime(extraction_time)})
+                            singer.write_bookmark(
+                                state,
+                                repo_path,
+                                'review_comments',
+                                {'since': singer.utils.strftime(extraction_time)},
+                            )
 
                     if schemas.get('pr_commits'):
                         for pr_commit in get_commits_for_pr(
@@ -843,7 +939,12 @@ def get_all_pull_requests(schemas, repo_path, state, mdata, start_date):
                                 mdata
                         ):
                             singer.write_record('pr_commits', pr_commit, time_extracted=extraction_time)
-                            singer.write_bookmark(state, repo_path, 'pr_commits', {'since': singer.utils.strftime(extraction_time)})
+                            singer.write_bookmark(
+                                state,
+                                repo_path,
+                                'pr_commits',
+                                {'since': singer.utils.strftime(extraction_time)},
+                            )
 
     return state
 
@@ -893,9 +994,9 @@ def get_commits_for_pr(pr_number, pr_id, schema, repo_path, state, mdata):
 
 
 def get_all_assignees(schema, repo_path, state, mdata, _start_date):
-    '''
+    """
     https://developer.github.com/v3/issues/assignees/#list-assignees
-    '''
+    """
     with metrics.record_counter('assignees') as counter:
         for response in authed_get_all_pages(
                 'assignees',
@@ -914,9 +1015,9 @@ def get_all_assignees(schema, repo_path, state, mdata, _start_date):
     return state
 
 def get_all_collaborators(schema, repo_path, state, mdata, _start_date):
-    '''
+    """
     https://developer.github.com/v3/repos/collaborators/#list-collaborators
-    '''
+    """
     with metrics.record_counter('collaborators') as counter:
         for response in authed_get_all_pages(
                 'collaborators',
@@ -929,15 +1030,20 @@ def get_all_collaborators(schema, repo_path, state, mdata, _start_date):
                 with singer.Transformer() as transformer:
                     rec = transformer.transform(collaborator, schema, metadata=metadata.to_map(mdata))
                 singer.write_record('collaborators', rec, time_extracted=extraction_time)
-                singer.write_bookmark(state, repo_path, 'collaborator', {'since': singer.utils.strftime(extraction_time)})
+                singer.write_bookmark(
+                    state,
+                    repo_path,
+                    'collaborator',
+                    {'since': singer.utils.strftime(extraction_time)},
+                )
                 counter.increment()
 
     return state
 
 def get_all_commits(schema, repo_path,  state, mdata, start_date):
-    '''
+    """
     https://developer.github.com/v3/repos/commits/#list-commits-on-a-repository
-    '''
+    """
     bookmark = get_bookmark(state, repo_path, "commits", "since", start_date)
     if bookmark:
         query_string = '?since={}'.format(bookmark)
@@ -962,9 +1068,9 @@ def get_all_commits(schema, repo_path,  state, mdata, start_date):
     return state
 
 def get_all_issues(schema, repo_path,  state, mdata, start_date):
-    '''
+    """
     https://developer.github.com/v3/issues/#list-issues-for-a-repository
-    '''
+    """
 
     bookmark = get_bookmark(state, repo_path, "issues", "since", start_date)
     if bookmark:
@@ -975,7 +1081,10 @@ def get_all_issues(schema, repo_path,  state, mdata, start_date):
     with metrics.record_counter('issues') as counter:
         for response in authed_get_all_pages(
                 'issues',
-                'https://api.github.com/repos/{}/issues?state=all&sort=updated&direction=asc{}'.format(repo_path, query_string)
+                (
+                    'https://api.github.com/repos/{}/issues?state=all&sort=updated'
+                    '&direction=asc{}'
+                ).format(repo_path, query_string)
         ):
             issues = response.json()
             extraction_time = singer.utils.now()
@@ -989,9 +1098,9 @@ def get_all_issues(schema, repo_path,  state, mdata, start_date):
     return state
 
 def get_all_comments(schema, repo_path, state, mdata, start_date):
-    '''
+    """
     https://developer.github.com/v3/issues/comments/#list-comments-in-a-repository
-    '''
+    """
 
     bookmark = get_bookmark(state, repo_path, "comments", "since", start_date)
     if bookmark:
@@ -1002,7 +1111,10 @@ def get_all_comments(schema, repo_path, state, mdata, start_date):
     with metrics.record_counter('comments') as counter:
         for response in authed_get_all_pages(
                 'comments',
-                'https://api.github.com/repos/{}/issues/comments?sort=updated&direction=asc{}'.format(repo_path, query_string)
+                (
+                    'https://api.github.com/repos/{}/issues/comments?sort=updated'
+                    '&direction=asc{}'
+                ).format(repo_path, query_string)
         ):
             comments = response.json()
             extraction_time = singer.utils.now()
@@ -1016,9 +1128,9 @@ def get_all_comments(schema, repo_path, state, mdata, start_date):
     return state
 
 def get_all_stargazers(schema, repo_path, state, mdata, _start_date):
-    '''
+    """
     https://developer.github.com/v3/activity/starring/#list-stargazers
-    '''
+    """
 
     stargazers_headers = {'Accept': 'application/vnd.github.v3.star+json'}
 
@@ -1049,9 +1161,9 @@ def get_all_repositories(
     include_archived=False,
     include_disabled=False
 ) -> dict:
-    '''
+    """
     https://docs.github.com/en/rest/reference/repos
-    '''
+    """
 
     if includes is None:
         includes = []
@@ -1120,11 +1232,11 @@ def should_skip_repo(
 
 
 def get_selected_streams(catalog):
-    '''
+    """
     Gets selected streams.  Checks schema's 'selected'
     first -- and then checks metadata, looking for an empty
     breadcrumb and mdata with a 'selected' entry
-    '''
+    """
     selected_streams = []
     for stream in catalog['streams']:
         stream_metadata = stream['metadata']
@@ -1228,7 +1340,9 @@ def _validate_repo_config(organization, repos_include, repos_exclude):
 
     if not organization:
         if [repo for repo in repos_include if '*' in repo]:
-            raise InvalidParametersException("organization is required when repos_include/repository contains wildcard matchers")
+            raise InvalidParametersException(
+                "organization is required when repos_include/repository contains wildcard matchers"
+            )
 
         if [repo for repo in repos_exclude if '*' in repo]:
             raise InvalidParametersException("organization is required when repos_exclude contains wildcard matchers")
@@ -1240,7 +1354,9 @@ def _validate_repo_config(organization, repos_include, repos_exclude):
             raise InvalidParametersException("repos_exclude requires organization")
 
     if organization and [repo for repo in repos_include if '/' in repo]:
-        raise InvalidParametersException("org prefix not allowed in repos_include/repository when organization is present")
+        raise InvalidParametersException(
+            "org prefix not allowed in repos_include/repository when organization is present"
+        )
 
     if [repo for repo in repos_exclude if '/' in repo]:
         raise InvalidParametersException("org prefix not allowed in repos_exclude")

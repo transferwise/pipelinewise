@@ -146,6 +146,10 @@ def test_root_ci_dependencies_and_policy_use_ruff():
 
     assert set(ruff_config['lint']['select']) == {'C90', 'E', 'F', 'PLE', 'Q002', 'W'}
     assert ruff_config['lint']['mccabe']['max-complexity'] == 15
+    connector_source_rules = {'C901', 'E501', 'E731', 'Q002'}
+    for pattern, ignored_rules in ruff_config['lint']['per-file-ignores'].items():
+        if pattern.startswith('singer-connectors/'):
+            assert connector_source_rules.isdisjoint(ignored_rules)
 
     setup_tree = ast.parse((REPOSITORY_ROOT / 'setup.py').read_text())
     dependencies = {

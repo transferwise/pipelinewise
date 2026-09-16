@@ -190,7 +190,7 @@ class MixPanel:
 
             return max_bookmark_value, counter.value
 
-    def get_and_transform_records(
+    def get_and_transform_records(  # noqa: C901
         self,
         querystring,
         project_timezone,
@@ -432,7 +432,7 @@ class MixPanel:
 
         return start_window, end_window, days_interval
 
-    def sync(
+    def sync(  # noqa: C901
         self, state, catalog, config, start_date, selected_streams, parent_data=None
     ):
         """The sync method common to all the streams which internally call

@@ -29,7 +29,7 @@ def emit_state(state):
 
 
 
-def persist_messages(messages, config, s3_client):
+def persist_messages(messages, config, s3_client):  # noqa: C901
     state = None
     schemas = {}
     key_properties = {}

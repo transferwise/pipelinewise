@@ -198,7 +198,7 @@ class Tickets(Stream):
             self.buf[stream_name] = []
 
 
-    def sync(self, state):
+    def sync(self, state):  # noqa: C901
         bookmark = self.get_bookmark(state)
         tickets = self.client.tickets.incremental(start_time=bookmark)
 

@@ -60,7 +60,7 @@ BINARY_TYPE = set(['binary', 'varbinary'])
 
 
 def schema_for_column(c):
-    '''Returns the Schema object for the given Column.'''
+    """Returns the Schema object for the given Column."""
     data_type = c.data_type.lower()
 
     inclusion = 'available'

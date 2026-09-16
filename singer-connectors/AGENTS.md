@@ -5,10 +5,11 @@ Read root `AGENTS.md` and relevant implementation, test, E2E, and docs guides.
 ## Environments and CI
 
 These are vendored sources, not submodules. The root Ruff gate checks connector
-source packages plus the tap-mysql, tap-postgres, and target-snowflake suites run
-by connector CI. Unexecuted legacy connector tests and spikes remain excluded;
-root unit tests exclude connectors. Prefer the ready `pipelinewise` container;
-report host fallbacks.
+source packages plus the tap-mysql, tap-postgres, and target-snowflake unit
+suites run by connector CI. Connector tests outside GitHub connector CI,
+including integration suites, legacy tests, and spikes, remain excluded; root
+unit tests exclude connectors. Prefer the ready `pipelinewise` container; report
+host fallbacks.
 
 Connector CI installs all connectors and runs Python 3.12 units for tap-mysql
 (`make unit_test_cov`, 47%), tap-postgres (`make unit_test_cov`, 58%), and
@@ -28,8 +29,10 @@ tap-postgres, and target-snowflake targets lint source, their GitHub-tested unit
 suites, and shared unit helpers; other connector targets lint source only. Unit
 and integration targets remain the behavioral validation. Do not add
 connector-local lint configuration, another Python linter, or an automatic
-formatter. New or modified connector Python must remain within the root Ruff
-scope.
+formatter. Line length, docstring quoting, lambda assignment, and complexity
+rules apply to all connector source. Keep unavoidable legacy ignores inline,
+function- or line-scoped, and rule-specific. New or modified connector Python
+must remain within the root Ruff scope.
 
 Run available environment, lint, unit, integration, and coverage targets
 without lowering thresholds; integration may need containers or credentials.

@@ -1,5 +1,5 @@
-Unversioned
------------
+0.87.0 (2026-09-17)
+-------------------
 
 **Test infrastructure**
 
@@ -7,17 +7,25 @@ Unversioned
   across branch protection, workflow outputs, and contract tests, allowing
   future test rebalancing without further required-check renames
 
+**Docker image**
+
+- Configure mbuffer status reporting every 30 seconds in the main Docker image,
+  reducing progress log volume without changing stream-buffer behaviour
+
 **Developer tooling**
 
 - Consolidate Python linting on Ruff for PipelineWise, data-diff, all root tests
   including E2E, vendored connector source, and the tap-mysql, tap-postgres, and
   target-snowflake suites run by connector CI, replacing Pylint, Flake8, YAPF,
-  and Unify. Retain 120-character line, warning, docstring-quote, and complexity
-  checks plus Ruff's Pylint-category error rules. Pylint convention, refactor,
-  and warning families are intentionally not enabled wholesale because they
-  expose broad legacy debt; connector-wide legacy rule exclusions and explicit
-  exclusions for unexecuted connector tests keep the first pass focused on
-  syntax and actionable errors instead of unrelated cleanup
+  and Unify
+- Retain 120-character line, warning, docstring-quote, and complexity checks
+  plus Ruff's Pylint-category error rules without enabling Pylint convention,
+  refactor, and warning families wholesale over legacy code
+- Enforce line length, docstring quoting, lambda assignment, and complexity
+  across all vendored connector source, replacing connector-wide Ruff
+  exemptions with fixes or narrowly scoped inline exceptions
+- Exclude connector suites outside existing GitHub connector CI, including
+  integration suites, legacy tests, and spikes, from the root Ruff gate
 - Run the lint and unit workflow for changes to Ruff policy, its pre-commit
   hook, or the workflow itself, even when no application Python changed
 - Remove obsolete inline directives for retired linters, replace avoidable

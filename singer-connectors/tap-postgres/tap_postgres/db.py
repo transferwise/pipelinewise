@@ -114,7 +114,7 @@ def filter_schemas_sql_clause(sql, filer_schemas):
 
 
 
-def selected_value_to_singer_value_impl(elem, sql_datatype):
+def selected_value_to_singer_value_impl(elem, sql_datatype):  # noqa: C901
     sql_datatype = sql_datatype.replace('[]', '')
     if elem is None:
         cleaned_elem = elem

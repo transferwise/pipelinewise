@@ -104,7 +104,7 @@ def create_property_schema(field, mdata):
 
 
 
-def do_discover(sf):
+def do_discover(sf):  # noqa: C901
     """Describes a Salesforce instance's objects and generates a JSON schema for each field."""
     global_description = sf.describe()
 
@@ -195,9 +195,10 @@ def do_discover(sf):
         missing_unsupported_field_names = [f[0] for f in unsupported_fields if f[0] not in field_name_set]
 
         if missing_unsupported_field_names:
-            LOGGER.info("Ignoring the following unsupported fields for object %s as they are missing from the field list: %s",
-                        sobject_name,
-                        ', '.join(sorted(missing_unsupported_field_names)))
+            LOGGER.info(
+                "Ignoring the following unsupported fields for object %s as they are missing from the field list: %s",
+                sobject_name,
+                ', '.join(sorted(missing_unsupported_field_names)))
 
         if filtered_unsupported_fields:
             LOGGER.info("Not syncing the following unsupported fields for object %s: %s",
@@ -320,7 +321,8 @@ def do_sync(sf, catalog, state):
                 # Resuming a sync should clear out the remaining state once finished
                 counter = resume_syncing_bulk_query(sf, catalog_entry, job_id, state, counter)
                 LOGGER.info("%s: Completed sync (%s rows)", stream_name, counter.value)
-                # Remove Job info from state once we complete this resumed query. One of a few cases could have occurred:
+                # Remove Job info from state once we complete this resumed query.
+                # One of a few cases could have occurred:
                 # 1. The job succeeded, in which case make JobHighestBookmarkSeen the new bookmark
                 # 2. The job partially completed, in which case make JobHighestBookmarkSeen the new bookmark, or
                 #    existing bookmark if no bookmark exists for the Job.

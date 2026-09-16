@@ -45,7 +45,10 @@ def proto_to_message_type(schema: str, protobuf_classes_dir: str, topic: str):
         schema_f.flush()
 
     # Compile schema to python class by protoc
-    command = f"{sys.executable} -m grpc_tools.protoc -I {protobuf_classes_dir} --python_out={protobuf_classes_dir} {proto_name}"
+    command = (
+        f"{sys.executable} -m grpc_tools.protoc -I {protobuf_classes_dir} "
+        f"--python_out={protobuf_classes_dir} {proto_name}"
+    )
     try:
         subprocess.run(command.split(), check=True, stdout=subprocess.PIPE, env=os.environ.copy())
     except subprocess.CalledProcessError as exc:

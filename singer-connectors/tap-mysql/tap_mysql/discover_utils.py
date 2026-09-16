@@ -251,8 +251,11 @@ def discover_catalog(
                                             'is-view',
                                             is_view)
 
-                column_is_key_prop = lambda c, s: (c.column_key == 'PRI' and
-                                                   s.properties[c.column_name].inclusion != 'unsupported')
+                def column_is_key_prop(column, column_schema):
+                    return (
+                        column.column_key == 'PRI'
+                        and column_schema.properties[column.column_name].inclusion != 'unsupported'
+                    )
 
                 key_properties = [c.column_name for c in cols if column_is_key_prop(c, schema)]
 

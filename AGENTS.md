@@ -53,12 +53,13 @@ pytest --cov=pipelinewise --cov-fail-under=77 -v tests/units
 ```
 
 An unavoidable host run must activate `.virtualenvs/pipelinewise/`. Keep paths
-and flags exact: Ruff checks all repository Python except explicitly excluded
-unexecuted legacy connector tests and spikes. This includes data-diff, root E2E,
-vendored connector source, and the tap-mysql, tap-postgres, and
-target-snowflake suites run by connector CI. Never run bare `pytest tests/`
-because it collects credentialed E2E. Collect nested data-diff/backend-db tests
-from `tests/units`, narrowing with `-k` to avoid import failures.
+and flags exact: Ruff checks all repository Python except connector tests outside
+existing GitHub connector CI, including integration suites, legacy tests, and
+spikes. This includes data-diff, root E2E, vendored connector source, and the
+tap-mysql, tap-postgres, and target-snowflake unit suites run by connector CI.
+Never run bare `pytest tests/` because it collects credentialed E2E. Collect
+nested data-diff/backend-db tests from `tests/units`, narrowing with `-k` to
+avoid import failures.
 
 After implementation, schema, example-config, or connector-config changes,
 validate in Docker (Compose loads `dev-project/.env`):
@@ -97,8 +98,8 @@ Also follow these scoped checks:
   pass the repository `pyproject.toml` policy. Do not add or invoke another
   Python linter or formatter.
 - Uppercase Snowflake FastSync identifiers. Scope new Ruff ignores to the
-  narrowest file and rule. Do not broaden the connector-wide migration
-  exclusions or unrelated legacy inline suppressions.
+  narrowest line or function and rule. Do not add connector-wide or
+  directory-wide rule exemptions or broaden unrelated inline suppressions.
 - Comments explain a non-obvious constraint or consequence in at most two
   lines; do not restate code, narrate edits, argue choices, or add walkthroughs.
 - Preserve dirty-worktree changes. Never run `pre-commit run --all-files`,

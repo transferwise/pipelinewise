@@ -171,7 +171,7 @@ def create_hstore_elem(conn_info, elem):
             return hstore_elem
 
 
-def create_array_elem(elem, sql_datatype, conn_info):
+def create_array_elem(elem, sql_datatype, conn_info):  # noqa: C901
     if elem is None:
         return None
 
@@ -231,7 +231,7 @@ def create_array_elem(elem, sql_datatype, conn_info):
 
 
 
-def selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info):
+def selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info):  # noqa: C901
     sql_datatype = og_sql_datatype.replace('[]', '')
 
     if elem is None:
@@ -657,7 +657,7 @@ def _start_replication(cur, logical_streams, slot, start_lsn, version):
         raise Exception(f"Unable to start replication with logical replication (slot {ex})") from ex
 
 
-def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
+def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):  # noqa: C901
     target_acknowledged_lsn = _minimum_acknowledged_lsn(state, logical_streams)
     start_lsn = target_acknowledged_lsn
     lsn_to_flush = None

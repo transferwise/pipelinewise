@@ -72,7 +72,9 @@ class TestBinlogSyncStrategy(TestCase):
         self.assertEqual(binlog.binlog_filename_key(None), (None, 0))
 
         # Comparison tests
-        self.assertTrue(binlog.binlog_filename_key('mysql-bin.1000000') > binlog.binlog_filename_key('mysql-bin.999999'))
+        self.assertTrue(
+            binlog.binlog_filename_key('mysql-bin.1000000') > binlog.binlog_filename_key('mysql-bin.999999')
+        )
         self.assertTrue(binlog.binlog_filename_key('mysql-bin.2') > binlog.binlog_filename_key('mysql-bin.1'))
 
     @patch.dict(os.environ, {'TZ': 'Europe/Helsinki'})

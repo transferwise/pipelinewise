@@ -219,7 +219,7 @@ def json_bytes_to_string(data):
 
 
 
-def row_to_singer_record(catalog_entry, version, db_column_map, row, time_extracted):
+def row_to_singer_record(catalog_entry, version, db_column_map, row, time_extracted):  # noqa: C901
     row_to_persist = {}
     for column_name, val in row.items():
         property_type = catalog_entry.schema.properties[column_name].type
@@ -628,7 +628,7 @@ def __get_diff_in_columns_list(
 
 
 
-def _run_binlog_sync(
+def _run_binlog_sync(  # noqa: C901
         mysql_conn: MySQLConnection,
         reader: BinLogStreamReader,
         binlog_streams_map: Dict,

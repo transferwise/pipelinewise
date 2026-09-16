@@ -210,7 +210,15 @@ class MixpanelClient:
 
     @backoff.on_exception(
         backoff.expo,
-        (Server5xxError, Server429Error, ReadTimeoutError, ConnectionError, Timeout, ProtocolError, ChunkedEncodingError),
+        (
+            Server5xxError,
+            Server429Error,
+            ReadTimeoutError,
+            ConnectionError,
+            Timeout,
+            ProtocolError,
+            ChunkedEncodingError,
+        ),
         max_tries=BACKOFF_MAX_TRIES_REQUEST,
         factor=3,
         logger=LOGGER,
