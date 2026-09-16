@@ -22,23 +22,23 @@ actions:
             type: tests
           - name: publish
             type: tests
-          - name: e2e_tests_target_pg
+          - name: e2e_tests_01
             type: tests
-          - name: e2e_tests_sf_conversion
+          - name: e2e_tests_02
             type: tests
-          - name: e2e_tests_sf_publication
+          - name: e2e_tests_03
             type: tests
-          - name: e2e_tests_sf_pg_partial
+          - name: e2e_tests_04
             type: tests
-          - name: e2e_tests_sf_mariadb_partial
+          - name: e2e_tests_05
             type: tests
-          - name: e2e_tests_sf_pg_iceberg
+          - name: e2e_tests_06
             type: tests
-          - name: e2e_tests_sf_mariadb_iceberg
+          - name: e2e_tests_07
             type: tests
-          - name: e2e_tests_sf_mysql_iceberg
+          - name: e2e_tests_08
             type: tests
-          - name: e2e_tests_sf_mariadb_native
+          - name: e2e_tests_09
             type: tests
 
   sync-codeowners:
