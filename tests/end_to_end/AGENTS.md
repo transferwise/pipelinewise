@@ -33,9 +33,10 @@ step ran and report pass/skip/fail counts.
 
 ## E2E matrix
 
-These groups mirror `.github/workflows/e2e_tests.yml`; update both together. CI
-runs eight Snowflake groups concurrently on isolated runners; local groups
-share/reset fixtures/config and must run serially:
+These groups mirror `.github/workflows/e2e_tests.yml` in required-check order
+`e2e_tests_01` through `e2e_tests_09`; update both together. CI runs eight
+Snowflake groups concurrently on isolated runners; local groups share/reset
+fixtures/config and must run serially:
 
 ```bash
 run_e2e() { docker exec -t pipelinewise pytest "$@" -vx --timer-top-n 10; }

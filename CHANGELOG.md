@@ -3,9 +3,9 @@ Unversioned
 
 **Test infrastructure**
 
-- Prepare branch protection for stable numbered E2E shard checks
-  `e2e_tests_01` through `e2e_tests_09`, allowing future test rebalancing
-  without further required-check renames
+- Use stable numbered E2E shard checks `e2e_tests_01` through `e2e_tests_09`
+  across branch protection, workflow outputs, and contract tests, allowing
+  future test rebalancing without further required-check renames
 
 0.86.0 (2026-09-16)
 -------------------
