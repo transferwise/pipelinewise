@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# pylint: disable=missing-function-docstring
+
 
 import pendulum
 import singer

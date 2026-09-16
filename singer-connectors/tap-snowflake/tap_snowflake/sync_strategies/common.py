@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# pylint: disable=too-many-arguments,duplicate-code,too-many-locals
+
 
 import copy
 import datetime
@@ -116,7 +116,7 @@ def generate_select_sql(catalog_entry, columns):
     return select_sql
 
 
-# pylint: disable=too-many-branches
+
 def row_to_singer_record(catalog_entry, version, row, columns, time_extracted):
     """Transform SQL row to singer compatible record message"""
     row_to_persist = ()

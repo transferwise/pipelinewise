@@ -224,7 +224,7 @@ class TestCommands:
             f'/bin/transform_field.py --config {transform_config}'
         )
 
-    # pylint: disable=invalid-name
+
     def test_build_stream_buffer_command(self):
         """Tests the function that generates stream buffer executable command"""
         # Should return empty string if buffer size is invalid or too small

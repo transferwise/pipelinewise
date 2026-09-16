@@ -110,7 +110,7 @@ class MixPanel:
         singer.write_state(state)
 
     def process_records(
-        self,  # pylint: disable=too-many-branches
+        self,
         catalog,
         stream_name,
         records,

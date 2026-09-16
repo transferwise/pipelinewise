@@ -12,7 +12,7 @@ from pipelinewise.fastsync.commons.partial_sync_boundary import (
 )
 
 
-class TestFastSyncTapPostgres(TestCase):  # pylint: disable=too-many-public-methods
+class TestFastSyncTapPostgres(TestCase):
     """
     Unit tests for fastsync tap postgres
     """

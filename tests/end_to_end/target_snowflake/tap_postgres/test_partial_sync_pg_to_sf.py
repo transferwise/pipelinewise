@@ -66,7 +66,7 @@ class TestPartialSyncPGToSF(TapPostgres):
     Test cases for Partial sync table from Postgres to Snowflake
     """
 
-    # pylint: disable=arguments-differ
+
     def setUp(self):
         self.table = 'edgydata'
         self.column = 'cid'
@@ -372,7 +372,7 @@ class TestPartialSyncPGToSFSoftDelete(TapPostgres):
     """
     Test cases for Partial sync table from Postgres to Snowflake if set to soft delete
     """
-    # pylint: disable=arguments-differ
+
     def setUp(self):
         self.table = 'edgydata'
         self.column = 'cid'

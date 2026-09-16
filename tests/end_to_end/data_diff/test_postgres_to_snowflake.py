@@ -32,7 +32,7 @@ EXPECTED_CHECKS = {
 }
 
 
-# pylint: disable=attribute-defined-outside-init
+
 class TestPostgresToSnowflakeDataDiff:
     """Prove data-diff reconciles a PostgreSQL source against a Snowflake replica."""
 

@@ -115,7 +115,7 @@ def primary_column_names(stream_schema_message):
     return [safe_column_name(p) for p in stream_schema_message['key_properties']]
 
 
-# pylint: disable=invalid-name
+
 def create_query_tag(query_tag_pattern: str, database: str = None, schema: str = None, table: str = None) -> str:
     """
     Generate a string to tag executed queries in Snowflake.
@@ -150,7 +150,7 @@ def create_query_tag(query_tag_pattern: str, database: str = None, schema: str =
     return query_tag
 
 
-# pylint: disable=too-many-public-methods,too-many-instance-attributes
+
 class DbSync:
     """DbSync class"""
 
@@ -205,7 +205,7 @@ class DbSync:
                               "Use named stages with Parquet file format or table stages with CSV files format")
             sys.exit(1)
 
-        # Init stream schema pylint: disable=line-too-long
+        # Init stream schema
         if self.stream_schema_message is not None:
             #  Define target schema name.
             #  --------------------------
@@ -321,7 +321,7 @@ class DbSync:
 
                 qid = None
 
-                # pylint: disable=invalid-name
+
                 for q in queries:
 
                     # update the LAST_QID
@@ -617,7 +617,7 @@ class DbSync:
         self.logger.info("Granting USAGE privilege on '%s' schema to '%s'... %s", schema_name, grantee, query)
         self.query(query)
 
-    # pylint: disable=invalid-name
+
     def grant_select_on_all_tables_in_schema(self, schema_name, grantee):
         """Grant select on all tables in schema"""
         query = f"GRANT SELECT ON ALL TABLES IN SCHEMA {schema_name} TO ROLE {grantee}"

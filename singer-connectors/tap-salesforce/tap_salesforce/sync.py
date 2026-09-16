@@ -12,7 +12,7 @@ BLACKLISTED_FIELDS = set(['attributes'])
 def remove_blacklisted_fields(data):
     return {k: v for k, v in data.items() if k not in BLACKLISTED_FIELDS}
 
-# pylint: disable=unused-argument
+
 def transform_bulk_data_hook(data, typ, schema):
     result = data
     if isinstance(data, dict):

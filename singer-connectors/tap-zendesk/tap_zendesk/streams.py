@@ -1,4 +1,4 @@
-# pylint: disable=invalid-name,missing-function-docstring,missing-class-docstring,unused-argument
+
 import os
 import json
 import datetime
@@ -77,7 +77,7 @@ class Stream():
             schema = json.load(f)
         return self._add_custom_fields(schema)
 
-    def _add_custom_fields(self, schema): # pylint: disable=no-self-use
+    def _add_custom_fields(self, schema):
         return schema
 
     def load_metadata(self):
@@ -128,7 +128,7 @@ class Organizations(Stream):
         # NB: Zenpy doesn't have a public endpoint for this at time of writing
         #     Calling into underlying query method to grab all fields
         try:
-            field_gen = self.client.organizations._query_zendesk(endpoint.organization_fields, # pylint: disable=protected-access
+            field_gen = self.client.organizations._query_zendesk(endpoint.organization_fields,
                                                                  'organization_field')
         except zenpy.lib.exception.APIException as e:
             return raise_or_log_zenpy_apiexception(schema, self.name, e)
@@ -197,7 +197,7 @@ class Tickets(Stream):
                 yield rec
             self.buf[stream_name] = []
 
-    # pylint: disable=too-many-locals,too-many-statements
+
     def sync(self, state):
         bookmark = self.get_bookmark(state)
         tickets = self.client.tickets.incremental(start_time=bookmark)
@@ -420,7 +420,7 @@ class Tags(Stream):
     replication_method = "FULL_TABLE"
     key_properties = ["name"]
 
-    def sync(self, state): # pylint: disable=unused-argument
+    def sync(self, state):
         # NB: Setting page to force it to paginate all tags, instead of just the
         #     top 100 popular tags
         tags = self.client.tags(page=1)
@@ -491,7 +491,7 @@ class SLAPolicies(Stream):
     name = "sla_policies"
     replication_method = "FULL_TABLE"
 
-    def sync(self, state): # pylint: disable=unused-argument
+    def sync(self, state):
         for policy in self.client.sla_policies():
             yield (self.stream, policy)
 

@@ -19,7 +19,7 @@ TARGET_ID = 'snowflake'
 class TestIcebergV3MySQLToSnowflake(TapMySQL):
     """Exercise genuine MySQL Singer, FullSync, and PartialSync into Iceberg."""
 
-    # pylint: disable=arguments-differ
+
     def setUp(self):
         super().setUp(tap_id=TAP_ID, target_id=TARGET_ID)
         self.source_db = self.e2e_env.get_conn_env_var('TAP_ORACLE_MYSQL', 'DB')

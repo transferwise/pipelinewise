@@ -8,7 +8,7 @@ RECORD_UPDATE_MODE_SCHEMA_KEY = 'x-pipelinewise-record-update-mode'
 PATCH_RECORD_UPDATE_MODE = 'PATCH'
 
 
-# pylint: disable=invalid-name,missing-function-docstring
+
 def should_sync_column(md_map, field_name):
     field_metadata = md_map.get(('properties', field_name), {})
     return singer.should_sync_field(field_metadata.get('inclusion'),

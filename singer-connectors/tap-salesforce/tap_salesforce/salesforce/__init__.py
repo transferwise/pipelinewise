@@ -129,7 +129,7 @@ def log_backoff_attempt(details):
     LOGGER.info("ConnectionError detected, triggering backoff: %d try", details.get("tries"))
 
 
-def field_to_property_schema(field, mdata): # pylint: disable=too-many-branches
+def field_to_property_schema(field, mdata):
     property_schema = {}
 
     field_name = field['name']
@@ -187,7 +187,7 @@ def field_to_property_schema(field, mdata): # pylint: disable=too-many-branches
     return property_schema, mdata
 
 class Salesforce():
-    # pylint: disable=too-many-instance-attributes,too-many-arguments
+
     def __init__(self,
                  refresh_token=None,
                  token=None,
@@ -230,7 +230,7 @@ class Salesforce():
     def _get_standard_headers(self):
         return {"Authorization": "Bearer {}".format(self.access_token)}
 
-    # pylint: disable=anomalous-backslash-in-string,line-too-long
+
     def check_rest_quota_usage(self, headers):
         match = re.search(r'^api-usage=(\d+)/(\d+)$', headers.get('Sforce-Limit-Info'))
 
@@ -262,7 +262,7 @@ class Salesforce():
                                                                        self.quota_percent_per_run)
             raise TapSalesforceQuotaExceededException(partial_message)
 
-    # pylint: disable=too-many-arguments
+
     @backoff.on_exception(backoff.expo,
                           requests.exceptions.ConnectionError,
                           max_tries=10,
@@ -338,7 +338,7 @@ class Salesforce():
 
         return resp.json()
 
-    # pylint: disable=no-self-use
+
     def _get_selected_properties(self, catalog_entry):
         mdata = metadata.to_map(catalog_entry['metadata'])
         properties = catalog_entry['schema'].get('properties', {})
@@ -405,7 +405,7 @@ class Salesforce():
                 "api_type should be REST or BULK was: {}".format(
                     self.api_type))
 
-    # pylint: disable=line-too-long
+
     def get_blacklisted_fields(self):
         if self.api_type == BULK_API_TYPE:
             return {('EntityDefinition', 'RecordTypesSupported'): "this field is unsupported by the Bulk API."}

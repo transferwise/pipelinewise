@@ -209,5 +209,5 @@ make venv
 
 To run linter:
 ```bash
-make pylint
+make venv lint
 ```

@@ -39,7 +39,7 @@ TABLE_COMMENT = 'source: C:\\data' + '\\'
 COLUMN_COMMENT = "column: x\\' || CURRENT_USER() || '"
 
 
-class LostPromotionResponseAdapter:  # pylint: disable=too-few-public-methods
+class LostPromotionResponseAdapter:
     """Raise after one real Iceberg promotion has committed."""
 
     def __init__(self, adapter):

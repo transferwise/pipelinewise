@@ -59,7 +59,7 @@ class TestDefinedPartialSyncMariaDBToSF(TapMariaDB):
     Defined Partial Sync from MariaDB to Snowflake
     """
 
-    # pylint: disable=arguments-differ
+
     def setUp(self):
         super().setUp(tap_id=TAP_ID, target_id=TARGET_ID)
 
@@ -112,7 +112,7 @@ class TestDefinedPartialSyncMariaDBToSF(TapMariaDB):
             ((1001, ''), (1002, None)),
         )
 
-    # pylint: disable=invalid-name
+
     def test_defined_partial_sync_mariadb_to_sf(self):
         """
         Testing defined partial syn from Mariadb to Snowflake

@@ -10,7 +10,7 @@ from pipelinewise.cli.errors import InvalidConfigException
 VIRTUALENVS_DIR = './virtualenvs-dummy'
 
 
-# pylint: disable=too-many-public-methods,fixme
+
 class TestUtils:
     """
     Unit Tests for PipelineWise CLI utility functions
@@ -285,7 +285,7 @@ class TestUtils:
             cli.utils.silentremove(file.name)
             assert os.path.exists(file.name) is False
 
-    # pylint: disable=consider-using-with
+
     def test_silentremove_successfully_removes_directory(self):
         """Test removing an existing directory works"""
         directory = TemporaryDirectory().name

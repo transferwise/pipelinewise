@@ -160,9 +160,10 @@ To apply transformation conditionally, you can make use of the property `when` w
   pip install .[test]
 ```
 
-2. Run pylint
+2. Run Ruff from the repository root
 ```shell
-pylint transform_field
+cd ../..
+singer-connectors/transform-field/venv/bin/ruff check singer-connectors/transform-field/transform_field/
 ```
 
 ### To run tests:
@@ -199,4 +200,3 @@ pylint transform_field
 Apache License Version 2.0
 
 See [LICENSE](LICENSE) to see the full text.
-

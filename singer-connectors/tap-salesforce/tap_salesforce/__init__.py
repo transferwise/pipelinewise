@@ -87,7 +87,7 @@ def build_state(raw_state, catalog):
 
     return state
 
-# pylint: disable=undefined-variable
+
 def create_property_schema(field, mdata):
     field_name = field['name']
 
@@ -103,7 +103,7 @@ def create_property_schema(field, mdata):
     return (property_schema, mdata)
 
 
-# pylint: disable=too-many-branches,too-many-statements
+
 def do_discover(sf):
     """Describes a Salesforce instance's objects and generates a JSON schema for each field."""
     global_description = sf.describe()
@@ -258,7 +258,7 @@ def do_discover(sf):
     unsupported_tag_objects = [object_to_tag_references[f]
                                for f in sf_custom_setting_objects if f in object_to_tag_references]
     if unsupported_tag_objects:
-        LOGGER.info( #pylint:disable=logging-not-lazy
+        LOGGER.info(
             "Skipping the following Tag objects, Tags on Custom Settings Salesforce objects " +
             "are not supported by the Bulk API:")
         LOGGER.info(unsupported_tag_objects)

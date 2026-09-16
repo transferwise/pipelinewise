@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# pylint: disable=missing-docstring,arguments-differ,missing-function-docstring
+
 
 import backoff
 import pymysql
@@ -159,7 +159,7 @@ class MySQLConnection(pymysql.connections.Connection):
 
 def make_connection_wrapper(config):
     class ConnectionWrapper(MySQLConnection):
-        def __init__(self, *args, **kwargs):  # pylint: disable=unused-argument
+        def __init__(self, *args, **kwargs):
             config["cursorclass"] = kwargs.get('cursorclass')
             super().__init__(config)
 

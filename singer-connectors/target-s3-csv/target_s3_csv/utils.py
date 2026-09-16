@@ -88,7 +88,7 @@ def remove_metadata_values_from_record(record_message):
     return cleaned_record
 
 
-# pylint: disable=unnecessary-comprehension
+
 def flatten_key(k, parent_key, sep):
     """
     """
@@ -129,7 +129,7 @@ def get_target_key(message, prefix=None, timestamp=None, naming_convention=None)
     if not timestamp:
         timestamp = datetime.now().strftime('%Y%m%dT%H%M%S')
     key = naming_convention
-    
+
     # replace simple tokens
     for k, v in {
         '{stream}': message['stream'],

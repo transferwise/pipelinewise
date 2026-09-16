@@ -8,7 +8,7 @@ from pipelinewise.data_diff.coverage import (
     coverage_event_type,
 )
 
-# pylint: disable=missing-function-docstring,invalid-name
+
 
 
 def _instant(hour):

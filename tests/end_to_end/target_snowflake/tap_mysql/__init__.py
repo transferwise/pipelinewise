@@ -33,7 +33,7 @@ def mysql_recurring_state_expectations(source_db='mysql8_source_db'):
 class TapMySQL(TargetSnowflake):
     """Base class for genuine MySQL-to-Snowflake E2E tests."""
 
-    # pylint: disable=arguments-differ
+
     def setUp(self, tap_id: str, target_id: str):
         super().setUp(
             tap_id=tap_id,

@@ -28,7 +28,7 @@ def _args(**overrides):
 
 def test_accepts_valid_conversion_args():
     """The manual conversion command accepts its complete argument set."""
-    cli._validate_command_specific_arguments(_args())  # pylint: disable=protected-access
+    cli._validate_command_specific_arguments(_args())
 
 
 @pytest.mark.parametrize(
@@ -79,7 +79,7 @@ def test_accepts_valid_conversion_args():
 def test_rejects_invalid_conversion_args(override, message):
     """Missing or unsupported conversion arguments fail before dispatch."""
     with pytest.raises(CommandSpecificArgumentsException, match=message):
-        cli._validate_command_specific_arguments(_args(**override))  # pylint: disable=protected-access
+        cli._validate_command_specific_arguments(_args(**override))
 
 
 @patch(
@@ -117,7 +117,7 @@ def test_target_only_signal_exits(mock_signal):
         CONFIG_DIR,
         VIRTUALENVS_DIR,
     )
-    handler = pipelinewise._stop_command_on_signal  # pylint: disable=protected-access
+    handler = pipelinewise._stop_command_on_signal
 
     assert mock_signal.call_args_list == [
         call(signal.SIGINT, handler),

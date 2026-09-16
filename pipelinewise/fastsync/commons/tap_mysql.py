@@ -209,7 +209,7 @@ class FastSyncTapMySql:
                     LOGGER.exception(exc)
                     LOGGER.info('%s connection seems to be already closed.', connection_name.capitalize())
 
-    # pylint: disable=too-many-arguments
+
     def query(self, query, conn=None, params=None, return_as_cursor=False, n_retry=1):
         """
         Run query
@@ -317,7 +317,7 @@ class FastSyncTapMySql:
             'version': version,
         }
 
-    # pylint: disable=invalid-name
+
     def fetch_current_incremental_key_pos(self, table, replication_key):
         """
         Get the actual incremental key position in the table
@@ -414,7 +414,7 @@ class FastSyncTapMySql:
 
         # Keep the legacy NUL removal separate from CSV quoting; every other
         # text character must reach csv.writer unchanged.
-        # pylint: disable=line-too-long
+
         sql = f"""
                 SELECT column_name AS column_name,
                     {data_type_projection} AS data_type,
@@ -453,7 +453,7 @@ class FastSyncTapMySql:
                 ORDER BY
                         ordinal_position
             """  # noqa: E501
-        # pylint: enable=line-too-long
+
         return self.query(sql)
 
     def map_column_types_to_target(self, table_name):
@@ -479,7 +479,7 @@ class FastSyncTapMySql:
             ],
         }
 
-    # pylint: disable=too-many-locals, too-many-positional-arguments
+
     def copy_table(
             self,
             table_name,

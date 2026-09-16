@@ -127,7 +127,7 @@ def _target_table_name(
 
 
 @dataclass(frozen=True)
-# pylint: disable=too-many-instance-attributes
+
 class CheckDefinition:
     """A normalized, credential-free version of one table check."""
 
@@ -175,7 +175,7 @@ class CheckDefinition:
         return hashlib.sha256(payload).hexdigest()
 
 
-# pylint: disable=too-many-locals,too-many-branches
+
 def extract_check_definitions(
     global_config: dict,
     targets: dict,

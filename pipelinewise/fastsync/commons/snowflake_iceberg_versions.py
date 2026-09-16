@@ -325,7 +325,7 @@ def _valid_copy_on_write_contract(spec) -> bool:
 
 
 @dataclass(frozen=True)
-class ManagedIcebergVersionSpec:  # pylint: disable=too-many-instance-attributes
+class ManagedIcebergVersionSpec:
     """All Snowflake table contracts owned by one managed Iceberg version."""
 
     version: int

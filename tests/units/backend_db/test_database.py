@@ -10,7 +10,7 @@ from pipelinewise.backend_db import BackendDatabase, BackendDatabaseConfigError
 from pipelinewise.cli import utils
 
 
-# pylint: disable=missing-function-docstring,invalid-name,protected-access
+
 
 
 def _config():

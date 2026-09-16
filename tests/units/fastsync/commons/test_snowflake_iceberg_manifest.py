@@ -1,6 +1,6 @@
 """Typed payload, version strategy, and lifecycle contract tests."""
 
-# pylint: disable=invalid-name
+
 
 from dataclasses import replace
 

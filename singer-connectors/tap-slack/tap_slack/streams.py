@@ -32,12 +32,12 @@ class SlackStream:
 
     def load_schema(self):
         schema_path = self.get_abs_path('schemas')
-        # pylint: disable=no-member
+
         return singer.utils.load_json('{}/{}.json'.format(schema_path, self.name))
 
     def write_schema(self):
         schema = self.load_schema()
-        # pylint: disable=no-member
+
         return singer.write_schema(stream_name=self.name, schema=schema,
                                    key_properties=self.key_properties)
 
@@ -114,7 +114,7 @@ class ConversationsStream(SlackStream):
     def sync(self, mdata):
         schema = self.load_schema()
 
-        # pylint: disable=unused-variable
+
         with singer.metrics.job_timer(job_type='list_conversations') as timer:
             with singer.metrics.record_counter(endpoint=self.name) as counter:
                 channels = self.channels()
@@ -146,7 +146,7 @@ class ConversationMembersStream(SlackStream):
 
         schema = self.load_schema()
 
-        # pylint: disable=unused-variable
+
         with singer.metrics.job_timer(job_type='list_conversation_members') as timer:
             with singer.metrics.record_counter(endpoint=self.name) as counter:
                 for channel in self.channels():
@@ -178,7 +178,7 @@ class ConversationHistoryStream(SlackStream):
     valid_replication_keys = ['channel_id', 'ts']
     date_fields = ['ts']
 
-    # pylint: disable=arguments-differ
+
     def update_bookmarks(self, channel_id, value):
         """
         For the messages stream, bookmarks are written per-channel.
@@ -193,7 +193,7 @@ class ConversationHistoryStream(SlackStream):
         self.state['bookmarks'][self.name][channel_id] = value
         self.write_state()
 
-    # pylint: disable=arguments-differ
+
     def get_bookmark(self, channel_id, default):
         """
         Gets the channel's bookmark value, if present, otherwise a default value passed in.
@@ -207,7 +207,7 @@ class ConversationHistoryStream(SlackStream):
         return self.state.get('bookmarks', {}).get(self.name, {channel_id: default}) \
             .get(channel_id, default)
 
-    # pylint: disable=too-many-branches,too-many-statements
+
     def sync(self, mdata):
 
         schema = self.load_schema()
@@ -221,7 +221,7 @@ class ConversationHistoryStream(SlackStream):
                 threads_stream = ThreadsStream(client=self.client, config=self.config,
                                                catalog=self.catalog, state=self.state)
 
-        # pylint: disable=unused-variable
+
         with singer.metrics.job_timer(job_type='list_conversation_history') as timer:
             with singer.metrics.record_counter(endpoint=self.name) as counter:
                 for channel in self.channels():
@@ -330,7 +330,7 @@ class UsersStream(SlackStream):
 
         LOGGER.info('Fetching all users that have been updated since %s', bookmark)
 
-        # pylint: disable=unused-variable
+
         with singer.metrics.job_timer(job_type='list_users') as timer:
             with singer.metrics.record_counter(endpoint=self.name) as counter:
                 # API returns users in no particular order.
@@ -380,7 +380,7 @@ class ThreadsStream(SlackStream):
         schema = self.load_schema()
         start, end = self.get_absolute_date_range(self.config.get('start_date'))
 
-        # pylint: disable=unused-variable
+
         with singer.metrics.job_timer(job_type='list_threads') as timer:
             with singer.metrics.record_counter(endpoint=self.name) as counter:
                 replies = self.client.get_thread(channel=channel_id,
@@ -418,7 +418,7 @@ class UserGroupsStream(SlackStream):
     def sync(self, mdata):
         schema = self.load_schema()
 
-        # pylint: disable=unused-variable
+
         with singer.metrics.job_timer(job_type='list_user_groups') as timer:
             with singer.metrics.record_counter(endpoint=self.name) as counter:
                 usergroups_list = self.client.get_user_groups(include_count="true",
@@ -453,7 +453,7 @@ class TeamsStream(SlackStream):
     def sync(self, mdata):
         schema = self.load_schema()
 
-        # pylint: disable=unused-variable
+
         with singer.metrics.job_timer(job_type='team_info') as timer:
             with singer.metrics.record_counter(endpoint=self.name) as counter:
 
@@ -487,7 +487,7 @@ class FilesStream(SlackStream):
     def sync(self, mdata):
         schema = self.load_schema()
 
-        # pylint: disable=unused-variable
+
         with singer.metrics.job_timer(job_type='list_files') as timer:
             with singer.metrics.record_counter(endpoint=self.name) as counter:
 
@@ -565,7 +565,7 @@ class RemoteFilesStream(SlackStream):
     def sync(self, mdata):
         schema = self.load_schema()
 
-        # pylint: disable=unused-variable
+
         with singer.metrics.job_timer(job_type='list_files') as timer:
             with singer.metrics.record_counter(endpoint=self.name) as counter:
 

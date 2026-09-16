@@ -22,11 +22,11 @@ class TestReplicatePGToSFWithArchiveLoadFiles(TapPostgres):
     Fastsync tables from Postgres to Snowflake with archive load files enabled
     """
 
-    # pylint: disable=arguments-differ
+
     def setUp(self):
         super().setUp(tap_id=TAP_ID, target_id=TARGET_ID)
 
-        # pylint: disable=protected-access
+
         self.s3_bucket = self.e2e_env.get_conn_env_var('TARGET_SNOWFLAKE', 'S3_BUCKET')
         self.archive_s3_prefix = self.e2e_env.get_conn_env_var(
             'TARGET_SNOWFLAKE',

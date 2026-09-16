@@ -39,7 +39,7 @@ class Config:
         self.targets = {}
 
     @classmethod
-    # pylint: disable=too-many-locals
+
     def from_yamls(cls, config_dir, yaml_dir='.', vault_secret=None):
         """
         Class Constructor
@@ -67,7 +67,7 @@ class Config:
             utils.validate(instance=global_config, schema=global_config_schema)
             config.global_config = global_config or {}
 
-        # pylint: disable=E1136,E1137  # False positive when loading vault encrypted YAML
+
         # Load every target yaml into targets dictionary
         for yaml_file in target_yamls:
             config.logger.info('LOADING TARGET: %s', yaml_file)
@@ -286,7 +286,7 @@ class Config:
         # Save target config.json
         utils.save_json(target.get('db_conn'), target_config_path)
 
-    # pylint: disable=too-many-locals
+
     def save_tap_jsons(self, target, tap, extra_config_keys=None):
         """
         Generating JSON config files for a singer tap connector:

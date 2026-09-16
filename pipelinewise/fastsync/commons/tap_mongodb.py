@@ -235,7 +235,7 @@ class FastSyncTapMongoDB:
         """
         self.database.client.close()
 
-    # pylint: disable=R0914,R0913,R0917
+
     def copy_table(
         self,
         table_name: str,
@@ -385,7 +385,7 @@ class FastSyncTapMongoDB:
         # '_data' is enough to resume LOG_BASED Singer replication after FastSync
         return {'token': {'_data': token['_data']}}
 
-    # pylint: disable=invalid-name
+
     def fetch_current_incremental_key_pos(
         self, fully_qualified_table_name: str, replication_key: str
     ):

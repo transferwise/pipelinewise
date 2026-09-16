@@ -74,7 +74,7 @@ def get_snowflake_statics(config):
     if not ('disable_table_cache' in config and config['disable_table_cache']):
         LOGGER.info('Getting catalog objects from PipelineWise table cache...')
 
-        db = DbSync(config)  # pylint: disable=invalid-name
+        db = DbSync(config)
         table_cache = db.get_table_columns(
             table_schemas=stream_utils.get_schema_names_from_config(config))
 
@@ -84,7 +84,7 @@ def get_snowflake_statics(config):
     return table_cache, file_format_type
 
 
-# pylint: disable=too-many-locals,too-many-branches,too-many-statements,invalid-name
+
 def persist_lines(config, lines, table_cache=None, file_format_type: FileFormatTypes = None) -> None:
     """Main loop to read and consume singer messages from stdin
 
@@ -337,7 +337,7 @@ def persist_lines(config, lines, table_cache=None, file_format_type: FileFormatT
     emit_state(copy.deepcopy(flushed_state))
 
 
-# pylint: disable=too-many-arguments
+
 def flush_streams(
         streams,
         row_count,

@@ -1,4 +1,4 @@
-# pylint: disable=missing-docstring,too-many-locals
+
 import copy
 import pymysql
 import singer
@@ -218,7 +218,7 @@ def do_sync_incremental(mysql_conn, catalog_entry, state, columns):
     singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
 
 
-# pylint: disable=too-many-arguments
+
 def do_sync_historical_binlog(mysql_conn, catalog_entry, state, columns, use_gtid: bool, engine: str):
     binlog.verify_binlog_config(mysql_conn)
 

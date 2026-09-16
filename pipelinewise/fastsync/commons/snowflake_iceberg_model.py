@@ -1,6 +1,6 @@
 """Data models and durable state for Snowflake-managed Iceberg publication."""
 
-# pylint: disable=too-many-lines
+
 
 from __future__ import annotations
 
@@ -557,7 +557,7 @@ class PublicationPlan:
 
 
 @dataclass
-class IcebergPublicationAttempt:  # pylint: disable=too-many-instance-attributes
+class IcebergPublicationAttempt:
     """Credential-free durable state for one table publication."""
 
     load_id: str
@@ -568,7 +568,7 @@ class IcebergPublicationAttempt:  # pylint: disable=too-many-instance-attributes
     intended_state: Optional[Dict[str, Any]]
     staging_table: str
     method: Optional[str]
-    pre_publication_target_fingerprint: str  # pylint: disable=invalid-name
+    pre_publication_target_fingerprint: str
     target_table_format: str
     iceberg_version: int
     phase: str = PHASE_PREPARED
@@ -592,7 +592,7 @@ class IcebergPublicationAttempt:  # pylint: disable=too-many-instance-attributes
         self.context = self._manifest_payload.as_context()
 
     @classmethod
-    # pylint: disable=too-many-arguments,too-many-positional-arguments
+
     def new(
         cls,
         kind: str,
@@ -600,7 +600,7 @@ class IcebergPublicationAttempt:  # pylint: disable=too-many-instance-attributes
         source_bookmark: Optional[Dict[str, Any]],
         staging_table: str,
         method: Optional[str],
-        pre_publication_target_fingerprint: str,  # pylint: disable=invalid-name
+        pre_publication_target_fingerprint: str,
         recovery_identity: Dict[str, Any],
         target_table_format: str,
         iceberg_version: int,
@@ -992,7 +992,7 @@ class IcebergRecoveryStore:
         if attempt_id is not None and current.attempt_id != attempt_id:
             raise RecoveryManifestError('Iceberg recovery attempt changed before cleanup')
         os.remove(self.path)
-        utils._fsync_directory(os.path.dirname(self.path))  # pylint: disable=protected-access
+        utils._fsync_directory(os.path.dirname(self.path))
 
     def delete_locked(self, attempt_id: Optional[str] = None) -> None:
         """Delete while a recovery coordinator owns the target lifecycle lock."""
@@ -1045,7 +1045,7 @@ class IcebergRecoveryStore:
                     'Iceberg FastSync target attempt changed before cleanup'
                 )
             os.remove(pointer_path)
-            utils._fsync_directory(os.path.dirname(pointer_path))  # pylint: disable=protected-access
+            utils._fsync_directory(os.path.dirname(pointer_path))
 
 
 @dataclass(frozen=True)

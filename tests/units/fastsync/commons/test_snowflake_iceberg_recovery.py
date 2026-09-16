@@ -1,6 +1,6 @@
 """Tests for Snowflake Iceberg durable recovery state."""
 
-# pylint: disable=too-many-lines
+
 
 import json
 import os
@@ -919,7 +919,7 @@ class TestStagingRecovery:
     def test_sigkill_equivalent_upload_keeps_all_planned_keys_for_restart_cleanup(self, tmp_path, spec):
         """Sigkill equivalent upload keeps all planned keys for restart cleanup."""
         snowflake = MagicMock()
-        snowflake._get_s3_key.side_effect = (  # pylint: disable=protected-access
+        snowflake._get_s3_key.side_effect = (
             lambda file_part: f"loads/{os.path.basename(file_part)}"
         )
         publisher = SnowflakeIcebergPublisher(snowflake, str(tmp_path))

@@ -251,15 +251,11 @@ Full list of options in `config.json`:
   pytest tests/integration
 ```
 
-### To run pylint:
+### To run Ruff:
 
 1. Install python dependencies and run python linter
 ```
-  python3 -m venv venv
-  . venv/bin/activate
-  pip install --upgrade pip
-  pip install .[test]
-  pylint target_snowflake
+  make venv lint
 ```
 
 ## License

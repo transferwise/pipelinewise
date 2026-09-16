@@ -12,7 +12,7 @@ from .transform_utils import SQLFlavor, TransformationHelper
 LOGGER = logging.getLogger(__name__)
 
 
-# pylint: disable=missing-function-docstring,too-many-arguments
+
 class FastSyncTargetPostgres:
     """
     Common functions for fastsync to Postgres
@@ -161,7 +161,7 @@ class FastSyncTargetPostgres:
 
     # grant_... functions are common functions called by utils.py: grant_privilege function
     # "to_group" is not used here but exists for compatibility reasons with other database types
-    # pylint: disable=unused-argument
+
     def grant_select_on_table(
         self, target_schema, table_name, role, is_temporary, to_group=False
     ):
@@ -178,14 +178,14 @@ class FastSyncTargetPostgres:
             )
             self.query(sql)
 
-    # pylint: disable=unused-argument
+
     def grant_usage_on_schema(self, target_schema, role, to_group=False):
         # Grant role is not mandatory parameter, do nothing if not specified
         if role:
             sql = 'GRANT USAGE ON SCHEMA {} TO GROUP {}'.format(target_schema, role)
             self.query(sql)
 
-    # pylint: disable=unused-argument
+
     def grant_select_on_schema(self, target_schema, role, to_group=False):
         # Grant role is not mandatory parameter, do nothing if not specified
         if role:

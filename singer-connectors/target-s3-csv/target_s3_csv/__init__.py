@@ -28,7 +28,7 @@ def emit_state(state):
         sys.stdout.flush()
 
 
-# pylint: disable=too-many-locals,too-many-branches,too-many-statements
+
 def persist_messages(messages, config, s3_client):
     state = None
     schemas = {}

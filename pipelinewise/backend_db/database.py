@@ -119,8 +119,8 @@ class BackendDatabase:
         try:
             # Imported lazily so the stderr handler is detached before Alembic's
             # import-time plugin registration emits INFO logs.
-            from alembic import command  # pylint: disable=import-outside-toplevel
-            from alembic.config import Config  # pylint: disable=import-outside-toplevel
+            from alembic import command
+            from alembic.config import Config
 
             migrations_dir = os.path.join(os.path.dirname(__file__), "migrations")
             alembic_cfg = Config(os.path.join(migrations_dir, "alembic.ini"))

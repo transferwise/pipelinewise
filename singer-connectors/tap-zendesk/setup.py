@@ -21,7 +21,7 @@ setup(name='pipelinewise-tap-zendesk',
       extras_require={
           'test': [
               'ipdb',
-              'pylint',
+              'ruff==0.16.1',
               'nose',
               'nose-watch',
           ]

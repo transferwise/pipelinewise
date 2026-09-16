@@ -16,7 +16,7 @@ LARGE_VARCHAR_LENGTH = 16_777_217
 class TestIcebergV3MariaDBToSnowflake(TapMariaDB):
     """Exercise MariaDB Singer, FullSync, and PartialSync into Iceberg."""
 
-    # pylint: disable=arguments-differ
+
     def setUp(self):
         super().setUp(tap_id=TAP_ID, target_id=TARGET_ID)
         self.source_db = self.e2e_env.get_conn_env_var('TAP_MYSQL', 'DB')

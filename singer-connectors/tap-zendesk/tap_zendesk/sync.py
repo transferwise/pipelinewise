@@ -1,4 +1,4 @@
-# pylint: disable=invalid-name,missing-function-docstring,missing-class-docstring
+
 import json
 from zenpy.lib.api_objects import BaseObject
 from zenpy.lib.proxy import ProxyList
@@ -49,7 +49,7 @@ def sync_stream(state, start_date, instance):
         return counter.value
 
 class ZendeskEncoder(json.JSONEncoder):
-    def default(self, obj): # pylint: disable=arguments-differ,method-hidden
+    def default(self, obj):
         if isinstance(obj, BaseObject):
             obj_dict = obj.to_dict()
             for k, v in list(obj_dict.items()):

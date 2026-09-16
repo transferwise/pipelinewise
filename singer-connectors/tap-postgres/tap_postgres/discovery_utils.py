@@ -184,7 +184,7 @@ def discover_columns(connection, table_info):
     return entries
 
 
-# pylint: disable=too-many-return-statements,too-many-branches,too-many-statements
+
 def schema_for_column_datatype(col):
     """
     Build json schema for columns with non-array datatype
@@ -350,7 +350,7 @@ def schema_for_column(col_info):
     return column_schema
 
 
-# pylint: disable=invalid-name,missing-function-docstring
+
 def nullable_columns(col_types, pk):
     if pk:
         return col_types

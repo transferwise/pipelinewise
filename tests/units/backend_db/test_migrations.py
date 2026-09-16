@@ -2,7 +2,7 @@ import importlib
 from unittest.mock import patch
 
 
-# pylint: disable=missing-function-docstring
+
 
 
 MIGRATION = importlib.import_module(

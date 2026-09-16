@@ -9,7 +9,7 @@ from tests.end_to_end.target_snowflake.tap_mariadb import (
 class TestReplicateMariaDBToSFSoftDelete(TapMariaDB):
     """Replicate MariaDB deletions to Snowflake as soft deletes."""
 
-    # pylint: disable=arguments-differ
+
     def setUp(self):
         super().setUp(tap_id='mariadb_to_sf_soft_delete', target_id='snowflake')
 

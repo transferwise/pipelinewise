@@ -117,7 +117,7 @@ class ColumnTypeCompatibility:
 
 
 @dataclass(frozen=True)
-class ManagedIcebergContract:  # pylint: disable=too-many-instance-attributes
+class ManagedIcebergContract:
     """One complete target-snowflake implementation of a managed version."""
 
     version: int

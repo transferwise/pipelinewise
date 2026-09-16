@@ -14,7 +14,7 @@ class TestReplicateMariaDBReplicaToSF(TapMariaDB):
     Test Replicate data from MariaDB to Snowflake
     """
 
-    # pylint: disable=arguments-differ
+
     def setUp(self):
         super().setUp(tap_id=TAP_ID, target_id=TARGET_ID)
 

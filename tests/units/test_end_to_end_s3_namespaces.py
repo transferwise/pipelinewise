@@ -25,7 +25,7 @@ class EndToEndS3NamespaceTestCase(TestCase):
         with mock.patch.object(env_module, 'load_dotenv'), mock.patch.object(
             E2EEnv, '_is_env_connector_configured', return_value=True
         ), mock.patch.dict(env_module.os.environ, environment, clear=True):
-            e2e._load_env()  # pylint: disable=protected-access
+            e2e._load_env()
         return e2e
 
     def test_keeps_default_s3_paths_without_an_e2e_namespace(self):

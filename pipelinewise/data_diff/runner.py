@@ -127,7 +127,7 @@ def execute_started_run(
         )
 
 
-# pylint: disable=too-many-arguments,too-many-locals
+
 def _execute_and_persist(
     backend,
     connection_config_loader: ConnectionConfigLoader,
@@ -262,7 +262,7 @@ def _finish_failed_run(backend, check: dict, run: dict, preflight_id, error: str
     )
 
 
-# pylint: disable=too-many-locals
+
 def run_due_checks(
     backend,
     connection_config_loader: ConnectionConfigLoader,
@@ -294,7 +294,7 @@ def run_due_checks(
         latest = backend.latest_scheduled_for(check["check_id"])
         try:
             slots = due_slots(check, now, latest)
-        except Exception as exc:  # pylint: disable=broad-except
+        except Exception as exc:
             # No run row exists yet, so this cannot be recorded against one. Report
             # and continue: one broken definition must not stop the other checks.
             LOGGER.error(

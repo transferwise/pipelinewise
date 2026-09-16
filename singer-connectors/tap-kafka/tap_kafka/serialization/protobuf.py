@@ -13,7 +13,7 @@ from google.protobuf.json_format import MessageToJson
 from tap_kafka.errors import ProtobufCompilerException
 
 
-# pylint: disable=R0903
+
 class ProtobufDictDeserializer(ProtobufDeserializer):
     """
     Deserializes a Python dict object from protobuf
@@ -28,7 +28,7 @@ def topic_name_to_protoc_output_name(topic: str) -> str:
     """Convert topic name to the file name that protoc is generating"""
     return topic.replace('-', '_').replace('.', '_')
 
-# pylint: disable=R0914
+
 def proto_to_message_type(schema: str, protobuf_classes_dir: str, topic: str):
     """Compile a protobuf schema to python class and load it dynamically"""
     mod_name = f"proto_message_{topic_name_to_protoc_output_name(topic)}"

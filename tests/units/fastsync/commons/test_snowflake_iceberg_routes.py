@@ -17,7 +17,7 @@ from pipelinewise.fastsync.commons.snowflake_iceberg import (
     TableFormatDiscoveryError,
 )
 
-# pylint: disable=missing-function-docstring,invalid-name
+
 
 
 @pytest.mark.parametrize(

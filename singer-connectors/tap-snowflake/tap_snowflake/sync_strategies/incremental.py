@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# pylint: disable=duplicate-code
+
 
 import pendulum
 import singer
@@ -60,7 +60,7 @@ def sync_table(snowflake_conn, catalog_entry, state, columns):
                 if catalog_entry.schema.properties[replication_key_metadata].format == 'date-time':
                     replication_key_value = pendulum.parse(replication_key_value)
 
-                # pylint: disable=duplicate-string-formatting-argument
+
                 select_sql += ' WHERE "{}" >= \'{}\' ORDER BY "{}" ASC'.format(
                     replication_key_metadata,
                     replication_key_value,

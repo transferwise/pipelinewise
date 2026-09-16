@@ -27,7 +27,7 @@ class TestReplicatePGToSF(TapPostgres):
     Resync tables from Postgres to Snowflake using splitting large files option.
     """
 
-    # pylint: disable=arguments-differ
+
     def setUp(self):
         super().setUp(tap_id=TAP_ID, target_id=TARGET_ID)
 

@@ -4,8 +4,11 @@ Read root `AGENTS.md` and relevant implementation, test, E2E, and docs guides.
 
 ## Environments and CI
 
-These are vendored sources, not submodules, and root lint/unit gates exclude
-them. Prefer the ready `pipelinewise` container; report host fallbacks.
+These are vendored sources, not submodules. The root Ruff gate checks connector
+source packages plus the tap-mysql, tap-postgres, and target-snowflake suites run
+by connector CI. Unexecuted legacy connector tests and spikes remain excluded;
+root unit tests exclude connectors. Prefer the ready `pipelinewise` container;
+report host fallbacks.
 
 Connector CI installs all connectors and runs Python 3.12 units for tap-mysql
 (`make unit_test_cov`, 47%), tap-postgres (`make unit_test_cov`, 58%), and
@@ -18,15 +21,20 @@ PipelineWise, runtime-connector, connector-test, host, or container interpreters
 
 ## Validation
 
-The owning Makefile is authoritative. Run available environment, Pylint, unit,
-integration, and coverage targets without lowering thresholds; integration may
-need containers or credentials.
+Ruff is the only supported connector linter. Where present, the owning
+Makefile's `lint` target runs the connector environment's Ruff binary from the
+repository root so the root `pyproject.toml` applies. The tap-mysql,
+tap-postgres, and target-snowflake targets lint source, their GitHub-tested unit
+suites, and shared unit helpers; other connector targets lint source only. Unit
+and integration targets remain the behavioral validation. Do not add
+connector-local lint configuration, another Python linter, or an automatic
+formatter. New or modified connector Python must remain within the root Ruff
+scope.
 
-Legacy connector Pylint configurations may not be green with the installed
-Pylint. Preserve or improve the master score and finding set, and report the
-baseline configuration errors and findings rather than claiming the gate passed.
+Run available environment, lint, unit, integration, and coverage targets
+without lowering thresholds; integration may need containers or credentials.
 
-- Most use `venv`, `pylint`, `unit_test`, and `integration_test`; inspect the
+- Most use `venv`, `lint`, `unit_test`, and `integration_test`; inspect the
   Makefile for variants.
 - PostgreSQL also requires `integration_test_cov` >=63 and `total_cov` >=85;
   MySQL uses Pytest for unit and integration tests.

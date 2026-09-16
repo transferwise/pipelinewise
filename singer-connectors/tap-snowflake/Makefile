@@ -4,13 +4,8 @@ venv:
 	pip install --upgrade pip setuptools wheel ;\
 	pip install -e .[test]
 
-format:
-	. ./venv/bin/activate ;\
-	find tap_snowflake tests -type f -name '*.py' | xargs unify --check-only
-
-pylint:
-	. ./venv/bin/activate ;\
-	pylint --rcfile pylintrc tap_snowflake/
+lint:
+	cd ../.. && singer-connectors/tap-snowflake/venv/bin/ruff check singer-connectors/tap-snowflake/tap_snowflake/
 
 unit_test:
 	. ./venv/bin/activate ;\

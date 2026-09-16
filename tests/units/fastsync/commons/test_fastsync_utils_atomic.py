@@ -25,13 +25,13 @@ def test_s3_key_error_precedence(
 ):
     """A missing key remains more important than an earlier duplicate."""
     snowflake = mock.MagicMock()
-    snowflake._get_s3_key.side_effect = resolved_keys  # pylint: disable=protected-access
+    snowflake._get_s3_key.side_effect = resolved_keys
     file_parts = [f'part-{index}' for index in range(len(resolved_keys))]
 
     with pytest.raises(ValueError, match=message):
         utils.get_expected_s3_keys(snowflake, file_parts)
 
-    assert snowflake._get_s3_key.call_args_list == [  # pylint: disable=protected-access
+    assert snowflake._get_s3_key.call_args_list == [
         mock.call(file_part) for file_part in file_parts
     ]
 

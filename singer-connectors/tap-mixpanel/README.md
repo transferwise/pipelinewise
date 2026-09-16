@@ -207,14 +207,9 @@ More details may be found in the [Mixpanel API Authentication](https://developer
 
 6. Test the Tap
     
-    While developing the mixpanel tap, the following utilities were run in accordance with Singer.io best practices:
-    Pylint to improve [code quality](https://github.com/singer-io/getting-started/blob/master/docs/BEST_PRACTICES.md#code-quality):
+    Run Ruff to check code quality:
     ```bash
-    > pylint tap_mixpanel -d missing-docstring -d logging-format-interpolation -d too-many-locals -d too-many-arguments
-    ```
-    Pylint test resulted in the following score:
-    ```bash
-    Your code has been rated at 9.67/10
+    > make venv lint
     ```
 
     To [check the tap](https://github.com/singer-io/singer-tools#singer-check-tap) and verify working:

@@ -15,7 +15,7 @@ TEST_PROJECT_DIR = f'{os.getcwd()}/{TEST_PROJECT_NAME}'
 PROFILING_DIR = './profiling'
 
 
-# pylint: disable=attribute-defined-outside-init,fixme
+
 class TestCli2:
     """
     Continuation of pipelinewise unit tests

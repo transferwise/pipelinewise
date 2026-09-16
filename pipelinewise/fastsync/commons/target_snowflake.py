@@ -20,13 +20,13 @@ LOGGER = logging.getLogger(__name__)
 logging.getLogger('snowflake.connector').setLevel(logging.WARNING)
 
 
-# pylint: disable=missing-function-docstring,too-many-arguments
-class FastSyncTargetSnowflake(SnowflakeSqlClient):  # pylint: disable=too-many-public-methods
+
+class FastSyncTargetSnowflake(SnowflakeSqlClient):
     """
     Common functions for fastsync to Snowflake
     """
 
-    # pylint: disable=invalid-name
+
     def __init__(self, connection_config, transformation_config=None):
         super().__init__(connection_config)
         self.transformation_config = transformation_config
@@ -240,7 +240,7 @@ class FastSyncTargetSnowflake(SnowflakeSqlClient):  # pylint: disable=too-many-p
                     exc,
                 )
 
-    # pylint: disable=too-many-positional-arguments
+
     def create_table(
         self,
         target_schema: str,
@@ -362,7 +362,7 @@ class FastSyncTargetSnowflake(SnowflakeSqlClient):  # pylint: disable=too-many-p
         """
         return f'"{schema.upper()}"."{table.upper()}"'
 
-    # pylint: disable=too-many-locals
+
     def copy_to_table(
         self,
         s3_key,
@@ -417,7 +417,7 @@ class FastSyncTargetSnowflake(SnowflakeSqlClient):  # pylint: disable=too-many-p
 
     # grant_... functions are common functions called by utils.py: grant_privilege function
     # "to_group" is not used here but exists for compatibility reasons with other database types
-    # pylint: disable=unused-argument
+
     def grant_select_on_table(
         self, target_schema, table_name, role, is_temporary, to_group=False
     ):
@@ -436,14 +436,14 @@ class FastSyncTargetSnowflake(SnowflakeSqlClient):  # pylint: disable=too-many-p
                 sql, query_tag_props={'schema': target_schema, 'table': table_name}
             )
 
-    # pylint: disable=unused-argument
+
     def grant_usage_on_schema(self, target_schema, role, to_group=False):
         # Grant role is not mandatory parameter, do nothing if not specified
         if role:
             sql = 'GRANT USAGE ON SCHEMA {} TO ROLE {}'.format(target_schema, role)
             self.query(sql, query_tag_props={'schema': target_schema})
 
-    # pylint: disable=unused-argument
+
     def grant_select_on_schema(self, target_schema, role, to_group=False):
         # Grant role is not mandatory parameter, do nothing if not specified
         if role:

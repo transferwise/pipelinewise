@@ -1,5 +1,4 @@
 import psycopg2
-import singer
 import os
 import decimal
 import math

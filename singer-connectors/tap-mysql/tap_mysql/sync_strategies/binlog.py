@@ -1,4 +1,4 @@
-# pylint: disable=missing-function-docstring,too-many-arguments,too-many-branches
+
 import codecs
 import copy
 import datetime
@@ -218,7 +218,7 @@ def json_bytes_to_string(data):
     return data
 
 
-# pylint: disable=too-many-locals
+
 def row_to_singer_record(catalog_entry, version, db_column_map, row, time_extracted):
     row_to_persist = {}
     for column_name, val in row.items():
@@ -627,7 +627,7 @@ def __get_diff_in_columns_list(
     return set(binlog_columns_filtered).difference(schema_properties)
 
 
-# pylint: disable=R1702,R0915
+
 def _run_binlog_sync(
         mysql_conn: MySQLConnection,
         reader: BinLogStreamReader,

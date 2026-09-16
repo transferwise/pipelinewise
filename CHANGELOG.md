@@ -7,6 +7,25 @@ Unversioned
   across branch protection, workflow outputs, and contract tests, allowing
   future test rebalancing without further required-check renames
 
+**Developer tooling**
+
+- Consolidate Python linting on Ruff for PipelineWise, data-diff, all root tests
+  including E2E, vendored connector source, and the tap-mysql, tap-postgres, and
+  target-snowflake suites run by connector CI, replacing Pylint, Flake8, YAPF,
+  and Unify. Retain 120-character line, warning, docstring-quote, and complexity
+  checks plus Ruff's Pylint-category error rules. Pylint convention, refactor,
+  and warning families are intentionally not enabled wholesale because they
+  expose broad legacy debt; connector-wide legacy rule exclusions and explicit
+  exclusions for unexecuted connector tests keep the first pass focused on
+  syntax and actionable errors instead of unrelated cleanup
+- Run the lint and unit workflow for changes to Ruff policy, its pre-commit
+  hook, or the workflow itself, even when no application Python changed
+- Remove obsolete inline directives for retired linters, replace avoidable
+  invalid-escape exceptions with equivalent valid string literals, and guard
+  against reintroducing non-Ruff directives
+- Set tap-kafka's unit, integration, and combined coverage threshold to 59%,
+  matching its current rounded baseline
+
 0.86.0 (2026-09-16)
 -------------------
 

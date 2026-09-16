@@ -11,7 +11,7 @@ from collections.abc import MutableMapping
 from singer import get_logger
 
 
-# pylint: disable=missing-function-docstring,missing-class-docstring
+
 def validate_config(config):
     errors = []
     required_config_keys = [
@@ -36,7 +36,7 @@ def validate_config(config):
     return errors
 
 
-# pylint: disable=fixme
+
 def column_type(schema_property):
     property_type = schema_property['type']
     property_format = schema_property['format'] if 'format' in schema_property else None
@@ -97,7 +97,7 @@ def flatten_key(k, parent_key, sep):
     return sep.join(inflected_key)
 
 
-# pylint: disable=dangerous-default-value,invalid-name
+
 def flatten_schema(d, parent_key=[], sep='__', level=0, max_level=0):
     items = []
 
@@ -132,7 +132,7 @@ def flatten_schema(d, parent_key=[], sep='__', level=0, max_level=0):
     return dict(sorted_items)
 
 
-# pylint: disable=redefined-outer-name
+
 def _should_json_dump_value(key, value, flatten_schema=None):
     if isinstance(value, (dict, list)):
         return True
@@ -144,7 +144,7 @@ def _should_json_dump_value(key, value, flatten_schema=None):
     return False
 
 
-# pylint: disable-msg=too-many-arguments
+
 def flatten_record(d, flatten_schema=None, parent_key=[], sep='__', level=0, max_level=0):
     items = []
     for k, v in d.items():
@@ -183,7 +183,7 @@ def stream_name_to_dict(stream_name, separator='-'):
     }
 
 
-# pylint: disable=too-many-public-methods,too-many-instance-attributes
+
 class DbSync:
     def __init__(self, connection_config, stream_schema_message=None):
         """
@@ -386,7 +386,7 @@ class DbSync:
                                  self.table_name(stream, False),
                                  json.dumps({'inserts': inserts, 'updates': updates, 'size_bytes': size_bytes}))
 
-    # pylint: disable=duplicate-string-formatting-argument
+
     def insert_from_temp_table(self, temp_table):
         stream_schema_message = self.stream_schema_message
         columns = self.column_names()

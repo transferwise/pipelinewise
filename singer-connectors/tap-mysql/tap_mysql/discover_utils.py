@@ -1,4 +1,4 @@
-# pylint: disable=missing-docstring,too-many-locals
+
 
 import collections
 import itertools
@@ -274,7 +274,7 @@ def discover_catalog(
     return Catalog(entries)
 
 
-def schema_for_column(column):  # pylint: disable=too-many-branches
+def schema_for_column(column):
     """Returns the Schema object for the given Column."""
 
     data_type = column.data_type.lower()

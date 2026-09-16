@@ -216,7 +216,7 @@ class TestPublication:
             RecoveryManifestError,
             match='Published Iceberg target does not satisfy',
         ):
-            publisher._verify_published(  # pylint: disable=protected-access
+            publisher._verify_published(
                 attempt,
                 spec,
             )
@@ -237,7 +237,7 @@ class TestPublication:
         attempt.expected_row_fingerprint = "staged-hash"
 
         with pytest.raises(RecoveryManifestError, match="contents"):
-            publisher._verify_published(attempt, spec)  # pylint: disable=protected-access
+            publisher._verify_published(attempt, spec)
 
     def test_published_contents_reject_equal_count_with_wrong_fingerprint(self, tmp_path, spec):
         """Equal row counts cannot hide a different published row set."""
@@ -249,7 +249,7 @@ class TestPublication:
         attempt.expected_row_fingerprint = "staged-hash"
 
         with pytest.raises(RecoveryManifestError, match="contents do not match"):
-            publisher._verify_published(attempt, spec)  # pylint: disable=protected-access
+            publisher._verify_published(attempt, spec)
 
         assert len(snowflake.queries) == 1
 
@@ -272,7 +272,7 @@ class TestPublication:
         attempt.expected_row_count = 7
         attempt.expected_row_fingerprint = "staged-hash"
 
-        publisher._verify_published(attempt, spec)  # pylint: disable=protected-access
+        publisher._verify_published(attempt, spec)
 
         assert 'WHERE "ID" >= \'2\' AND "ID" <= \'8\'' in snowflake.queries[0][0]
 
@@ -589,7 +589,7 @@ class TestQueryHistoryRecovery:
             }
         )
         attempt.phase = PHASE_SUBMITTED
-        publisher._save_active_attempt(attempt)  # pylint: disable=protected-access
+        publisher._save_active_attempt(attempt)
 
         assert publisher.reconcile(attempt, spec).action == RECOVERY_FINALIZE
         assert snowflake.queries[0][1] == {

@@ -249,7 +249,7 @@ def rate_throttling(response):
 
     return False
 
-# pylint: disable=dangerous-default-value
+
 def authed_get(source, url, headers={}, do_rate_throttling=True, rate_limit_retry_count=0):
     with metrics.http_request_timer(source) as timer:
         session.headers.update(headers)
@@ -651,7 +651,7 @@ def get_all_projects(schemas, repo_path, state, mdata, start_date):
         bookmark_time = 0
 
     with metrics.record_counter('projects') as counter:
-        #pylint: disable=too-many-nested-blocks
+
         for response in authed_get_all_pages(
                 'projects',
                 'https://api.github.com/repos/{}/projects?sort=created_at&direction=desc'.format(repo_path),
@@ -1182,7 +1182,7 @@ def do_sync(config, state, catalog):
     state = translate_state(state, catalog, repositories)
     singer.write_state(state)
 
-    #pylint: disable=too-many-nested-blocks
+
     for repo in repositories:
         logger.info("Starting sync of repository: %s", repo)
         for stream in catalog['streams']:

@@ -20,7 +20,7 @@ from tests.end_to_end.target_snowflake.tap_postgres.test_partial_sync_pg_to_sf i
 )
 
 
-class EndToEndHelpersTestCase(TestCase):  # pylint: disable=too-many-public-methods
+class EndToEndHelpersTestCase(TestCase):
     """Tests for E2E control-flow helpers that do not require external services."""
 
     def setUp(self):
@@ -302,7 +302,7 @@ class EndToEndHelpersTestCase(TestCase):  # pylint: disable=too-many-public-meth
             with mock.patch.object(
                 assertions.Path, 'home', return_value=Path(temp_directory)
             ):
-                assertions._assert_partial_sync_state(  # pylint: disable=protected-access
+                assertions._assert_partial_sync_state(
                     self.tap_parameters,
                     end_value=10,
                     state_before=original_state,
@@ -314,7 +314,7 @@ class EndToEndHelpersTestCase(TestCase):  # pylint: disable=too-many-public-meth
                     {'bookmarks': {'public-table': {'lsn': 'changed'}}},
                 )
                 with self.assertRaises(AssertionError):
-                    assertions._assert_partial_sync_state(  # pylint: disable=protected-access
+                    assertions._assert_partial_sync_state(
                         self.tap_parameters,
                         end_value=10,
                         state_before=original_state,
@@ -613,7 +613,7 @@ class EndToEndHelpersTestCase(TestCase):  # pylint: disable=too-many-public-meth
             {'TARGET_SNOWFLAKE_SCHEMA_POSTFIX': '_configured'},
             clear=True,
         ):
-            env._load_env()  # pylint: disable=protected-access
+            env._load_env()
 
         self.assertEqual(env.sf_schema_postfix, '_configured')
         self.assertTrue(env.sf_schema_postfix_is_override)
@@ -630,7 +630,7 @@ class EndToEndHelpersTestCase(TestCase):  # pylint: disable=too-many-public-meth
         with mock.patch.object(env_module, 'load_dotenv'), mock.patch.object(
             E2EEnv, '_is_env_connector_configured', return_value=True
         ), mock.patch.dict(env_module.os.environ, {}, clear=True):
-            env._load_env()  # pylint: disable=protected-access
+            env._load_env()
 
         self.assertEqual(env.sf_schema_postfix, '_generated')
         self.assertFalse(env.sf_schema_postfix_is_override)
@@ -641,7 +641,7 @@ class EndToEndHelpersTestCase(TestCase):  # pylint: disable=too-many-public-meth
 
     def test_partial_sync_command_includes_each_boundary_once(self):
         """Render both boundaries exactly once, including a zero start value."""
-        command = assertions._get_command_for_partial_sync(  # pylint: disable=protected-access
+        command = assertions._get_command_for_partial_sync(
             self.tap_parameters,
             start_value=0,
             end_value=7,
@@ -655,7 +655,7 @@ class EndToEndHelpersTestCase(TestCase):  # pylint: disable=too-many-public-meth
 
     def test_partial_sync_command_omits_an_unspecified_end_boundary(self):
         """Do not render a synthetic end boundary when none was requested."""
-        command = assertions._get_command_for_partial_sync(  # pylint: disable=protected-access
+        command = assertions._get_command_for_partial_sync(
             self.tap_parameters,
             start_value=3,
         )
@@ -775,7 +775,7 @@ class EndToEndHelpersTestCase(TestCase):  # pylint: disable=too-many-public-meth
                         side_effect=PermissionError('cleanup failed'),
                     ):
                 with self.assertRaisesRegex(PermissionError, 'cleanup failed'):
-                    env._init_test_project_dir(temp_directory)  # pylint: disable=protected-access
+                    env._init_test_project_dir(temp_directory)
 
     def test_snowflake_setup_propagates_config_cleanup_failure(self):
         """Target setup must stop immediately when generated config cannot be cleaned."""

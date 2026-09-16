@@ -141,13 +141,9 @@ The tap will write bookmarks to stdout which can be captured and passed as an op
   make integration_test
 ```
 
-## To run pylint:
+## To run Ruff:
 
-1. Install python dependencies and run python linter
+Install the test dependencies and run Ruff:
 ```
-  python3 -m venv venv
-  . venv/bin/activate
-  pip install --upgrade pip
-  pip install -e .[test]
-  pylint tap_kafka -d C,W,unexpected-keyword-arg,duplicate-code
+  make lint
 ```

@@ -9,7 +9,7 @@ from pipelinewise.cli.config import Config
 from pipelinewise.cli.errors import InvalidConfigException
 
 
-# pylint: disable=missing-function-docstring,invalid-name
+
 
 
 def _config(tmp_path):

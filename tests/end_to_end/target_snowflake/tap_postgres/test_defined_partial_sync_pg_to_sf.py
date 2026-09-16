@@ -34,7 +34,7 @@ class TestDefinedPartialSyncPGToSF(TapPostgres):
     Defined Partial Sync from Postgres to Snowflake
     """
 
-    # pylint: disable=arguments-differ
+
     def setUp(self):
         super().setUp(tap_id=TAP_ID, target_id=TARGET_ID)
 
@@ -76,7 +76,7 @@ class TestDefinedPartialSyncPGToSF(TapPostgres):
             f'DELETE FROM ppw_e2e_tap_postgres{self.e2e_env.sf_schema_postfix}.customers '
             'WHERE id=15')
 
-    # pylint: disable=invalid-name
+
     def test_defined_partial_sync_pg_to_sf(self):
         """
         Testing defined partial syn from Postgres to Snowflake

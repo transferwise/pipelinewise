@@ -92,7 +92,7 @@ def _metadata_preflight(check: dict, column_pairs: list) -> dict:
     }
 
 
-# pylint: disable=too-many-arguments
+
 def build_metric_query(
     adapter: DatabaseAdapter,
     schema: str,
@@ -310,7 +310,7 @@ def _mysql_ssl_context(connection_config: dict):
     if not certificate or not private_key:
         raise DataDiffExecutionError("MySQL ssl_cert and ssl_key must be configured together")
 
-    temp_dir = tempfile.TemporaryDirectory(  # pylint: disable=consider-using-with
+    temp_dir = tempfile.TemporaryDirectory(
         prefix="pipelinewise-data-diff-tls-"
     )
     try:
@@ -347,7 +347,7 @@ def connect_target(check: dict, connection_config: dict) -> DatabaseAdapter:
             f"Unsupported target type: {check['target_type']}"
         )
 
-    import snowflake.connector  # pylint: disable=import-outside-toplevel
+    import snowflake.connector
 
     connect_args = {
         "user": connection_config["user"],
@@ -397,7 +397,7 @@ def _require_resolved(columns: dict, name: str, qualified_table: str) -> dict:
     return column
 
 
-# pylint: disable=too-many-branches,too-many-locals,too-many-statements
+
 def run_check(
     check: dict,
     source_config: dict,

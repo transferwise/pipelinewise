@@ -61,7 +61,7 @@ class TestPartialSyncMariaDBToSF(TapMariaDB):
     Test cases for Partial sync table from MariaDB to Snowflake
     """
 
-    # pylint: disable=arguments-differ
+
     def setUp(self):
         self.table = 'weight_unit'
         self.column = 'weight_unit_id'
@@ -302,7 +302,7 @@ class TestPartialSyncMariaDBToSFSoftDelete(TapMariaDB):
     Test cases for Partial sync table from MariaDB to Snowflake if set to soft delete
     """
 
-    # pylint: disable=arguments-differ
+
     def setUp(self):
         self.table = 'weight_unit'
         self.column = 'weight_unit_id'

@@ -267,7 +267,7 @@ def _validate_partial_sync_arguments(args):
             'You must specify a start value by using the argument --start_value')
 
 
-# pylint: disable=too-many-branches,too-many-statements
+
 def main():
     """Main entry point"""
     parser = argparse.ArgumentParser(

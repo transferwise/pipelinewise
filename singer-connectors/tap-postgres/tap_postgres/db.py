@@ -31,7 +31,7 @@ def validate_server_version(connection):
         )
 
 
-# pylint: disable=invalid-name,missing-function-docstring
+
 def calculate_destination_stream_name(stream, md_map):
     return f"{md_map.get((), {}).get('schema-name')}-{stream['stream']}"
 
@@ -113,7 +113,7 @@ def filter_schemas_sql_clause(sql, filer_schemas):
     return sql + in_clause
 
 
-# pylint: disable=too-many-branches,too-many-nested-blocks,too-many-statements
+
 def selected_value_to_singer_value_impl(elem, sql_datatype):
     sql_datatype = sql_datatype.replace('[]', '')
     if elem is None:
@@ -201,7 +201,7 @@ def selected_value_to_singer_value(elem, sql_datatype):
     return selected_value_to_singer_value_impl(elem, sql_datatype)
 
 
-# pylint: disable=too-many-arguments
+
 def selected_row_to_singer_message(stream, row, version, columns, time_extracted, md_map):
     row_to_persist = ()
     for idx, elem in enumerate(row):

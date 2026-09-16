@@ -11,7 +11,7 @@ import backoff
 import boto3
 
 from botocore.exceptions import ClientError
-from singer_encodings.csv import get_row_iterator, SDC_EXTRA_COLUMN  # pylint:disable=no-name-in-module
+from singer_encodings.csv import get_row_iterator, SDC_EXTRA_COLUMN
 from singer import get_logger, utils
 from typing import Dict, Generator, Optional, Iterator, List
 
@@ -157,7 +157,7 @@ def sample_file(config: Dict, table_spec: Dict, s3_path: str, sample_rate: int) 
     """
     file_handle = get_file_handle(config, s3_path)
     # _raw_stream seems like the wrong way to access this..
-    iterator = get_row_iterator(file_handle._raw_stream, table_spec)  # pylint:disable=protected-access
+    iterator = get_row_iterator(file_handle._raw_stream, table_spec)
 
     current_row = 0
 
@@ -180,7 +180,7 @@ def sample_file(config: Dict, table_spec: Dict, s3_path: str, sample_rate: int) 
                 s3_path)
 
 
-# pylint: disable=too-many-arguments
+
 def sample_files(config: Dict, table_spec: Dict, s3_files: Generator,
                  sample_rate: int = 5, max_records: int = 1000, max_files: int = 5) -> Generator:
     """

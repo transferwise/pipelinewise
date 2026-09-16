@@ -1,4 +1,4 @@
-# pylint: disable=invalid-name,missing-function-docstring
+
 import os
 import json
 import singer
