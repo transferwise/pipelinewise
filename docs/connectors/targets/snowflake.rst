@@ -63,6 +63,9 @@ before loading. The settings above let it distinguish SQL ``NULL``, an empty
 string, actual line breaks and tabs, and literal backslash sequences. It rejects
 an incompatible format without writing rows.
 
+Validation resolves the configured file format in its database and schema,
+including quoted identifiers; it does not use a same-named format elsewhere.
+
 FastSync does not use this named object; it supplies its own inline CSV options.
 Changing the named format therefore affects Singer ``target-snowflake`` loads,
 not FastSync loads.

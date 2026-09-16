@@ -80,6 +80,9 @@ SQL `NULL`, empty strings, LF, CR, CRLF, tabs, CSV punctuation, Unicode, and
 literal backslash sequences as distinct values. An incompatible named CSV
 format is rejected before rows are written.
 
+Validation resolves the exact configured database, schema, and file-format
+name, including quoted identifiers, rather than a same-named format elsewhere.
+
 PipelineWise FastSync does not use this named object; its Snowflake loader
 supplies inline CSV options. This prerequisite applies to Singer
 `target-snowflake` loads.

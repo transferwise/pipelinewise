@@ -191,6 +191,16 @@ class TestCsv(unittest.TestCase):
         self.assertIn('C:\\\\data\\\\', csv_line)
         self.assertTrue(csv_line.endswith(',"",'))
 
+    def test_record_to_csv_line_preserves_all_c0_controls(self):
+        schema = {'value': {'type': ['null', 'string']}}
+        for code in range(32):
+            with self.subTest(code=f'0x{code:02x}'):
+                value = f'left{chr(code)}right'
+                csv_line = csv.record_to_csv_line({'value': value}, schema)
+
+                self.assertEqual(csv_line.encode('utf-8'), f'"{value}"'.encode('utf-8'))
+                self.assertEqual(_read_csv_row(csv_line), [value])
+
     def test_record_to_csv_line_preserves_serialized_mariadb_json_roots(self):
         mariadb_json_schema = {
             'type': ['null', 'object', 'array', 'string', 'number', 'boolean'],

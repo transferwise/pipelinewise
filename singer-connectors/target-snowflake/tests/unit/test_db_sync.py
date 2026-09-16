@@ -14,6 +14,7 @@ from target_snowflake.file_formats.csv import REQUIRED_FILE_FORMAT_OPTIONS
 
 def _csv_file_format_result():
     return [{
+        'name': 'DUMMY_FILE_FORMAT',
         'type': 'CSV',
         'format_options': json.dumps(REQUIRED_FILE_FORMAT_OPTIONS),
     }]
@@ -56,7 +57,7 @@ class TestDBSync(unittest.TestCase):
             'private_key': "dummy-key",
             'warehouse': "dummy-value",
             'default_target_schema': "dummy-value",
-            'file_format': "dummy-value"
+            'file_format': "dummy_file_format"
         }
 
         # Config validator returns a list of errors
@@ -239,7 +240,7 @@ class TestDBSync(unittest.TestCase):
             'private_key': "dummy-key",
             'warehouse': "dummy-value",
             'default_target_schema': "dummy-value",
-            'file_format': "dummy-value"
+            'file_format': "dummy_file_format"
         }
 
         # Using external stages should allow parallelism
@@ -270,7 +271,7 @@ class TestDBSync(unittest.TestCase):
             'private_key': "dummy-key",
             'warehouse': "dummy-value",
             'default_target_schema': "dummy-value",
-            'file_format': "dummy-value",
+            'file_format': "dummy_file_format",
             's3_bucket': 'dummy-bucket',
             'stage': 'dummy_schema.dummy_stage'
         }
@@ -312,7 +313,7 @@ class TestDBSync(unittest.TestCase):
             'private_key': "dummy-key",
             'warehouse': "dummy-value",
             'default_target_schema': "dummy-value",
-            'file_format': "dummy-value"
+            'file_format': "dummy_file_format"
         }
 
         stream_schema_message = {"stream": "public-table1",
@@ -369,7 +370,7 @@ class TestDBSync(unittest.TestCase):
             'private_key': 'dummy-key',
             'warehouse': 'dummy-value',
             'default_target_schema': 'dummy-value',
-            'file_format': 'dummy-value',
+            'file_format': 'dummy_file_format',
             'data_flattening_max_level': 1,
         }
         stream_schema_message = {
@@ -424,7 +425,7 @@ class TestDBSync(unittest.TestCase):
             'private_key': 'dummy-key',
             'warehouse': 'dummy-value',
             'default_target_schema': 'dummy-value',
-            'file_format': 'dummy-value',
+            'file_format': 'dummy_file_format',
         }
         stream_schema_message = {
             'stream': 'public-table1',
@@ -527,7 +528,7 @@ class TestDBSync(unittest.TestCase):
             'private_key': "dummy-key",
             'warehouse': "dummy-wh",
             'default_target_schema': "dummy-schema",
-            'file_format': "dummy-file-format"
+            'file_format': "dummy_file_format"
         }
 
         stream_schema_message = {"stream": "public-table1",
@@ -562,7 +563,7 @@ class TestDBSync(unittest.TestCase):
         dbsync.sync_table()
 
         query_patch.assert_has_calls([
-            call('SHOW FILE FORMATS LIKE \'dummy-file-format\''),
+            call('SHOW FILE FORMATS LIKE \'DUMMY_FILE_FORMAT\' IN SCHEMA'),
             call('SHOW TABLES IN SCHEMA "DUMMY-DB"."DUMMY-SCHEMA" STARTS WITH \'TABLE1\''),
             call('show primary keys in table dummy-db.dummy-schema."TABLE1";'),
             call(['alter table dummy-schema."TABLE1" alter column "ID" drop not null;'])
@@ -577,7 +578,7 @@ class TestDBSync(unittest.TestCase):
             'private_key': "dummy-key",
             'warehouse': "dummy-wh",
             'default_target_schema': "dummy-schema",
-            'file_format': "dummy-file-format"
+            'file_format': "dummy_file_format"
         }
 
         stream_schema_message = {"stream": "public-table1",
@@ -625,7 +626,7 @@ class TestDBSync(unittest.TestCase):
         calls = query_patch.call_args_list
         self.assertEqual(4, len(calls))
 
-        self.assertEqual('SHOW FILE FORMATS LIKE \'dummy-file-format\'', calls[0][0][0])
+        self.assertEqual('SHOW FILE FORMATS LIKE \'DUMMY_FILE_FORMAT\' IN SCHEMA', calls[0][0][0])
         self.assertEqual(
             'SHOW TABLES IN SCHEMA "DUMMY-DB"."DUMMY-SCHEMA" STARTS WITH \'TABLE1\'',
             calls[1][0][0],
@@ -653,7 +654,7 @@ class TestDBSync(unittest.TestCase):
             'private_key': "dummy-key",
             'warehouse': "dummy-wh",
             'default_target_schema': "dummy-schema",
-            'file_format': "dummy-file-format"
+            'file_format': "dummy_file_format"
         }
 
         stream_schema_message = {"stream": "public-table1",
@@ -688,7 +689,7 @@ class TestDBSync(unittest.TestCase):
         dbsync.sync_table()
 
         query_patch.assert_has_calls([
-            call('SHOW FILE FORMATS LIKE \'dummy-file-format\''),
+            call('SHOW FILE FORMATS LIKE \'DUMMY_FILE_FORMAT\' IN SCHEMA'),
             call('SHOW TABLES IN SCHEMA "DUMMY-DB"."DUMMY-SCHEMA" STARTS WITH \'TABLE1\''),
             call('show primary keys in table dummy-db.dummy-schema."TABLE1";'),
             call(['alter table dummy-schema."TABLE1" drop primary key;',
@@ -704,7 +705,7 @@ class TestDBSync(unittest.TestCase):
             'private_key': "dummy-key",
             'warehouse': "dummy-wh",
             'default_target_schema': "dummy-schema",
-            'file_format': "dummy-file-format"
+            'file_format': "dummy_file_format"
         }
 
         stream_schema_message = {"stream": "public-table1",
@@ -739,7 +740,7 @@ class TestDBSync(unittest.TestCase):
         dbsync.sync_table()
 
         query_patch.assert_has_calls([
-            call('SHOW FILE FORMATS LIKE \'dummy-file-format\''),
+            call('SHOW FILE FORMATS LIKE \'DUMMY_FILE_FORMAT\' IN SCHEMA'),
             call('SHOW TABLES IN SCHEMA "DUMMY-DB"."DUMMY-SCHEMA" STARTS WITH \'TABLE1\''),
             call('show primary keys in table dummy-db.dummy-schema."TABLE1";'),
             call(['alter table dummy-schema."TABLE1" add primary key("ID");',
@@ -863,7 +864,7 @@ class TestDBSync(unittest.TestCase):
             'private_key': 'dummy-key',
             'warehouse': 'dummy-wh',
             'default_target_schema': 'dummy-schema',
-            'file_format': 'dummy-file-format',
+            'file_format': 'dummy_file_format',
             'hard_delete': True,
         }
         config.update(overrides)
@@ -1194,7 +1195,7 @@ class TestDBSync(unittest.TestCase):
             'private_key': "dummy-key",
             'warehouse': "dummy-wh",
             'default_target_schema': "dummy-schema",
-            'file_format': "dummy-file-format"
+            'file_format': "dummy_file_format"
         }
         stream_schema_message = {
             "stream": "public-table1",
@@ -1225,7 +1226,7 @@ class TestDBSync(unittest.TestCase):
             'private_key': "dummy-key",
             'warehouse': "dummy-wh",
             'default_target_schema': "dummy-schema",
-            'file_format': "dummy-file-format"
+            'file_format': "dummy_file_format"
         }
         stream_schema_message = {
             "stream": "public-table1",

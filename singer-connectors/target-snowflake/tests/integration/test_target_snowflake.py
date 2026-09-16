@@ -486,7 +486,17 @@ class TestIntegration(unittest.TestCase):
             ])
 
     def test_loading_multiline_and_literal_escape_strings(self):
-        """COPY and MERGE keep control characters distinct from literal escapes."""
+        """COPY and MERGE preserve controls using the exact quoted file format."""
+        target_schema = self.config['default_target_schema']
+        format_components = (
+            self.config['dbname'].upper(), target_schema.upper(), 'multiline.format\'\\_%"quoted',
+        )
+        file_format = '.'.join('"' + part.replace('"', '""') + '"' for part in format_components)
+        self.snowflake.query(f'CREATE SCHEMA IF NOT EXISTS {target_schema}')
+        self.addCleanup(self.snowflake.query, f'DROP FILE FORMAT IF EXISTS {file_format}')
+        self.snowflake.query(f'CREATE FILE FORMAT {file_format} CLONE {self.config["file_format"]}')
+        self.config['file_format'] = file_format
+
         self.config['primary_key_required'] = False
         record = {
             'id': 1,
@@ -500,6 +510,8 @@ class TestIntegration(unittest.TestCase):
             'quoted_comma': 'say "hello", world',
             'unicode': '初雪',
             'trailing_backslash': 'C:\\data\\',
+            'c0_controls': ''.join(chr(code) for code in range(32)),
+            'literal_c0_escapes': ''.join(f'\\u{code:04x}' for code in range(32)),
             'empty_value': '',
             'null_value': None,
         }
@@ -532,10 +544,17 @@ class TestIntegration(unittest.TestCase):
         self.persist_lines_with_cache(singer_lines)
 
         target_schema = self.config.get('default_target_schema', '')
-        expected_rows = [{column.upper(): value for column, value in record.items()}]
+        selected_columns = ', '.join(
+            'ID' if column == 'id' else f'HEX_ENCODE("{column.upper()}") AS "{column.upper()}"'
+            for column in record
+        )
+        expected_rows = [{
+            column.upper(): value.encode('utf-8').hex().upper() if isinstance(value, str) else value
+            for column, value in record.items()
+        }]
         for table in ('multiline_merge', 'multiline_copy'):
             with self.subTest(table=table):
-                rows = self.snowflake.query(f'SELECT * FROM {target_schema}.{table}')
+                rows = self.snowflake.query(f'SELECT {selected_columns} FROM {target_schema}.{table}')
                 self.assertEqual(rows, expected_rows)
 
     def test_non_db_friendly_columns(self):

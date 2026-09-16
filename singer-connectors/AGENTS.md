@@ -36,6 +36,8 @@ baseline configuration errors and findings rather than claiming the gate passed.
   Jira, and Zendesk lack repository E2E.
 
 Report unavailable or skipped integration/E2E coverage as unverified.
+Use distinct ``COVERAGE_FILE`` paths for overlapping coverage runs; otherwise
+unit and integration results can combine and overstate an individual suite's coverage.
 
 ### Target-snowflake integration tests in dev-project
 

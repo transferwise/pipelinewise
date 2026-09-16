@@ -370,6 +370,8 @@ class TestManagedIcebergV3Integration(unittest.TestCase):
             'quoted_comma': 'say "hello", world',
             'unicode': '初雪',
             'trailing_backslash': 'C:\\data\\',
+            'c0_controls': ''.join(chr(code) for code in range(32)),
+            'literal_c0_escapes': ''.join(f'\\u{code:04x}' for code in range(32)),
             'empty_value': '',
             'null_value': None,
         }
@@ -404,12 +406,15 @@ class TestManagedIcebergV3Integration(unittest.TestCase):
             TABLE_FORMAT_MANAGED_ICEBERG_V3,
         )
         selected_columns = ', '.join(
-            self._quote_identifier(column.upper())
+            '"ID"' if column == 'id' else f'HEX_ENCODE("{column.upper()}") AS "{column.upper()}"'
             for column in record
         )
         self.assertEqual(
             self.snowflake.query(f'SELECT {selected_columns} FROM {table_fqtn}'),
-            [{column.upper(): value for column, value in record.items()}],
+            [{
+                column.upper(): value.encode('utf-8').hex().upper() if isinstance(value, str) else value
+                for column, value in record.items()
+            }],
         )
         script_column = self.snowflake.query(
             'SELECT "DATA_TYPE", "CHARACTER_MAXIMUM_LENGTH" '

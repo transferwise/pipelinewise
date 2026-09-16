@@ -251,6 +251,11 @@ to apply the new default to existing generated configs. Explicit YAML
 ``flush_all_streams: false`` remains an opt-out. Standalone target connectors
 retain their ``false`` default.
 
+Flushing all buffered streams loads sparse streams sooner and allows fresher
+cross-stream checkpoints, but smaller, more frequent loads can increase loading
+cost. With ``false``, only the flushed stream's bookmark advances; both modes
+wait for the corresponding loads to finish before acknowledging their state.
+
 .. important::
 
    Any tap whose Singer output is compatible with ``target-snowflake`` can
