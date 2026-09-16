@@ -7,6 +7,24 @@ from typing import Callable, Dict, Iterable, List, Optional
 from tempfile import mkstemp
 
 from target_snowflake import flattening
+from target_snowflake.managed_iceberg import sql_string_literal
+
+
+REQUIRED_FILE_FORMAT_OPTIONS = {
+    'TYPE': 'CSV',
+    'RECORD_DELIMITER': '\n',
+    'FIELD_DELIMITER': ',',
+    'SKIP_HEADER': 0,
+    'PARSE_HEADER': False,
+    'ESCAPE': '\\',
+    'TRIM_SPACE': False,
+    'FIELD_OPTIONALLY_ENCLOSED_BY': '"',
+    'NULL_IF': [],
+    'SKIP_BLANK_LINES': False,
+    'EMPTY_FIELD_AS_NULL': True,
+    'ENCODING': 'UTF8',
+    'MULTI_LINE': True,
+}
 
 
 def create_copy_sql(table_name: str,
@@ -19,7 +37,7 @@ def create_copy_sql(table_name: str,
 
     return f"COPY INTO {table_name} ({p_columns}) " \
            f"FROM '@{stage_name}/{s3_key}' " \
-           f"FILE_FORMAT = (format_name='{file_format_name}')"
+           f"FILE_FORMAT = (format_name={sql_string_literal(file_format_name)})"
 
 
 def create_merge_sql(table_name: str,
@@ -44,7 +62,7 @@ def create_merge_sql(table_name: str,
     return f"MERGE INTO {table_name} t USING (" \
            f"SELECT {p_source_columns} " \
            f"FROM '@{stage_name}/{s3_key}' " \
-           f"(FILE_FORMAT => '{file_format_name}')) s " \
+           f"(FILE_FORMAT => {sql_string_literal(file_format_name)})) s " \
            f"ON {pk_merge_condition} " \
            f"{p_update_clause}" \
            "WHEN NOT MATCHED THEN " \
@@ -67,15 +85,18 @@ def record_to_csv_line(record: dict,
         string of csv line
     """
     flatten_record = flattening.flatten_record(record, schema, max_level=data_flattening_max_level)
+    values = []
+    for column in schema:
+        value = flatten_record.get(column)
+        if value is None:
+            values.append('')
+        elif isinstance(value, str):
+            escaped_value = value.replace('\\', '\\\\').replace('"', '\\"')
+            values.append(f'"{escaped_value}"')
+        else:
+            values.append(json.dumps(value, ensure_ascii=False))
 
-    return ','.join(
-        [
-            json.dumps(flatten_record[column], ensure_ascii=False)
-            if column in flatten_record and flatten_record[column] is not None
-            else ''
-            for column in schema
-        ]
-    )
+    return ','.join(values)
 
 
 def write_records_to_file(outfile,

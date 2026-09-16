@@ -57,10 +57,43 @@ You need to create a few objects in snowflake in one schema before start using t
 1. Create a named file format. This will be used by the MERGE/COPY commands to parse the files correctly from S3. You can use CSV or Parquet file formats.
 
 To use CSV files:
-```
+
+```sql
 CREATE FILE FORMAT {database}.{schema}.{file_format_name}
-TYPE = 'CSV' ESCAPE='\\' FIELD_OPTIONALLY_ENCLOSED_BY='"';
+TYPE = 'CSV'
+RECORD_DELIMITER = '0x0A'
+FIELD_DELIMITER = '0x2C'
+ESCAPE = '0x5C'
+FIELD_OPTIONALLY_ENCLOSED_BY = '0x22'
+SKIP_HEADER = 0
+PARSE_HEADER = FALSE
+SKIP_BLANK_LINES = FALSE
+TRIM_SPACE = FALSE
+EMPTY_FIELD_AS_NULL = TRUE
+ENCODING = 'UTF8'
+MULTI_LINE = TRUE
+NULL_IF = ();
 ```
+
+The target validates these effective CSV options before loading. They preserve
+SQL `NULL`, empty strings, LF, CR, CRLF, tabs, CSV punctuation, Unicode, and
+literal backslash sequences as distinct values. An incompatible named CSV
+format is rejected before rows are written.
+
+Validation resolves the exact configured database, schema, and file-format
+name, including quoted identifiers, rather than a same-named format elsewhere.
+
+PipelineWise FastSync does not use this named object; its Snowflake loader
+supplies inline CSV options. This prerequisite applies to Singer
+`target-snowflake` loads.
+
+To migrate an existing CSV format, stop all loads sharing it and apply the
+required settings shown above before resuming. Deploy the updated target writer
+as well; changing the format alone does not fix older writers' text handling.
+
+The change applies only to later loads. Resync affected tables from their source
+if an earlier target version normalized or removed control characters; the
+original values cannot be reconstructed from Snowflake.
 
 To use Parquet files (experimental):
 
@@ -159,7 +192,7 @@ Full list of options in `config.json`:
 | file_format                         | String  | Yes        | Named file format name created at pre-requirements section. Has to be a fully qualified name including the schema name. |
 | batch_size_rows                     | Integer |            | (Default: 100000) Maximum number of rows in each batch. At the end of each batch, the rows in the batch are loaded into Snowflake. |
 | batch_wait_limit_seconds            | Integer |            | (Default: None) Maximum time to wait for batch to reach `batch_size_rows`. |
-| flush_all_streams                   | Boolean |            | (Default: False) Flush and load every stream into Snowflake when one batch is full. Warning: This may trigger the COPY command to use files with low number of records, and may cause performance problems. |
+| flush_all_streams                   | Boolean |            | (Standalone default: False; PipelineWise default: True) Flush and load every buffered stream into Snowflake when one batch is full. Set `false` to flush only that stream. Enabling this can produce smaller, more frequent COPY/MERGE loads and increase loading cost. |
 | parallelism                         | Integer |            | (Default: 0) The number of threads used to flush tables. 0 will create a thread for each stream, up to parallelism_max. -1 will create a thread for each CPU core. Any other positive number will create that number of threads, up to parallelism_max. |
 | parallelism_max                     | Integer |            | (Default: 16) Max number of parallel threads to use when flushing tables. |
 | default_target_schema               | String  |            | Name of the schema where the tables will be created, **without** database prefix. If `schema_mapping` is not defined then every stream sent by the tap is loaded into this schema.    |

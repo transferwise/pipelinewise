@@ -1,3 +1,39 @@
+0.86.0 (2026-09-16)
+-------------------
+
+**Breaking compatibility**
+
+- Require target-snowflake named CSV formats to use the required multiline-safe
+  options, including `NULL_IF = ()`, and reject incompatible formats before
+  loading
+- Default `flush_all_streams` to `true` in PipelineWise-generated Singer
+  configuration to load sparse streams sooner and advance cross-stream
+  checkpoints more frequently, potentially increasing loading cost; retain
+  explicit `false` overrides and re-run `import_config` to adopt the default
+  for existing taps
+
+**Fixes**
+
+- Preserve LF, CR, CRLF, tabs, CSV punctuation, three-byte Unicode, and literal
+  backslash sequences in MariaDB/MySQL FastSync exports while
+  continuing to remove NUL characters
+- Preserve actual control characters and literal backslash sequences in
+  target-snowflake Singer CSV string fields
+- Validate the exact configured Snowflake file format, respecting database and
+  schema qualifiers and quoted identifiers instead of checking a same-named
+  object in another schema
+- Preserve quoted Snowflake file-format names in COPY and MERGE SQL so loading
+  uses the same object as validation
+
+**Tests**
+
+- Verify PostgreSQL Snowflake FastSync and target-snowflake retain multiline
+  strings and literal escape sequences
+- Include native MariaDB, MySQL, and PostgreSQL multiline regression tests in
+  the Snowflake E2E shards, with exact-once coverage enforced by the CI contract
+- Verify exact C0 control-character bytes through native and managed-v3 Singer
+  loads and reject incompatible CSV formats before consuming Singer input
+
 0.85.1 (2026-09-12)
 -------------------
 

@@ -6,6 +6,7 @@ from typing import Dict, Iterable, List, Optional
 from tempfile import mkstemp
 
 from target_snowflake import flattening
+from target_snowflake.managed_iceberg import sql_string_literal
 
 
 def create_copy_sql(table_name: str,
@@ -20,7 +21,7 @@ def create_copy_sql(table_name: str,
 
     return f"COPY INTO {table_name} ({p_target_columns}) " \
            f"FROM (SELECT {p_source_columns} FROM '@{stage_name}/{s3_key}') " \
-           f"FILE_FORMAT = (format_name='{file_format_name}')"
+           f"FILE_FORMAT = (format_name={sql_string_literal(file_format_name)})"
 
 
 def create_merge_sql(table_name: str,
@@ -46,7 +47,7 @@ def create_merge_sql(table_name: str,
     return f"MERGE INTO {table_name} t USING (" \
            f"SELECT {p_source_columns} " \
            f"FROM '@{stage_name}/{s3_key}' " \
-           f"(FILE_FORMAT => '{file_format_name}')) s " \
+           f"(FILE_FORMAT => {sql_string_literal(file_format_name)})) s " \
            f"ON {pk_merge_condition} " \
            f"{p_update_clause}" \
            "WHEN NOT MATCHED THEN " \

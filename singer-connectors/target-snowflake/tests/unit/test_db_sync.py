@@ -9,6 +9,15 @@ from target_snowflake.exceptions import (
     TableFormatDiscoveryException,
     TableFormatMismatchException,
 )
+from target_snowflake.file_formats.csv import REQUIRED_FILE_FORMAT_OPTIONS
+
+
+def _csv_file_format_result():
+    return [{
+        'name': 'DUMMY_FILE_FORMAT',
+        'type': 'CSV',
+        'format_options': json.dumps(REQUIRED_FILE_FORMAT_OPTIONS),
+    }]
 
 
 class TestDBSync(unittest.TestCase):
@@ -48,7 +57,7 @@ class TestDBSync(unittest.TestCase):
             'private_key': "dummy-key",
             'warehouse': "dummy-value",
             'default_target_schema': "dummy-value",
-            'file_format': "dummy-value"
+            'file_format': "dummy_file_format"
         }
 
         # Config validator returns a list of errors
@@ -222,7 +231,7 @@ class TestDBSync(unittest.TestCase):
 
     @patch('target_snowflake.db_sync.DbSync.query')
     def test_parallelism(self, query_patch):
-        query_patch.return_value = [{'type': 'CSV'}]
+        query_patch.return_value = _csv_file_format_result()
 
         minimal_config = {
             'account': "dummy-value",
@@ -231,7 +240,7 @@ class TestDBSync(unittest.TestCase):
             'private_key': "dummy-key",
             'warehouse': "dummy-value",
             'default_target_schema': "dummy-value",
-            'file_format': "dummy-value"
+            'file_format': "dummy_file_format"
         }
 
         # Using external stages should allow parallelism
@@ -254,7 +263,7 @@ class TestDBSync(unittest.TestCase):
     @patch('target_snowflake.upload_clients.s3_upload_client.S3UploadClient.copy_object')
     @patch('target_snowflake.db_sync.DbSync.query')
     def test_copy_to_archive(self, query_patch, copy_object_patch):
-        query_patch.return_value = [{'type': 'CSV'}]
+        query_patch.return_value = _csv_file_format_result()
         minimal_config = {
             'account': "dummy-value",
             'dbname': "dummy-value",
@@ -262,7 +271,7 @@ class TestDBSync(unittest.TestCase):
             'private_key': "dummy-key",
             'warehouse': "dummy-value",
             'default_target_schema': "dummy-value",
-            'file_format': "dummy-value",
+            'file_format': "dummy_file_format",
             's3_bucket': 'dummy-bucket',
             'stage': 'dummy_schema.dummy_stage'
         }
@@ -296,7 +305,7 @@ class TestDBSync(unittest.TestCase):
 
     @patch('target_snowflake.db_sync.DbSync.query')
     def test_record_primary_key_string(self, query_patch):
-        query_patch.return_value = [{'type': 'CSV'}]
+        query_patch.return_value = _csv_file_format_result()
         minimal_config = {
             'account': "dummy-value",
             'dbname': "dummy-value",
@@ -304,7 +313,7 @@ class TestDBSync(unittest.TestCase):
             'private_key': "dummy-key",
             'warehouse': "dummy-value",
             'default_target_schema': "dummy-value",
-            'file_format': "dummy-value"
+            'file_format': "dummy_file_format"
         }
 
         stream_schema_message = {"stream": "public-table1",
@@ -353,7 +362,7 @@ class TestDBSync(unittest.TestCase):
 
     @patch('target_snowflake.db_sync.DbSync.query')
     def test_patch_record_mode_and_present_flattened_columns(self, query_patch):
-        query_patch.return_value = [{'type': 'CSV'}]
+        query_patch.return_value = _csv_file_format_result()
         minimal_config = {
             'account': 'dummy-value',
             'dbname': 'dummy-value',
@@ -361,7 +370,7 @@ class TestDBSync(unittest.TestCase):
             'private_key': 'dummy-key',
             'warehouse': 'dummy-value',
             'default_target_schema': 'dummy-value',
-            'file_format': 'dummy-value',
+            'file_format': 'dummy_file_format',
             'data_flattening_max_level': 1,
         }
         stream_schema_message = {
@@ -407,7 +416,7 @@ class TestDBSync(unittest.TestCase):
     @patch('target_snowflake.db_sync.DbSync.query')
     @patch('target_snowflake.db_sync.DbSync._load_file_merge')
     def test_load_file_restricts_patch_update_columns(self, load_file_merge_patch, query_patch):
-        query_patch.return_value = [{'type': 'CSV'}]
+        query_patch.return_value = _csv_file_format_result()
         load_file_merge_patch.return_value = (0, 1)
         minimal_config = {
             'account': 'dummy-value',
@@ -416,7 +425,7 @@ class TestDBSync(unittest.TestCase):
             'private_key': 'dummy-key',
             'warehouse': 'dummy-value',
             'default_target_schema': 'dummy-value',
-            'file_format': 'dummy-value',
+            'file_format': 'dummy_file_format',
         }
         stream_schema_message = {
             'stream': 'public-table1',
@@ -438,7 +447,7 @@ class TestDBSync(unittest.TestCase):
     @patch('target_snowflake.db_sync.DbSync._load_file_merge')
     def test_merge_failure_message(self, load_file_merge_patch, query_patch):
         LOGGER_NAME = "target_snowflake"
-        query_patch.return_value = [{'type': 'CSV'}]
+        query_patch.return_value = _csv_file_format_result()
         minimal_config = {
             'account': "dummy_account",
             'dbname': "dummy_dbname",
@@ -476,7 +485,7 @@ class TestDBSync(unittest.TestCase):
     @patch('target_snowflake.db_sync.DbSync._load_file_copy')
     def test_copy_failure_message(self, load_file_copy_patch, query_patch):
         LOGGER_NAME = "target_snowflake"
-        query_patch.return_value = [{'type': 'CSV'}]
+        query_patch.return_value = _csv_file_format_result()
         minimal_config = {
             'account': "dummy_account",
             'dbname': "dummy_dbname",
@@ -519,7 +528,7 @@ class TestDBSync(unittest.TestCase):
             'private_key': "dummy-key",
             'warehouse': "dummy-wh",
             'default_target_schema': "dummy-schema",
-            'file_format': "dummy-file-format"
+            'file_format': "dummy_file_format"
         }
 
         stream_schema_message = {"stream": "public-table1",
@@ -544,7 +553,7 @@ class TestDBSync(unittest.TestCase):
             }
         ]
         query_patch.side_effect = [
-            [{'type': 'CSV'}],           # SHOW FILE FORMATS
+            _csv_file_format_result(),           # SHOW FILE FORMATS
             [{'name': 'TABLE1', 'is_iceberg': 'N'}],
             [{'column_name': 'ID'}],     # show primary keys
             None                          # ALTER TABLE
@@ -554,7 +563,7 @@ class TestDBSync(unittest.TestCase):
         dbsync.sync_table()
 
         query_patch.assert_has_calls([
-            call('SHOW FILE FORMATS LIKE \'dummy-file-format\''),
+            call('SHOW FILE FORMATS LIKE \'DUMMY_FILE_FORMAT\' IN SCHEMA'),
             call('SHOW TABLES IN SCHEMA "DUMMY-DB"."DUMMY-SCHEMA" STARTS WITH \'TABLE1\''),
             call('show primary keys in table dummy-db.dummy-schema."TABLE1";'),
             call(['alter table dummy-schema."TABLE1" alter column "ID" drop not null;'])
@@ -569,7 +578,7 @@ class TestDBSync(unittest.TestCase):
             'private_key': "dummy-key",
             'warehouse': "dummy-wh",
             'default_target_schema': "dummy-schema",
-            'file_format': "dummy-file-format"
+            'file_format': "dummy_file_format"
         }
 
         stream_schema_message = {"stream": "public-table1",
@@ -603,7 +612,7 @@ class TestDBSync(unittest.TestCase):
             }
         ]
         query_patch.side_effect = [
-            [{'type': 'CSV'}],           # SHOW FILE FORMATS
+            _csv_file_format_result(),           # SHOW FILE FORMATS
             [{'name': 'TABLE1', 'is_iceberg': 'N'}],
             [{'column_name': 'ID'}],     # show primary keys
             None                          # ALTER TABLE
@@ -617,7 +626,7 @@ class TestDBSync(unittest.TestCase):
         calls = query_patch.call_args_list
         self.assertEqual(4, len(calls))
 
-        self.assertEqual('SHOW FILE FORMATS LIKE \'dummy-file-format\'', calls[0][0][0])
+        self.assertEqual('SHOW FILE FORMATS LIKE \'DUMMY_FILE_FORMAT\' IN SCHEMA', calls[0][0][0])
         self.assertEqual(
             'SHOW TABLES IN SCHEMA "DUMMY-DB"."DUMMY-SCHEMA" STARTS WITH \'TABLE1\'',
             calls[1][0][0],
@@ -645,7 +654,7 @@ class TestDBSync(unittest.TestCase):
             'private_key': "dummy-key",
             'warehouse': "dummy-wh",
             'default_target_schema': "dummy-schema",
-            'file_format': "dummy-file-format"
+            'file_format': "dummy_file_format"
         }
 
         stream_schema_message = {"stream": "public-table1",
@@ -670,7 +679,7 @@ class TestDBSync(unittest.TestCase):
             }
         ]
         query_patch.side_effect = [
-            [{'type': 'CSV'}],           # SHOW FILE FORMATS
+            _csv_file_format_result(),           # SHOW FILE FORMATS
             [{'name': 'TABLE1', 'is_iceberg': 'N'}],
             [{'column_name': 'ID'}],     # show primary keys
             None                          # ALTER TABLE
@@ -680,7 +689,7 @@ class TestDBSync(unittest.TestCase):
         dbsync.sync_table()
 
         query_patch.assert_has_calls([
-            call('SHOW FILE FORMATS LIKE \'dummy-file-format\''),
+            call('SHOW FILE FORMATS LIKE \'DUMMY_FILE_FORMAT\' IN SCHEMA'),
             call('SHOW TABLES IN SCHEMA "DUMMY-DB"."DUMMY-SCHEMA" STARTS WITH \'TABLE1\''),
             call('show primary keys in table dummy-db.dummy-schema."TABLE1";'),
             call(['alter table dummy-schema."TABLE1" drop primary key;',
@@ -696,7 +705,7 @@ class TestDBSync(unittest.TestCase):
             'private_key': "dummy-key",
             'warehouse': "dummy-wh",
             'default_target_schema': "dummy-schema",
-            'file_format': "dummy-file-format"
+            'file_format': "dummy_file_format"
         }
 
         stream_schema_message = {"stream": "public-table1",
@@ -721,7 +730,7 @@ class TestDBSync(unittest.TestCase):
             }
         ]
         query_patch.side_effect = [
-            [{'type': 'CSV'}],           # SHOW FILE FORMATS
+            _csv_file_format_result(),           # SHOW FILE FORMATS
             [{'name': 'TABLE1', 'is_iceberg': 'N'}],
             [],                           # show primary keys (no existing PK)
             None                          # ALTER TABLE add PK
@@ -731,7 +740,7 @@ class TestDBSync(unittest.TestCase):
         dbsync.sync_table()
 
         query_patch.assert_has_calls([
-            call('SHOW FILE FORMATS LIKE \'dummy-file-format\''),
+            call('SHOW FILE FORMATS LIKE \'DUMMY_FILE_FORMAT\' IN SCHEMA'),
             call('SHOW TABLES IN SCHEMA "DUMMY-DB"."DUMMY-SCHEMA" STARTS WITH \'TABLE1\''),
             call('show primary keys in table dummy-db.dummy-schema."TABLE1";'),
             call(['alter table dummy-schema."TABLE1" add primary key("ID");',
@@ -855,7 +864,7 @@ class TestDBSync(unittest.TestCase):
             'private_key': 'dummy-key',
             'warehouse': 'dummy-wh',
             'default_target_schema': 'dummy-schema',
-            'file_format': 'dummy-file-format',
+            'file_format': 'dummy_file_format',
             'hard_delete': True,
         }
         config.update(overrides)
@@ -1178,7 +1187,7 @@ class TestDBSync(unittest.TestCase):
     @patch('target_snowflake.db_sync.DbSync.query')
     def test_version_column_sql(self, query_patch):
         """version_column uses ALTER ICEBERG TABLE when is_iceberg_table=True, ALTER TABLE otherwise"""
-        query_patch.return_value = [{'type': 'CSV'}]
+        query_patch.return_value = _csv_file_format_result()
         minimal_config = {
             'account': "dummy-account",
             'dbname': "dummy-db",
@@ -1186,7 +1195,7 @@ class TestDBSync(unittest.TestCase):
             'private_key': "dummy-key",
             'warehouse': "dummy-wh",
             'default_target_schema': "dummy-schema",
-            'file_format': "dummy-file-format"
+            'file_format': "dummy_file_format"
         }
         stream_schema_message = {
             "stream": "public-table1",
@@ -1209,7 +1218,7 @@ class TestDBSync(unittest.TestCase):
     @patch('target_snowflake.db_sync.DbSync.query')
     def test_add_column_sql(self, query_patch):
         """add_column uses ALTER ICEBERG TABLE when is_iceberg_table=True, ALTER TABLE otherwise"""
-        query_patch.return_value = [{'type': 'CSV'}]
+        query_patch.return_value = _csv_file_format_result()
         minimal_config = {
             'account': "dummy-account",
             'dbname': "dummy-db",
@@ -1217,7 +1226,7 @@ class TestDBSync(unittest.TestCase):
             'private_key': "dummy-key",
             'warehouse': "dummy-wh",
             'default_target_schema': "dummy-schema",
-            'file_format': "dummy-file-format"
+            'file_format': "dummy_file_format"
         }
         stream_schema_message = {
             "stream": "public-table1",
@@ -1248,7 +1257,7 @@ class TestDBSync(unittest.TestCase):
     @patch('target_snowflake.db_sync.DbSync.query')
     def test_update_columns_native_adds_new_string_at_max_width(self, query_patch):
         """Native Singer evolution creates new string columns at maximum width."""
-        query_patch.return_value = [{'type': 'CSV'}]
+        query_patch.return_value = _csv_file_format_result()
         stream_schema = {
             'stream': 'public-table1',
             'schema': {
@@ -1285,7 +1294,7 @@ class TestDBSync(unittest.TestCase):
     @patch('target_snowflake.db_sync.DbSync.query')
     def test_update_columns_native_keeps_existing_string_column(self, query_patch):
         """A pre-existing native string is not widened, renamed, or re-added."""
-        query_patch.return_value = [{'type': 'CSV'}]
+        query_patch.return_value = _csv_file_format_result()
         stream_schema = {
             'stream': 'public-table1',
             'schema': {'properties': {'body': {'type': ['string']}}},
@@ -1314,7 +1323,7 @@ class TestDBSync(unittest.TestCase):
     @patch('target_snowflake.db_sync.DbSync.query')
     def test_update_columns_explicit_v3_adds_new_column(self, query_patch):
         """Explicit v3 schema evolution issues ALTER ICEBERG TABLE ADD COLUMN."""
-        query_patch.return_value = [{'type': 'CSV'}]
+        query_patch.return_value = _csv_file_format_result()
         stream_schema_message = {
             "stream": "public-table1",
             "schema": {
@@ -1352,7 +1361,7 @@ class TestDBSync(unittest.TestCase):
     @patch('target_snowflake.db_sync.DbSync.query')
     def test_update_columns_explicit_v3_number_no_spurious_alter(self, query_patch):
         """An existing NUMBER column matches explicit v3 NUMBER(38,0)."""
-        query_patch.return_value = [{'type': 'CSV'}]
+        query_patch.return_value = _csv_file_format_result()
         stream_schema_message = {
             "stream": "public-table1",
             "schema": {
@@ -1380,7 +1389,7 @@ class TestDBSync(unittest.TestCase):
     @patch('target_snowflake.db_sync.DbSync.query')
     def test_update_columns_explicit_v3_accepts_reported_text_for_varchar(self, query_patch):
         """Snowflake's TEXT alias matches a preflight-validated max-width VARCHAR."""
-        query_patch.return_value = [{'type': 'CSV'}]
+        query_patch.return_value = _csv_file_format_result()
         stream_schema = {
             'stream': 'public-table1',
             'schema': {'properties': {'body': {'type': ['string']}}},
@@ -1405,7 +1414,7 @@ class TestDBSync(unittest.TestCase):
 
     @patch('target_snowflake.db_sync.DbSync.query')
     def test_update_columns_explicit_v3_adds_variant(self, query_patch):
-        query_patch.return_value = [{'type': 'CSV'}]
+        query_patch.return_value = _csv_file_format_result()
         table_cache = [
             {
                 'SCHEMA_NAME': 'DUMMY-SCHEMA',
@@ -1436,7 +1445,7 @@ class TestDBSync(unittest.TestCase):
     @patch('target_snowflake.db_sync.DbSync.query')
     def test_update_columns_explicit_v3_accepts_reported_float_for_double(self, query_patch):
         """Snowflake reports an Iceberg DOUBLE column through the FLOAT alias."""
-        query_patch.return_value = [{'type': 'CSV'}]
+        query_patch.return_value = _csv_file_format_result()
         table_cache = [
             {
                 'SCHEMA_NAME': 'DUMMY-SCHEMA',
@@ -1464,7 +1473,7 @@ class TestDBSync(unittest.TestCase):
     @patch('target_snowflake.db_sync.DbSync.query')
     def test_update_columns_explicit_v3_preserves_existing_timestamp_family(self, query_patch):
         """The precision-qualified v3 mapping retains compatible timestamp data."""
-        query_patch.return_value = [{'type': 'CSV'}]
+        query_patch.return_value = _csv_file_format_result()
         stream_schema = {
             'stream': 'public-table1',
             'schema': {
@@ -1502,7 +1511,7 @@ class TestDBSync(unittest.TestCase):
     @patch('target_snowflake.db_sync.DbSync.query')
     def test_update_columns_explicit_v3_replaces_non_timestamp_with_timestamp(self, query_patch):
         """A date-time schema does not preserve an unrelated existing type."""
-        query_patch.return_value = [{'type': 'CSV'}]
+        query_patch.return_value = _csv_file_format_result()
         stream_schema = {
             'stream': 'public-table1',
             'schema': {
@@ -1554,7 +1563,7 @@ class TestDBSync(unittest.TestCase):
 
     @patch('target_snowflake.db_sync.DbSync.query')
     def test_update_columns_does_not_implicitly_convert_text_and_variant(self, query_patch):
-        query_patch.return_value = [{'type': 'CSV'}]
+        query_patch.return_value = _csv_file_format_result()
 
         for current_type, property_schema, expected_message in (
             ('TEXT', {'type': ['object']}, 'explicit Iceberg v3 mapping requires VARIANT'),
@@ -1604,7 +1613,7 @@ class TestDBSync(unittest.TestCase):
     @patch('target_snowflake.db_sync.DbSync.query')
     def test_update_columns_iceberg_type_change_versions_and_re_adds(self, query_patch):
         """A type mismatch on Iceberg renames the old column then adds the new one via ICEBERG DDL"""
-        query_patch.return_value = [{'type': 'CSV'}]
+        query_patch.return_value = _csv_file_format_result()
         stream_schema_message = {
             "stream": "public-table1",
             "schema": {
@@ -1714,7 +1723,7 @@ class TestDBSync(unittest.TestCase):
             "key_properties": ["id"]
         }
 
-        with patch('target_snowflake.db_sync.DbSync.query', return_value=[{'type': 'CSV'}]):
+        with patch('target_snowflake.db_sync.DbSync.query', return_value=_csv_file_format_result()):
             dbsync = db_sync.DbSync(config, stream_schema_message)
 
         ddl = dbsync.create_iceberg_table_query(iceberg_version=3)
@@ -1764,7 +1773,7 @@ class TestDBSync(unittest.TestCase):
             'created_at': {'type': ['string'], 'format': 'date-time'},
         })
 
-        with patch('target_snowflake.db_sync.DbSync.query', return_value=[{'type': 'CSV'}]):
+        with patch('target_snowflake.db_sync.DbSync.query', return_value=_csv_file_format_result()):
             dbsync = db_sync.DbSync(config, stream_schema_message)
 
         ddl = dbsync.create_iceberg_table_query(iceberg_version=3)
@@ -1788,7 +1797,7 @@ class TestDBSync(unittest.TestCase):
             "schema": {"properties": {"id": {"type": ["integer"]}}},
             "key_properties": []
         }
-        with patch('target_snowflake.db_sync.DbSync.query', return_value=[{'type': 'CSV'}]):
+        with patch('target_snowflake.db_sync.DbSync.query', return_value=_csv_file_format_result()):
             dbsync = db_sync.DbSync(config, stream_schema_message)
 
         ddl = dbsync.create_iceberg_table_query(iceberg_version=3)
@@ -1798,7 +1807,7 @@ class TestDBSync(unittest.TestCase):
         """New native strings are wide and Iceberg settings do not leak."""
         stream_schema = self._table_sync_schema()
         stream_schema['schema']['properties']['name'] = {'type': ['string']}
-        with patch('target_snowflake.db_sync.DbSync.query', return_value=[{'type': 'CSV'}]):
+        with patch('target_snowflake.db_sync.DbSync.query', return_value=_csv_file_format_result()):
             dbsync = db_sync.DbSync(
                 self._table_sync_config(),
                 stream_schema,
@@ -1819,7 +1828,7 @@ class TestDBSync(unittest.TestCase):
     @patch('target_snowflake.db_sync.DbSync.grant_privilege')
     @patch('target_snowflake.db_sync.DbSync.query')
     def test_sync_table_explicit_create_rejects_concurrent_v2_table(self, query_patch, grant_patch):
-        query_patch.return_value = [{'type': 'CSV'}]
+        query_patch.return_value = _csv_file_format_result()
         dbsync = db_sync.DbSync(
             self._table_sync_config(
                 target_table_format='iceberg', iceberg_version=3
@@ -1853,7 +1862,7 @@ class TestDBSync(unittest.TestCase):
             },
         ]
         with patch('target_snowflake.db_sync.DbSync.query') as query_patch:
-            query_patch.return_value = [{'type': 'CSV'}]
+            query_patch.return_value = _csv_file_format_result()
             dbsync = db_sync.DbSync(config, self._table_sync_schema(), table_cache)
             query_patch.reset_mock()
 
@@ -1875,7 +1884,7 @@ class TestDBSync(unittest.TestCase):
         query_patch,
         grant_patch,
     ):
-        query_patch.return_value = [{'type': 'CSV'}]
+        query_patch.return_value = _csv_file_format_result()
         dbsync = db_sync.DbSync(
             self._table_sync_config(target_table_format='iceberg', iceberg_version=3),
             self._table_sync_schema(),
@@ -1912,7 +1921,7 @@ class TestDBSync(unittest.TestCase):
     def test_sync_table_omitted_format_creates_and_verifies_native_table(
         self, query_patch, grant_patch
     ):
-        query_patch.return_value = [{'type': 'CSV'}]
+        query_patch.return_value = _csv_file_format_result()
         dbsync = db_sync.DbSync(
             self._table_sync_config(),
             self._table_sync_schema(),
@@ -1938,7 +1947,7 @@ class TestDBSync(unittest.TestCase):
     @patch('target_snowflake.db_sync.DbSync.grant_privilege')
     @patch('target_snowflake.db_sync.DbSync.query')
     def test_sync_table_explicit_v3_create_is_verified_before_grants(self, query_patch, grant_patch):
-        query_patch.return_value = [{'type': 'CSV'}]
+        query_patch.return_value = _csv_file_format_result()
         dbsync = db_sync.DbSync(
             self._table_sync_config(target_table_format='iceberg', iceberg_version=3),
             self._table_sync_schema(),
@@ -2012,7 +2021,7 @@ class TestDBSync(unittest.TestCase):
         query_patch,
         grant_patch,
     ):
-        query_patch.return_value = [{'type': 'CSV'}]
+        query_patch.return_value = _csv_file_format_result()
         dbsync = db_sync.DbSync(
             self._table_sync_config(target_table_format='iceberg', iceberg_version=3),
             self._table_sync_schema(),
@@ -2053,7 +2062,7 @@ class TestDBSync(unittest.TestCase):
     @patch('target_snowflake.db_sync.DbSync.grant_privilege')
     @patch('target_snowflake.db_sync.DbSync.query')
     def test_sync_table_explicit_create_rejects_concurrent_wrong_format(self, query_patch, grant_patch):
-        query_patch.return_value = [{'type': 'CSV'}]
+        query_patch.return_value = _csv_file_format_result()
         dbsync = db_sync.DbSync(
             self._table_sync_config(target_table_format='iceberg', iceberg_version=3),
             self._table_sync_schema(),
@@ -2087,7 +2096,7 @@ class TestDBSync(unittest.TestCase):
                 config = self._table_sync_config(target_table_format=requested_format)
                 if requested_format == 'iceberg':
                     config['iceberg_version'] = 3
-                query_patch.return_value = [{'type': 'CSV'}]
+                query_patch.return_value = _csv_file_format_result()
                 dbsync = db_sync.DbSync(config, self._table_sync_schema())
                 query_patch.reset_mock()
 
@@ -2104,7 +2113,7 @@ class TestDBSync(unittest.TestCase):
         self, query_patch
     ):
         """Omitted format means native and cannot load an existing Iceberg table."""
-        query_patch.return_value = [{'type': 'CSV'}]
+        query_patch.return_value = _csv_file_format_result()
         dbsync = db_sync.DbSync(
             self._table_sync_config(),
             self._table_sync_schema(),

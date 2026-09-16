@@ -100,6 +100,12 @@ Also follow these scoped checks:
 - Never commit secrets, `.tfvars`, private keys, or populated environment files.
 - Use `import_config` in docs, examples, tests, and comments; `import` is deprecated.
 
+## Reviews
+
+When reviewing changes between the current state and `master`, present concerns
+as a numbered list, ordered from most to least severe. Label each concern's
+severity; if there are no concerns, say so explicitly.
+
 ## Git and completion
 
 - Branch from `master`; keep diffs task-scoped. Sign every commit with

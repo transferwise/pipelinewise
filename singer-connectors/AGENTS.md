@@ -36,6 +36,8 @@ baseline configuration errors and findings rather than claiming the gate passed.
   Jira, and Zendesk lack repository E2E.
 
 Report unavailable or skipped integration/E2E coverage as unverified.
+Use distinct ``COVERAGE_FILE`` paths for overlapping coverage runs; otherwise
+unit and integration results can combine and overstate an individual suite's coverage.
 
 ### Target-snowflake integration tests in dev-project
 
@@ -54,7 +56,7 @@ CSV suite needs standard Snowflake/S3 variables,
 `TARGET_SNOWFLAKE_SCHEMA`, and `TARGET_SNOWFLAKE_FILE_FORMAT_CSV` (which may
 reuse `TARGET_SNOWFLAKE_FILE_FORMAT`); ensure the private key is readable.
 
-Run the supported 46-test subset with plaintext upload explicitly selected:
+Run the supported 48-test subset with plaintext upload explicitly selected:
 
 ```bash
 docker exec -t -e CLIENT_SIDE_ENCRYPTION_MASTER_KEY= pipelinewise bash -lc '
@@ -67,7 +69,7 @@ docker exec -t -e CLIENT_SIDE_ENCRYPTION_MASTER_KEY= pipelinewise bash -lc '
 ```
 
 This excludes Parquet, mixed CSV/Parquet table-stage, and successful client-side
-encryption while retaining wrong-key rejection. Expect 46 passes, zero skips;
+encryption while retaining wrong-key rejection. Expect 48 passes, zero skips;
 anything else is non-green. Full `make integration_test` separately requires
 Parquet and a real client-side encryption master key.
 
@@ -106,6 +108,10 @@ invariants. Connector-specific rules follow:
   Iceberg policy layer. Keep the dependency-free fixture aligned with core.
 - Keep all managed-v3 DDL/type/version settings and the dependency-free fixture
   in exact core parity. CREATE/ADD emits v3 binary as `BINARY(67108864)`.
+- Keep target-snowflake's quote-aware CSV writer and named-format validation in
+  lockstep. Preserve SQL NULL, empty strings, controls, Unicode, punctuation,
+  and literal escapes; require the documented comma/LF, escape, enclosure,
+  whitespace, empty-field, multiline, UTF-8, header, and empty `NULL_IF` options.
 - Conversion stays in the PipelineWise command; do not restore a connector
   executable or duplicate its type, metadata, or recovery policy.
 - Detect MariaDB JSON aliases only from the exact generated `JSON_VALID`
