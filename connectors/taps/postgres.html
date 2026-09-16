@@ -507,6 +507,8 @@ safety, state backups, pending-Iceberg guards, and non-atomic reset recovery.</p
 full template with <code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">init</span></code>.</p>
 <p>Snowflake Singer, FullSync, and PartialSync can target managed Iceberg v3 with
 explicit tap-level configuration. See <a class="reference internal" href="../targets/snowflake_iceberg.html#snowflake-iceberg"><span class="std std-ref">Snowflake Iceberg tables</span></a>.
+Snowflake Singer loading, FullSync, and PartialSync preserve line breaks, tabs,
+CSV punctuation, Unicode, and literal backslash sequences in string values.
 PostgreSQL <code class="docutils literal notranslate"><span class="pre">hstore</span></code> values map to Snowflake <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> only on that explicit
 v3 route; native mappings remain unchanged.</p>
 </section>

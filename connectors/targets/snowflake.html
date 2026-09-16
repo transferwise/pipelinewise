@@ -417,10 +417,35 @@ must create, merge, alter, or replace tables.</p>
 
 <span class="k">CREATE</span><span class="w"> </span><span class="n">FILE</span><span class="w"> </span><span class="n">FORMAT</span><span class="w"> </span><span class="o">&lt;</span><span class="k">database</span><span class="o">&gt;</span><span class="p">.</span><span class="o">&lt;</span><span class="k">schema</span><span class="o">&gt;</span><span class="p">.</span><span class="o">&lt;</span><span class="n">file_format</span><span class="o">&gt;</span>
 <span class="w">  </span><span class="k">TYPE</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'CSV'</span>
-<span class="w">  </span><span class="k">ESCAPE</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'\\'</span>
-<span class="w">  </span><span class="n">FIELD_OPTIONALLY_ENCLOSED_BY</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'"'</span><span class="p">;</span>
+<span class="w">  </span><span class="n">RECORD_DELIMITER</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'0x0A'</span>
+<span class="w">  </span><span class="n">FIELD_DELIMITER</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'0x2C'</span>
+<span class="w">  </span><span class="k">ESCAPE</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'0x5C'</span>
+<span class="w">  </span><span class="n">FIELD_OPTIONALLY_ENCLOSED_BY</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'0x22'</span>
+<span class="w">  </span><span class="n">SKIP_HEADER</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span>
+<span class="w">  </span><span class="n">PARSE_HEADER</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">FALSE</span>
+<span class="w">  </span><span class="n">SKIP_BLANK_LINES</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">FALSE</span>
+<span class="w">  </span><span class="n">TRIM_SPACE</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">FALSE</span>
+<span class="w">  </span><span class="n">EMPTY_FIELD_AS_NULL</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">TRUE</span>
+<span class="w">  </span><span class="k">ENCODING</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'UTF8'</span>
+<span class="w">  </span><span class="n">MULTI_LINE</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">TRUE</span>
+<span class="w">  </span><span class="n">NULL_IF</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">();</span>
 </pre></div>
 </div>
+<p><code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code> validates the effective options of a named CSV format
+before loading. The settings above let it distinguish SQL <code class="docutils literal notranslate"><span class="pre">NULL</span></code>, an empty
+string, actual line breaks and tabs, and literal backslash sequences. It rejects
+an incompatible format without writing rows.</p>
+<p>Validation resolves the configured file format in its database and schema,
+including quoted identifiers; it does not use a same-named format elsewhere.</p>
+<p>FastSync does not use this named object; it supplies its own inline CSV options.
+Changing the named format therefore affects Singer <code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code> loads,
+not FastSync loads.</p>
+<p>To migrate an existing CSV format, stop all loads sharing it and apply the
+required settings shown above before resuming. Deploy the updated target writer
+as well; changing the format alone does not fix older writers’ text handling.</p>
+<p>Changing the format affects later loads only. If earlier replication normalized
+or removed control characters, run a source resync for each affected table;
+PipelineWise cannot reconstruct the original value from Snowflake.</p>
 <p>Use a storage integration, instance role, or AWS profile where possible. If the
 stage uses client-side encryption, configure the same master key in PipelineWise.</p>
 <p><code class="docutils literal notranslate"><span class="pre">aws_profile</span></code> falls back to <code class="docutils literal notranslate"><span class="pre">AWS_PROFILE</span></code>. <code class="docutils literal notranslate"><span class="pre">aws_access_key_id</span></code>,
@@ -553,6 +578,14 @@ column at its current width. It does not widen or version that column solely
 because its declared width is narrower. Existing managed Iceberg v3 strings are
 different: every string column must already have the exact maximum width before
 PipelineWise writes the table. See <a class="reference internal" href="snowflake_iceberg.html#snowflake-iceberg"><span class="std std-ref">Snowflake Iceberg tables</span></a>.</p>
+</section>
+<section id="string-contents">
+<h2>String contents<a class="headerlink" href="#string-contents" title="Link to this heading"></a></h2>
+<p>Singer CSV loading preserves LF, CR, CRLF, tab, CSV punctuation, Unicode, and
+literal backslash sequences in string values. This applies to new and existing
+native and managed Iceberg v3 string columns. The named CSV file format must use
+the required options in the prerequisites above; otherwise the target stops
+before loading.</p>
 </section>
 <section id="publication-and-grants">
 <h2>Publication and grants<a class="headerlink" href="#publication-and-grants" title="Link to this heading"></a></h2>

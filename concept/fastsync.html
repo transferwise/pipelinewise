@@ -513,6 +513,15 @@ already use the maximum width; see <a class="reference internal" href="../connec
 <code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code> uses the maximum width for new string columns but does not
 widen or version a compatible existing native string column solely because of
 its declared width. See <a class="reference internal" href="../connectors/targets/snowflake.html#target-snowflake"><span class="std std-ref">Snowflake target</span></a>.</p>
+<p>MariaDB/MySQL and PostgreSQL Snowflake FullSync and PartialSync preserve LF, CR,
+CRLF, tab, CSV punctuation, and literal backslash sequences in string values.
+PostgreSQL preserves Unicode; MariaDB/MySQL remains limited to characters
+representable by its legacy three-byte <code class="docutils literal notranslate"><span class="pre">utf8</span></code> FastSync projection and
+continues to remove NUL characters. This preservation applies to native and
+managed Iceberg v3 publication; the table format does not change the staged
+string representation. SQL <code class="docutils literal notranslate"><span class="pre">NULL</span></code> and a literal <code class="docutils literal notranslate"><span class="pre">\N</span></code> string remain distinct.</p>
+<p>This behavior does not repair values normalized by an earlier run. Resync each
+affected table from its source after upgrading.</p>
 </section>
 <section id="explicit-fullsync">
 <h2>Explicit FullSync<a class="headerlink" href="#explicit-fullsync" title="Link to this heading"></a></h2>

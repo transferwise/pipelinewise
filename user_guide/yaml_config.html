@@ -605,8 +605,10 @@ buffered stream up to the target’s effective cap.</p></td>
 and Snowflake targets read <code class="docutils literal notranslate"><span class="pre">max_parallelism</span></code> instead.</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">flush_all_streams</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">false</span></code></p></td>
-<td><p>Flushes every buffered stream when one stream reaches its batch boundary.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">true</span></code></p></td>
+<td><p>Flushes every buffered stream when one stream reaches its batch boundary.
+Set <code class="docutils literal notranslate"><span class="pre">false</span></code> to flush only that stream. Flushing all streams can create
+smaller, more frequent loads and increase loading cost.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">primary_key_required</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">true</span></code></p></td>
@@ -666,6 +668,15 @@ otherwise.</p></td>
 </tr>
 </tbody>
 </table>
+<p><code class="docutils literal notranslate"><span class="pre">flush_all_streams</span></code> controls Singer loading into PostgreSQL and Snowflake;
+it does not affect FastSync or PartialSync. Run <code class="docutils literal notranslate"><span class="pre">import_config</span></code> after upgrading
+to apply the new default to existing generated configs. Explicit YAML
+<code class="docutils literal notranslate"><span class="pre">flush_all_streams:</span> <span class="pre">false</span></code> remains an opt-out. Standalone target connectors
+retain their <code class="docutils literal notranslate"><span class="pre">false</span></code> default.</p>
+<p>Flushing all buffered streams loads sparse streams sooner and allows fresher
+cross-stream checkpoints, but smaller, more frequent loads can increase loading
+cost. With <code class="docutils literal notranslate"><span class="pre">false</span></code>, only the flushed stream’s bookmark advances; both modes
+wait for the corresponding loads to finish before acknowledging their state.</p>
 <div class="admonition important">
 <p class="admonition-title">Important</p>
 <p>Any tap whose Singer output is compatible with <code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code> can
