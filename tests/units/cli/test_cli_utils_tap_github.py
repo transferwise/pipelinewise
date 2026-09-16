@@ -8,8 +8,6 @@ from pipelinewise.cli.errors import InvalidConfigException
 TAP_GITHUB_YAML = '{}/resources/tap-github.yml'.format(os.path.dirname(__file__))
 
 
-
-
 class TestUtils(TestCase):
     """
     Unit Tests for Tap Github PipelineWise CLI utility functions

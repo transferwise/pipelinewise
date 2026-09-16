@@ -389,7 +389,6 @@ class NotSelectedTableException(Exception):
         super().__init__(self, self.message)
 
 
-
 def get_cpu_cores():
     """Get CPU cores for multiprocessing"""
     try:
@@ -599,7 +598,6 @@ def get_target_schema(target_config, table):
     return target_schema
 
 
-
 def get_target_schemas(target_config, tables):
     """Get list of target schemas"""
     target_schemas = []
@@ -607,7 +605,6 @@ def get_target_schemas(target_config, tables):
         target_schemas.append(get_target_schema(target_config, trans))
 
     return list(dict.fromkeys(target_schemas))
-
 
 
 def get_grantees(target_config, table):
@@ -791,7 +788,6 @@ def parse_args(required_config_keys: Dict) -> argparse.Namespace:
     check_config(args.target, required_config_keys['target'])
 
     return args
-
 
 
 def retry_pattern():

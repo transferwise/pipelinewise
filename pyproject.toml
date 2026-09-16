@@ -1,7 +1,7 @@
 [tool.ruff]
 line-length = 120
 force-exclude = true
-# GitHub-tested connector suites are linted; unexecuted legacy suites and spikes remain out of scope.
+# Connector suites outside GitHub connector CI remain out of scope.
 extend-exclude = [
     "singer-connectors/tap-github/tests",
     "singer-connectors/tap-kafka/tests",
@@ -24,17 +24,14 @@ extend-exclude = [
 [tool.ruff.lint]
 # Keep high-confidence Pylint-category errors; porting legacy convention, refactor, and warning policy is out of scope.
 select = ["E", "F", "W", "C90", "Q002", "PLE"]
+preview = true
+explicit-preview-rules = true
+extend-select = ["E301", "E302", "E303", "E304", "E305", "E306"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 15
 
 [tool.ruff.lint.per-file-ignores]
 # The former root complexity gate inspected production code only.
-"tests/**/*.py" = ["C901", "E721"]
+"tests/**/*.py" = ["C901"]
 "tests/units/cli/test_cli.py" = ["E501"]
-"singer-connectors/**/__init__.py" = ["F401"]
-"singer-connectors/tap-github/setup.py" = ["F401"]
-"singer-connectors/tap-kafka/tap_kafka/serialization/protobuf.py" = ["F401"]
-"singer-connectors/tap-salesforce/tap_salesforce/__init__.py" = ["F821"]
-"singer-connectors/tap-slack/tap_slack/streams.py" = ["F841"]
-"singer-connectors/target-s3-csv/target_s3_csv/s3.py" = ["F401"]

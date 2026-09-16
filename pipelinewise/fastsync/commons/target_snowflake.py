@@ -20,12 +20,10 @@ LOGGER = logging.getLogger(__name__)
 logging.getLogger('snowflake.connector').setLevel(logging.WARNING)
 
 
-
 class FastSyncTargetSnowflake(SnowflakeSqlClient):
     """
     Common functions for fastsync to Snowflake
     """
-
 
     def __init__(self, connection_config, transformation_config=None):
         super().__init__(connection_config)
@@ -240,7 +238,6 @@ class FastSyncTargetSnowflake(SnowflakeSqlClient):
                     exc,
                 )
 
-
     def create_table(
         self,
         target_schema: str,
@@ -362,7 +359,6 @@ class FastSyncTargetSnowflake(SnowflakeSqlClient):
         """
         return f'"{schema.upper()}"."{table.upper()}"'
 
-
     def copy_to_table(
         self,
         s3_key,
@@ -436,13 +432,11 @@ class FastSyncTargetSnowflake(SnowflakeSqlClient):
                 sql, query_tag_props={'schema': target_schema, 'table': table_name}
             )
 
-
     def grant_usage_on_schema(self, target_schema, role, to_group=False):
         # Grant role is not mandatory parameter, do nothing if not specified
         if role:
             sql = 'GRANT USAGE ON SCHEMA {} TO ROLE {}'.format(target_schema, role)
             self.query(sql, query_tag_props={'schema': target_schema})
-
 
     def grant_select_on_schema(self, target_schema, role, to_group=False):
         # Grant role is not mandatory parameter, do nothing if not specified

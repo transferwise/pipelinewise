@@ -40,6 +40,7 @@ class MockCursor:
             ]
         return None
 
+
 class ConnMock:
     """Mock Connection class"""
 

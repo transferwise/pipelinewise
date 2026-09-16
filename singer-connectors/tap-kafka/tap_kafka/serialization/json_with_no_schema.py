@@ -5,7 +5,6 @@ from confluent_kafka.serialization import Serializer
 from confluent_kafka.serialization import SerializationError
 
 
-
 class JSONSimpleSerializer(Serializer):
     """
     Serializes a Python object to JSON formatted string.
@@ -18,7 +17,6 @@ class JSONSimpleSerializer(Serializer):
             return orjson.dumps(obj)
         except orjson.JSONDecodeError as e:
             raise SerializationError(e)
-
 
 
 class JSONSimpleDeserializer(Deserializer):

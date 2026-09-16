@@ -103,7 +103,6 @@ class PartialSyncCLITestCase(TestCase):
         self.assertEqual(system_exit.exception.code, 1)
         self.assertEqual(expected_log_message, actual_logs.output[0])
 
-
     def test_it_returns_error_1_if_tap_is_not_enabled(self):
         """Test log message and exit code is 1 if tap is not enabled"""
         tap_name = 'Source MySQL'

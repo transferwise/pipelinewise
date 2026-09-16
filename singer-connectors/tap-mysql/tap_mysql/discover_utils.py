@@ -356,7 +356,6 @@ def create_column_metadata(cols: List[Column]):
                                ('properties', col.column_name),
                                'sql-datatype', col.column_type.lower())
 
-
         data_type = 'json' if col.is_json_alias else col.data_type.lower()
         mdata = metadata.write(mdata,
                                ('properties', col.column_name),

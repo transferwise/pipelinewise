@@ -127,7 +127,6 @@ def _target_table_name(
 
 
 @dataclass(frozen=True)
-
 class CheckDefinition:
     """A normalized, credential-free version of one table check."""
 
@@ -173,7 +172,6 @@ class CheckDefinition:
             separators=(",", ":"),
         ).encode("utf-8")
         return hashlib.sha256(payload).hexdigest()
-
 
 
 def extract_check_definitions(

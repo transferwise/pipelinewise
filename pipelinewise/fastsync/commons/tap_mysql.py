@@ -209,7 +209,6 @@ class FastSyncTapMySql:
                     LOGGER.exception(exc)
                     LOGGER.info('%s connection seems to be already closed.', connection_name.capitalize())
 
-
     def query(self, query, conn=None, params=None, return_as_cursor=False, n_retry=1):
         """
         Run query
@@ -316,7 +315,6 @@ class FastSyncTapMySql:
             'log_pos': log_pos,
             'version': version,
         }
-
 
     def fetch_current_incremental_key_pos(self, table, replication_key):
         """
@@ -478,7 +476,6 @@ class FastSyncTapMySql:
                 column.get('column_name') for column in mysql_columns
             ],
         }
-
 
     def copy_table(
             self,

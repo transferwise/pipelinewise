@@ -39,7 +39,6 @@ class Config:
         self.targets = {}
 
     @classmethod
-
     def from_yamls(cls, config_dir, yaml_dir='.', vault_secret=None):
         """
         Class Constructor
@@ -66,7 +65,6 @@ class Config:
             global_config = utils.load_yaml(global_config_yaml, vault_secret)
             utils.validate(instance=global_config, schema=global_config_schema)
             config.global_config = global_config or {}
-
 
         # Load every target yaml into targets dictionary
         for yaml_file in target_yamls:
@@ -285,7 +283,6 @@ class Config:
 
         # Save target config.json
         utils.save_json(target.get('db_conn'), target_config_path)
-
 
     def save_tap_jsons(self, target, tap, extra_config_keys=None):
         """

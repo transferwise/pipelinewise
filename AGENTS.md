@@ -91,7 +91,8 @@ Also follow these scoped checks:
 - Python: 120 columns, complexity 15, four spaces, Google docstrings,
   consistent single quotes, `snake_case` names/JSON keys, `PascalCase` classes.
 - Ruff retains error, warning, quote, line-length, and complexity gates plus the
-  `PLE` family. The Ruff-only migration intentionally did not enable `PLC`,
+  `PLE` family. Preview rules require explicit selection; `E301`–`E306` enforce
+  blank-line spacing. The Ruff-only migration intentionally did not enable `PLC`,
   `PLR`, or `PLW` wholesale over legacy code; broaden rules only with a
   scoped cleanup and regression plan.
 - Every new or modified Python file must remain in scope for `ruff check .` and

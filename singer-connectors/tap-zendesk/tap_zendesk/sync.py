@@ -10,11 +10,13 @@ from singer import Transformer
 
 LOGGER = singer.get_logger('tap_zendesk')
 
+
 def process_record(record):
     """ Serializes Zenpy's internal classes into Python objects via ZendeskEncoder. """
     rec_str = json.dumps(record, cls=ZendeskEncoder)
     rec_dict = json.loads(rec_str)
     return rec_dict
+
 
 def sync_stream(state, start_date, instance):
     stream = instance.stream
@@ -47,6 +49,7 @@ def sync_stream(state, start_date, instance):
             singer.write_state(state)
 
         return counter.value
+
 
 class ZendeskEncoder(json.JSONEncoder):
     def default(self, obj):

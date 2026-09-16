@@ -114,6 +114,7 @@ def get_test_connection(target_db='postgres', superuser=False):
 
     return conn
 
+
 def build_col_sql(col, cur):
     if col.get('quoted'):
         col_sql = "{} {}".format(quote_ident(col['name'], cur), col['type'])
@@ -121,6 +122,7 @@ def build_col_sql(col, cur):
         col_sql = "{} {}".format(col['name'], col['type'])
 
     return col_sql
+
 
 def build_table(table, cur):
     create_sql = "CREATE TABLE {}\n".format(quote_ident(table['name'], cur))
@@ -135,6 +137,7 @@ def build_table(table, cur):
 
     return sql
 
+
 def ensure_test_table(table_spec, target_db='postgres'):
     with get_test_connection(target_db) as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
@@ -145,11 +148,13 @@ def ensure_test_table(table_spec, target_db='postgres'):
             cur.execute(sql)
             cur.execute('ANALYZE {}'.format(quote_ident(table_spec['name'], cur)))
 
+
 def unselect_column(our_stream, col):
     md = metadata.to_map(our_stream['metadata'])
     md.get(('properties', col))['selected'] = False
     our_stream['metadata'] = metadata.to_list(md)
     return our_stream
+
 
 def set_replication_method_for_stream(stream, method):
     new_md = metadata.to_map(stream['metadata'])
@@ -158,6 +163,7 @@ def set_replication_method_for_stream(stream, method):
 
     stream['metadata'] = metadata.to_list(new_md)
     return stream
+
 
 def select_all_of_stream(stream):
     new_md = metadata.to_map(stream['metadata'])
@@ -204,11 +210,11 @@ def crud_up_value(value):
     else:
         raise Exception("crud_up_value does not yet support {}".format(value.__class__))
 
+
 def insert_record(cursor, table_name, data):
     our_keys = list(data.keys())
     our_keys.sort()
     our_values = list(map( lambda k: data.get(k), our_keys))
-
 
     columns_sql = ", \n".join(map(lambda k: quote_ident(k, cursor), our_keys))
     value_sql = ",".join(["%s" for i in range(len(our_keys))])
@@ -238,6 +244,7 @@ def drop_replication_slot(target_db='postgres', tap_id='tap_test'):
         with conn.cursor() as cur:
             LOGGER.info("Dropping replication slot: %s", sql)
             cur.execute(sql)
+
 
 def drop_table(table_name, target_db='postgres'):
     with get_test_connection(target_db) as conn:

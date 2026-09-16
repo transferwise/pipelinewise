@@ -20,7 +20,6 @@ def _save_state_worker(state_path, table, bookmark, ready, finished):
     finished.set()
 
 
-
 class MySqlMock:
     """
     MySQL mock
@@ -28,7 +27,6 @@ class MySqlMock:
 
     def fetch_current_log_pos(self):
         return {'log_file': 'mysqld-bin.000001', 'log_pos': '123456', 'version': 1}
-
 
     def fetch_current_incremental_key_pos(self, table, replication_key):
         return {
@@ -46,7 +44,6 @@ class PostgresMock:
     def fetch_current_log_pos(self):
         return {'lsn': '16/B374D848', 'version': 1}
 
-
     def fetch_current_incremental_key_pos(self, table, replication_key):
         return {
             'replication_key': replication_key,
@@ -59,7 +56,6 @@ class S3CsvMock:
     """
     S3 CSV mock
     """
-
 
     def fetch_current_incremental_key_pos(self, table, replication_key):
         return {'modified_since': '2019-11-15T07:39:44.171098'}

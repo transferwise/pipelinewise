@@ -9,9 +9,6 @@ from pipelinewise.cli.config import Config
 from pipelinewise.cli.errors import InvalidConfigException
 
 
-
-
-
 def _config(tmp_path):
     config = Config(str(tmp_path))
     config.global_config = {

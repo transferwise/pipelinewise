@@ -36,8 +36,6 @@ class UnsupportedPayloadKindError(Exception):
     """Custom exception when waljson payload is not insert, update nor delete"""
 
 
-# Preserve the legacy connector lint baseline; scope new suppressions narrowly.
-
 def lsn_to_int(lsn):
     """Convert pg_lsn to int"""
 
@@ -230,7 +228,6 @@ def create_array_elem(elem, sql_datatype, conn_info):  # noqa: C901
             return res
 
 
-
 def selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info):  # noqa: C901
     sql_datatype = og_sql_datatype.replace('[]', '')
 
@@ -399,7 +396,6 @@ def row_to_singer_message(stream, row, version, columns, time_extracted, md_map,
         record=rec,
         version=version,
         time_extracted=time_extracted)
-
 
 
 def consume_message(streams, state, msg, time_extracted, conn_info, *, message_payload=None):

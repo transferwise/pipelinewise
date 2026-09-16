@@ -27,9 +27,6 @@ from pipelinewise.data_diff.engine import (
 )
 
 
-
-
-
 def _usable_index(columns, name="idx", **overrides):
     """Index metadata as a healthy btree index reports it."""
     return {"index_name": name, "columns": columns, "is_usable": True, **overrides}

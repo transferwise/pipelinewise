@@ -1,7 +1,6 @@
 """Data models and durable state for Snowflake-managed Iceberg publication."""
 
 
-
 from __future__ import annotations
 
 from copy import deepcopy
@@ -592,7 +591,6 @@ class IcebergPublicationAttempt:
         self.context = self._manifest_payload.as_context()
 
     @classmethod
-
     def new(
         cls,
         kind: str,

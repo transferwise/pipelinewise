@@ -92,7 +92,6 @@ def _metadata_preflight(check: dict, column_pairs: list) -> dict:
     }
 
 
-
 def build_metric_query(
     adapter: DatabaseAdapter,
     schema: str,
@@ -395,7 +394,6 @@ def _require_resolved(columns: dict, name: str, qualified_table: str) -> dict:
             f"Column '{name}' does not exist in {qualified_table}"
         )
     return column
-
 
 
 def run_check(

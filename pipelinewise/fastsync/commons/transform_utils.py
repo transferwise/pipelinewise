@@ -43,7 +43,6 @@ class SQLFlavor(Enum):
     POSTGRES = 'postgres'
 
 
-
 class TransformationHelper:
     """
     A helper class for transformations in FastSync
@@ -143,7 +142,6 @@ class TransformationHelper:
         return trans_map
 
     @classmethod
-
     def __conditions_to_sql(
         cls, transform_conditions: List[Dict], sql_flavor: SQLFlavor
     ) -> Optional[str]:
@@ -215,7 +213,6 @@ class TransformationHelper:
         return ' AND '.join(conditions)
 
     @classmethod
-
     def __safe_column(cls, col: str, sql_flavor: SQLFlavor):
         # Make the field id safe in case it's a reserved word
         if sql_flavor == SQLFlavor.SNOWFLAKE:
@@ -230,7 +227,6 @@ class TransformationHelper:
         return column
 
     @classmethod
-
     def __hash_to_sql(cls, column: str, sql_flavor: SQLFlavor) -> str:
         """
         convert HASH transformation into the right sql string
@@ -256,7 +252,6 @@ class TransformationHelper:
         return trans
 
     @classmethod
-
     def __hash_skip_first_to_sql(
         cls, transform_type: TransformationType, column: str, sql_flavor: SQLFlavor
     ) -> str:
@@ -291,7 +286,6 @@ class TransformationHelper:
         return trans
 
     @classmethod
-
     def __mask_date_to_sql(cls, column: str, sql_flavor: SQLFlavor) -> str:
         """
         convert MASK-DATE transformation into the right sql string
@@ -329,7 +323,6 @@ class TransformationHelper:
         return trans
 
     @classmethod
-
     def __mask_string_skip_ends_to_sql(
         cls, transform_type: TransformationType, column: str, sql_flavor: SQLFlavor
     ) -> str:

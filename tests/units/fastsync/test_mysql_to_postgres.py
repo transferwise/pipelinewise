@@ -12,7 +12,6 @@ TAP = 'FastSyncTapMySql'
 TARGET = 'FastSyncTargetPostgres'
 
 
-
 class S3CsvToPostgres(unittest.TestCase):
     """
     Unit tests for fastsync mysql to postgres

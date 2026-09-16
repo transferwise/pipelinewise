@@ -69,7 +69,6 @@ def _create_object_names_to_mock(
     )
 
 
-
 def assert_sync_table_returns_true_on_success(
     sync_table: callable, package_nm: str, tap_class_nm: str, target_class_nm: str
 ) -> None:
@@ -110,7 +109,6 @@ def assert_sync_table_returns_true_on_success(
 
         assert isinstance(res, bool)
         assert res
-
 
 
 def assert_sync_table_exception_on_failed_copy(
@@ -155,7 +153,6 @@ def assert_snowflake_sync_table_native_workflow(
     grant_error: Exception = None,
 ) -> None:
     """Assert the native Snowflake staging, publication, and state workflow."""
-
 
     objects_to_mock = _create_object_names_to_mock(
         package_nm, tap_class_nm, 'FastSyncTargetSnowflake'
@@ -396,7 +393,6 @@ def assert_snowflake_sync_table_iceberg_workflow(
     recovery_error=None,
 ) -> None:
     """Assert an Iceberg route publishes or recovers before state advances."""
-
 
     objects_to_mock = _create_object_names_to_mock(
         package_nm, tap_class_nm, 'FastSyncTargetSnowflake'
@@ -882,7 +878,6 @@ def assert_snowflake_sync_table_rolls_back_later_upload_failure(
             raise AssertionError(f'Unsupported source type: {source_type}')
 
 
-
 def assert_main_impl_exit_normally_on_success(
     main_impl: callable, package_nm: str, tap_class_nm: str, target_class_nm: str
 ) -> None:
@@ -931,7 +926,6 @@ def assert_main_impl_exit_normally_on_success(
                         multiproc_mock.Pool.assert_called_once_with(10)
                         assert utils_mock.parse_args.call_count == 1
                         assert mock_enter.return_value.map.call_count == 1
-
 
 
 def assert_main_impl_should_exit_with_error_on_failure(

@@ -11,7 +11,6 @@ class TestResyncMariaDBToSF(TapMariaDB):
     Resync tables from MariaDB to Snowflake
     """
 
-
     def setUp(self):
         super().setUp(tap_id=TAP_ID, target_id=TARGET_ID)
 

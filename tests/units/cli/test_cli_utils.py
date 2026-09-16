@@ -10,7 +10,6 @@ from pipelinewise.cli.errors import InvalidConfigException
 VIRTUALENVS_DIR = './virtualenvs-dummy'
 
 
-
 class TestUtils:
     """
     Unit Tests for PipelineWise CLI utility functions
@@ -191,7 +190,7 @@ class TestUtils:
         # Encrypting with not existing file with secret should exit
         with pytest.raises(SystemExit) as pytest_wrapped_e:
             cli.utils.vault_encrypt('plain_test', 'not-existing-secret-file')
-        assert pytest_wrapped_e.type == SystemExit
+        assert pytest_wrapped_e.type is SystemExit
         assert pytest_wrapped_e.value.code == 1
 
         # Encrypted string should start with $ANSIBLE_VAULT; identifier
@@ -213,7 +212,7 @@ class TestUtils:
         # Loading JSON schema file that not exist should exit
         with pytest.raises(SystemExit) as pytest_wrapped_e:
             assert cli.utils.load_schema('/invalid/location/to/schema') is None
-        assert pytest_wrapped_e.type == SystemExit
+        assert pytest_wrapped_e.type is SystemExit
         assert pytest_wrapped_e.value.code == 1
 
         # Loading existing JSON schema should be loaded correctly
@@ -284,7 +283,6 @@ class TestUtils:
         with NamedTemporaryFile(delete=False) as file:
             cli.utils.silentremove(file.name)
             assert os.path.exists(file.name) is False
-
 
     def test_silentremove_successfully_removes_directory(self):
         """Test removing an existing directory works"""

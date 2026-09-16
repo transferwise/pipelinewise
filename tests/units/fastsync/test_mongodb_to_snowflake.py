@@ -20,7 +20,6 @@ TAP = 'FastSyncTapMongoDB'
 TARGET = 'FastSyncTargetSnowflake'
 
 
-
 class MongoDBToSnowflake(unittest.TestCase):
     """
     Unit tests for fastsync MongoDB to postgres

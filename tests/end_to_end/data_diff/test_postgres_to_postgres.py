@@ -68,7 +68,6 @@ def _repository_definition(tap_id, source_table, *, frequency='0 * * * *'):
     )
 
 
-
 class TestPostgresToPostgresDataDiff:
     """Exercise persisted checks, failures, remediation, and coverage."""
 
@@ -115,7 +114,6 @@ class TestPostgresToPostgresDataDiff:
             if char in ('[', '{'):
                 return json.loads(stdout[index:])
         raise ValueError(f'No JSON found in command output: {stdout[:200]}')
-
 
     def test_dd_pass_failure_and_remediation_lifecycle(self):
         """Prove source-target comparison and immutable remediation evidence."""

@@ -728,7 +728,6 @@ class Export(MixPanel):
     replication_method = "INCREMENTAL"
     params = {}
 
-
     @backoff.on_exception(
         backoff.expo,
         (requests.exceptions.ChunkedEncodingError,),

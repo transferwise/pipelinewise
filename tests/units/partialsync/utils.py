@@ -9,11 +9,8 @@ from pipelinewise.fastsync.commons import utils as common_utils
 from pipelinewise.fastsync.commons.snowflake_iceberg import PartialSyncBoundary
 
 
-
 class PartialSync2SFArgs:
     """Arguments for using in mysql to snowflake tests"""
-
-
 
     def __init__(self, temp_test_dir, table='email',
                  start_value='FOO_START', end_value='FOO_END', state='state.json',
@@ -91,8 +88,6 @@ def assert_iceberg_partial_sync_workflow(
     recovery_error=None,
 ):
     """Assert a source route uses durable Iceberg PartialSync publication."""
-
-
 
     package_name = route_module.__name__
     args = PartialSync2SFArgs(

@@ -20,7 +20,6 @@ TAP = 'FastSyncTapMySql'
 TARGET = 'FastSyncTargetSnowflake'
 
 
-
 class MySqlToSnowflake(unittest.TestCase):
     """
     Unit tests for fastsync mysql to snowflake

@@ -32,7 +32,6 @@ EXPECTED_CHECKS = {
 }
 
 
-
 class TestPostgresToSnowflakeDataDiff:
     """Prove data-diff reconciles a PostgreSQL source against a Snowflake replica."""
 

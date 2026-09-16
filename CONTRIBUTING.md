@@ -51,9 +51,10 @@ Never run bare `pytest tests/`; it also collects credentialed end-to-end tests.
 
 Changes under `singer-connectors/` require the owning connector's install, lint,
 unit, coverage, and applicable integration targets. The root Ruff gate inspects
-all repository Python except explicitly excluded unexecuted legacy connector
-tests and spikes. This includes vendored connector source and the tap-mysql,
-tap-postgres, and target-snowflake test suites run by connector CI. Run relevant
+all repository Python except connector suites outside GitHub connector CI,
+including integration suites, legacy tests, and spikes. This includes vendored
+connector source and the tap-mysql, tap-postgres, and target-snowflake unit suites
+run by connector CI. Run relevant
 database and end-to-end routes serially using the
 [`dev-project`](dev-project/README.md) environment.
 

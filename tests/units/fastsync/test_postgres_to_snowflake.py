@@ -21,7 +21,6 @@ TAP = 'FastSyncTapPostgres'
 TARGET = 'FastSyncTargetSnowflake'
 
 
-
 class PostgresToSnowflake(unittest.TestCase):
     """
     Unit tests for fastsync postgres to snowflake

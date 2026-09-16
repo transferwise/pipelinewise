@@ -1,7 +1,6 @@
 from typing import Union
 
 import psycopg2
-import psycopg2.extras
 import pymongo
 import pymysql
 import snowflake.connector

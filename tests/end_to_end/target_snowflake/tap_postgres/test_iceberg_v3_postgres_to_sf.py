@@ -88,7 +88,6 @@ def _horizon_credentials(identity):
 class TestIcebergV3PostgresToSnowflake(TapPostgres):
     """Exercise PostgreSQL Singer, FullSync, and PartialSync into Iceberg."""
 
-
     def setUp(self):
         super().setUp(tap_id=TAP_ID, target_id=TARGET_ID)
         self.target_schema = (f"PPW_E2E_TAP_POSTGRES{self.e2e_env.sf_schema_postfix}").upper()

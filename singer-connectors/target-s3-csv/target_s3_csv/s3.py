@@ -6,7 +6,7 @@ import backoff
 import boto3
 import singer
 
-from typing import Optional, Tuple, List, Dict, Iterator
+from typing import Optional, Dict, Iterator
 from botocore.client import BaseClient
 from botocore.exceptions import ClientError
 
@@ -51,7 +51,6 @@ def create_client(config):
     else:
         s3 = aws_session.client('s3')
     return s3
-
 
 
 @retry_pattern()

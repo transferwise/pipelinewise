@@ -1,9 +1,14 @@
 import ast
 import fnmatch
+import json
 import os
 import re
+import subprocess
+import sys
 import tomllib
 from pathlib import Path
+
+import pytest
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -145,11 +150,14 @@ def test_root_ci_dependencies_and_policy_use_ruff():
         assert f'singer-connectors/{connector}/tests/unit/' in makefile
 
     assert set(ruff_config['lint']['select']) == {'C90', 'E', 'F', 'PLE', 'Q002', 'W'}
+    assert ruff_config['lint']['preview'] is True
+    assert ruff_config['lint']['explicit-preview-rules'] is True
+    assert set(ruff_config['lint']['extend-select']) == {'E301', 'E302', 'E303', 'E304', 'E305', 'E306'}
     assert ruff_config['lint']['mccabe']['max-complexity'] == 15
-    connector_source_rules = {'C901', 'E501', 'E731', 'Q002'}
-    for pattern, ignored_rules in ruff_config['lint']['per-file-ignores'].items():
-        if pattern.startswith('singer-connectors/'):
-            assert connector_source_rules.isdisjoint(ignored_rules)
+    assert ruff_config['lint']['per-file-ignores'] == {
+        'tests/**/*.py': ['C901'],
+        'tests/units/cli/test_cli.py': ['E501'],
+    }
 
     setup_tree = ast.parse((REPOSITORY_ROOT / 'setup.py').read_text())
     dependencies = {
@@ -162,3 +170,37 @@ def test_root_ci_dependencies_and_policy_use_ruff():
     connector_setups = sorted((REPOSITORY_ROOT / 'singer-connectors').glob('*/setup.py'))
     assert connector_setups
     assert all('ruff==0.16.1' in path.read_text() for path in connector_setups)
+
+
+@pytest.mark.parametrize(
+    ('source', 'expected_codes'),
+    [
+        pytest.param("value = '" + 'x' * 110 + "'\n", [], id='120-characters-allowed'),
+        pytest.param("value = '" + 'x' * 111 + "'\n", ['E501'], id='121-characters-rejected'),
+        pytest.param(
+            'def first():\n    pass\n\n\n\ndef second():\n    pass\n',
+            ['E303'],
+            id='extra-blank-line-rejected',
+        ),
+        pytest.param(
+            '@staticmethod\n\ndef example():\n    return None\n',
+            ['E304'],
+            id='decorator-gap-rejected',
+        ),
+    ],
+)
+def test_ruff_enforces_production_line_length_and_spacing(source, expected_codes):
+    result = subprocess.run(
+        [
+            sys.executable, '-m', 'ruff', 'check', '--no-cache', '--output-format', 'json',
+            '--stdin-filename', str(REPOSITORY_ROOT / 'pipelinewise/lint_policy_probe.py'), '-',
+        ],
+        cwd=REPOSITORY_ROOT,
+        input=source,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == bool(expected_codes), result.stderr or result.stdout
+    assert [finding['code'] for finding in json.loads(result.stdout)] == expected_codes

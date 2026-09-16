@@ -59,7 +59,6 @@ class TestDefinedPartialSyncMariaDBToSF(TapMariaDB):
     Defined Partial Sync from MariaDB to Snowflake
     """
 
-
     def setUp(self):
         super().setUp(tap_id=TAP_ID, target_id=TARGET_ID)
 
@@ -111,7 +110,6 @@ class TestDefinedPartialSyncMariaDBToSF(TapMariaDB):
             ),
             ((1001, ''), (1002, None)),
         )
-
 
     def test_defined_partial_sync_mariadb_to_sf(self):
         """

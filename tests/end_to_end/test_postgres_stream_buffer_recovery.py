@@ -291,7 +291,6 @@ def _source_target_rows(e2e):
     return source_rows, target_rows
 
 
-
 def test_postgres_buffer_recovers_after_stop(tmp_path):
     """Replay WAL that was consumed into mbuffer but never target-acknowledged."""
     project_dir = tmp_path / 'project'

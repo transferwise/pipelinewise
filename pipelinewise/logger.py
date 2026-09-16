@@ -5,7 +5,6 @@ from logging.config import fileConfig
 from pathlib import Path
 
 
-
 class Logger:
     """PipelineWise logger class"""
 

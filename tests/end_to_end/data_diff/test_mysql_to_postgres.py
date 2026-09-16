@@ -31,7 +31,6 @@ EXPECTED_CHECKS = {
 }
 
 
-
 class TestMySqlToPostgresDataDiff:
     """Prove data-diff reconciles a MySQL source against a PostgreSQL replica."""
 

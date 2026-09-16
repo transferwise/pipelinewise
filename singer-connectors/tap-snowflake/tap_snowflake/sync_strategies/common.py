@@ -12,6 +12,7 @@ from singer import utils
 
 LOGGER = singer.get_logger('tap_snowflake')
 
+
 def escape(string):
     """Escape strings to be SQL safe"""
     if '"' in string:
@@ -114,7 +115,6 @@ def generate_select_sql(catalog_entry, columns):
     # escape percent signs
     select_sql = select_sql.replace('%', '%%')
     return select_sql
-
 
 
 def row_to_singer_record(catalog_entry, version, row, columns, time_extracted):

@@ -8,6 +8,7 @@ LOGGER = singer.get_logger('tap_salesforce')
 
 MAX_RETRIES = 4
 
+
 class Rest():
 
     def __init__(self, sf):
@@ -18,7 +19,6 @@ class Rest():
         query = self.sf._build_query_string(catalog_entry, start_date)
 
         return self._query_recur(query, catalog_entry, start_date)
-
 
     def _query_recur(
             self,

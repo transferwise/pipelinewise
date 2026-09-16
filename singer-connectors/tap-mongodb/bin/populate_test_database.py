@@ -32,8 +32,10 @@ for db_name, colls in databases.items():
         print("---- Dropping database: " + db_name + ", collection: " + coll_name + " ----")
         client[db_name][coll_name].drop()
 
+
 def random_string_generator(size=6, chars=string.ascii_uppercase + string.digits):
     return ''.join(random.choice(chars) for x in range(size))
+
 
 def generate_simple_coll_docs(num_docs):
     docs = []

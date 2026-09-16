@@ -5,7 +5,6 @@ import psycopg2
 import psycopg2.extras
 import psycopg2.extensions
 import singer
-import singer.schema
 
 from singer import utils, metadata, get_bookmark
 from singer.catalog import Catalog
@@ -276,7 +275,6 @@ def register_type_adapters(conn_config):
                 psycopg2.extensions.register_type(
                     psycopg2.extensions.new_array_type(
                         (enum_oid,), f'ENUM_{enum_oid}[]', psycopg2.STRING))
-
 
 
 def do_sync(conn_config, catalog, default_replication_method, state, state_file=None):

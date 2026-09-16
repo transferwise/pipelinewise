@@ -1,7 +1,6 @@
 """Tests for Snowflake Iceberg durable recovery state."""
 
 
-
 import json
 import os
 from datetime import date, datetime, time

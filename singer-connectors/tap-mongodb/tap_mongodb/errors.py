@@ -13,14 +13,18 @@ class InvalidReplicationMethodException(Exception):
 class UnsupportedKeyTypeException(Exception):
     """Raised if key type is unsupported"""
 
+
 class MongoAssertionException(Exception):
     """Raised if Mongo exhibits incorrect behavior"""
+
 
 class MongoInvalidDateTimeException(Exception):
     """Raised if we find an invalid date-time that we can't handle"""
 
+
 class SyncException(Exception):
     """Raised if we find an invalid date-time that we can't handle"""
+
 
 class NoReadPrivilegeException(Exception):
     """Raised if the DB user has no read privilege on the DB"""
@@ -28,11 +32,13 @@ class NoReadPrivilegeException(Exception):
         msg = f"The user '{user}' has no read privilege on the database '{db_name}'!"
         super().__init__(msg)
 
+
 class InvalidUpdateBufferSizeError(Exception):
     """Raised if the given update buffer size used in log_based is invalid"""
     def __init__(self, size, reason):
         msg = f"Invalid update buffer size {size}! {reason}"
         super().__init__(msg)
+
 
 class InvalidAwaitTimeError(Exception):
     """Raised if the given await time used in log_based is invalid"""

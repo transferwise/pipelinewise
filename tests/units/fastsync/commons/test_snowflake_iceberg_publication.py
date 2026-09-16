@@ -426,6 +426,7 @@ class TestPublication:
         assert snowflake.transactions == []
         publisher.inspect_table.assert_not_called()
 
+
 class TestQueryHistoryRecovery:
     """Validate publication recovery and bounded query-history polling."""
 

@@ -115,7 +115,6 @@ def primary_column_names(stream_schema_message):
     return [safe_column_name(p) for p in stream_schema_message['key_properties']]
 
 
-
 def create_query_tag(query_tag_pattern: str, database: str = None, schema: str = None, table: str = None) -> str:
     """
     Generate a string to tag executed queries in Snowflake.
@@ -148,7 +147,6 @@ def create_query_tag(query_tag_pattern: str, database: str = None, schema: str =
             query_tag = query_tag.replace(k, v or '')
 
     return query_tag
-
 
 
 class DbSync:
@@ -324,7 +322,6 @@ class DbSync:
                     queries = [query]
 
                 qid = None
-
 
                 for q in queries:
 
@@ -620,7 +617,6 @@ class DbSync:
         query = f"GRANT USAGE ON SCHEMA {schema_name} TO ROLE {grantee}"
         self.logger.info("Granting USAGE privilege on '%s' schema to '%s'... %s", schema_name, grantee, query)
         self.query(query)
-
 
     def grant_select_on_all_tables_in_schema(self, schema_name, grantee):
         """Grant select on all tables in schema"""

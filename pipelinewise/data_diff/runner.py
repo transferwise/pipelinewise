@@ -127,7 +127,6 @@ def execute_started_run(
         )
 
 
-
 def _execute_and_persist(
     backend,
     connection_config_loader: ConnectionConfigLoader,
@@ -260,7 +259,6 @@ def _finish_failed_run(backend, check: dict, run: dict, preflight_id, error: str
     backend.finish_run(
         run["run_id"], "ERROR", [], preflight_id=preflight_id, error=error
     )
-
 
 
 def run_due_checks(

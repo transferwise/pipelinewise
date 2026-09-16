@@ -352,7 +352,6 @@ class FastSyncTapPostgres:
 
                 return []
 
-
     def create_replication_slot(self):
         """
         Create replication slot on the primary host
@@ -387,7 +386,6 @@ class FastSyncTapPostgres:
             else:
                 raise exc
 
-
     def fetch_current_log_pos(self):
         """
         Get the actual wal position in Postgres
@@ -416,7 +414,6 @@ class FastSyncTapPostgres:
         lsn = (int(file, 16) << 32) + int(index, 16)
 
         return {'lsn': lsn, 'version': 1}
-
 
     def fetch_current_incremental_key_pos(self, table, replication_key):
         """
@@ -513,7 +510,6 @@ class FastSyncTapPostgres:
             if self.hstore_as_json else ''
         )
 
-
         sql = f"""
                 SELECT
                     column_name
@@ -549,7 +545,6 @@ class FastSyncTapPostgres:
                 ) AS x
             """  # noqa: E501
 
-
         return self.query(sql)
 
     def map_column_types_to_target(self, table_name):
@@ -578,7 +573,6 @@ class FastSyncTapPostgres:
             'primary_key': self.get_primary_keys(table_name),
             'source_column_names': [column[0] for column in postgres_columns],
         }
-
 
     def copy_table(
         self,

@@ -10,9 +10,6 @@ from pipelinewise.backend_db import BackendDatabase, BackendDatabaseConfigError
 from pipelinewise.cli import utils
 
 
-
-
-
 def _config():
     return {
         "host": "backend",

@@ -193,7 +193,6 @@ def discover_columns(connection, table_info):
     return entries
 
 
-
 def schema_for_column_datatype(col):  # noqa: C901
     """
     Build json schema for columns with non-array datatype
@@ -357,7 +356,6 @@ def schema_for_column(col_info):  # noqa: C901
         # custom datatypes like enums
         column_schema['items'] = {'$ref': '#/definitions/sdc_recursive_string_array'}
     return column_schema
-
 
 
 def nullable_columns(col_types, pk):

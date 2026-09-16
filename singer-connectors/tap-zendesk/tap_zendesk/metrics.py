@@ -22,9 +22,11 @@ metrics_data = {
 
 LOGGER = singer.get_logger('tap_zendesk')
 
+
 def _seconds_since_datetime(dt):
     "Returns the number of seconds since DT"
     return (datetime.utcnow() - dt).seconds
+
 
 def _log_aggregate_rates(current_capture_rate, aggregate_rates):
     """Logs the aggregate rates"""
@@ -65,6 +67,7 @@ def _aggregate_rates(current_capture_rate, current_metrics_data):
     current_metrics_data['window_start_time'] = datetime.utcnow()
     _log_aggregate_rates(current_capture_rate, current_metrics_data['aggregate_rates'])
 
+
 def _maybe_aggregate_rates(current_capture_rate, current_metrics_data):
     """Takes metrics_data and aggregates it into the current aggregated rates
     if enough time has passed. If an aggregation happens it the new
@@ -75,12 +78,14 @@ def _maybe_aggregate_rates(current_capture_rate, current_metrics_data):
             current_metrics_data['window_start_time']):
         _aggregate_rates(current_capture_rate, current_metrics_data)
 
+
 def _capture_raw(current_metrics_data, metric):
     """Adds one to METRIC in WINDOW_COUNTS defaultdict"""
     current_metrics_data['window_counts'][metric] += 1
     LOGGER.debug('Raw count for metric %s is %d',
                  metric,
                  current_metrics_data['window_counts'][metric])
+
 
 def capture(metric):
     # Start the metrics window timer if this is the first time capture has
@@ -92,6 +97,7 @@ def capture(metric):
 
     _capture_raw(metrics_data, metric)
     _maybe_aggregate_rates(capture_rate, metrics_data)
+
 
 def log_aggregate_rates():
     """Forces a log of the aggregate rates for the internal datastructures"""

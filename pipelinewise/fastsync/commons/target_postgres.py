@@ -12,7 +12,6 @@ from .transform_utils import SQLFlavor, TransformationHelper
 LOGGER = logging.getLogger(__name__)
 
 
-
 class FastSyncTargetPostgres:
     """
     Common functions for fastsync to Postgres
@@ -178,13 +177,11 @@ class FastSyncTargetPostgres:
             )
             self.query(sql)
 
-
     def grant_usage_on_schema(self, target_schema, role, to_group=False):
         # Grant role is not mandatory parameter, do nothing if not specified
         if role:
             sql = 'GRANT USAGE ON SCHEMA {} TO GROUP {}'.format(target_schema, role)
             self.query(sql)
-
 
     def grant_select_on_schema(self, target_schema, role, to_group=False):
         # Grant role is not mandatory parameter, do nothing if not specified

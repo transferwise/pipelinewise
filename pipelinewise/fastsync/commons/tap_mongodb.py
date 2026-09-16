@@ -235,7 +235,6 @@ class FastSyncTapMongoDB:
         """
         self.database.client.close()
 
-
     def copy_table(
         self,
         table_name: str,
@@ -384,7 +383,6 @@ class FastSyncTapMongoDB:
         # serialized when saving the state in the function 'utils.save_state_file'.
         # '_data' is enough to resume LOG_BASED Singer replication after FastSync
         return {'token': {'_data': token['_data']}}
-
 
     def fetch_current_incremental_key_pos(
         self, fully_qualified_table_name: str, replication_key: str

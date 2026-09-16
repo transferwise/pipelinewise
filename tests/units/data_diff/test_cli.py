@@ -10,10 +10,6 @@ from pipelinewise.cli.pipelinewise import PipelineWise
 from tests.units.cli.cli_args import CliArgs
 
 
-
-
-
-
 class RepositoryContext:
     def __init__(self, checks=None, sync_error=None):
         self.checks = checks or []

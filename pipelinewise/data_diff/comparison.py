@@ -38,7 +38,6 @@ def column_type_name(column: dict) -> str:
     return data_type
 
 
-
 def type_family(column: dict) -> str:
     """Collapse route-specific physical types into comparable families."""
     type_name = column_type_name(column)

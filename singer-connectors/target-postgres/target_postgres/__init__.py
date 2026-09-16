@@ -81,7 +81,6 @@ def emit_state(state):
         sys.stdout.flush()
 
 
-
 def persist_lines(config, lines) -> None:  # noqa: C901
     """Read singer messages and process them line by line"""
     state = None
@@ -242,7 +241,6 @@ def persist_lines(config, lines) -> None:  # noqa: C901
     emit_state(copy.deepcopy(flushed_state))
 
 
-
 def flush_streams(
         streams,
         row_count,
@@ -316,7 +314,6 @@ def flush_streams(
     return flushed_state
 
 
-
 def load_stream_batch(stream, records_to_load, row_count, db_sync, delete_rows=False, temp_dir=None):
     """Load a batch of records and do post load operations, like creating
     or deleting rows"""
@@ -333,7 +330,6 @@ def load_stream_batch(stream, records_to_load, row_count, db_sync, delete_rows=F
 
     # reset row count for the current stream
     row_count[stream] = 0
-
 
 
 def flush_records(stream, records_to_load, row_count, db_sync, temp_dir=None):

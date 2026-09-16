@@ -12,7 +12,6 @@ from pipelinewise.cli.alert_handlers.victorops_alert_handler import (
 )
 
 
-
 class TestAlertSender:
     """
     Unit tests for PipelineWise CLI alert sender classes

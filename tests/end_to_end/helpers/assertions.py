@@ -307,7 +307,6 @@ def _normalize_hashed_fixture_value(value, normalizer):
     return f'{value[:skip_first]}{digest}'
 
 
-
 def assert_partial_sync_table_success(
         tap_parameters, start_value, end_value=None):
     """Partial sync a specific tap and make sure that it finished successfully and state file is created
@@ -718,7 +717,6 @@ def assert_row_counts_equal(
     assert row_counts_in_target == row_counts_in_source
 
 
-
 def assert_all_columns_exist(
     tap_query_runner_fn: callable,
     target_query_runner_fn: callable,
@@ -886,7 +884,6 @@ def assert_profiling_stats_files_created(
     if isinstance(tap, list):
         for tap_ in tap:
             assert f'tap_{tap_}.pstat' in pstat_files
-
 
 
 @contextmanager

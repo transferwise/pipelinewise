@@ -78,7 +78,6 @@ def generate_all_datatypes_doc():
     }
 
 
-
 class TestFastSyncTapMongoDB(TestCase):
     """
     Unit tests for fastsync tap mongo

@@ -37,12 +37,15 @@ API_TOKEN_CONFIG_KEYS = [
 # patch Session.request to record HTTP request metrics
 request = Session.request
 
+
 def request_metrics_patch(self, method, url, **kwargs):
     with singer_metrics.http_request_timer(None):
         return request(self, method, url, **kwargs)
 
+
 Session.request = request_metrics_patch
 # end patch
+
 
 def do_discover(client):
     LOGGER.info("Starting discover")
@@ -50,8 +53,10 @@ def do_discover(client):
     json.dump(catalog, sys.stdout, indent=2)
     LOGGER.info("Finished discover")
 
+
 def stream_is_selected(mdata):
     return mdata.get((), {}).get('selected', False)
+
 
 def get_selected_streams(catalog):
     selected_stream_names = []
@@ -66,14 +71,17 @@ SUB_STREAMS = {
     'tickets': ['ticket_audits', 'ticket_metrics', 'ticket_comments']
 }
 
+
 def get_sub_stream_names():
     sub_stream_names = []
     for parent_stream in SUB_STREAMS:
         sub_stream_names.extend(SUB_STREAMS[parent_stream])
     return sub_stream_names
 
+
 class DependencyException(Exception):
     pass
+
 
 def validate_dependencies(selected_stream_ids):
     errs = []
@@ -87,6 +95,7 @@ def validate_dependencies(selected_stream_ids):
 
     if errs:
         raise DependencyException(" ".join(errs))
+
 
 def populate_class_schemas(catalog, selected_stream_names):
     for stream in catalog.streams:
@@ -118,7 +127,6 @@ def do_sync(client, catalog, state, start_date):
         # else:
         #     LOGGER.info("%s: Starting", stream_name)
 
-
         key_properties = metadata.get(mdata, (), 'table-key-properties')
         singer.write_schema(stream_name, stream.schema.to_dict(), key_properties)
 
@@ -147,6 +155,7 @@ def do_sync(client, catalog, state, start_date):
     LOGGER.info("Finished sync")
     zendesk_metrics.log_aggregate_rates()
 
+
 def oauth_auth(args):
     if not set(OAUTH_CONFIG_KEYS).issubset(args.config.keys()):
         LOGGER.debug("OAuth authentication unavailable.")
@@ -157,6 +166,7 @@ def oauth_auth(args):
         "subdomain": args.config['subdomain'],
         "oauth_token": args.config['access_token'],
     }
+
 
 def api_token_auth(args):
     if not set(API_TOKEN_CONFIG_KEYS).issubset(args.config.keys()):
@@ -170,16 +180,19 @@ def api_token_auth(args):
         "token": args.config['api_token']
     }
 
+
 def convert_x_rate_limit_remaining_to_int(response, *args, **kwargs):
     if 'X-Rate-Limit-Remaining' in response.headers and isinstance(response.headers['X-Rate-Limit-Remaining'], str):
         response.headers['X-Rate-Limit-Remaining'] = int(response.headers['X-Rate-Limit-Remaining'])
 
     return response
 
+
 def add_session_hooks(session):
     # This is due version conflict between singer-python and ZenPy
     # Link: https://github.com/singer-io/singer-python/issues/114
     session.hooks['response'].append(convert_x_rate_limit_remaining_to_int)
+
 
 def get_session(config):
     """ Add partner information to requests Session object if specified in the config. """
@@ -218,12 +231,14 @@ def get_default_config():
 
     return config
 
+
 def get_internal_config(user_config, default_config):
     config = {}
     for key in default_config.keys():
         config[key] = user_config.get(key, default_config[key])
 
     return config
+
 
 @singer.utils.handle_top_exception(LOGGER)
 def main():

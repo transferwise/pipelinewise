@@ -10,7 +10,6 @@ class TestReplicateS3ToSF(TapS3):
     Test replicate S3 to SF
     """
 
-
     def setUp(self):
         super().setUp(tap_id=TAP_ID, target_id=TARGET_ID)
 

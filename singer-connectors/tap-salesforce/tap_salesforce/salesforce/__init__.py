@@ -1,6 +1,5 @@
 import re
 import threading
-import time
 import backoff
 import requests
 from requests.exceptions import RequestException
@@ -125,6 +124,7 @@ QUERY_INCOMPATIBLE_SALESFORCE_OBJECTS = set(['ListViewChartInstance',
                                              'AttachedContentNote',
                                              'QuoteTemplateRichTextData'])
 
+
 def log_backoff_attempt(details):
     LOGGER.info("ConnectionError detected, triggering backoff: %d try", details.get("tries"))
 
@@ -186,6 +186,7 @@ def field_to_property_schema(field, mdata):
 
     return property_schema, mdata
 
+
 class Salesforce():
 
     def __init__(self,
@@ -232,7 +233,6 @@ class Salesforce():
     def _get_standard_headers(self):
         return {"Authorization": "Bearer {}".format(self.access_token)}
 
-
     def check_rest_quota_usage(self, headers):
         match = re.search(r'^api-usage=(\d+)/(\d+)$', headers.get('Sforce-Limit-Info'))
 
@@ -263,7 +263,6 @@ class Salesforce():
                                                                        (self.rest_requests_attempted / allotted) * 100,
                                                                        self.quota_percent_per_run)
             raise TapSalesforceQuotaExceededException(partial_message)
-
 
     @backoff.on_exception(backoff.expo,
                           requests.exceptions.ConnectionError,
@@ -345,7 +344,6 @@ class Salesforce():
 
         return resp.json()
 
-
     def _get_selected_properties(self, catalog_entry):
         mdata = metadata.to_map(catalog_entry['metadata'])
         properties = catalog_entry['schema'].get('properties', {})
@@ -354,7 +352,6 @@ class Salesforce():
                 if singer.should_sync_field(metadata.get(mdata, ('properties', k), 'inclusion'),
                                             metadata.get(mdata, ('properties', k), 'selected'),
                                             self.select_fields_by_default)]
-
 
     def get_start_date(self, state, catalog_entry):
         catalog_metadata = metadata.to_map(catalog_entry['metadata'])
@@ -411,7 +408,6 @@ class Salesforce():
             raise TapSalesforceException(
                 "api_type should be REST or BULK was: {}".format(
                     self.api_type))
-
 
     def get_blacklisted_fields(self):
         if self.api_type == BULK_API_TYPE:

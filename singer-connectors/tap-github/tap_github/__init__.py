@@ -48,41 +48,54 @@ KEY_PROPERTIES = {
     'team_memberships': ['url']
 }
 
+
 class GithubException(Exception):
     pass
+
 
 class BadCredentialsException(GithubException):
     pass
 
+
 class InvalidParametersException(Exception):
     pass
+
 
 class AuthException(GithubException):
     pass
 
+
 class NotFoundException(GithubException):
     pass
+
 
 class BadRequestException(GithubException):
     pass
 
+
 class InternalServerError(GithubException):
     pass
+
 
 class UnprocessableError(GithubException):
     pass
 
+
 class NotModifiedError(GithubException):
     pass
+
 
 class MovedPermanentlyError(GithubException):
     pass
 
+
 class ConflictError(GithubException):
     pass
 
+
 class RateLimitExceeded(GithubException):
     pass
+
 
 ERROR_CODE_EXCEPTION_MAPPING = {
     301: {
@@ -122,6 +135,7 @@ ERROR_CODE_EXCEPTION_MAPPING = {
         "message": "An error has occurred at Github's end."
     }
 }
+
 
 def translate_state(state, catalog, repositories):
     '''
@@ -176,6 +190,7 @@ def get_bookmark(state, repo, stream_name, bookmark_key, start_date):
         return start_date
     return None
 
+
 def raise_for_error(resp, source):
 
     content_length = len(resp.content)
@@ -209,9 +224,11 @@ def raise_for_error(resp, source):
     exc = ERROR_CODE_EXCEPTION_MAPPING.get(error_code, {}).get("raise_exception", GithubException)
     raise exc(message) from None
 
+
 def calculate_seconds(epoch):
     current = time.time()
     return int(round((epoch - current), 0))
+
 
 def rate_throttling(response):
     if 'Retry-After' in response.headers:
@@ -294,6 +311,7 @@ def authed_get(source, url, headers={}, do_rate_throttling=True, rate_limit_retr
                 rate_throttling(resp)
             return resp
 
+
 def authed_get_all_pages(source, url, headers={}):
     while True:
         r = authed_get(source, url, headers)
@@ -302,6 +320,7 @@ def authed_get_all_pages(source, url, headers={}):
             url = r.links['next']['url']
         else:
             break
+
 
 def get_abs_path(path):
     return os.path.join(os.path.dirname(os.path.realpath(__file__)), path)
@@ -321,6 +340,7 @@ def generate_pr_commit_schema(commit_schema):
 
     return pr_commit_schema
 
+
 def load_schemas():
     schemas = {}
 
@@ -333,8 +353,10 @@ def load_schemas():
     schemas['pr_commits'] = generate_pr_commit_schema(schemas['commits'])
     return schemas
 
+
 class DependencyException(Exception):
     pass
+
 
 def validate_dependencies(selected_stream_ids):
     errs = []
@@ -359,6 +381,7 @@ def write_metadata(mdata, values, breadcrumb):
         }
     )
 
+
 def populate_metadata(schema_name, schema):
     mdata = metadata.new()
     #mdata = metadata.write(mdata, (), 'forced-replication-method', KEY_PROPERTIES[schema_name])
@@ -371,6 +394,7 @@ def populate_metadata(schema_name, schema):
             mdata = metadata.write(mdata, ('properties', field_name), 'inclusion', 'available')
 
     return mdata
+
 
 def get_catalog():
     raw_schemas = load_schemas()
@@ -393,6 +417,7 @@ def get_catalog():
 
     return {'streams': streams}
 
+
 def verify_repo_access(url_for_repo, repo):
     try:
         authed_get("verifying repository access", url_for_repo, do_rate_throttling=False)
@@ -403,6 +428,7 @@ def verify_repo_access(url_for_repo, repo):
             "or you do not have sufficient permissions to access this repository."
         ).format(repo)
         raise NotFoundException(message) from None
+
 
 def verify_access_for_repo(config):
 
@@ -419,11 +445,13 @@ def verify_access_for_repo(config):
         # Verifying for Repo access
         verify_repo_access(url_for_repo, repo)
 
+
 def do_discover(config):
     verify_access_for_repo(config)
     catalog = get_catalog()
     # dump catalog
     print(json.dumps(catalog, indent=2))
+
 
 def get_all_teams(schemas, repo_path, state, mdata, _start_date):
     org = repo_path.split('/')[0]
@@ -466,6 +494,7 @@ def get_all_teams(schemas, repo_path, state, mdata, _start_date):
 
     return state
 
+
 def get_all_team_members(team_slug, schemas, repo_path, state, mdata):
     org = repo_path.split('/')[0]
     with metrics.record_counter('team_members') as counter:
@@ -485,6 +514,7 @@ def get_all_team_members(team_slug, schemas, repo_path, state, mdata):
                 yield rec
 
     return state
+
 
 def get_all_team_memberships(team_slug, schemas, repo_path, state, mdata):
     org = repo_path.split('/')[0]
@@ -515,7 +545,6 @@ def get_all_issue_events(schemas, repo_path, state, mdata, start_date):
         bookmark_time = singer.utils.strptime_to_utc(bookmark_value)
     else:
         bookmark_time = 0
-
 
     with metrics.record_counter('issue_events') as counter:
         for response in authed_get_all_pages(
@@ -587,6 +616,7 @@ def get_all_events(schemas, repo_path, state, mdata, start_date):
 
     return state
 
+
 def get_all_issue_milestones(schemas, repo_path, state, mdata, start_date):
     # Incremental sync off `due on` ??? confirm.
     # https://developer.github.com/v3/issues/milestones/#list-milestones-for-a-repository
@@ -628,6 +658,7 @@ def get_all_issue_milestones(schemas, repo_path, state, mdata, start_date):
 
     return state
 
+
 def get_all_issue_labels(schemas, repo_path, state, mdata, _start_date):
     # https://developer.github.com/v3/issues/labels/
     # not sure if incremental key
@@ -656,6 +687,7 @@ def get_all_issue_labels(schemas, repo_path, state, mdata, _start_date):
                 counter.increment()
 
     return state
+
 
 def get_all_commit_comments(schemas, repo_path, state, mdata, start_date):
     # https://developer.github.com/v3/repos/comments/
@@ -697,6 +729,7 @@ def get_all_commit_comments(schemas, repo_path, state, mdata, start_date):
                 counter.increment()
 
     return state
+
 
 def get_all_projects(schemas, repo_path, state, mdata, start_date):
     bookmark_value = get_bookmark(state, repo_path, "projects", "since", start_date)
@@ -803,6 +836,7 @@ def get_all_project_cards(column_id, schemas, repo_path, state, mdata, start_dat
 
     return state
 
+
 def get_all_project_columns(project_id, schemas, repo_path, state, mdata, start_date):
     bookmark_value = get_bookmark(state, repo_path, "project_columns", "since", start_date)
     if bookmark_value:
@@ -834,6 +868,7 @@ def get_all_project_columns(project_id, schemas, repo_path, state, mdata, start_
 
     return state
 
+
 def get_all_releases(schemas, repo_path, state, mdata, _start_date):
     # Releases doesn't seem to have an `updated_at` property, yet can be edited.
     # For this reason and since the volume of release can safely be considered low,
@@ -858,6 +893,7 @@ def get_all_releases(schemas, repo_path, state, mdata, _start_date):
 
     return state
 
+
 def get_all_pull_requests(schemas, repo_path, state, mdata, start_date):
     """
     https://developer.github.com/v3/pulls/#list-pull-requests
@@ -878,7 +914,6 @@ def get_all_pull_requests(schemas, repo_path, state, mdata, start_date):
                 pull_requests = response.json()
                 extraction_time = singer.utils.now()
                 for pr in pull_requests:
-
 
                     # skip records that haven't been updated since the last run
                     # the GitHub API doesn't currently allow a ?since param for pulls
@@ -948,6 +983,7 @@ def get_all_pull_requests(schemas, repo_path, state, mdata, start_date):
 
     return state
 
+
 def get_reviews_for_pr(pr_number, schema, repo_path, state, mdata):
     for response in authed_get_all_pages(
             'reviews',
@@ -961,6 +997,7 @@ def get_reviews_for_pr(pr_number, schema, repo_path, state, mdata):
             yield rec
     return state
 
+
 def get_review_comments_for_pr(pr_number, schema, repo_path, state, mdata):
     for response in authed_get_all_pages(
             'comments',
@@ -973,6 +1010,7 @@ def get_review_comments_for_pr(pr_number, schema, repo_path, state, mdata):
                 rec = transformer.transform(comment, schema, metadata=metadata.to_map(mdata))
             yield rec
     return state
+
 
 def get_commits_for_pr(pr_number, pr_id, schema, repo_path, state, mdata):
     for response in authed_get_all_pages(
@@ -1014,6 +1052,7 @@ def get_all_assignees(schema, repo_path, state, mdata, _start_date):
 
     return state
 
+
 def get_all_collaborators(schema, repo_path, state, mdata, _start_date):
     """
     https://developer.github.com/v3/repos/collaborators/#list-collaborators
@@ -1039,6 +1078,7 @@ def get_all_collaborators(schema, repo_path, state, mdata, _start_date):
                 counter.increment()
 
     return state
+
 
 def get_all_commits(schema, repo_path,  state, mdata, start_date):
     """
@@ -1066,6 +1106,7 @@ def get_all_commits(schema, repo_path,  state, mdata, start_date):
                 counter.increment()
 
     return state
+
 
 def get_all_issues(schema, repo_path,  state, mdata, start_date):
     """
@@ -1097,6 +1138,7 @@ def get_all_issues(schema, repo_path,  state, mdata, start_date):
                 counter.increment()
     return state
 
+
 def get_all_comments(schema, repo_path, state, mdata, start_date):
     """
     https://developer.github.com/v3/issues/comments/#list-comments-in-a-repository
@@ -1126,6 +1168,7 @@ def get_all_comments(schema, repo_path, state, mdata, start_date):
                 singer.write_bookmark(state, repo_path, 'comments', {'since': singer.utils.strftime(extraction_time)})
                 counter.increment()
     return state
+
 
 def get_all_stargazers(schema, repo_path, state, mdata, _start_date):
     """
@@ -1230,7 +1273,6 @@ def should_skip_repo(
     return False
 
 
-
 def get_selected_streams(catalog):
     """
     Gets selected streams.  Checks schema's 'selected'
@@ -1250,11 +1292,13 @@ def get_selected_streams(catalog):
 
     return selected_streams
 
+
 def get_stream_from_catalog(stream_id, catalog):
     for stream in catalog['streams']:
         if stream['tap_stream_id'] == stream_id:
             return stream
     return None
+
 
 SYNC_FUNCTIONS = {
     'commits': get_all_commits,
@@ -1280,6 +1324,7 @@ SUB_STREAMS = {
     'teams': ['team_members', 'team_memberships']
 }
 
+
 def do_sync(config, state, catalog):
     access_token = config['access_token']
     session.headers.update({'authorization': 'token ' + access_token})
@@ -1293,7 +1338,6 @@ def do_sync(config, state, catalog):
 
     state = translate_state(state, catalog, repositories)
     singer.write_state(state)
-
 
     for repo in repositories:
         logger.info("Starting sync of repository: %s", repo)
@@ -1397,6 +1441,7 @@ def _get_repository_full_name(org, repo_name):
     else:
         return f"{org}/{repo_name}"
 
+
 @singer.utils.handle_top_exception(logger)
 def main():
     args = singer.utils.parse_args(REQUIRED_CONFIG_KEYS)
@@ -1411,6 +1456,7 @@ def main():
     else:
         catalog = args.properties if args.properties else get_catalog()
         do_sync(args.config, args.state, catalog)
+
 
 if __name__ == '__main__':
     main()

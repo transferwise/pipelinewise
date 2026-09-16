@@ -8,7 +8,6 @@ from tests.units.fastsync.commons.snowflake_iceberg_test_helpers import (
 )
 
 
-
 class S3Mock:
     """
     Mocked boto3
@@ -17,13 +16,11 @@ class S3Mock:
     def __init__(self):
         pass
 
-
     def delete_object(self, Bucket, Key):
         """Do nothing when trying to delete file on s3"""
 
     def copy_object(self, **kwargs):
         """Mock if needed"""
-
 
     def head_object(self, **kwargs):
         """Mock if needed"""
@@ -813,7 +810,6 @@ class TestFastSyncTargetSnowflake(TestCase):
             ],
         )
 
-
     def test_default_archive_destination(self):
         """
         Validate parameters passed to s3 copy_object method when custom s3 bucket and folder are not defined
@@ -839,7 +835,6 @@ class TestFastSyncTargetSnowflake(TestCase):
             },
             MetadataDirective='REPLACE',
         )
-
 
     def test_custom_archive_destination(self):
         """
@@ -872,7 +867,6 @@ class TestFastSyncTargetSnowflake(TestCase):
             },
             MetadataDirective='REPLACE',
         )
-
 
     def test_copied_archive_metadata(self):
         """

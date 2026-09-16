@@ -15,7 +15,6 @@ DEFAULT_MAX_CHUNKS = 20
 EST_COMPR_RATE = 0.12
 
 
-
 def open(
     base_filename,
     mode='wb',
@@ -50,7 +49,6 @@ def open(
     return SplitGzipFile(
         base_filename, mode, chunk_size_mb, max_chunks, est_compr_rate, compress
     )
-
 
 
 class SplitGzipFile(io.BufferedIOBase):

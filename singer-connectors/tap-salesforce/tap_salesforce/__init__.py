@@ -31,6 +31,7 @@ FORCED_FULL_TABLE = {
     'BackgroundOperationResult' # Does not support ordering by CreatedDate
 }
 
+
 def get_replication_key(sobject_name, fields):
     if sobject_name in FORCED_FULL_TABLE:
         return None
@@ -47,8 +48,10 @@ def get_replication_key(sobject_name, fields):
         return 'LoginTime'
     return None
 
+
 def stream_is_selected(mdata):
     return mdata.get((), {}).get('selected', False)
+
 
 def build_state(raw_state, catalog):
     state = {}
@@ -98,10 +101,9 @@ def create_property_schema(field, mdata):
         mdata = metadata.write(
             mdata, ('properties', field_name), 'inclusion', 'available')
 
-    property_schema, mdata = salesforce.field_to_property_schema(field, mdata)
+    property_schema, mdata = tap_salesforce.salesforce.field_to_property_schema(field, mdata)
 
     return (property_schema, mdata)
-
 
 
 def do_discover(sf):  # noqa: C901
@@ -269,6 +271,7 @@ def do_discover(sf):  # noqa: C901
     result = {'streams': entries}
     json.dump(result, sys.stdout, indent=4)
 
+
 def do_sync(sf, catalog, state):
     starting_stream = state.get("current_stream")
 
@@ -357,6 +360,7 @@ def do_sync(sf, catalog, state):
     state["current_stream"] = None
     singer.write_state(state)
     LOGGER.info("Finished sync")
+
 
 def main_impl():
     args = singer_utils.parse_args(REQUIRED_CONFIG_KEYS)

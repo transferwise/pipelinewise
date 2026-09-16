@@ -6,7 +6,6 @@ import json
 import random
 import re
 import socket
-import pymysql.connections
 import pymysql.err
 import pytz
 import singer
@@ -216,7 +215,6 @@ def json_bytes_to_string(data):
         return list(map(json_bytes_to_string, data))
 
     return data
-
 
 
 def row_to_singer_record(catalog_entry, version, db_column_map, row, time_extracted):  # noqa: C901
@@ -623,9 +621,7 @@ def __get_diff_in_columns_list(
         )
     ]
 
-
     return set(binlog_columns_filtered).difference(schema_properties)
-
 
 
 def _run_binlog_sync(  # noqa: C901

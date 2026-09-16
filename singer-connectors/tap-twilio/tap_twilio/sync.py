@@ -190,7 +190,6 @@ def sync_endpoint(  # noqa: C901
 
     endpoint_total = 0
 
-
     while start_window < now_datetime:
         LOGGER.info(
             'START Sync for Stream: %s%s',

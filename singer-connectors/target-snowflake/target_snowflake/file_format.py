@@ -11,6 +11,7 @@ from target_snowflake.exceptions import FileFormatNotFoundException, InvalidFile
 from target_snowflake.file_formats.csv import REQUIRED_FILE_FORMAT_OPTIONS
 from target_snowflake.managed_iceberg import sql_string_literal
 
+
 # Supported types for file formats.
 @unique
 class FileFormatTypes(str, Enum):
@@ -23,7 +24,6 @@ class FileFormatTypes(str, Enum):
     def list():
         """List of supported file type values"""
         return list(map(lambda c: c.value, FileFormatTypes))
-
 
 
 class FileFormat:

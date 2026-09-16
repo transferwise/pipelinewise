@@ -31,7 +31,6 @@ def validate_server_version(connection):
         )
 
 
-
 def calculate_destination_stream_name(stream, md_map):
     return f"{md_map.get((), {}).get('schema-name')}-{stream['stream']}"
 
@@ -85,6 +84,7 @@ def open_connection(conn_config, logical_replication=False, prioritize_primary=F
 
     return conn
 
+
 def prepare_columns_for_select_sql(c, md_map):
     column_name = f' "{canonicalize_identifier(c)}" '
 
@@ -97,6 +97,7 @@ def prepare_columns_for_select_sql(c, md_map):
                    f'ELSE {column_name} ' \
                    f'END AS {column_name}'
     return column_name
+
 
 def prepare_columns_sql(c):
     column_name = f""" "{canonicalize_identifier(c)}" """
@@ -111,7 +112,6 @@ def filter_dbs_sql_clause(sql, filter_dbs):
 def filter_schemas_sql_clause(sql, filer_schemas):
     in_clause = " AND n.nspname in (" + ",".join([f"'{b.strip(' ')}'" for b in filer_schemas.split(',')]) + ")"
     return sql + in_clause
-
 
 
 def selected_value_to_singer_value_impl(elem, sql_datatype):  # noqa: C901
@@ -201,7 +201,6 @@ def selected_value_to_singer_value(elem, sql_datatype):
     return selected_value_to_singer_value_impl(elem, sql_datatype)
 
 
-
 def selected_row_to_singer_message(stream, row, version, columns, time_extracted, md_map):
     row_to_persist = ()
     for idx, elem in enumerate(row):
@@ -277,10 +276,12 @@ def filter_tables_sql_clause(sql, tables: List[str]):
     in_clause = " AND pg_class.relname in (" + ",".join([f"'{b.strip(' ')}'" for b in tables]) + ")"
     return sql + in_clause
 
+
 def get_database_name(connection):
     cur = connection.cursor()
     rows = cur.execute("SELECT name FROM v$database").fetchall()
     return rows[0][0]
+
 
 def attempt_connection_to_db(conn_config, dbname):
     nascent_config = copy.deepcopy(conn_config)

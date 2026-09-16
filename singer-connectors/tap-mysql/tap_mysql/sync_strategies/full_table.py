@@ -163,7 +163,6 @@ def sync_table(mysql_conn, catalog_entry, state, columns, stream_version):
 
             params = {}
 
-
             common.sync_query(cur,
                               catalog_entry,
                               state,

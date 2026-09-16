@@ -12,7 +12,6 @@ TAP = 'FastSyncTapPostgres'
 TARGET = 'FastSyncTargetPostgres'
 
 
-
 class PostgresToPostgres(unittest.TestCase):
     """
     Unit tests for postgres postgres to postgres

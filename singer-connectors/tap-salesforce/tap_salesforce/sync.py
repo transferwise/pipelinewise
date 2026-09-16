@@ -9,6 +9,7 @@ LOGGER = singer.get_logger('tap_salesforce')
 
 BLACKLISTED_FIELDS = set(['attributes'])
 
+
 def remove_blacklisted_fields(data):
     return {k: v for k, v in data.items() if k not in BLACKLISTED_FIELDS}
 
@@ -26,6 +27,7 @@ def transform_bulk_data_hook(data, typ, schema):
 
     return result
 
+
 def get_stream_version(catalog_entry, state):
     tap_stream_id = catalog_entry['tap_stream_id']
     catalog_metadata = metadata.to_map(catalog_entry['metadata'])
@@ -39,6 +41,7 @@ def get_stream_version(catalog_entry, state):
     if replication_key:
         return stream_version
     return int(time.time() * 1000)
+
 
 def resume_syncing_bulk_query(sf, catalog_entry, job_id, state, counter):
     bulk = Bulk(sf)
@@ -96,6 +99,7 @@ def resume_syncing_bulk_query(sf, catalog_entry, job_id, state, counter):
 
     return counter
 
+
 def sync_stream(sf, catalog_entry, state):
     stream = catalog_entry['stream']
 
@@ -111,6 +115,7 @@ def sync_stream(sf, catalog_entry, state):
                 stream, ex)) from ex
 
         return counter
+
 
 def sync_records(sf, catalog_entry, state, counter):
     chunked_bookmark = singer_utils.strptime_with_tz(sf.get_start_date(state, catalog_entry))
@@ -181,6 +186,7 @@ def sync_records(sf, catalog_entry, state, counter):
             catalog_entry['tap_stream_id'],
             replication_key,
             singer_utils.strftime(chunked_bookmark))
+
 
 def fix_record_anytype(rec, schema):
     """Modifies a record when the schema has no 'type' element due to a SF type of 'anyType.'

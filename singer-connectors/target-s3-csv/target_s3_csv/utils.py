@@ -94,7 +94,6 @@ def remove_metadata_values_from_record(record_message):
     return cleaned_record
 
 
-
 def flatten_key(k, parent_key, sep):
     """
     """

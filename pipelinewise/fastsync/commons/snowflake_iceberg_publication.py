@@ -1,7 +1,6 @@
 """Planning, publication, and reconciliation for managed Iceberg loads."""
 
 
-
 from __future__ import annotations
 
 from dataclasses import dataclass

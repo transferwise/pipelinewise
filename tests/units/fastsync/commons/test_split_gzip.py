@@ -43,7 +43,6 @@ class TestSplitGzipFile(TestCase):
         for temp_file in glob.glob('@test_*_tmp*'):
             unlink(temp_file)
 
-
     def test_bytes_to_megabytes(self):
         """
         Test bytes to megabytes transformer
@@ -74,7 +73,6 @@ class TestSplitGzipFile(TestCase):
             split_gzip.open('basefile', mode='wt', chunk_size_mb=0)
         with self.assertRaises(ValueError):
             split_gzip.open('basefile', max_chunks=-1)
-
 
     def test_gen_export_chunk_filename(self):
         """

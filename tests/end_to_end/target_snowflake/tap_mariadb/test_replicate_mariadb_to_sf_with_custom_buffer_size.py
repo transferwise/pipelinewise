@@ -16,7 +16,6 @@ class TestReplicateMariaDBToSFWithCustomBufferSize(TapMariaDB):
     Same tests cases as test_replicate_mariadb_to_sf but using another tap with custom stream buffer size
     """
 
-
     def setUp(self):
         super().setUp(tap_id=TAP_ID, target_id=TARGET_ID)
 

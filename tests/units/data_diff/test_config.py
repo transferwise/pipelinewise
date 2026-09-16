@@ -12,7 +12,6 @@ from pipelinewise.data_diff.config import (
 )
 
 
-
 def _config(tmp_path, *, backend=True, transformed=False):
     del tmp_path
     global_config = {

@@ -11,7 +11,6 @@ from collections.abc import MutableMapping
 from singer import get_logger
 
 
-
 def validate_config(config):
     errors = []
     required_config_keys = [
@@ -34,7 +33,6 @@ def validate_config(config):
         errors.append("Neither 'default_target_schema' (string) nor 'schema_mapping' (object) keys set in config.")
 
     return errors
-
 
 
 def column_type(schema_property):
@@ -97,7 +95,6 @@ def flatten_key(k, parent_key, sep):
     return sep.join(inflected_key)
 
 
-
 def flatten_schema(d, parent_key=[], sep='__', level=0, max_level=0):
     items = []
 
@@ -134,7 +131,6 @@ def flatten_schema(d, parent_key=[], sep='__', level=0, max_level=0):
     return dict(sorted_items)
 
 
-
 def _should_json_dump_value(key, value, flatten_schema=None):
     if isinstance(value, (dict, list)):
         return True
@@ -144,7 +140,6 @@ def _should_json_dump_value(key, value, flatten_schema=None):
         return True
 
     return False
-
 
 
 def flatten_record(d, flatten_schema=None, parent_key=[], sep='__', level=0, max_level=0):
@@ -183,7 +178,6 @@ def stream_name_to_dict(stream_name, separator='-'):
         'schema_name': schema_name,
         'table_name': table_name
     }
-
 
 
 class DbSync:
@@ -387,7 +381,6 @@ class DbSync:
                 self.logger.info('Loading into %s: %s',
                                  self.table_name(stream, False),
                                  json.dumps({'inserts': inserts, 'updates': updates, 'size_bytes': size_bytes}))
-
 
     def insert_from_temp_table(self, temp_table):
         stream_schema_message = self.stream_schema_message

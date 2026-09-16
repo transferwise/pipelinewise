@@ -34,7 +34,6 @@ class TestDefinedPartialSyncPGToSF(TapPostgres):
     Defined Partial Sync from Postgres to Snowflake
     """
 
-
     def setUp(self):
         super().setUp(tap_id=TAP_ID, target_id=TARGET_ID)
 
@@ -75,7 +74,6 @@ class TestDefinedPartialSyncPGToSF(TapPostgres):
         self.e2e_env.run_query_target_snowflake(
             f'DELETE FROM ppw_e2e_tap_postgres{self.e2e_env.sf_schema_postfix}.customers '
             'WHERE id=15')
-
 
     def test_defined_partial_sync_pg_to_sf(self):
         """

@@ -130,8 +130,6 @@ class MySQLConnection(pymysql.connections.Connection):
                 ctx.verify_mode = ssl.CERT_REQUIRED  # Or ssl.CERT_NONE if preferred
                 server_hostname = None
 
-
-
             ssl_arg = ctx
 
             args["server_hostname"] = server_hostname

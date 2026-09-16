@@ -3,6 +3,7 @@ import tap_postgres
 
 tap_stream_id = 'chicken_table'
 
+
 class TestClearState(unittest.TestCase):
 
     def test_incremental_happy(self):
@@ -88,7 +89,6 @@ class TestClearState(unittest.TestCase):
             {'bookmarks': {tap_stream_id: {"last_replication_method": "INCREMENTAL"}}},
         )
 
-
     def test_log_based_to_incremental(self):
         state = {
             'bookmarks': {
@@ -173,7 +173,6 @@ class TestClearState(unittest.TestCase):
             {'bookmarks': {tap_stream_id: {"last_replication_method": "FULL_TABLE"}}},
         )
 
-
     #log based tests
     def test_log_based_happy(self):
         lsn = 43434343
@@ -228,7 +227,6 @@ class TestClearState(unittest.TestCase):
             nascent_state,
             {'bookmarks': {tap_stream_id: {"last_replication_method": "LOG_BASED"}}},
         )
-
 
 
 if __name__== "__main__":

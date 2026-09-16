@@ -15,7 +15,6 @@ ALERT_LEVEL_SLACK_COLORS = {
 }
 
 
-
 class SlackAlertHandler(BaseAlertHandler):
     """
     Slack Alert Handler class
@@ -37,7 +36,6 @@ class SlackAlertHandler(BaseAlertHandler):
             raise InvalidAlertHandlerException('No valid Slack config supplied.')
 
         self.client = WebClient(self.token)
-
 
     def send(
         self, message: str, level: str = BaseAlertHandler.ERROR, exc: Exception = None, tap_slack_channel: str = None

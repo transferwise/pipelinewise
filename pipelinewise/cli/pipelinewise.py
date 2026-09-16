@@ -52,7 +52,6 @@ ICEBERG_FASTSYNC_PAIRS = fastsync_capability_policy.ICEBERG_FASTSYNC_PAIRS
 PARTIAL_SYNC_PAIRS = fastsync_capability_policy.PARTIAL_SYNC_PAIRS
 
 
-
 class PipelineWise:
     """PipelineWise main Class"""
 
@@ -174,8 +173,6 @@ class PipelineWise:
             raise Exception(
                 f'Cannot merge JSON files {dict_a} {dict_b} - {exc}'
             ) from exc
-
-
 
     def create_filtered_tap_properties(
         self,
@@ -857,7 +854,6 @@ class PipelineWise:
             self.logger.error(error)
             raise SystemExit(1)
 
-
     def _discover_tap(self, tap, target):
         """
         Discover a tap and return an error string so imports can aggregate failures.
@@ -1165,7 +1161,6 @@ class PipelineWise:
             # Run command
             commands.run_command(command, self.tap_run_log_file)
 
-
     def run_tap(self):
         """
         Generating command(s) to run tap to sync data from source to target
@@ -1345,7 +1340,6 @@ class PipelineWise:
         self.logger.info('Stopping command gracefully...')
         raise SystemExit(1)
 
-
     def stop_tap(self, sig=None, frame=None):
         """
         Stop running tap
@@ -1406,7 +1400,6 @@ class PipelineWise:
             pass
 
         sys.exit(1)
-
 
     def fast_sync(self):
         """Entry point for the fast_sync CLI command."""
@@ -1737,7 +1730,6 @@ class PipelineWise:
         for yaml_file in target_yamls:
             self.logger.info('Started validating target file: %s', yaml_file)
 
-
             target_yml = utils.load_yaml(os.path.join(yaml_dir, yaml_file), vault_secret)
             utils.validate(target_yml, target_schema)
 
@@ -1753,7 +1745,6 @@ class PipelineWise:
         # Validate tap json schemas, check that every tap has valid 'target' and that no duplicate IDs exist
         for yaml_file in tap_yamls:
             self.logger.info('Started validating %s ...', yaml_file)
-
 
             tap_yml = utils.load_yaml(os.path.join(yaml_dir, yaml_file), vault_secret)
             utils.validate(tap_yml, tap_schema)
@@ -2156,7 +2147,6 @@ class PipelineWise:
             SnowflakeNativeToIcebergConverter,
         )
 
-
         if self.target['type'] != ConnectorType.TARGET_SNOWFLAKE.value:
             raise PreRunChecksException(
                 'copy_native_to_iceberg requires a target-snowflake destination.'
@@ -2556,7 +2546,6 @@ TAP RUN SUMMARY
             if log_file_to_write_summary:
                 with open(log_file_to_write_summary, 'a', encoding='utf-8') as logfile:
                     logfile.write(summary)
-
 
     def _run_post_import_tap_checks(
         self, tap: Dict, catalog: Dict, target_id: str

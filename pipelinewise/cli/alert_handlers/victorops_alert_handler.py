@@ -19,7 +19,6 @@ ALERT_LEVEL_MESSAGE_TYPES = {
 }
 
 
-
 class VictoropsAlertHandler(BaseAlertHandler):
     """
     VictorOps Alert Handler class

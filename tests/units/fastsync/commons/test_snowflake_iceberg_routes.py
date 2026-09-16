@@ -18,8 +18,6 @@ from pipelinewise.fastsync.commons.snowflake_iceberg import (
 )
 
 
-
-
 @pytest.mark.parametrize(
     ('target_config', 'expected'),
     [

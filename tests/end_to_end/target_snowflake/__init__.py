@@ -16,7 +16,6 @@ class TargetSnowflake(unittest.TestCase):
     Base class for E2E tests for target snowflake
     """
 
-
     def setUp(self, tap_id: str, target_id: str, tap_type: str):
         super().setUp()
 

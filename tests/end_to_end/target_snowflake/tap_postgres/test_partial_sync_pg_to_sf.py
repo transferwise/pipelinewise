@@ -66,7 +66,6 @@ class TestPartialSyncPGToSF(TapPostgres):
     Test cases for Partial sync table from Postgres to Snowflake
     """
 
-
     def setUp(self):
         self.table = 'edgydata'
         self.column = 'cid'

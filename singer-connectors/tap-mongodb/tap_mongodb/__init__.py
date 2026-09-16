@@ -16,8 +16,14 @@ from tap_mongodb.sync_strategies import incremental
 from tap_mongodb.config_utils import validate_config
 from tap_mongodb.db_utils import get_databases, produce_collection_schema
 from tap_mongodb.errors import InvalidReplicationMethodException, NoReadPrivilegeException
-from tap_mongodb.stream_utils import is_log_based_stream, is_stream_selected, write_schema_message, \
-    streams_list_to_dict, filter_streams_by_replication_method, get_streams_to_sync
+from tap_mongodb.stream_utils import (
+    is_log_based_stream as is_log_based_stream,
+    is_stream_selected as is_stream_selected,
+    write_schema_message,
+    streams_list_to_dict,
+    filter_streams_by_replication_method,
+    get_streams_to_sync,
+)
 
 LOGGER = singer.get_logger('tap_mongodb')
 
@@ -152,7 +158,6 @@ def sync_traditional_stream(client: MongoClient, stream: Dict, state: Dict):
     state = singer.set_currently_syncing(state, None)
 
     singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
-
 
 
 def sync_traditional_streams(client: MongoClient, traditional_streams: List[Dict], state: Dict):

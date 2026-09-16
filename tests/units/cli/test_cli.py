@@ -151,7 +151,7 @@ class TestCli:
             with pytest.raises(SystemExit) as pytest_wrapped_e:
                 ppw_command = getattr(pipelinewise, command)
                 ppw_command()
-            assert pytest_wrapped_e.type == SystemExit
+            assert pytest_wrapped_e.type is SystemExit
             assert pytest_wrapped_e.value.code == 1
 
     def test_target_dir(self):
@@ -625,7 +625,7 @@ class TestCli:
         # Re-creating project should raise exception of directory not empty
         with pytest.raises(SystemExit) as pytest_wrapped_e:
             pipelinewise.init()
-        assert pytest_wrapped_e.type == SystemExit
+        assert pytest_wrapped_e.type is SystemExit
         assert pytest_wrapped_e.value.code == 1
 
     def test_command_import_all_taps(self):
@@ -755,7 +755,7 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         # Since the executable is not available in this test then it should fail
         with pytest.raises(SystemExit) as pytest_wrapped_e:
             pipelinewise.run_tap()
-        assert pytest_wrapped_e.type == SystemExit
+        assert pytest_wrapped_e.type is SystemExit
         assert pytest_wrapped_e.value.code == 1
 
     def test_run_tap_routes_full_table_salesforce_iceberg_to_singer(self, tmp_path):
@@ -828,7 +828,7 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         # Tap is not running, pid file not exist, should exit with error
         with pytest.raises(SystemExit) as pytest_wrapped_e:
             pipelinewise.stop_tap()
-        assert pytest_wrapped_e.type == SystemExit
+        assert pytest_wrapped_e.type is SystemExit
         assert pytest_wrapped_e.value.code == 1
 
         Path(f'{pipelinewise.tap_run_log_file}.running').touch()
@@ -894,7 +894,7 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         for sync_method in all_sync_methods:
             with pytest.raises(SystemExit) as pytest_wrapped_e:
                 sync_method(['foo'])
-            assert pytest_wrapped_e.type == SystemExit
+            assert pytest_wrapped_e.type is SystemExit
             assert pytest_wrapped_e.value.code == 1
 
     def test_command_sync_tables_cleanup_state_if_file_not_exists_and_no_tables_argument(self):
@@ -1561,7 +1561,6 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
 
         with pytest.raises(InvalidConfigException, match='iceberg_create'):
             pipelinewise.validate()
-
 
     def test_post_import_checks(self):
         """Test post import checks"""

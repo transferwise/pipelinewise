@@ -5,13 +5,10 @@ import importlib.machinery
 import sys
 import subprocess
 
-from confluent_kafka.schema_registry.protobuf import ProtobufSerializer
 from confluent_kafka.schema_registry.protobuf import ProtobufDeserializer
 from google.protobuf.json_format import MessageToDict
-from google.protobuf.json_format import MessageToJson
 
 from tap_kafka.errors import ProtobufCompilerException
-
 
 
 class ProtobufDictDeserializer(ProtobufDeserializer):
@@ -23,6 +20,7 @@ class ProtobufDictDeserializer(ProtobufDeserializer):
         return MessageToDict(msg,
                              preserving_proto_field_name=True,
                              including_default_value_fields=True)
+
 
 def topic_name_to_protoc_output_name(topic: str) -> str:
     """Convert topic name to the file name that protoc is generating"""

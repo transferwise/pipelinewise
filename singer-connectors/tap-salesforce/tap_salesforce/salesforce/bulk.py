@@ -54,7 +54,6 @@ class Bulk():
 
         self.sf.jobs_completed += 1
 
-
     def check_bulk_quota_usage(self):
         endpoint = "limits"
         url = self.sf.data_url.format(self.sf.instance_url, endpoint)
@@ -317,7 +316,6 @@ class Bulk():
                 url,
                 headers=self._get_bulk_headers(),
                 body=json.dumps(body))
-
 
     def _iter_lines(self, response):
         """Clone of the iter_lines function from the requests library with the change

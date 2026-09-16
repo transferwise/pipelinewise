@@ -356,7 +356,6 @@ class PartialSyncTestCase(TestCase):
         with TemporaryDirectory() as temp_test_dir:
             args = PartialSync2SFArgs(temp_test_dir=temp_test_dir)
 
-
             def mocked_copy_table_method(table, filepath, **kwargs):
                 for part_number in range(3):
                     with open(f'{filepath}{part_number}', 'w', encoding='utf8') as data_file:
@@ -396,14 +395,11 @@ class PartialSyncTestCase(TestCase):
         for file_part in expected_file_parts:
             self.assertIn(file_part, actual_file_parts)
 
-
-
     @mock.patch('pipelinewise.fastsync.partialsync.mysql_to_snowflake.multiprocessing.Pool')
     def test_running_partial_sync_mysql_to_snowflake(self, mocked_pool):
         """Test the whole partial_sync_mysql_to_snowflake module works as expected"""
         test_table = {}
         expected_args = None
-
 
         class MockedMultiprocessor:
             """"Mocked multiprocessing class"""
@@ -486,7 +482,6 @@ class PartialSyncTestCase(TestCase):
                         for message in log_messages:
                             self.assertIn(message, actual_logs.output[log_index])
 
-
     @mock.patch('pipelinewise.fastsync.partialsync.utils.load_into_snowflake')
     @mock.patch('pipelinewise.fastsync.partialsync.utils.upload_to_s3')
     @mock.patch('pipelinewise.fastsync.commons.utils.save_state_file')
@@ -524,7 +519,6 @@ class PartialSyncTestCase(TestCase):
                     'primary_key': 'foo_primary',
                     'source_column_names': ['foo_column'],
                 }
-
 
                 def export_data_to_file(*args, **kwargs):
                     with open(f'{temp_directory}/t1', 'w', encoding='utf8') as exported_file:

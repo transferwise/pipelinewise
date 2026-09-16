@@ -3,12 +3,16 @@ import copy
 import pymysql
 import singer
 
-from typing import Dict
 from singer import metadata, get_logger
 from singer import metrics
 from singer.catalog import Catalog
 
-from tap_mysql.connection import connect_with_backoff, MySQLConnection, fetch_server_id, MYSQL_ENGINE
+from tap_mysql.connection import (
+    connect_with_backoff,
+    MySQLConnection,
+    fetch_server_id as fetch_server_id,
+    MYSQL_ENGINE,
+)
 from tap_mysql.discover_utils import (
     discover_catalog,
     mariadb_json_aliases_enabled,
@@ -216,7 +220,6 @@ def do_sync_incremental(mysql_conn, catalog_entry, state, columns):
     incremental.sync_table(mysql_conn, catalog_entry, state, columns)
 
     singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
-
 
 
 def do_sync_historical_binlog(mysql_conn, catalog_entry, state, columns, use_gtid: bool, engine: str):

@@ -24,6 +24,11 @@
 - Enforce line length, docstring quoting, lambda assignment, and complexity
   across all vendored connector source, replacing connector-wide Ruff
   exemptions with fixes or narrowly scoped inline exceptions
+- Enforce blank-line spacing with explicitly selected Ruff preview rules and
+  remove spacing left by retired directives; verify line-length and spacing
+  enforcement with executable lint probes
+- Remove broad unused-import, unused-variable, undefined-name, and test
+  type-comparison exemptions while preserving connector exports and initialization
 - Exclude connector suites outside existing GitHub connector CI, including
   integration suites, legacy tests, and spikes, from the root Ruff gate
 - Run the lint and unit workflow for changes to Ruff policy, its pre-commit
@@ -32,7 +37,8 @@
   invalid-escape exceptions with equivalent valid string literals, and guard
   against reintroducing non-Ruff directives
 - Set tap-kafka's unit, integration, and combined coverage threshold to 59%,
-  matching its current rounded baseline
+  with measured unit coverage of 59.18%; integration and combined coverage
+  baselines remain unverified
 
 0.86.0 (2026-09-16)
 -------------------

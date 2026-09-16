@@ -19,9 +19,6 @@ from pipelinewise.data_diff.runner import (
 )
 
 
-
-
-
 def _check():
     return {
         "check_id": uuid4(),

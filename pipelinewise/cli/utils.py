@@ -41,7 +41,6 @@ class AnsibleJSONEncoder(json.JSONEncoder):
     singer JSON configuration files
     """
 
-
     def default(self, o):
         if isinstance(o, AnsibleVaultEncryptedUnicode):
             # vault object - serialise the decrypted value as a string
@@ -492,7 +491,6 @@ def get_pipelinewise_python_bin(venv_dir: str) -> str:
     Returns: path to python executable
     """
     return os.path.join(venv_dir, 'pipelinewise', 'bin', 'python')
-
 
 
 def create_temp_file(suffix=None, prefix=None, dir=None, text=None):

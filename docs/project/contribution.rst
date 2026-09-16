@@ -16,9 +16,10 @@ provides the Linux runtime, databases, and connector layout closest to productio
 Read the root and scoped ``AGENTS.md`` files before changing code or tests.
 
 Keep changes limited to the owning package. The root Ruff gate inspects vendored
-connector source and the tap-mysql, tap-postgres, and target-snowflake suites run
-by connector CI. Unexecuted legacy connector tests and spikes remain excluded,
-so run the connector's own Makefile targets as well.
+connector source and the tap-mysql, tap-postgres, and target-snowflake unit suites
+run by connector CI. Other connector suites, including integration suites,
+legacy tests, and spikes, remain excluded, so run the connector's own Makefile
+targets as well.
 
 
 Add or update a source connector

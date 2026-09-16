@@ -35,7 +35,6 @@ def _namespaced_s3_path(base_prefix, namespace):
     return f'{base_prefix.rstrip("/")}/{namespace}'
 
 
-
 class E2EEnv:
     """Utilities class to run End to End tests
 
@@ -409,7 +408,6 @@ class E2EEnv:
                     env_connectors.append(connector)
         return env_connectors
 
-
     def _all_env_vars_to_dict(self):
         """Transform self.env dict to a simple key-value dictionary
         From:
@@ -535,7 +533,6 @@ class E2EEnv:
             database=self.get_conn_env_var('PIPELINEWISE_BACKEND', 'DB'),
         )
 
-
     def run_query_tap_s3_csv(self, file):
         """Get file from S3 and read into the file
         This function is not yet implemented"""
@@ -602,7 +599,6 @@ class E2EEnv:
         """Reset the genuine Oracle MySQL source before discovery."""
         db_script = os.path.join(DIR, '..', '..', 'db', 'tap_oracle_mysql_db.sh')
         self._run_command(db_script)
-
 
     def setup_tap_postgres(self):
         """Clean postgres source database and prepare for test run

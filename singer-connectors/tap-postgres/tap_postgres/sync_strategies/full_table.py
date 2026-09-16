@@ -1,6 +1,5 @@
 import copy
 import time
-import psycopg2
 import psycopg2.extras
 import singer
 
@@ -13,7 +12,6 @@ import tap_postgres.db as post_db
 LOGGER = singer.get_logger('tap_postgres')
 
 UPDATE_BOOKMARK_PERIOD = 1000
-
 
 
 def sync_view(conn_info, stream, state, desired_columns, md_map):
@@ -69,7 +67,6 @@ def sync_view(conn_info, stream, state, desired_columns, md_map):
     singer.write_message(activate_version_message)
 
     return state
-
 
 
 def sync_table(conn_info, stream, state, desired_columns, md_map):

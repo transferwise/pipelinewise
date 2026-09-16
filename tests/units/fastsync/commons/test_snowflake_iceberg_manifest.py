@@ -1,7 +1,6 @@
 """Typed payload, version strategy, and lifecycle contract tests."""
 
 
-
 from dataclasses import replace
 
 import pytest

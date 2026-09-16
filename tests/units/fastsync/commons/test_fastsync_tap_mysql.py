@@ -24,8 +24,6 @@ class FastSyncTapMySqlMock(FastSyncTapMySql):
         self.executed_queries_unbuffered = []
         self.executed_queries = []
 
-
-
     def query(self, query, conn=None, params=None, return_as_cursor=False, n_retry=1):
         if query.startswith('INVALID-SQL'):
             raise pymysql.err.InternalError
@@ -36,7 +34,6 @@ class FastSyncTapMySqlMock(FastSyncTapMySql):
             self.executed_queries_unbuffered.append(query)
 
         return []
-
 
 
 class TestFastSyncTapMySql(TestCase):

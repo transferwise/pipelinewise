@@ -4,14 +4,10 @@
 import collections
 import copy
 import itertools
-import re
-import sys
 import logging
 
 import singer
 import singer.metrics as metrics
-import singer.schema
-import snowflake.connector
 from singer import metadata
 from singer import utils
 from singer.catalog import Catalog, CatalogEntry
@@ -240,7 +236,6 @@ def discover_catalog(snowflake_conn, config):
 
 def do_discover(snowflake_conn, config):
     discover_catalog(snowflake_conn, config).dump()
-
 
 
 # TODO: Maybe put in a singer-db-utils library.

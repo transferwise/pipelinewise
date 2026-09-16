@@ -114,8 +114,7 @@ class ConversationsStream(SlackStream):
     def sync(self, mdata):
         schema = self.load_schema()
 
-
-        with singer.metrics.job_timer(job_type='list_conversations') as timer:
+        with singer.metrics.job_timer(job_type='list_conversations'):
             with singer.metrics.record_counter(endpoint=self.name) as counter:
                 channels = self.channels()
                 for channel in channels:
@@ -146,8 +145,7 @@ class ConversationMembersStream(SlackStream):
 
         schema = self.load_schema()
 
-
-        with singer.metrics.job_timer(job_type='list_conversation_members') as timer:
+        with singer.metrics.job_timer(job_type='list_conversation_members'):
             with singer.metrics.record_counter(endpoint=self.name) as counter:
                 for channel in self.channels():
                     channel_id = channel.get('id')
@@ -178,7 +176,6 @@ class ConversationHistoryStream(SlackStream):
     valid_replication_keys = ['channel_id', 'ts']
     date_fields = ['ts']
 
-
     def update_bookmarks(self, channel_id, value):
         """
         For the messages stream, bookmarks are written per-channel.
@@ -193,7 +190,6 @@ class ConversationHistoryStream(SlackStream):
         self.state['bookmarks'][self.name][channel_id] = value
         self.write_state()
 
-
     def get_bookmark(self, channel_id, default):
         """
         Gets the channel's bookmark value, if present, otherwise a default value passed in.
@@ -206,7 +202,6 @@ class ConversationHistoryStream(SlackStream):
             return default
         return self.state.get('bookmarks', {}).get(self.name, {channel_id: default}) \
             .get(channel_id, default)
-
 
     def sync(self, mdata):
 
@@ -221,8 +216,7 @@ class ConversationHistoryStream(SlackStream):
                 threads_stream = ThreadsStream(client=self.client, config=self.config,
                                                catalog=self.catalog, state=self.state)
 
-
-        with singer.metrics.job_timer(job_type='list_conversation_history') as timer:
+        with singer.metrics.job_timer(job_type='list_conversation_history'):
             with singer.metrics.record_counter(endpoint=self.name) as counter:
                 for channel in self.channels():
                     channel_id = channel.get('id')
@@ -330,8 +324,7 @@ class UsersStream(SlackStream):
 
         LOGGER.info('Fetching all users that have been updated since %s', bookmark)
 
-
-        with singer.metrics.job_timer(job_type='list_users') as timer:
+        with singer.metrics.job_timer(job_type='list_users'):
             with singer.metrics.record_counter(endpoint=self.name) as counter:
                 # API returns users in no particular order.
                 # let's fetch 1000 users per page for now, it saves on api requests and avoids running
@@ -380,8 +373,7 @@ class ThreadsStream(SlackStream):
         schema = self.load_schema()
         start, end = self.get_absolute_date_range(self.config.get('start_date'))
 
-
-        with singer.metrics.job_timer(job_type='list_threads') as timer:
+        with singer.metrics.job_timer(job_type='list_threads'):
             with singer.metrics.record_counter(endpoint=self.name) as counter:
                 replies = self.client.get_thread(channel=channel_id,
                                                  ts=ts,
@@ -418,8 +410,7 @@ class UserGroupsStream(SlackStream):
     def sync(self, mdata):
         schema = self.load_schema()
 
-
-        with singer.metrics.job_timer(job_type='list_user_groups') as timer:
+        with singer.metrics.job_timer(job_type='list_user_groups'):
             with singer.metrics.record_counter(endpoint=self.name) as counter:
                 usergroups_list = self.client.get_user_groups(include_count="true",
                                                               include_disabled="true",
@@ -453,8 +444,7 @@ class TeamsStream(SlackStream):
     def sync(self, mdata):
         schema = self.load_schema()
 
-
-        with singer.metrics.job_timer(job_type='team_info') as timer:
+        with singer.metrics.job_timer(job_type='team_info'):
             with singer.metrics.record_counter(endpoint=self.name) as counter:
 
                 team_info = self.client.get_teams()
@@ -487,8 +477,7 @@ class FilesStream(SlackStream):
     def sync(self, mdata):
         schema = self.load_schema()
 
-
-        with singer.metrics.job_timer(job_type='list_files') as timer:
+        with singer.metrics.job_timer(job_type='list_files'):
             with singer.metrics.record_counter(endpoint=self.name) as counter:
 
                 bookmark_date = self.get_bookmark(self.name, self.config.get('start_date'))
@@ -565,8 +554,7 @@ class RemoteFilesStream(SlackStream):
     def sync(self, mdata):
         schema = self.load_schema()
 
-
-        with singer.metrics.job_timer(job_type='list_files') as timer:
+        with singer.metrics.job_timer(job_type='list_files'):
             with singer.metrics.record_counter(endpoint=self.name) as counter:
 
                 bookmark_date = self.get_bookmark(self.name, self.config.get('start_date'))

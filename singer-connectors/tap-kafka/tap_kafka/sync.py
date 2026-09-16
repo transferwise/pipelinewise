@@ -373,7 +373,6 @@ def commit_consumer_to_bookmarked_state(consumer, topic, state):
     LOGGER.info("Bookmarked offsets committed")
 
 
-
 def read_kafka_messages(consumer, kafka_config, state):
     """Read kafka topic continuously and writing transformed singer messages to STDOUT"""
 

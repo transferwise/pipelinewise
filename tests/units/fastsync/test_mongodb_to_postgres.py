@@ -12,7 +12,6 @@ TAP = 'FastSyncTapMongoDB'
 TARGET = 'FastSyncTargetPostgres'
 
 
-
 class MongoDBToPostgres(unittest.TestCase):
     """
     Unit tests for fastsync MongoDB to postgres
