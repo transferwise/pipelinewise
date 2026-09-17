@@ -100,10 +100,6 @@ def validate_route_config(target_config):
         raise ValueError(
             'Snowflake Iceberg FastSync requires a supported integer iceberg_version'
         )
-    if target_config.get('hard_delete') is not True:
-        raise ValueError(
-            'Snowflake Iceberg FastSync requires hard_delete to be true'
-        )
     flattening_level = target_config.get('data_flattening_max_level')
     if not _is_exact_int(flattening_level) or flattening_level != 0:
         raise ValueError(

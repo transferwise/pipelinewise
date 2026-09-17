@@ -530,7 +530,6 @@ class TestCli:
             'data_flattening_max_level': 0,
             'default_target_schema': 'jira_clear',
             'default_target_schema_select_permissions': ['grp_power'],
-            'hard_delete': True,
             'primary_key_required': True,
             'schema_mapping': {
                 'jira': {
@@ -542,6 +541,23 @@ class TestCli:
 
         # Remove temp file with merged JSON
         os.remove(temp_file)
+
+    @pytest.mark.parametrize('value', [True, False, None, 'false'])
+    @pytest.mark.parametrize('location', ['target', 'inheritable'])
+    def test_runtime_config_accepts_legacy_hard_delete(self, tmp_path, value, location):
+        """Old imported configurations continue to produce consumable target JSON."""
+        configs = {'target': {}, 'inheritable': {}}
+        configs[location]['hard_delete'] = value
+        paths = []
+        for name, settings in configs.items():
+            path = tmp_path / f'{name}.json'
+            path.write_text(json.dumps(settings), encoding='utf-8')
+            paths.append(str(path))
+
+        merged_path = tmp_path / 'merged.json'
+        with patch('pipelinewise.cli.utils.create_temp_file', return_value=(None, str(merged_path))):
+            self.pipelinewise.create_consumable_target_config(*paths)
+        assert json.loads(merged_path.read_text(encoding='utf-8'))['hard_delete'] == value
 
     def test_invalid_target_config(self):
         """Test merging invalid target config.json and inheritable_config.json"""
@@ -662,7 +678,7 @@ class TestCli:
         assert target_runtime['target_table_format'] == 'iceberg'
         assert target_runtime['iceberg_version'] == 3
         assert target_runtime['data_flattening_max_level'] == 10
-        assert target_runtime['hard_delete'] is True
+        assert 'hard_delete' not in target_runtime
         assert imported_tap['target_table_format'] == 'iceberg'
         assert imported_tap['iceberg_version'] == 3
 
@@ -1120,6 +1136,24 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
 
         clear_bookmarks.assert_not_called()
         reset_slot.assert_not_called()
+        process.assert_not_called()
+
+    @pytest.mark.parametrize('tap_type', ['tap-mysql', 'tap-postgres'])
+    def test_fastsync_invalid_target_config_does_not_clear_bookmarks(self, tmp_path, tap_type):
+        """The worker loads target JSON before clearing replication bookmarks."""
+        pipelinewise = self._init_for_sync_tables_states_cleanup(tables_arg='db_test_mysql.table_one')
+        pipelinewise.tap['type'] = tap_type
+        path = tmp_path / 'inheritable.json'
+        path.write_text('invalid JSON', encoding='utf-8')
+        pipelinewise.tap['files']['inheritable_config'] = str(path)
+        self._make_sample_state_file(pipelinewise.tap['files']['state'])
+        original_state = Path(pipelinewise.tap['files']['state']).read_bytes()
+        with patch.object(pipelinewise, '_check_if_complete_tap_configuration'), patch.object(
+            pipelinewise, 'send_alert',
+        ), patch('pipelinewise.cli.pipelinewise.Process') as process:
+            with pytest.raises(Exception, match='Cannot merge JSON files'):
+                pipelinewise.sync_tables_fast_sync(['db_test_mysql.table_one'])
+        assert Path(pipelinewise.tap['files']['state']).read_bytes() == original_state
         process.assert_not_called()
 
     def test_postgres_slot_reset_preflight_rejects_stale_catalog(self):

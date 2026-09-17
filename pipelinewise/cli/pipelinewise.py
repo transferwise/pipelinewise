@@ -1632,8 +1632,6 @@ class PipelineWise:
 
             self._check_if_complete_tap_configuration(fastsync_bin, tap_type, target_type)
 
-            self._cleanup_tap_state_file()
-
             # Generate and run the command to run the tap directly
             tap_config = self.tap['files']['config']
             tap_inheritable_config = self.tap['files']['inheritable_config']
@@ -1647,6 +1645,8 @@ class PipelineWise:
             cons_target_config = self.create_consumable_target_config(
                 target_config, tap_inheritable_config
             )
+
+            self._cleanup_tap_state_file()
 
             # Output will be redirected into target and tap specific log directory
             log_dir = self.get_tap_log_dir(target_id, tap_id)

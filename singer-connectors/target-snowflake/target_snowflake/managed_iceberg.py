@@ -778,9 +778,6 @@ def validate_table_format_config(config):
     elif target_table_format != 'iceberg' and iceberg_version_is_set:
         errors.append("'iceberg_version' is only valid when 'target_table_format' is 'iceberg'")
 
-    if target_table_format == 'iceberg' and config.get('hard_delete') is not True:
-        errors.append("'hard_delete' must be true when 'target_table_format' is 'iceberg'")
-
     return errors
 
 

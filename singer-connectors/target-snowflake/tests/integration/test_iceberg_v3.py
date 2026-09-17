@@ -49,7 +49,6 @@ class TestManagedIcebergV3Integration(unittest.TestCase):
             'target_table_format': 'iceberg',
             'iceberg_version': 3,
             'data_flattening_max_level': 0,
-            'hard_delete': True,
             'disable_table_cache': True,
             'file_format': (
                 self.config.get('file_format')

@@ -27,7 +27,6 @@ def get_db_config():
     config['disable_table_cache'] = None
     config['schema_mapping'] = None
     config['add_metadata_columns'] = None
-    config['hard_delete'] = None
     config['flush_all_streams'] = None
 
 
@@ -47,4 +46,3 @@ def get_test_tap_lines(filename):
             lines.append(line)
 
     return lines
-

@@ -90,5 +90,8 @@ Operational notes
 - Size transactions and ``batch_size_rows`` for available memory and WAL volume.
 - The target must acknowledge Singer state only after the corresponding records
   are durable; PipelineWise persists that acknowledgement for source recovery.
+- Source-delete markers always physically remove rows before state is
+  acknowledged. Metadata columns are enabled automatically; see
+  :ref:`metadata_columns` for deletion processing.
 - Schema evolution can add or version columns. See :ref:`schema_changes` before
   granting downstream consumers direct access.

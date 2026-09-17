@@ -168,10 +168,7 @@ def persist_lines(config, lines, table_cache=None, file_format_type: FileFormatT
                 total_row_count[stream] += 1
 
             # append record
-            if config.get('add_metadata_columns') or config.get('hard_delete'):
-                record = stream_utils.add_metadata_values_to_record(o)
-            else:
-                record = o['record']
+            record = stream_utils.add_metadata_values_to_record(o)
 
             store_record(records_to_load[stream], primary_key_string, record, stream_to_sync[stream])
 
@@ -277,13 +274,10 @@ def persist_lines(config, lines, table_cache=None, file_format_type: FileFormatT
 
                 key_properties[stream] = o['key_properties']
 
-                if config.get('add_metadata_columns') or config.get('hard_delete'):
-                    stream_to_sync[stream] = DbSync(config,
-                                                    add_metadata_columns_to_schema(o),
-                                                    table_cache,
-                                                    file_format_type)
-                else:
-                    stream_to_sync[stream] = DbSync(config, o, table_cache, file_format_type)
+                stream_to_sync[stream] = DbSync(config,
+                                                add_metadata_columns_to_schema(o),
+                                                table_cache,
+                                                file_format_type)
 
                 if archive_load_files:
                     archive_load_files_data[stream] = {
@@ -387,7 +381,6 @@ def flush_streams(
             row_count=row_count,
             db_sync=stream_to_sync[stream],
             no_compression=config.get('no_compression'),
-            delete_rows=config.get('hard_delete'),
             temp_dir=config.get('temp_dir'),
             archive_load_files=copy.copy(archive_load_files_data.get(stream, None))
         ) for stream in streams_to_flush)
@@ -418,16 +411,14 @@ def flush_streams(
     return flushed_state
 
 
-def load_stream_batch(stream, records, row_count, db_sync, no_compression=False, delete_rows=False,
+def load_stream_batch(stream, records, row_count, db_sync, no_compression=False,
                       temp_dir=None, archive_load_files=None):
     """Load one batch of the stream into target table"""
     # Load into snowflake
     if row_count[stream] > 0:
         flush_records(stream, records, db_sync, temp_dir, no_compression, archive_load_files)
 
-        # Delete soft-deleted, flagged rows - where _sdc_deleted at is not null
-        if delete_rows:
-            db_sync.delete_rows(stream)
+        db_sync.delete_rows(stream)
 
         # reset row count for the current stream
         row_count[stream] = 0

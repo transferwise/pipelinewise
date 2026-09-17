@@ -142,10 +142,7 @@ def persist_lines(config, lines) -> None:  # noqa: C901
                 total_row_count[stream] += 1
 
             # append record
-            if config.get('add_metadata_columns') or config.get('hard_delete'):
-                records_to_load[stream][primary_key_string] = add_metadata_values_to_record(o)
-            else:
-                records_to_load[stream][primary_key_string] = o['record']
+            records_to_load[stream][primary_key_string] = add_metadata_values_to_record(o)
 
             row_count[stream] = len(records_to_load[stream])
 
@@ -209,10 +206,7 @@ def persist_lines(config, lines) -> None:  # noqa: C901
 
             key_properties[stream] = o['key_properties']
 
-            if config.get('add_metadata_columns') or config.get('hard_delete'):
-                stream_to_sync[stream] = DbSync(config, add_metadata_columns_to_schema(o))
-            else:
-                stream_to_sync[stream] = DbSync(config, o)
+            stream_to_sync[stream] = DbSync(config, add_metadata_columns_to_schema(o))
 
             stream_to_sync[stream].create_schema_if_not_exists()
             stream_to_sync[stream].sync_table()
@@ -288,7 +282,6 @@ def flush_streams(
             records_to_load=streams[stream],
             row_count=row_count,
             db_sync=stream_to_sync[stream],
-            delete_rows=config.get('hard_delete'),
             temp_dir=config.get('temp_dir')
         ) for stream in streams_to_flush)
 
@@ -314,7 +307,7 @@ def flush_streams(
     return flushed_state
 
 
-def load_stream_batch(stream, records_to_load, row_count, db_sync, delete_rows=False, temp_dir=None):
+def load_stream_batch(stream, records_to_load, row_count, db_sync, temp_dir=None):
     """Load a batch of records and do post load operations, like creating
     or deleting rows"""
     # Load into Postgres
@@ -324,9 +317,7 @@ def load_stream_batch(stream, records_to_load, row_count, db_sync, delete_rows=F
     # Load finished, create indices if required
     db_sync.create_indices(stream)
 
-    # Delete soft-deleted, flagged rows - where _sdc_deleted at is not null
-    if delete_rows:
-        db_sync.delete_rows(stream)
+    db_sync.delete_rows(stream)
 
     # reset row count for the current stream
     row_count[stream] = 0

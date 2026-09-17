@@ -64,9 +64,10 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
   FullSync, and PartialSync. Keep the Singer and FastSync connection gates
   aligned; only deleted-tap slot cleanup may bypass the floor. PostgreSQL
   targets, the backend, and data-diff connections are separate.
-- Soft delete (`hard_delete: false`, `_SDC_DELETED_AT`) is deprecated. Preserve
-  compatibility but add no features/docs, do not restore data-diff
-  `exclude_soft_deleted`, and use `hard_delete: true` for new taps.
+- Source deletes are always physical. Silently ignore retired deletion-mode
+  options in YAML and bundled PostgreSQL/Snowflake target JSON; do not require
+  reimport or warn. Keep `_SDC_DELETED_AT` as the internal deletion marker,
+  always delete marked rows, and enable target metadata.
 - Dev MySQL requires TLS (`ssl={'': True}`). PyMySQL interpolates bound SQL, so
   double literal tokens, e.g. `DATE_FORMAT(t, '%%Y')`.
 - PostgreSQL `reltuples == 0` after ANALYZE-then-load does not prove emptiness;
@@ -93,9 +94,9 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
   Retain both through Singer
   handover/evolution. Route compatible Singer taps through target-snowflake and
   MySQL/PostgreSQL FastSync through the shared publisher; retain native
-  `SWAP WITH`. All v3 taps need `hard_delete: true`; only FastSync-capable
-  MySQL/PostgreSQL also need `data_flattening_max_level: 0` (keep Singer-only
-  defaults such as Salesforce level 10).
+  `SWAP WITH`. Only FastSync-capable MySQL/PostgreSQL need
+  `data_flattening_max_level: 0` (keep Singer-only defaults such as Salesforce
+  level 10).
 - Carry `iceberg_version` through tap/generated config, publication/recovery,
   and conversion; reject non-v3 before mutation. Future versions need explicit
   branches/tests. Through executable hooks, `snowflake_iceberg_versions.py`

@@ -97,6 +97,9 @@ Parquet and a real client-side encryption master key.
   method and PipelineWise FullSync/PartialSync. Keep their version checks aligned;
   this source minimum does not constrain target-postgres or the PipelineWise
   backend database.
+- PostgreSQL/Snowflake targets silently ignore retired deletion-mode options,
+  enable metadata automatically, and physically process `_SDC_DELETED_AT` before
+  acknowledging state. Keep this marker in Singer schemas and transport.
 
 ## Snowflake traps
 
