@@ -36,8 +36,6 @@ class UnsupportedPayloadKindError(Exception):
     """Custom exception when waljson payload is not insert, update nor delete"""
 
 
-# Preserve the legacy connector lint baseline; scope new suppressions narrowly.
-# pylint: disable=invalid-name,missing-function-docstring,too-many-branches,too-many-statements,too-many-arguments
 def lsn_to_int(lsn):
     """Convert pg_lsn to int"""
 
@@ -118,7 +116,7 @@ def emit_wal_progress_message(conn_info):
                 emitted_lsn = cur.fetchone()
         marker_lsn = lsn_to_int(emitted_lsn[0]) if emitted_lsn else None
         return marker_lsn if marker_lsn is not None and marker_lsn > 0 else None
-    except (  # pylint: disable=no-member
+    except (
             psycopg2.errors.InsufficientPrivilege,
             psycopg2.errors.UndefinedFunction):
         LOGGER.debug('Logical WAL progress messages are unavailable')
@@ -171,7 +169,7 @@ def create_hstore_elem(conn_info, elem):
             return hstore_elem
 
 
-def create_array_elem(elem, sql_datatype, conn_info):
+def create_array_elem(elem, sql_datatype, conn_info):  # noqa: C901
     if elem is None:
         return None
 
@@ -230,8 +228,7 @@ def create_array_elem(elem, sql_datatype, conn_info):
             return res
 
 
-# pylint: disable=too-many-branches,too-many-nested-blocks,too-many-return-statements
-def selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info):
+def selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info):  # noqa: C901
     sql_datatype = og_sql_datatype.replace('[]', '')
 
     if elem is None:
@@ -401,7 +398,6 @@ def row_to_singer_message(stream, row, version, columns, time_extracted, md_map,
         time_extracted=time_extracted)
 
 
-# pylint: disable=unused-argument,too-many-locals
 def consume_message(streams, state, msg, time_extracted, conn_info, *, message_payload=None):
     if message_payload is None:
         try:
@@ -573,9 +569,8 @@ def locate_replication_slot(conn_info):
             return locate_replication_slot_by_cur(cur, conn_info['dbname'], conn_info['tap_id'])
 
 
-# pylint: disable=anomalous-backslash-in-string
 def streams_to_wal2json_tables(streams):
-    """Converts a list of singer stream dictionaries to wal2json plugin compatible string list.
+    r"""Converts a list of singer stream dictionaries to wal2json plugin compatible string list.
     The output is compatible with the 'filter-tables' and 'add-tables' option of wal2json plugin.
 
     Special characters (space, single quote, comma, period, asterisk) must be escaped with backslash.
@@ -658,7 +653,7 @@ def _start_replication(cur, logical_streams, slot, start_lsn, version):
         raise Exception(f"Unable to start replication with logical replication (slot {ex})") from ex
 
 
-def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
+def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):  # noqa: C901
     target_acknowledged_lsn = _minimum_acknowledged_lsn(state, logical_streams)
     start_lsn = target_acknowledged_lsn
     lsn_to_flush = None

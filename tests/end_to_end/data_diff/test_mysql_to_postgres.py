@@ -31,7 +31,6 @@ EXPECTED_CHECKS = {
 }
 
 
-# pylint: disable=attribute-defined-outside-init
 class TestMySqlToPostgresDataDiff:
     """Prove data-diff reconciles a MySQL source against a PostgreSQL replica."""
 

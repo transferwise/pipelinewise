@@ -10,7 +10,6 @@ from pipelinewise.data_diff.config import (
     extract_check_definitions,
     parse_duration,
 )
-# pylint: disable=missing-function-docstring,invalid-name
 
 
 def _config(tmp_path, *, backend=True, transformed=False):

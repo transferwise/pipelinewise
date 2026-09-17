@@ -41,7 +41,6 @@ class AnsibleJSONEncoder(json.JSONEncoder):
     singer JSON configuration files
     """
 
-    # pylint: disable=method-hidden,assignment-from-no-return
     def default(self, o):
         if isinstance(o, AnsibleVaultEncryptedUnicode):
             # vault object - serialise the decrypted value as a string
@@ -310,7 +309,7 @@ def delete_keys_from_dict(dic, keys):
         return dic
     if isinstance(dic, list):
         return [v for v in (delete_keys_from_dict(v, keys) for v in dic) if v]
-    # pylint: disable=C0325  # False positive on tuples
+
     return {
         k: v
         for k, v in ((k, delete_keys_from_dict(v, keys)) for k, v in dic.items())
@@ -494,7 +493,6 @@ def get_pipelinewise_python_bin(venv_dir: str) -> str:
     return os.path.join(venv_dir, 'pipelinewise', 'bin', 'python')
 
 
-# pylint: disable=redefined-builtin
 def create_temp_file(suffix=None, prefix=None, dir=None, text=None):
     """
     Create temp file with parent directories if not exists

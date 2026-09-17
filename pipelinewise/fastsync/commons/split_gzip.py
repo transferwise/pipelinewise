@@ -15,7 +15,6 @@ DEFAULT_MAX_CHUNKS = 20
 EST_COMPR_RATE = 0.12
 
 
-# pylint: disable=W0622,R1732
 def open(
     base_filename,
     mode='wb',
@@ -52,7 +51,6 @@ def open(
     )
 
 
-# pylint: disable=R0902
 class SplitGzipFile(io.BufferedIOBase):
     """The SplitGzipFile file like object class that implements only the write method.
 
@@ -127,7 +125,7 @@ class SplitGzipFile(io.BufferedIOBase):
                 self.chunk_file = gzip.open(self.chunk_filename, self.mode)
             else:
                 if 'b' in self.mode:
-                    self.chunk_file = builtins.open(  # pylint: disable=unspecified-encoding
+                    self.chunk_file = builtins.open(
                         self.chunk_filename, self.mode
                     )
                 else:

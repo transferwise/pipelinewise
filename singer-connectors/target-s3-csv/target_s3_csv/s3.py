@@ -6,7 +6,7 @@ import backoff
 import boto3
 import singer
 
-from typing import Optional, Tuple, List, Dict, Iterator
+from typing import Optional, Dict, Iterator
 from botocore.client import BaseClient
 from botocore.exceptions import ClientError
 
@@ -53,7 +53,6 @@ def create_client(config):
     return s3
 
 
-# pylint: disable=too-many-arguments
 @retry_pattern()
 def upload_file(filename, s3_client, bucket, s3_key,
                 encryption_type=None, encryption_key=None):
@@ -107,7 +106,7 @@ def upload_files(filenames: Iterator[Dict],
 
                 with open(filename, 'rb') as f_in:
                     with gzip.open(compressed_file, 'wb') as f_out:
-                        LOGGER.info(f"Compressing file as '%s'", compressed_file)
+                        LOGGER.info("Compressing file as '%s'", compressed_file)
                         shutil.copyfileobj(f_in, f_out)
 
             else:

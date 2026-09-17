@@ -177,7 +177,7 @@ def _ctas_statement(tmp_path, spec, method):
 
     publisher = SnowflakeIcebergPublisher(FakeSnowflake(), str(tmp_path))
     publisher.inspect_table = MagicMock(return_value=snapshot)
-    publisher._verify_replacement_metadata = MagicMock()  # pylint: disable=protected-access
+    publisher._verify_replacement_metadata = MagicMock()
     attempt = make_attempt(
         spec,
         kind=kind,

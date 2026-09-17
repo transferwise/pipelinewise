@@ -13,8 +13,8 @@ class TestConfigValidation(TestCase):
     def setUp(self):
         commands.PARAMS_VALIDATION_RETRY_PERIOD_SEC = 0.1
         commands.PARAMS_VALIDATION_RETRY_TIMES = 3
-        self.sec_to_repair_json_file = 0.15  #: pylint: disable=attribute-defined-outside-init
-        self.temp_dir = TemporaryDirectory()  #: pylint: disable=consider-using-with
+        self.sec_to_repair_json_file = 0.15
+        self.temp_dir = TemporaryDirectory()
         self.invalid_json_file = f'{self.temp_dir.name}/invalid_file.json'
         self.valid_json_file = f'{self.temp_dir.name}/valid_file.json'
         self.empty_file = f'{self.temp_dir.name}/empty_file.json'

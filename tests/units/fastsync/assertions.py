@@ -69,7 +69,6 @@ def _create_object_names_to_mock(
     )
 
 
-# pylint: disable=missing-function-docstring,unused-variable
 def assert_sync_table_returns_true_on_success(
     sync_table: callable, package_nm: str, tap_class_nm: str, target_class_nm: str
 ) -> None:
@@ -112,7 +111,6 @@ def assert_sync_table_returns_true_on_success(
         assert res
 
 
-# pylint: disable=missing-function-docstring,unused-variable,invalid-name,no-member
 def assert_sync_table_exception_on_failed_copy(
     sync_table: callable,
     package_nm: str,
@@ -155,8 +153,7 @@ def assert_snowflake_sync_table_native_workflow(
     grant_error: Exception = None,
 ) -> None:
     """Assert the native Snowflake staging, publication, and state workflow."""
-    # pylint: disable=too-many-arguments,too-many-positional-arguments
-    # pylint: disable=too-many-locals,too-many-statements,no-member
+
     objects_to_mock = _create_object_names_to_mock(
         package_nm, tap_class_nm, 'FastSyncTargetSnowflake'
     )
@@ -396,8 +393,7 @@ def assert_snowflake_sync_table_iceberg_workflow(
     recovery_error=None,
 ) -> None:
     """Assert an Iceberg route publishes or recovers before state advances."""
-    # pylint: disable=too-many-arguments,too-many-positional-arguments
-    # pylint: disable=too-many-locals,too-many-statements,too-many-branches
+
     objects_to_mock = _create_object_names_to_mock(
         package_nm, tap_class_nm, 'FastSyncTargetSnowflake'
     )
@@ -795,7 +791,7 @@ def assert_snowflake_sync_table_rolls_back_later_upload_failure(
     rollback_cleanup_error: Exception = None,
 ) -> None:
     """A failed later upload removes local files and rolls back earlier S3 parts."""
-    # pylint: disable=too-many-locals
+
     objects_to_mock = _create_object_names_to_mock(
         package_nm, tap_class_nm, 'FastSyncTargetSnowflake'
     )
@@ -882,7 +878,6 @@ def assert_snowflake_sync_table_rolls_back_later_upload_failure(
             raise AssertionError(f'Unsupported source type: {source_type}')
 
 
-# pylint: disable=missing-function-docstring,unused-variable,invalid-name
 def assert_main_impl_exit_normally_on_success(
     main_impl: callable, package_nm: str, tap_class_nm: str, target_class_nm: str
 ) -> None:
@@ -933,7 +928,6 @@ def assert_main_impl_exit_normally_on_success(
                         assert mock_enter.return_value.map.call_count == 1
 
 
-# pylint: disable=missing-function-docstring,unused-variable,invalid-name
 def assert_main_impl_should_exit_with_error_on_failure(
     main_impl: callable, package_nm: str, tap_class_nm: str, target_class_nm: str
 ) -> None:

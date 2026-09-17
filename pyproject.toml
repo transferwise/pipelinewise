@@ -1,20 +1,37 @@
 [tool.ruff]
-# Set the maximum line length to 120
-line-length = 130
+line-length = 120
+force-exclude = true
+# Connector suites outside GitHub connector CI remain out of scope.
+extend-exclude = [
+    "singer-connectors/tap-github/tests",
+    "singer-connectors/tap-kafka/tests",
+    "singer-connectors/tap-mixpanel/tests",
+    "singer-connectors/tap-mongodb/tests",
+    "singer-connectors/tap-mysql/tests/integration",
+    "singer-connectors/tap-postgres/tests/integration",
+    "singer-connectors/tap-s3-csv/tests",
+    "singer-connectors/tap-slack/tests",
+    "singer-connectors/tap-snowflake/tests",
+    "singer-connectors/tap-twilio/tests",
+    "singer-connectors/tap-zendesk/spikes",
+    "singer-connectors/tap-zendesk/test",
+    "singer-connectors/target-postgres/tests",
+    "singer-connectors/target-s3-csv/tests",
+    "singer-connectors/target-snowflake/tests/integration",
+    "singer-connectors/transform-field/tests",
+]
 
 [tool.ruff.lint]
-# Select the rules you want to check (E=Error, F=Pyflakes, Q=Quotes)
-select = ["E", "F", "Q"]
+# Keep high-confidence Pylint-category errors; porting legacy convention, refactor, and warning policy is out of scope.
+select = ["E", "F", "W", "C90", "Q002", "PLE"]
+preview = true
+explicit-preview-rules = true
+extend-select = ["E301", "E302", "E303", "E304", "E305", "E306"]
 
-# Add Q000, Q001, or any other rules you want to skip entirely
-# Q000: Single quotes found but double quotes preferred
-# Q001: Multiline string quote preference
-# Q003: Avoidable escaped quotes
-# Q004: Unnecessary escape on inner quote character
-ignore = ["Q000", "Q001", "Q003", "Q004", "E721"]
+[tool.ruff.lint.mccabe]
+max-complexity = 15
 
-[tool.ruff.lint.flake8-quotes]
-# This sets your preference, but the 'ignore' above will
-# stop Ruff from complaining even if you break these rules.
-inline-quotes = "single"
-multiline-quotes = "single"
+[tool.ruff.lint.per-file-ignores]
+# The former root complexity gate inspected production code only.
+"tests/**/*.py" = ["C901"]
+"tests/units/cli/test_cli.py" = ["E501"]

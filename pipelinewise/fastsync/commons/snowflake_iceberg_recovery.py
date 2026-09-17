@@ -161,15 +161,15 @@ class IcebergFinalizationService:
         self.publisher = publisher
 
     def _transition(self, attempt, phase) -> None:
-        self.publisher._transition(attempt, phase)  # pylint: disable=protected-access
+        self.publisher._transition(attempt, phase)
 
     def _save_active_attempt(self, attempt) -> None:
-        self.publisher._save_active_attempt(  # pylint: disable=protected-access
+        self.publisher._save_active_attempt(
             attempt
         )
 
     def _complete_attempt_cleanup(self, attempt) -> None:
-        self.publisher._complete_attempt_cleanup(  # pylint: disable=protected-access
+        self.publisher._complete_attempt_cleanup(
             attempt
         )
 

@@ -8,8 +8,6 @@ from pipelinewise.data_diff.coverage import (
     coverage_event_type,
 )
 
-# pylint: disable=missing-function-docstring,invalid-name
-
 
 def _instant(hour):
     return datetime(2026, 7, 22, hour, tzinfo=timezone.utc)

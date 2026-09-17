@@ -7,7 +7,7 @@ with open('README.md') as f:
 
 setup(name='pipelinewise',
       python_requires='==3.12.*',
-      version='0.86.0',
+      version='0.87.0',
       description='PipelineWise',
       long_description=LONG_DESCRIPTION,
       long_description_content_type='text/markdown',
@@ -48,12 +48,10 @@ setup(name='pipelinewise',
       extras_require={
           'test': [
               'pre-commit==2.21.0',
-              'flake8==7.3.0',
               'pytest==9.0.3',
               'pytest-dependency==0.4.0',
               'pytest-cov==4.1.0',
               'python-dotenv==1.2.2',
-              'pylint==4.0.5',
               'ruff==0.16.1',
               'pytest-timer~=1.0',
           ]

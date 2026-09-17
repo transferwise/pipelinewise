@@ -4,9 +4,8 @@ venv:
 	pip install --upgrade pip setuptools wheel ;\
 	pip install -e .[test]
 
-pylint:
-	. ./venv/bin/activate ;\
-	pylint target_s3_csv -d C,W
+lint:
+	cd ../.. && singer-connectors/target-s3-csv/venv/bin/ruff check singer-connectors/target-s3-csv/target_s3_csv/
 
 unit_test:
 	. ./venv/bin/activate ;\

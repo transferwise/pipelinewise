@@ -98,7 +98,6 @@ class TransformField:
                 trans.get('field_paths')
             ))
 
-    # pylint: disable=too-many-nested-blocks,too-many-branches
     # todo: simplify this method
     def flush(self):
         """Give batch to handlers to process"""

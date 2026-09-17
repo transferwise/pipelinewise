@@ -15,7 +15,6 @@ TARGET_ID = 'snowflake'
 class TestNativeMultilinePostgresToSnowflake(TapPostgres):
     """Exercise exact PostgreSQL text through native FullSync and PartialSync."""
 
-    # pylint: disable=arguments-differ
     def setUp(self):
         super().setUp(tap_id=TAP_ID, target_id=TARGET_ID)
         self.target_schema = (

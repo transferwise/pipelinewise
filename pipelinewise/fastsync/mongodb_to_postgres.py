@@ -42,7 +42,6 @@ def tap_type_to_target_type(mongo_type, *_):
     }.get(mongo_type, 'CHARACTER VARYING')
 
 
-# pylint: disable=too-many-locals
 def sync_table(table: str, args: Namespace) -> Union[bool, str]:
     """Sync one table"""
     mongodb = FastSyncTapMongoDB(args.tap, tap_type_to_target_type)

@@ -37,6 +37,7 @@ ROLES_WITH_ALL_DB_FIND_PRIVILEGES = {
     'root'
 }
 
+
 def get_roles_with_find_privs(database: Database, user: Dict) -> List[Dict]:
     """
     Finds and returns all the user's roles that have find privileges.

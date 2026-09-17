@@ -52,7 +52,7 @@ def _wait_for(description, predicate, timeout=30, interval=0.1):
 
 def _run_success(command, env, timeout=120):
     """Run a PipelineWise command and include complete output on failure."""
-    process = subprocess.Popen(  # pylint: disable=consider-using-with
+    process = subprocess.Popen(
         command,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -291,7 +291,6 @@ def _source_target_rows(e2e):
     return source_rows, target_rows
 
 
-# pylint: disable=too-many-locals,too-many-statements
 def test_postgres_buffer_recovers_after_stop(tmp_path):
     """Replay WAL that was consumed into mbuffer but never target-acknowledged."""
     project_dir = tmp_path / 'project'
@@ -360,7 +359,7 @@ def test_postgres_buffer_recovers_after_stop(tmp_path):
                 f'LOCK TABLE {TARGET_SCHEMA}.{TABLE_NAME} IN ACCESS EXCLUSIVE MODE'
             )
 
-        supervisor = subprocess.Popen(  # pylint: disable=consider-using-with
+        supervisor = subprocess.Popen(
             [
                 'pipelinewise',
                 'run_tap',

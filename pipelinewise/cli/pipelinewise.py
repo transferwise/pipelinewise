@@ -52,7 +52,6 @@ ICEBERG_FASTSYNC_PAIRS = fastsync_capability_policy.ICEBERG_FASTSYNC_PAIRS
 PARTIAL_SYNC_PAIRS = fastsync_capability_policy.PARTIAL_SYNC_PAIRS
 
 
-# pylint: disable=too-many-lines,too-many-instance-attributes,too-many-public-methods
 class PipelineWise:
     """PipelineWise main Class"""
 
@@ -175,8 +174,6 @@ class PipelineWise:
                 f'Cannot merge JSON files {dict_a} {dict_b} - {exc}'
             ) from exc
 
-    # pylint: disable=too-many-positional-arguments
-    # pylint: disable=too-many-statements,too-many-branches,too-many-nested-blocks,too-many-locals,too-many-arguments
     def create_filtered_tap_properties(
         self,
         target_type: ConnectorType,
@@ -277,7 +274,7 @@ class PipelineWise:
                 # Compare actual values to the filter conditions.
                 # Set the "selected" key to True if actual values meet the filter criteria
                 # Set the "selected" key to False if the actual values don't meet the filter criteria
-                # pylint: disable=too-many-boolean-expressions
+
                 if (
                     (f_selected is None or selected == f_selected)
                     and f_fastsync_supported
@@ -511,7 +508,7 @@ class PipelineWise:
         return tap
 
     # TODO: This method is too complex! make its complexity less than 15!
-    # pylint: disable=too-many-branches,too-many-statements,too-many-nested-blocks,too-many-locals
+
     def merge_schemas(self, old_schema, new_schema):  # noqa: C901
         """
         Merge two schemas
@@ -830,7 +827,7 @@ class PipelineWise:
         result = commands.run_command(command)
 
         # Get output and errors from tap
-        # pylint: disable=unused-variable
+
         returncode, new_schema, tap_output = result
 
         if returncode != 0:
@@ -857,7 +854,6 @@ class PipelineWise:
             self.logger.error(error)
             raise SystemExit(1)
 
-    # pylint: disable=too-many-locals,inconsistent-return-statements
     def _discover_tap(self, tap, target):
         """
         Discover a tap and return an error string so imports can aggregate failures.
@@ -895,7 +891,7 @@ class PipelineWise:
         result = commands.run_command(command)
 
         # Get output and errors from tap
-        # pylint: disable=unused-variable
+
         returncode, new_schema, output = result
 
         if returncode != 0:
@@ -1165,7 +1161,6 @@ class PipelineWise:
             # Run command
             commands.run_command(command, self.tap_run_log_file)
 
-    # pylint: disable=too-many-statements,too-many-locals
     def run_tap(self):
         """
         Generating command(s) to run tap to sync data from source to target
@@ -1340,12 +1335,11 @@ class PipelineWise:
             utils.silentremove(tap_properties_singer)
         self._print_tap_run_summary(self.STATUS_SUCCESS, start_time, datetime.now())
 
-    def _stop_command_on_signal(self, sig=None, frame=None):  # pylint: disable=unused-argument
+    def _stop_command_on_signal(self, sig=None, frame=None):
         """Exit a target-only or configuration command without resolving a tap."""
         self.logger.info('Stopping command gracefully...')
         raise SystemExit(1)
 
-    # pylint: disable=unused-argument
     def stop_tap(self, sig=None, frame=None):
         """
         Stop running tap
@@ -1407,7 +1401,6 @@ class PipelineWise:
 
         sys.exit(1)
 
-    # pylint: disable=too-many-locals
     def fast_sync(self):
         """Entry point for the fast_sync CLI command."""
         self.force_fast_sync = self.args.force
@@ -1490,7 +1483,7 @@ class PipelineWise:
 
     def _preflight_postgres_slot_reset(self, selected_tables):
         """Validate every local reset dependency before changing source or state."""
-        # pylint: disable=import-outside-toplevel
+
         self._check_if_tap_is_enabled()
 
         tap_type = self.tap['type']
@@ -1554,7 +1547,7 @@ class PipelineWise:
         return value
 
     @contextmanager
-    def _guard_postgres_slot_reset_from_iceberg_recovery(  # pylint: disable=import-outside-toplevel
+    def _guard_postgres_slot_reset_from_iceberg_recovery(
         self, selected_tables, target_config,
     ):
         """Hold selected Iceberg target locks and reject persisted recovery state."""
@@ -1737,7 +1730,6 @@ class PipelineWise:
         for yaml_file in target_yamls:
             self.logger.info('Started validating target file: %s', yaml_file)
 
-            # pylint: disable=E1136  # False positive when loading vault encrypted YAML
             target_yml = utils.load_yaml(os.path.join(yaml_dir, yaml_file), vault_secret)
             utils.validate(target_yml, target_schema)
 
@@ -1754,7 +1746,6 @@ class PipelineWise:
         for yaml_file in tap_yamls:
             self.logger.info('Started validating %s ...', yaml_file)
 
-            # pylint: disable=E1136  # False positive when loading vault encrypted YAML
             tap_yml = utils.load_yaml(os.path.join(yaml_dir, yaml_file), vault_secret)
             utils.validate(tap_yml, tap_schema)
 
@@ -1897,7 +1888,7 @@ class PipelineWise:
                         selected_taps=selected_taps_id,
                         excluded_taps=failed_tap_ids,
                     )
-            except Exception as exc:  # pylint: disable=broad-except
+            except Exception as exc:
                 data_diff_sync_failed = True
                 self.logger.exception(
                     'Failed to reconcile data-diff definitions: %s', exc
@@ -1911,7 +1902,7 @@ class PipelineWise:
         end_time = datetime.now()
 
         # Log summary
-        # pylint: disable=logging-too-many-args
+
         self.logger.info(
             """
             -------------------------------------------------------
@@ -2148,14 +2139,13 @@ class PipelineWise:
     def copy_native_to_iceberg(self):
         """Create or promote a managed Iceberg v3 copy of one native table."""
         # Local imports avoid a cycle through FastSync state helpers and the CLI package.
-        # pylint: disable=import-outside-toplevel
+
         from pipelinewise.fastsync.commons.snowflake_iceberg import (
             SnowflakeQueryAdapter,
         )
         from pipelinewise.fastsync.commons.snowflake_iceberg_converter import (
             SnowflakeNativeToIcebergConverter,
         )
-        # pylint: enable=import-outside-toplevel
 
         if self.target['type'] != ConnectorType.TARGET_SNOWFLAKE.value:
             raise PreRunChecksException(
@@ -2557,7 +2547,6 @@ TAP RUN SUMMARY
                 with open(log_file_to_write_summary, 'a', encoding='utf-8') as logfile:
                     logfile.write(summary)
 
-    # pylint: disable=unused-variable
     def _run_post_import_tap_checks(
         self, tap: Dict, catalog: Dict, target_id: str
     ) -> List:
@@ -2662,7 +2651,7 @@ TAP RUN SUMMARY
         for metadata in table_metadata:
             metadata_properties = metadata.get('metadata', {})
             selected = metadata_properties.get('selected')
-            if selected is True:   # pylint: disable=no-else-return
+            if selected is True:
                 return
             elif selected is False:
                 break
@@ -2744,7 +2733,7 @@ TAP RUN SUMMARY
 
         deleted_taps_count = 0
         for target_id, taps in old_config_dict.items():
-            # pylint: disable=unreachable
+
             if target_id not in new_config_dict:
                 # target is no longer configured, thus we need to remove all its config and taps tied to it
                 self._remove_target_config(target_id, taps)

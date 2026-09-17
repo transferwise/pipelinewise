@@ -189,7 +189,6 @@ class TestResetState(TestCase):
 
         self.assertEqual(system_exit.exception.code, 1)
 
-
     def test_exit_with_error_1_if_tap_is_not_allowed(self):
         """ Test reset_state command exit with error 1 if tap is not allowed for it"""
         arguments = {

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# pylint: disable=missing-function-docstring,too-many-arguments,too-many-locals
+
 import copy
 import datetime
 import json

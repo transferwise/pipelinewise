@@ -15,7 +15,6 @@ TARGET_ID = 'snowflake'
 class TestNativeMultilineMariaDBToSnowflake(TapMariaDB):
     """Exercise exact MariaDB text through native FullSync and PartialSync."""
 
-    # pylint: disable=arguments-differ
     def setUp(self):
         super().setUp(tap_id=TAP_ID, target_id=TARGET_ID)
         self.source_db = self.e2e_env.get_conn_env_var('TAP_MYSQL', 'DB')

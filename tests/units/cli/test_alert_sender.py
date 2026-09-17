@@ -12,7 +12,6 @@ from pipelinewise.cli.alert_handlers.victorops_alert_handler import (
 )
 
 
-# pylint: disable=too-few-public-methods
 class TestAlertSender:
     """
     Unit tests for PipelineWise CLI alert sender classes
@@ -35,7 +34,7 @@ class TestAlertSender:
                 'handler2': {'unknown-prop2': 'alert-handler-property2'},
             }
         )
-        # pylint: disable=protected-access
+
         assert alert_sender._AlertSender__get_alert_handler('handler1') == AlertHandler(
             type='handler1', config={'unknown-prop1': 'alert-handler-property1'}
         )
@@ -48,7 +47,7 @@ class TestAlertSender:
                     'handler2': {'unknown-prop2': 'alert-handler-property2'},
                 }
             )
-            # pylint: disable=protected-access
+
             alert_sender._AlertSender__get_alert_handler('handler3')
 
         # send_to_handler: Should raise an exception if alert handler not configured

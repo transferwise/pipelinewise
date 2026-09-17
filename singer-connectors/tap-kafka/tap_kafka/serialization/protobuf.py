@@ -5,15 +5,12 @@ import importlib.machinery
 import sys
 import subprocess
 
-from confluent_kafka.schema_registry.protobuf import ProtobufSerializer
 from confluent_kafka.schema_registry.protobuf import ProtobufDeserializer
 from google.protobuf.json_format import MessageToDict
-from google.protobuf.json_format import MessageToJson
 
 from tap_kafka.errors import ProtobufCompilerException
 
 
-# pylint: disable=R0903
 class ProtobufDictDeserializer(ProtobufDeserializer):
     """
     Deserializes a Python dict object from protobuf
@@ -24,11 +21,12 @@ class ProtobufDictDeserializer(ProtobufDeserializer):
                              preserving_proto_field_name=True,
                              including_default_value_fields=True)
 
+
 def topic_name_to_protoc_output_name(topic: str) -> str:
     """Convert topic name to the file name that protoc is generating"""
     return topic.replace('-', '_').replace('.', '_')
 
-# pylint: disable=R0914
+
 def proto_to_message_type(schema: str, protobuf_classes_dir: str, topic: str):
     """Compile a protobuf schema to python class and load it dynamically"""
     mod_name = f"proto_message_{topic_name_to_protoc_output_name(topic)}"
@@ -45,7 +43,10 @@ def proto_to_message_type(schema: str, protobuf_classes_dir: str, topic: str):
         schema_f.flush()
 
     # Compile schema to python class by protoc
-    command = f"{sys.executable} -m grpc_tools.protoc -I {protobuf_classes_dir} --python_out={protobuf_classes_dir} {proto_name}"
+    command = (
+        f"{sys.executable} -m grpc_tools.protoc -I {protobuf_classes_dir} "
+        f"--python_out={protobuf_classes_dir} {proto_name}"
+    )
     try:
         subprocess.run(command.split(), check=True, stdout=subprocess.PIPE, env=os.environ.copy())
     except subprocess.CalledProcessError as exc:

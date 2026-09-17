@@ -1,11 +1,44 @@
-Unversioned
------------
+0.87.0 (2026-09-17)
+-------------------
 
 **Test infrastructure**
 
 - Use stable numbered E2E shard checks `e2e_tests_01` through `e2e_tests_09`
   across branch protection, workflow outputs, and contract tests, allowing
   future test rebalancing without further required-check renames
+
+**Docker image**
+
+- Configure mbuffer status reporting every 30 seconds in the main Docker image,
+  reducing progress log volume without changing stream-buffer behaviour
+
+**Developer tooling**
+
+- Consolidate Python linting on Ruff for PipelineWise, data-diff, all root tests
+  including E2E, vendored connector source, and the tap-mysql, tap-postgres, and
+  target-snowflake suites run by connector CI, replacing Pylint, Flake8, YAPF,
+  and Unify
+- Retain 120-character line, warning, docstring-quote, and complexity checks
+  plus Ruff's Pylint-category error rules without enabling Pylint convention,
+  refactor, and warning families wholesale over legacy code
+- Enforce line length, docstring quoting, lambda assignment, and complexity
+  across all vendored connector source, replacing connector-wide Ruff
+  exemptions with fixes or narrowly scoped inline exceptions
+- Enforce blank-line spacing with explicitly selected Ruff preview rules and
+  remove spacing left by retired directives; verify line-length and spacing
+  enforcement with executable lint probes
+- Remove broad unused-import, unused-variable, undefined-name, and test
+  type-comparison exemptions while preserving connector exports and initialization
+- Exclude connector suites outside existing GitHub connector CI, including
+  integration suites, legacy tests, and spikes, from the root Ruff gate
+- Run the lint and unit workflow for changes to Ruff policy, its pre-commit
+  hook, or the workflow itself, even when no application Python changed
+- Remove obsolete inline directives for retired linters, replace avoidable
+  invalid-escape exceptions with equivalent valid string literals, and guard
+  against reintroducing non-Ruff directives
+- Set tap-kafka's unit, integration, and combined coverage threshold to 59%,
+  with measured unit coverage of 59.18%; integration and combined coverage
+  baselines remain unverified
 
 0.86.0 (2026-09-16)
 -------------------

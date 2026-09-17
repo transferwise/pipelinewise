@@ -99,7 +99,7 @@ The tap will write bookmarks to stdout which can be captured and passed as an op
   nosetests test
 ```
 
-### To run pylint:
+### To run Ruff:
 
 1. Install python dependencies and run python linter
 ```
@@ -107,5 +107,6 @@ The tap will write bookmarks to stdout which can be captured and passed as an op
   . venv/bin/activate
   pip install --upgrade pip
   pip install .[test]
-  pylint --rcfile .pylintrc tap_zendesk
+  cd ../..
+  singer-connectors/tap-zendesk/venv/bin/ruff check singer-connectors/tap-zendesk/tap_zendesk/
 ```

@@ -108,7 +108,6 @@ class TwilioClient:
     def __exit__(self, exception_type, exception_value, traceback):
         self.__session.close()
 
-    # pylint: disable=inconsistent-return-statements
     @backoff.on_exception(backoff.expo,
                           Server5xxError,
                           max_tries=7,

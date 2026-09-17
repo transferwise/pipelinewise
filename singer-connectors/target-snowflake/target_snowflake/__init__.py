@@ -14,15 +14,16 @@ from jsonschema import Draft7Validator, FormatChecker
 from singer import get_logger
 from datetime import datetime, timedelta
 
-from target_snowflake.file_formats import csv
-from target_snowflake.file_formats import parquet
+# FileFormat resolves these modules through the initialized file_formats package.
+from target_snowflake.file_formats import csv as csv
+from target_snowflake.file_formats import parquet as parquet
 from target_snowflake import stream_utils
 
 from target_snowflake.db_sync import DbSync, RECORD_UPDATE_MODE_PATCH
 from target_snowflake.file_format import FileFormatTypes
 from target_snowflake.exceptions import (
     RecordValidationException,
-    UnexpectedValueTypeException,
+    UnexpectedValueTypeException as UnexpectedValueTypeException,
     InvalidValidationOperationException
 )
 
@@ -74,7 +75,7 @@ def get_snowflake_statics(config):
     if not ('disable_table_cache' in config and config['disable_table_cache']):
         LOGGER.info('Getting catalog objects from PipelineWise table cache...')
 
-        db = DbSync(config)  # pylint: disable=invalid-name
+        db = DbSync(config)
         table_cache = db.get_table_columns(
             table_schemas=stream_utils.get_schema_names_from_config(config))
 
@@ -84,8 +85,7 @@ def get_snowflake_statics(config):
     return table_cache, file_format_type
 
 
-# pylint: disable=too-many-locals,too-many-branches,too-many-statements,invalid-name
-def persist_lines(config, lines, table_cache=None, file_format_type: FileFormatTypes = None) -> None:
+def persist_lines(config, lines, table_cache=None, file_format_type: FileFormatTypes = None) -> None:  # noqa: C901
     """Main loop to read and consume singer messages from stdin
 
     Params:
@@ -337,7 +337,6 @@ def persist_lines(config, lines, table_cache=None, file_format_type: FileFormatT
     emit_state(copy.deepcopy(flushed_state))
 
 
-# pylint: disable=too-many-arguments
 def flush_streams(
         streams,
         row_count,

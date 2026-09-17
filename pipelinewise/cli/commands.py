@@ -123,7 +123,6 @@ class TransformParams:
     target_id: str
 
 
-# pylint: disable=unnecessary-pass
 class RunCommandException(Exception):
     """
     Custom exception to raise when run command fails
@@ -296,7 +295,6 @@ def build_stream_buffer_command(
     return buffer_command
 
 
-# pylint: disable=too-many-positional-arguments
 def build_singer_command(
     tap: TapParams,
     target: TargetParams,
@@ -355,8 +353,6 @@ def build_singer_command(
     return command
 
 
-# pylint: disable=too-many-positional-arguments
-# pylint: disable=too-many-arguments
 def build_partialsync_command(
         tap: TapParams,
         target: TargetParams,
@@ -402,8 +398,6 @@ def build_partialsync_command(
     return command
 
 
-# pylint: disable=too-many-positional-arguments
-# pylint: disable=too-many-arguments
 def build_fastsync_command(
     tap: TapParams,
     target: TargetParams,
@@ -481,7 +475,6 @@ def log_file_with_status(log_file: str, status: str) -> str:
     return f'{log_file}.{status}'
 
 
-# pylint: disable=too-many-locals
 def run_command(command: str, log_file: str = None, line_callback: callable = None):
     """
     Runs a shell command with or without log file with STDOUT and STDERR

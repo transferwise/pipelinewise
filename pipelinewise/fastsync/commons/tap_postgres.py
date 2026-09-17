@@ -352,7 +352,6 @@ class FastSyncTapPostgres:
 
                 return []
 
-    # pylint: disable=no-member
     def create_replication_slot(self):
         """
         Create replication slot on the primary host
@@ -387,7 +386,6 @@ class FastSyncTapPostgres:
             else:
                 raise exc
 
-    # pylint: disable=no-member
     def fetch_current_log_pos(self):
         """
         Get the actual wal position in Postgres
@@ -417,7 +415,6 @@ class FastSyncTapPostgres:
 
         return {'lsn': lsn, 'version': 1}
 
-    # pylint: disable=invalid-name
     def fetch_current_incremental_key_pos(self, table, replication_key):
         """
         Get the actual incremental key position in the table
@@ -495,7 +492,7 @@ class FastSyncTapPostgres:
 
             decimal_format = f"""
               'CASE WHEN "' || column_name || '" IS NULL THEN NULL ELSE GREATEST(LEAST({max_num}, ROUND("' || column_name || '"::numeric , {decimals})), -{max_num}) END'
-            """ # noqa E501 pylint: disable=line-too-long
+            """  # noqa: E501
             integer_format = """
               '"' || column_name || '"'
             """
@@ -513,7 +510,6 @@ class FastSyncTapPostgres:
             if self.hstore_as_json else ''
         )
 
-        # pylint: disable = line-too-long
         sql = f"""
                 SELECT
                     column_name
@@ -548,7 +544,6 @@ class FastSyncTapPostgres:
                 ORDER BY ordinal_position
                 ) AS x
             """  # noqa: E501
-        # pylint: enable = line-too-long
 
         return self.query(sql)
 
@@ -579,7 +574,6 @@ class FastSyncTapPostgres:
             'source_column_names': [column[0] for column in postgres_columns],
         }
 
-    # pylint: disable=too-many-arguments, too-many-locals, too-many-positional-arguments
     def copy_table(
         self,
         table_name,

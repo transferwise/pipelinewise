@@ -2,6 +2,7 @@ import os
 import subprocess
 from pathlib import Path
 
+import pytest
 import yaml
 
 
@@ -56,6 +57,9 @@ case "${FAKE_CURL_SCENARIO}:${page}" in
     ;;
   detector_only:1)
     printf '[{"filename":"scripts/ci_check_no_file_changes.sh"}]'
+    ;;
+  lint_policy_only:1)
+    printf '[{"filename":"%s"}]' "${LINT_POLICY_FILE}"
     ;;
   e2e_workflow:1)
     printf '[{"filename":".github/workflows/e2e_tests.yml"}]'
@@ -173,6 +177,33 @@ def test_detector_change_triggers_checks(tmp_path):
     assert result.returncode == 1
     assert pages == ['1']
     assert 'Detected changes in following file: scripts/ci_check_no_file_changes.sh' in result.stdout
+
+
+@pytest.mark.parametrize(
+    'filename',
+    (
+        '.flake8',
+        '.github/workflows/connectors.yml',
+        '.github/workflows/e2e_tests.yml',
+        '.github/workflows/lint_unit_tests.yml',
+        '.github/workflows/publish_doc.yml',
+        '.pre-commit-config.yaml',
+        '.style.yapf',
+        'docs/conf.py',
+        'pylintrc',
+        'pyproject.toml',
+        'scripts/check_any_file_changed.py',
+    ),
+)
+def test_root_lint_input_change_triggers_checks(tmp_path, monkeypatch, filename):
+    """Changes to Ruff policy or files unique to its scope must run the workflow."""
+    monkeypatch.setenv('LINT_POLICY_FILE', filename)
+
+    result, pages = run_detector(tmp_path, 'lint_policy_only', 'python')
+
+    assert result.returncode == 1
+    assert pages == ['1']
+    assert f'Detected changes in following file: {filename}' in result.stdout
 
 
 def test_e2e_workflow_triggers_checks(tmp_path):

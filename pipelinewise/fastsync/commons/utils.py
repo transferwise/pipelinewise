@@ -389,7 +389,6 @@ class NotSelectedTableException(Exception):
         super().__init__(self, self.message)
 
 
-# pylint: disable=missing-function-docstring
 def get_cpu_cores():
     """Get CPU cores for multiprocessing"""
     try:
@@ -599,7 +598,6 @@ def get_target_schema(target_config, table):
     return target_schema
 
 
-# pylint: disable=invalid-name
 def get_target_schemas(target_config, tables):
     """Get list of target schemas"""
     target_schemas = []
@@ -609,7 +607,6 @@ def get_target_schemas(target_config, tables):
     return list(dict.fromkeys(target_schemas))
 
 
-# pylint: disable=invalid-name
 def get_grantees(target_config, table):
     """Grantees can be defined in multiple ways:
 
@@ -793,7 +790,6 @@ def parse_args(required_config_keys: Dict) -> argparse.Namespace:
     return args
 
 
-# pylint: disable=import-outside-toplevel
 def retry_pattern():
     import backoff
     from botocore.exceptions import ClientError

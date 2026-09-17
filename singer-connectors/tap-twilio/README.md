@@ -419,12 +419,11 @@ make venv test
 
 ## To lint the code
 
-Install python test dependencies in a virtual env and run linter
+Install the test dependencies in a virtual environment and run Ruff:
 ```
-make venv pylint
+make venv lint
 ```
 
 ## Licence
 
 GNU AFFERO GENERAL PUBLIC [LICENSE](./LICENSE)
-

@@ -81,8 +81,7 @@ def emit_state(state):
         sys.stdout.flush()
 
 
-# pylint: disable=too-many-locals,too-many-branches,too-many-statements,invalid-name,consider-iterating-dictionary
-def persist_lines(config, lines) -> None:
+def persist_lines(config, lines) -> None:  # noqa: C901
     """Read singer messages and process them line by line"""
     state = None
     flushed_state = None
@@ -242,7 +241,6 @@ def persist_lines(config, lines) -> None:
     emit_state(copy.deepcopy(flushed_state))
 
 
-# pylint: disable=too-many-arguments
 def flush_streams(
         streams,
         row_count,
@@ -316,7 +314,6 @@ def flush_streams(
     return flushed_state
 
 
-# pylint: disable=too-many-arguments
 def load_stream_batch(stream, records_to_load, row_count, db_sync, delete_rows=False, temp_dir=None):
     """Load a batch of records and do post load operations, like creating
     or deleting rows"""
@@ -335,7 +332,6 @@ def load_stream_batch(stream, records_to_load, row_count, db_sync, delete_rows=F
     row_count[stream] = 0
 
 
-# pylint: disable=unused-argument
 def flush_records(stream, records_to_load, row_count, db_sync, temp_dir=None):
     """Take a list of records and load into database"""
     if temp_dir:

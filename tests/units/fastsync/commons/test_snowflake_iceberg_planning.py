@@ -420,7 +420,7 @@ class TestDiscoveryPlanning:
         snowflake = FakeSnowflake()
         publisher = SnowflakeIcebergPublisher(snowflake, str(tmp_path))
         publisher.inspect_table = MagicMock(return_value=v3_snapshot(existing))
-        publisher._verify_replacement_metadata = MagicMock()  # pylint: disable=protected-access
+        publisher._verify_replacement_metadata = MagicMock()
 
         plan = publisher.plan_full_sync(
             make_attempt(
@@ -442,7 +442,7 @@ class TestDiscoveryPlanning:
         assert "COPY GRANTS COPY TAGS" in plan.publication_statements[0]
         assert "\"PAYLOAD\" VARIANT COMMENT 'payload'" in plan.publication_statements[0]
         assert "COMMENT = 'orders'" in plan.publication_statements[0]
-        publisher._verify_replacement_metadata.assert_called_once()  # pylint: disable=protected-access
+        publisher._verify_replacement_metadata.assert_called_once()
 
     def test_full_sync_never_converts_native_target(self, tmp_path, spec):
         """Full sync never converts a native target."""
@@ -573,7 +573,7 @@ class TestReplacementSafety:
         )
         assert recovered.context["replacement_metadata"]["column_comments"] == expected_comments
 
-        publisher._verify_replacement_metadata = MagicMock()  # pylint: disable=protected-access
+        publisher._verify_replacement_metadata = MagicMock()
         statement = publisher.plan_full_sync(attempt, spec).publication_statements[0]
         assert "removed comment" not in statement
         assert '"ID" NUMBER(38,0) NOT NULL COMMENT \'id comment\'' in statement
@@ -583,7 +583,7 @@ class TestReplacementSafety:
         """Replacement preflight rejects policies or streams."""
         publisher = SnowflakeIcebergPublisher(FakeSnowflake([[{"POLICY_NAME": "MASK"}]]), str(tmp_path))
         with pytest.raises(TableCompatibilityError, match="policies"):
-            publisher._preflight_replacement(spec.name, spec)  # pylint: disable=protected-access
+            publisher._preflight_replacement(spec.name, spec)
 
         publisher = SnowflakeIcebergPublisher(
             FakeSnowflake(
@@ -602,7 +602,7 @@ class TestReplacementSafety:
             str(tmp_path),
         )
         with pytest.raises(TableCompatibilityError, match="streams"):
-            publisher._preflight_replacement(spec.name, spec)  # pylint: disable=protected-access
+            publisher._preflight_replacement(spec.name, spec)
 
     def test_replacement_preflight_rejects_cross_schema_view_stream(self, tmp_path, spec):
         """Replacement preflight rejects cross schema view stream."""
@@ -620,7 +620,7 @@ class TestReplacementSafety:
         )
 
         with pytest.raises(TableCompatibilityError, match="dependent streams"):
-            publisher._preflight_replacement(spec.name, spec)  # pylint: disable=protected-access
+            publisher._preflight_replacement(spec.name, spec)
 
     def test_replacement_preflight_fails_closed_on_invalid_view_stream_metadata(
         self,
@@ -640,7 +640,7 @@ class TestReplacementSafety:
         )
 
         with pytest.raises(TableCompatibilityError, match="invalid source object metadata"):
-            publisher._preflight_replacement(spec.name, spec)  # pylint: disable=protected-access
+            publisher._preflight_replacement(spec.name, spec)
 
     def test_replacement_preflight_rejects_column_tags_defaults_and_identity(self, tmp_path, spec):
         """Replacement preflight rejects column tags defaults and identity."""
@@ -649,7 +649,7 @@ class TestReplacementSafety:
             str(tmp_path),
         )
         with pytest.raises(TableCompatibilityError, match="column tags"):
-            publisher._preflight_replacement(spec.name, spec)  # pylint: disable=protected-access
+            publisher._preflight_replacement(spec.name, spec)
 
         for column in (
             {"COLUMN_NAME": "ID", "COLUMN_DEFAULT": "1", "IS_IDENTITY": "NO"},
@@ -660,7 +660,7 @@ class TestReplacementSafety:
                 str(tmp_path),
             )
             with pytest.raises(TableCompatibilityError, match="defaults or identity"):
-                publisher._preflight_replacement(spec.name, spec)  # pylint: disable=protected-access
+                publisher._preflight_replacement(spec.name, spec)
 
     def test_replacement_preflight_allows_table_tags_inherited_by_columns(self, tmp_path, spec):
         """Replacement preflight allows table tags inherited by columns."""
@@ -707,7 +707,7 @@ class TestReplacementSafety:
             snowflake,
             str(tmp_path),
         )
-        metadata = publisher._preflight_replacement(  # pylint: disable=protected-access
+        metadata = publisher._preflight_replacement(
             spec.name,
             spec,
         )
@@ -747,7 +747,7 @@ class TestReplacementSafety:
             TableCompatibilityError,
             match="secondary constraints or inbound foreign keys",
         ):
-            publisher._preflight_replacement(spec.name, spec)  # pylint: disable=protected-access
+            publisher._preflight_replacement(spec.name, spec)
 
     def test_replacement_preflight_rejects_cross_database_inbound_foreign_key(self, tmp_path, spec):
         """Replacement preflight rejects cross database inbound foreign key."""
@@ -766,7 +766,7 @@ class TestReplacementSafety:
             TableCompatibilityError,
             match="secondary constraints or inbound foreign keys",
         ):
-            publisher._preflight_replacement(spec.name, spec)  # pylint: disable=protected-access
+            publisher._preflight_replacement(spec.name, spec)
 
         assert snowflake.queries[-1][0] == ('SHOW EXPORTED KEYS IN TABLE "TEST_DB"."TEST_SCHEMA"."ORDERS"')
 
@@ -833,7 +833,7 @@ class TestReplacementSafety:
         )
         publisher = SnowflakeIcebergPublisher(snowflake, str(tmp_path))
 
-        metadata = publisher._preflight_replacement(spec.name, spec)  # pylint: disable=protected-access
+        metadata = publisher._preflight_replacement(spec.name, spec)
         attempt = make_attempt(
             spec,
             phase=PHASE_PUBLISHED,
@@ -914,7 +914,7 @@ class TestReplacementSafety:
         )
 
         with pytest.raises(TableCompatibilityError, match=message):
-            publisher._preflight_replacement(spec.name, spec)  # pylint: disable=protected-access
+            publisher._preflight_replacement(spec.name, spec)
 
     def test_replacement_metadata_verification_rejects_grant_or_tag_drift(self, tmp_path, spec):
         """Replacement metadata verification rejects grant or tag drift."""
@@ -929,7 +929,7 @@ class TestReplacementSafety:
             table_tags=expected.table_tags,
         )
         publisher = SnowflakeIcebergPublisher(FakeSnowflake(), str(tmp_path))
-        publisher._preflight_replacement = MagicMock(return_value=actual)  # pylint: disable=protected-access
+        publisher._preflight_replacement = MagicMock(return_value=actual)
         attempt = make_attempt(
             spec,
             method=PUBLICATION_REPLACEMENT_CTAS,
@@ -937,7 +937,7 @@ class TestReplacementSafety:
         )
 
         with pytest.raises(RecoveryManifestError, match="metadata changed"):
-            publisher._verify_replacement_metadata(attempt)  # pylint: disable=protected-access
+            publisher._verify_replacement_metadata(attempt)
 
     def test_partial_sync_plans_one_idempotent_transaction(self, tmp_path, spec):
         """Partial sync plans one idempotent transaction."""

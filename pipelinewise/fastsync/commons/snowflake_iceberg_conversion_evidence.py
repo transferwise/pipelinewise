@@ -14,7 +14,7 @@ from pipelinewise.fastsync.commons.snowflake_iceberg_validation import (
 )
 
 
-class SnowflakeConversionEvidenceService:  # pylint: disable=too-few-public-methods
+class SnowflakeConversionEvidenceService:
     """Compare projected native rows with their Iceberg destination."""
 
     def __init__(self, converter):
@@ -30,7 +30,7 @@ class SnowflakeConversionEvidenceService:  # pylint: disable=too-few-public-meth
             column.projection if project else quote_identifier(column.name)
             for column in columns
         )
-        rows = self.converter._query(  # pylint: disable=protected-access
+        rows = self.converter._query(
             'SELECT COUNT(*) AS "ROW_COUNT", HASH_AGG(*) AS "ROW_HASH" '
             f'FROM (SELECT {select_list} FROM {table.quoted})',
             phase='validation',

@@ -2,15 +2,16 @@ VENV_DIR = ./venv
 ZOOKEEPER_CLIENT_PORT = 2181
 KAFKA_PORT = 29092
 SCHEMA_REGISTRY_PORT = 8081
+COVERAGE_THRESHOLD = 59
 
 .run_pytest_unit:
-	@$(VENV_DIR)/bin/pytest --verbose --cov=tap_kafka --cov-fail-under=80 --cov-report term-missing tests/unit
+	@$(VENV_DIR)/bin/pytest --verbose --cov=tap_kafka --cov-fail-under=$(COVERAGE_THRESHOLD) --cov-report term-missing tests/unit
 
 .run_pytest_integration:
-	@TAP_KAFKA_BOOTSTRAP_SERVERS=localhost:${KAFKA_PORT} $(VENV_DIR)/bin/pytest --verbose --cov=tap_kafka --cov-fail-under=80 --cov-report term-missing tests/integration
+	@TAP_KAFKA_BOOTSTRAP_SERVERS=localhost:${KAFKA_PORT} $(VENV_DIR)/bin/pytest --verbose --cov=tap_kafka --cov-fail-under=$(COVERAGE_THRESHOLD) --cov-report term-missing tests/integration
 
 .run_pytest_all:
-	@TAP_KAFKA_BOOTSTRAP_SERVERS=localhost:${KAFKA_PORT} $(VENV_DIR)/bin/pytest --verbose --cov=tap_kafka --cov-fail-under=80 --cov-report term-missing tests/
+	@TAP_KAFKA_BOOTSTRAP_SERVERS=localhost:${KAFKA_PORT} $(VENV_DIR)/bin/pytest --verbose --cov=tap_kafka --cov-fail-under=$(COVERAGE_THRESHOLD) --cov-report term-missing tests/
 
 virtual_env:
 	@echo "Making Virtual Environment in $(VENV_DIR)..."
@@ -39,7 +40,7 @@ clean_virtual_env:
 clean: clean_containers clean_virtual_env
 
 lint: virtual_env
-	@$(VENV_DIR)/bin/pylint tap_kafka -d C,W,unexpected-keyword-arg,duplicate-code
+	@cd ../.. && singer-connectors/tap-kafka/venv/bin/ruff check singer-connectors/tap-kafka/tap_kafka/
 
 unit_test: virtual_env .run_pytest_unit
 

@@ -1,5 +1,6 @@
 import singer
 
+
 def generate_catalog(streams):
 
     catalog = {}

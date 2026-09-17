@@ -6,9 +6,10 @@ venv:
 	pip install --upgrade pip setuptools wheel;\
 	pip install -e .[test]
 
-pylint:
-	. ./venv/bin/activate ;\
-	pylint --rcfile .pylintrc tap_postgres/
+lint:
+	cd ../.. && singer-connectors/tap-postgres/venv/bin/ruff check \
+		singer-connectors/tap-postgres/tap_postgres/ singer-connectors/tap-postgres/tests/unit/ \
+		singer-connectors/tap-postgres/tests/__init__.py singer-connectors/tap-postgres/tests/utils.py
 
 start_db:
 	docker-compose up -d

@@ -9,12 +9,9 @@ from pipelinewise.fastsync.commons import utils as common_utils
 from pipelinewise.fastsync.commons.snowflake_iceberg import PartialSyncBoundary
 
 
-# pylint: disable=too-many-instance-attributes, too-few-public-methods
 class PartialSync2SFArgs:
     """Arguments for using in mysql to snowflake tests"""
-    # pylint: disable=too-many-arguments
-    # pylint: disable=too-many-positional-arguments
-    # pylint: disable=too-many-locals
+
     def __init__(self, temp_test_dir, table='email',
                  start_value='FOO_START', end_value='FOO_END', state='state.json',
                  hard_delete=None, drop_target_table=False,
@@ -91,9 +88,7 @@ def assert_iceberg_partial_sync_workflow(
     recovery_error=None,
 ):
     """Assert a source route uses durable Iceberg PartialSync publication."""
-    # pylint: disable=too-many-arguments
-    # pylint: disable=too-many-locals,too-many-statements
-    # pylint: disable=too-many-branches
+
     package_name = route_module.__name__
     args = PartialSync2SFArgs(
         temp_test_dir='/tmp',

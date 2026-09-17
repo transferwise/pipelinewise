@@ -31,6 +31,7 @@ FORCED_FULL_TABLE = {
     'BackgroundOperationResult' # Does not support ordering by CreatedDate
 }
 
+
 def get_replication_key(sobject_name, fields):
     if sobject_name in FORCED_FULL_TABLE:
         return None
@@ -47,8 +48,10 @@ def get_replication_key(sobject_name, fields):
         return 'LoginTime'
     return None
 
+
 def stream_is_selected(mdata):
     return mdata.get((), {}).get('selected', False)
+
 
 def build_state(raw_state, catalog):
     state = {}
@@ -87,7 +90,7 @@ def build_state(raw_state, catalog):
 
     return state
 
-# pylint: disable=undefined-variable
+
 def create_property_schema(field, mdata):
     field_name = field['name']
 
@@ -98,13 +101,12 @@ def create_property_schema(field, mdata):
         mdata = metadata.write(
             mdata, ('properties', field_name), 'inclusion', 'available')
 
-    property_schema, mdata = salesforce.field_to_property_schema(field, mdata)
+    property_schema, mdata = tap_salesforce.salesforce.field_to_property_schema(field, mdata)
 
     return (property_schema, mdata)
 
 
-# pylint: disable=too-many-branches,too-many-statements
-def do_discover(sf):
+def do_discover(sf):  # noqa: C901
     """Describes a Salesforce instance's objects and generates a JSON schema for each field."""
     global_description = sf.describe()
 
@@ -195,9 +197,10 @@ def do_discover(sf):
         missing_unsupported_field_names = [f[0] for f in unsupported_fields if f[0] not in field_name_set]
 
         if missing_unsupported_field_names:
-            LOGGER.info("Ignoring the following unsupported fields for object %s as they are missing from the field list: %s",
-                        sobject_name,
-                        ', '.join(sorted(missing_unsupported_field_names)))
+            LOGGER.info(
+                "Ignoring the following unsupported fields for object %s as they are missing from the field list: %s",
+                sobject_name,
+                ', '.join(sorted(missing_unsupported_field_names)))
 
         if filtered_unsupported_fields:
             LOGGER.info("Not syncing the following unsupported fields for object %s: %s",
@@ -258,7 +261,7 @@ def do_discover(sf):
     unsupported_tag_objects = [object_to_tag_references[f]
                                for f in sf_custom_setting_objects if f in object_to_tag_references]
     if unsupported_tag_objects:
-        LOGGER.info( #pylint:disable=logging-not-lazy
+        LOGGER.info(
             "Skipping the following Tag objects, Tags on Custom Settings Salesforce objects " +
             "are not supported by the Bulk API:")
         LOGGER.info(unsupported_tag_objects)
@@ -267,6 +270,7 @@ def do_discover(sf):
 
     result = {'streams': entries}
     json.dump(result, sys.stdout, indent=4)
+
 
 def do_sync(sf, catalog, state):
     starting_stream = state.get("current_stream")
@@ -320,7 +324,8 @@ def do_sync(sf, catalog, state):
                 # Resuming a sync should clear out the remaining state once finished
                 counter = resume_syncing_bulk_query(sf, catalog_entry, job_id, state, counter)
                 LOGGER.info("%s: Completed sync (%s rows)", stream_name, counter.value)
-                # Remove Job info from state once we complete this resumed query. One of a few cases could have occurred:
+                # Remove Job info from state once we complete this resumed query.
+                # One of a few cases could have occurred:
                 # 1. The job succeeded, in which case make JobHighestBookmarkSeen the new bookmark
                 # 2. The job partially completed, in which case make JobHighestBookmarkSeen the new bookmark, or
                 #    existing bookmark if no bookmark exists for the Job.
@@ -355,6 +360,7 @@ def do_sync(sf, catalog, state):
     state["current_stream"] = None
     singer.write_state(state)
     LOGGER.info("Finished sync")
+
 
 def main_impl():
     args = singer_utils.parse_args(REQUIRED_CONFIG_KEYS)

@@ -30,7 +30,6 @@ class TestFileFormat(unittest.TestCase):
         with self.assertRaises(InvalidFileFormatException):
             FileFormat._get_formatter('UNKNOWN')
 
-
     @patch('target_snowflake.db_sync.DbSync.query')
     def test_detect_file_format_type(self, query_patch):
         # List method should return values as list

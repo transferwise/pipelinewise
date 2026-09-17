@@ -5,7 +5,6 @@ import psycopg2
 import psycopg2.extras
 import psycopg2.extensions
 import singer
-import singer.schema
 
 from singer import utils, metadata, get_bookmark
 from singer.catalog import Catalog
@@ -265,7 +264,7 @@ def register_type_adapters(conn_config):
                     (money_array_oid,), 'MONEY[]', psycopg2.STRING))
 
             # json and jsonb
-            # pylint: disable=unnecessary-lambda
+
             psycopg2.extras.register_default_json(loads=lambda x: str(x))
             psycopg2.extras.register_default_jsonb(loads=lambda x: str(x))
 
@@ -278,7 +277,6 @@ def register_type_adapters(conn_config):
                         (enum_oid,), f'ENUM_{enum_oid}[]', psycopg2.STRING))
 
 
-# pylint: disable-next=too-many-locals
 def do_sync(conn_config, catalog, default_replication_method, state, state_file=None):
     """
     Orchestrates sync of all streams

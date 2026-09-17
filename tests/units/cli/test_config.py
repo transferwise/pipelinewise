@@ -504,7 +504,7 @@ class TestConfig:
 
         with pytest.raises(SystemExit) as pytest_wrapped_e:
             Config.from_yamls(PIPELINEWISE_TEST_HOME, yaml_config_dir, vault_secret)
-        assert pytest_wrapped_e.type == SystemExit
+        assert pytest_wrapped_e.type is SystemExit
         assert pytest_wrapped_e.value.code == 1
 
     def test_from_invalid_yamls_fails(self):
@@ -528,7 +528,7 @@ class TestConfig:
 
         with pytest.raises(SystemExit) as pytest_wrapped_e:
             Config.from_yamls(PIPELINEWISE_TEST_HOME, yaml_config_dir, vault_secret)
-        assert pytest_wrapped_e.type == SystemExit
+        assert pytest_wrapped_e.type is SystemExit
         assert pytest_wrapped_e.value.code == 1
 
     def test_getters(self):
@@ -655,6 +655,7 @@ class TestConfig:
 
         # Delete the generated JSON config directory
         shutil.rmtree(json_config_dir)
+
     def test_save_config_selected_tap(self):
         """Test config target and tap JSON save functionalities if specific taps are selected"""
         json_config_dir = './pipelinewise-test-config'

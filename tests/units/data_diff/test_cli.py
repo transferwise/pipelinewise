@@ -10,10 +10,6 @@ from pipelinewise.cli.pipelinewise import PipelineWise
 from tests.units.cli.cli_args import CliArgs
 
 
-# pylint: disable=missing-class-docstring,missing-function-docstring,invalid-name
-# pylint: disable=protected-access
-
-
 class RepositoryContext:
     def __init__(self, checks=None, sync_error=None):
         self.checks = checks or []

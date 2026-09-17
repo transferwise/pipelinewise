@@ -1,6 +1,5 @@
 """Planning, publication, and reconciliation for managed Iceberg loads."""
 
-# pylint: disable=too-many-lines
 
 from __future__ import annotations
 
@@ -193,24 +192,24 @@ class SnowflakeIcebergPublicationService:
         return self.publisher.inspect_table(target)
 
     def _discover_table_row(self, target):
-        return self.publisher._discover_table_row(  # pylint: disable=protected-access
+        return self.publisher._discover_table_row(
             target
         )
 
     def _validate_production_attempt(self, attempt):
-        return self.publisher._validate_production_attempt(  # pylint: disable=protected-access
+        return self.publisher._validate_production_attempt(
             attempt
         )
 
     def _transition(self, attempt, phase, **updates):
-        return self.publisher._transition(  # pylint: disable=protected-access
+        return self.publisher._transition(
             attempt,
             phase,
             **updates,
         )
 
     def _save_active_attempt(self, attempt):
-        return self.publisher._save_active_attempt(  # pylint: disable=protected-access
+        return self.publisher._save_active_attempt(
             attempt
         )
 
@@ -246,7 +245,7 @@ class SnowflakeIcebergPublicationService:
         if attempt.method != method:
             raise RecoveryManifestError('Iceberg publication method changed after the source boundary was captured')
         if method == PUBLICATION_REPLACEMENT_CTAS:
-            self.publisher._verify_replacement_metadata(  # pylint: disable=protected-access
+            self.publisher._verify_replacement_metadata(
                 attempt
             )
         preparation = tuple(
@@ -308,7 +307,7 @@ class SnowflakeIcebergPublicationService:
         if attempt.method != method:
             raise RecoveryManifestError('Iceberg publication method changed after the partial range was resolved')
         if method == PUBLICATION_PARTIAL_REPLACEMENT_CTAS:
-            self.publisher._verify_replacement_metadata(  # pylint: disable=protected-access
+            self.publisher._verify_replacement_metadata(
                 attempt
             )
 
@@ -642,7 +641,7 @@ class SnowflakeIcebergPublicationService:
         expected = SnowflakeTableMetadata.from_dict(
             attempt.manifest_payload.replacement_metadata or {}
         )
-        if self.publisher._preflight_replacement(  # pylint: disable=protected-access
+        if self.publisher._preflight_replacement(
             attempt.target,
             attempt.table_spec,
         ) != expected:
@@ -699,7 +698,7 @@ class SnowflakeIcebergPublicationService:
             attempt.phase == PHASE_SUBMITTED
             and attempt.method == PUBLICATION_PARTIAL_MERGE
         ):
-            self.publisher._rearm_partial_merge_replay(  # pylint: disable=protected-access
+            self.publisher._rearm_partial_merge_replay(
                 attempt
             )
         return self._publish(attempt, spec, self.plan_partial_sync(attempt, spec), transactional=True)
@@ -748,7 +747,7 @@ class SnowflakeIcebergPublicationService:
             for statement in plan.publication_statements:
                 self.snowflake.query(statement, query_tag_props=attempt.query_tag)
 
-        self.publisher._verify_published(  # pylint: disable=protected-access
+        self.publisher._verify_published(
             attempt,
             spec,
         )
@@ -802,7 +801,7 @@ class SnowflakeIcebergPublicationService:
             PUBLICATION_REPLACEMENT_CTAS,
             PUBLICATION_PARTIAL_REPLACEMENT_CTAS,
         ):
-            self.publisher._verify_replacement_metadata(  # pylint: disable=protected-access
+            self.publisher._verify_replacement_metadata(
                 attempt
             )
 
@@ -918,7 +917,7 @@ class SnowflakeIcebergPublicationService:
             self._transition(attempt, PHASE_STAGED, query_id=None)
             return
         attempt.query_id = str(_row_value(successful[0], 'query_id'))
-        self.publisher._verify_published(  # pylint: disable=protected-access
+        self.publisher._verify_published(
             attempt,
             spec,
         )

@@ -28,7 +28,6 @@ def validate_config(config: Dict) -> None:
                 f'Not in the range [{change_streams.MIN_UPDATE_BUFFER_LENGTH}..'
                 f'{change_streams.MAX_UPDATE_BUFFER_LENGTH}]')
 
-
     if 'await_time_ms' in config:
         await_time_ms = config['await_time_ms']
 

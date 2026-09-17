@@ -30,7 +30,7 @@ def _snowflake_column(name, data_type, length=None):
     }
 
 
-class PartialSyncUtilsTestCase(TestCase):  # pylint: disable=too-many-public-methods
+class PartialSyncUtilsTestCase(TestCase):
     """Test case for partial sync utils"""
 
     def test_upload_to_s3(self):
@@ -45,7 +45,6 @@ class PartialSyncUtilsTestCase(TestCase):  # pylint: disable=too-many-public-met
             mocked_upload_to_s3 = mocked_snowflake.upload_to_s3
             mocked_upload_to_s3.return_value = test_s3_key
 
-            # pylint: disable=protected-access
             actual_return = upload_to_s3(mocked_snowflake, [test_file_part], temp_test_dir)
             self.assertTupleEqual(([test_s3_key], test_s3_key), actual_return)
             mocked_upload_to_s3.assert_called_with(test_file_part, tmp_dir=temp_test_dir)

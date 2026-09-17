@@ -156,7 +156,7 @@ def test_rejects_invalid_column_metadata():
         parse_native_columns((row, row.copy()))
 
 
-class FakeSnowflake:  # pylint: disable=too-many-instance-attributes,too-few-public-methods
+class FakeSnowflake:
     """Stateful Snowflake adapter for conversion and interruption tests."""
 
     def __init__(self):
@@ -204,8 +204,8 @@ class FakeSnowflake:  # pylint: disable=too-many-instance-attributes,too-few-pub
         self.interrupt_native_restore = False
 
     # Stateful SQL dispatch keeps the recovery scenarios deterministic.
-    # pylint: disable-next=too-many-return-statements,too-many-branches,too-many-statements
-    def query(  # noqa: C901
+
+    def query(
         self,
         sql,
         params=None,

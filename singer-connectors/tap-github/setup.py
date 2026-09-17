@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from setuptools import setup, find_packages
+from setuptools import setup
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
@@ -23,7 +23,7 @@ setup(name='pipelinewise-tap-github',
       ],
       extras_require={
           'test': [
-              'pylint==4.0.5',
+              'ruff==0.16.1',
               'pytest==9.0.3'
           ]
       },

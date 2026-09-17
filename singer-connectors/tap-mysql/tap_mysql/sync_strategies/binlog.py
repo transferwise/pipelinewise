@@ -1,4 +1,4 @@
-# pylint: disable=missing-function-docstring,too-many-arguments,too-many-branches
+
 import codecs
 import copy
 import datetime
@@ -6,7 +6,6 @@ import json
 import random
 import re
 import socket
-import pymysql.connections
 import pymysql.err
 import pytz
 import singer
@@ -218,8 +217,7 @@ def json_bytes_to_string(data):
     return data
 
 
-# pylint: disable=too-many-locals
-def row_to_singer_record(catalog_entry, version, db_column_map, row, time_extracted):
+def row_to_singer_record(catalog_entry, version, db_column_map, row, time_extracted):  # noqa: C901
     row_to_persist = {}
     for column_name, val in row.items():
         property_type = catalog_entry.schema.properties[column_name].type
@@ -623,12 +621,10 @@ def __get_diff_in_columns_list(
         )
     ]
 
-
     return set(binlog_columns_filtered).difference(schema_properties)
 
 
-# pylint: disable=R1702,R0915
-def _run_binlog_sync(
+def _run_binlog_sync(  # noqa: C901
         mysql_conn: MySQLConnection,
         reader: BinLogStreamReader,
         binlog_streams_map: Dict,

@@ -28,7 +28,7 @@ STREAMS = {
         'params': {},
         'pagination': 'root',
         'children': {
-            # pylint: disable=line-too-long
+
             # Reference: https://www.twilio.com/docs/usage/api/address#read-multiple-address-resources
             'addresses': {
                 'api_url': 'https://api.twilio.com',
@@ -41,7 +41,7 @@ STREAMS = {
                 'params': {},
                 'pagination': 'root',
                 'children': {
-                    # pylint: disable=line-too-long
+
                     # Reference: https://www.twilio.com/docs/usage/api/address?code-sample=code-list-dependent-pns-subresources&code-language=curl&code-sdk-version=json#instance-subresources
                     'dependent_phone_numbers': {
                         'api_url': 'https://api.twilio.com',
@@ -56,7 +56,7 @@ STREAMS = {
                     }
                 }
             },
-            # pylint: disable=line-too-long
+
             # Reference: https://www.twilio.com/docs/usage/api/applications#read-multiple-application-resources
             'applications': {
                 'api_url': 'https://api.twilio.com',
@@ -69,7 +69,7 @@ STREAMS = {
                 'params': {},
                 'pagination': 'root'
             },
-            # pylint: disable=line-too-long
+
             # Reference: https://www.twilio.com/docs/phone-numbers/api/availablephonenumber-resource#read-a-list-of-countries
             'available_phone_number_countries': {
                 'api_url': 'https://api.twilio.com',
@@ -81,7 +81,7 @@ STREAMS = {
                 'params': {},
                 'pagination': 'none',
                 'children': {
-                    # pylint: disable=line-too-long
+
                     # Reference: https://www.twilio.com/docs/phone-numbers/api/availablephonenumberlocal-resource#read-multiple-availablephonenumberlocal-resources
                     'available_phone_numbers_local': {
                         'api_url': 'https://api.twilio.com',
@@ -94,7 +94,7 @@ STREAMS = {
                         'pagination': 'root',
                         'activate_version': True
                     },
-                    # pylint: disable=line-too-long
+
                     # Reference: https://www.twilio.com/docs/phone-numbers/api/availablephonenumber-mobile-resource#read-multiple-availablephonenumbermobile-resources
                     'available_phone_numbers_mobile': {
                         'api_url': 'https://api.twilio.com',
@@ -107,7 +107,7 @@ STREAMS = {
                         'pagination': 'root',
                         'activate_version': True
                     },
-                    # pylint: disable=line-too-long
+
                     # Reference: https://www.twilio.com/docs/phone-numbers/api/availablephonenumber-tollfree-resource#read-multiple-availablephonenumbertollfree-resources
                     'available_phone_numbers_toll_free': {
                         'api_url': 'https://api.twilio.com',
@@ -122,7 +122,7 @@ STREAMS = {
                     }
                 }
             },
-            # pylint: disable=line-too-long
+
             # Reference: https://www.twilio.com/docs/phone-numbers/api/incomingphonenumber-resource#read-multiple-incomingphonenumber-resources
             'incoming_phone_numbers': {
                 'api_url': 'https://api.twilio.com',
@@ -147,7 +147,7 @@ STREAMS = {
                 'params': {},
                 'pagination': 'root'
             },
-            # pylint: disable=line-too-long
+
             # Reference: https://www.twilio.com/docs/sms/api/message-resource#read-multiple-message-resources
             'calls': {
                 'api_url': 'https://api.twilio.com',
@@ -162,7 +162,7 @@ STREAMS = {
                 'params': {},
                 'pagination': 'root'
             },
-            # pylint: disable=line-too-long
+
             # Reference: https://www.twilio.com/docs/voice/api/conference-resource#read-multiple-conference-resources
             'conferences': {
                 'api_url': 'https://api.twilio.com',
@@ -177,7 +177,7 @@ STREAMS = {
                 'params': {},
                 'pagination': 'root',
                 'children': {
-                    # pylint: disable=line-too-long
+
                     # Reference: https://www.twilio.com/docs/voice/api/conference-participant-resource#read-multiple-participant-resources
                     'conference_participants': {
                         'api_url': 'https://api.twilio.com',
@@ -191,7 +191,7 @@ STREAMS = {
                     }
                 }
             },
-            # pylint: disable=line-too-long
+
             # Reference: https://www.twilio.com/docs/voice/api/outgoing-caller-ids#outgoingcallerids-list-resource
             'outgoing_caller_ids': {
                 'api_url': 'https://api.twilio.com',
@@ -204,7 +204,7 @@ STREAMS = {
                 'params': {},
                 'pagination': 'none'
             },
-            # pylint: disable=line-too-long
+
             # Reference: https://www.twilio.com/docs/voice/api/recording#read-multiple-recording-resources
             'recordings': {
                 'api_url': 'https://api.twilio.com',
@@ -219,7 +219,7 @@ STREAMS = {
                 'params': {},
                 'pagination': 'root'
             },
-            # pylint: disable=line-too-long
+
             # Reference: https://www.twilio.com/docs/voice/api/recording-transcription?code-sample=code-read-list-all-transcriptions&code-language=curl&code-sdk-version=json#read-multiple-transcription-resources
             'transcriptions': {
                 'api_url': 'https://api.twilio.com',
@@ -232,7 +232,7 @@ STREAMS = {
                 'params': {},
                 'pagination': 'root'
             },
-            # pylint: disable=line-too-long
+
             # Reference: https://www.twilio.com/docs/voice/api/queue-resource#read-multiple-queue-resources
             'queues': {
                 'api_url': 'https://api.twilio.com',
@@ -245,7 +245,7 @@ STREAMS = {
                 'params': {},
                 'pagination': 'root'
             },
-            # pylint: disable=line-too-long
+
             # Reference: https://www.twilio.com/docs/sms/api/message-resource#read-multiple-message-resources
             'messages': {
                 'api_url': 'https://api.twilio.com',
@@ -260,7 +260,7 @@ STREAMS = {
                 'params': {},
                 'pagination': 'root',
                 'children': {
-                    # pylint: disable=line-too-long
+
                     # Reference: https://www.twilio.com/docs/sms/api/media-resource#read-multiple-media-resources
                     'message_media': {
                         'api_url': 'https://api.twilio.com',
@@ -274,7 +274,7 @@ STREAMS = {
                     }
                 }
             },
-            # pylint: disable=line-too-long
+
             # Reference: https://www.twilio.com/docs/usage/api/usage-record#read-multiple-usagerecord-resources
             'usage': {
                 'api_url': 'https://api.twilio.com',
@@ -289,7 +289,7 @@ STREAMS = {
                 'params': {},
                 'pagination': 'root',
                 'children': {
-                    # pylint: disable=line-too-long
+
                     # Reference: https://www.twilio.com/docs/usage/api/usage-record#read-multiple-usagerecord-resources
                     'usage_records': {
                         'api_url': 'https://api.twilio.com',
@@ -305,7 +305,7 @@ STREAMS = {
                         'params': {},
                         'pagination': 'root',
                     },
-                    # pylint: disable=line-too-long
+
                     # Reference: https://www.twilio.com/docs/usage/api/usage-trigger#read-multiple-usagetrigger-resources
                     'usage_triggers': {
                         'api_url': 'https://api.twilio.com',
@@ -323,7 +323,7 @@ STREAMS = {
             }
         }
     },
-    # pylint: disable=line-too-long
+
     # Reference: https://www.twilio.com/docs/usage/monitor-alert#read-multiple-alert-resources
     'alerts': {
         'api_url': 'https://monitor.twilio.com',
@@ -339,7 +339,7 @@ STREAMS = {
         'params': {},
         'pagination': 'meta'
     },
-    # pylint: disable=line-too-long
+
     # Reference: https://www.twilio.com/docs/taskrouter/api/workspace#list-all-workspaces
     'workspaces': {
         'api_url': 'https://taskrouter.twilio.com',
@@ -352,7 +352,7 @@ STREAMS = {
         'params': {},
         'pagination': 'meta',
         'children': {
-            # pylint: disable=line-too-long
+
             # Reference: https://www.twilio.com/docs/taskrouter/api/activity#read-multiple-activity-resources
             'activities': {
                 'api_url': 'https://taskrouter.twilio.com',
@@ -365,7 +365,7 @@ STREAMS = {
                 'params': {},
                 'pagination': 'meta',
             },
-            # pylint: disable=line-too-long
+
             # Reference: https://www.twilio.com/docs/taskrouter/api/event#list-all-events
             'events': {
                 'api_url': 'https://taskrouter.twilio.com',
@@ -381,7 +381,7 @@ STREAMS = {
                 'params': {},
                 'pagination': 'meta',
             },
-            # pylint: disable=line-too-long
+
             # Reference: https://www.twilio.com/docs/taskrouter/api/task#read-multiple-task-resources
             'tasks': {
                 'api_url': 'https://taskrouter.twilio.com',
@@ -395,7 +395,7 @@ STREAMS = {
                 'params': {},
                 'pagination': 'meta',
             },
-            # pylint: disable=line-too-long
+
             # Reference: https://www.twilio.com/docs/taskrouter/api/task-channel#read-multiple-taskchannel-resources
             'task_channels': {
                 'api_url': 'https://taskrouter.twilio.com',
@@ -408,7 +408,7 @@ STREAMS = {
                 'params': {},
                 'pagination': 'meta',
             },
-            # pylint: disable=line-too-long
+
             # Reference: https://www.twilio.com/docs/taskrouter/api/task-queue#action-list
             'task_queues': {
                 'api_url': 'https://taskrouter.twilio.com',
@@ -421,7 +421,7 @@ STREAMS = {
                 'params': {},
                 'pagination': 'meta',
                 'children': {
-                    # pylint: disable=line-too-long
+
                     # Reference: https://www.twilio.com/docs/taskrouter/api/taskqueue-statistics#taskqueue-cumulative-statistics
                     'cumulative_statistics': {
                         'api_url': 'https://taskrouter.twilio.com',
@@ -435,7 +435,7 @@ STREAMS = {
                     }
                 }
             },
-            # pylint: disable=line-too-long
+
             # Reference: https://www.twilio.com/docs/taskrouter/api/worker#read-multiple-worker-resources
             'workers': {
                 'api_url': 'https://taskrouter.twilio.com',
@@ -448,7 +448,7 @@ STREAMS = {
                 'params': {},
                 'pagination': 'meta',
                 'children': {
-                    # pylint: disable=line-too-long
+
                     # Reference: https://www.twilio.com/docs/taskrouter/api/worker-channel#read-multiple-workerchannel-resources
                     'channels': {
                         'api_url': 'https://taskrouter.twilio.com',
@@ -462,7 +462,7 @@ STREAMS = {
                     }
                 }
             },
-            # pylint: disable=line-too-long
+
             # Reference: https://www.twilio.com/docs/taskrouter/api/workflow#read-multiple-workflow-resources
             'workflows': {
                 'api_url': 'https://taskrouter.twilio.com',
@@ -478,7 +478,7 @@ STREAMS = {
             },
         },
     },
-    # pylint: disable=line-too-long
+
     # Reference: https://www.twilio.com/docs/chat/rest/service-resource#read-multiple-service-resources
     'services': {
         'api_url': 'https://chat.twilio.com',
@@ -491,7 +491,7 @@ STREAMS = {
         'params': {},
         'pagination': 'meta',
         'children': {
-            # pylint: disable=line-too-long
+
             # Reference: https://www.twilio.com/docs/chat/rest/role-resource#read-multiple-role-resources
             'roles': {
                 'api_url': 'https://chat.twilio.com',
@@ -504,7 +504,7 @@ STREAMS = {
                 'params': {},
                 'pagination': 'meta'
             },
-            # pylint: disable=line-too-long
+
             # Reference: https://www.twilio.com/docs/chat/rest/channel-resource#read-multiple-channel-resources
             'chat_channels': {
                 'api_url': 'https://chat.twilio.com',
@@ -518,7 +518,7 @@ STREAMS = {
                 'params': {},
                 'pagination': 'meta',
                 'children': {
-                    # pylint: disable=line-too-long
+
                     # Reference: https://www.twilio.com/docs/chat/rest/member-resource?code-sample=code-read-multiple-member-resources
                     'members': {
                         'api_url': 'https://chat.twilio.com',
@@ -530,7 +530,7 @@ STREAMS = {
                         'params': {},
                         'pagination': 'meta'
                     },
-                    # pylint: disable=line-too-long
+
                     # Reference: https://www.twilio.com/docs/chat/rest/message-resource#read-multiple-message-resources
                     'chat_messages': {
                         'api_url': 'https://chat.twilio.com',
@@ -544,7 +544,7 @@ STREAMS = {
                     }
                 }
             },
-            # pylint: disable=line-too-long
+
             # Reference: https://www.twilio.com/docs/chat/rest/user-resource#read-multiple-user-resources
             'users': {
                 'api_url': 'https://chat.twilio.com',
@@ -557,11 +557,11 @@ STREAMS = {
                 'params': {},
                 'pagination': 'meta'
             },
-            # pylint: disable=line-too-long
+
             # Reference: https://www.twilio.com/docs/voice/voice-insights/api/call/call-metrics-resource
         }
     },
-    # pylint: disable=line-too-long
+
     # Reference: https://www.twilio.com/docs/voice/voice-insights/api/call/call-summary-resource
     'call_summaries': {
         'api_url': 'https://insights.twilio.com',

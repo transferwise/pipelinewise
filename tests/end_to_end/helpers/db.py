@@ -1,7 +1,6 @@
 from typing import Union
 
 import psycopg2
-import psycopg2.extras
 import pymongo
 import pymysql
 import snowflake.connector
@@ -10,7 +9,7 @@ from pymongo.database import Database
 
 from pipelinewise.utils import pem2der
 
-# pylint: disable=too-many-arguments
+
 def run_query_postgres(query, host, port, user, password, database, params=None):
     """Run and SQL query in a postgres database"""
     result_rows = []

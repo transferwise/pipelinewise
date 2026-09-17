@@ -12,7 +12,7 @@ from pipelinewise.fastsync.commons.utils import StagingUploadError
 
 
 @dataclass
-class _FullSyncRun:  # pylint: disable=too-many-instance-attributes
+class _FullSyncRun:
     """Mutable state passed between ordered FullSync phases."""
 
     table: str
@@ -72,7 +72,7 @@ def sync_table(
         if run.iceberg_requested:
             return _publish_full_iceberg(run)
         return _publish_full_native(run)
-    except Exception as exc:  # pylint: disable=broad-exception-caught
+    except Exception as exc:
         return _full_failure_result(run, exc)
     finally:
         try:
@@ -403,7 +403,7 @@ def _publish_full_native(run: _FullSyncRun) -> bool:
         run.snowflake.swap_tables(
             run.target_schema, run.table, cleanup_old_table=False
         )
-    except Exception as exc:  # pylint: disable=broad-exception-caught
+    except Exception as exc:
         publication_error = exc
 
     run.route_utils.finalize_snowflake_fullsync(

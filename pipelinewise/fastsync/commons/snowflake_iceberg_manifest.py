@@ -167,7 +167,7 @@ def _context(
 
 
 @dataclass(frozen=True)
-class FullSyncManifestPayload:  # pylint: disable=too-many-instance-attributes
+class FullSyncManifestPayload:
     """Typed FullSync-specific durable context."""
 
     staging_config: Optional[Dict[str, Any]] = None

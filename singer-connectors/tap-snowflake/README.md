@@ -119,10 +119,10 @@ make integration_test
 ```
 
 
-### To run formatting and linting:
+### To run Ruff:
 
 ```bash
-make venv format pylint
+make venv lint
 ```
 
 ## License
@@ -130,4 +130,3 @@ make venv format pylint
 Apache License Version 2.0
 
 See [LICENSE](LICENSE) to see the full text.
-

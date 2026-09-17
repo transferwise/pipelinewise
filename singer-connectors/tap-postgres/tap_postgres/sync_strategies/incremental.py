@@ -1,6 +1,5 @@
 import copy
 import time
-import psycopg2
 import psycopg2.extras
 import singer
 
@@ -16,7 +15,6 @@ LOGGER = singer.get_logger('tap_postgres')
 UPDATE_BOOKMARK_PERIOD = 10000
 
 
-# pylint: disable=invalid-name,missing-function-docstring
 def fetch_max_replication_key(conn_config, replication_key, schema_name, table_name):
     with post_db.open_connection(conn_config, False) as conn:
         with conn.cursor() as cur:
@@ -32,7 +30,6 @@ def fetch_max_replication_key(conn_config, replication_key, schema_name, table_n
             return max_key
 
 
-# pylint: disable=too-many-locals
 def sync_table(conn_info, stream, state, desired_columns, md_map):
     time_extracted = utils.now()
 
@@ -137,7 +134,7 @@ def _get_select_sql(params):
     SELECT {','.join(escaped_columns)}
     FROM (
         SELECT *
-        FROM {post_db.fully_qualified_table_name(schema_name, table_name)} 
+        FROM {post_db.fully_qualified_table_name(schema_name, table_name)}
         {where_statement}
         ORDER BY {replication_key} ASC {limit_statement}
     ) pg_speedup_trick;"""

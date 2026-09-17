@@ -2,6 +2,7 @@ from singer.catalog import Catalog, CatalogEntry, Schema
 from tap_twilio.schema import get_schemas
 from tap_twilio.streams import flatten_streams
 
+
 def discover():
     schemas, field_metadata = get_schemas()
     catalog = Catalog([])

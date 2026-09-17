@@ -13,7 +13,6 @@ from tests.units.partialsync.utils import PartialSync2SFArgs
 class PartialSyncUploadOrderTestCase(TestCase):
     """Composition tests for local and remote PartialSync staging lifecycle."""
 
-    # pylint: disable=too-many-locals
     def _run_route(
         self,
         sync_module,

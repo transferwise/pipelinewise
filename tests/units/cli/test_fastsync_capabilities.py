@@ -133,7 +133,7 @@ def test_capability_registry_is_immutable():
     )
 
     with pytest.raises(TypeError):
-        capability_policy._FASTSYNC_CAPABILITIES[key] = FastSyncCapabilities()  # pylint: disable=protected-access
+        capability_policy._FASTSYNC_CAPABILITIES[key] = FastSyncCapabilities()
 
 
 def test_legacy_pair_views_are_immutable():

@@ -24,8 +24,6 @@ class FastSyncTapMySqlMock(FastSyncTapMySql):
         self.executed_queries_unbuffered = []
         self.executed_queries = []
 
-    # pylint: disable=too-many-arguments
-    # pylint: disable=too-many-positional-arguments
     def query(self, query, conn=None, params=None, return_as_cursor=False, n_retry=1):
         if query.startswith('INVALID-SQL'):
             raise pymysql.err.InternalError
@@ -38,7 +36,6 @@ class FastSyncTapMySqlMock(FastSyncTapMySql):
         return []
 
 
-# pylint: disable=invalid-name,too-many-public-methods
 class TestFastSyncTapMySql(TestCase):
     """
     Unit tests for fastsync tap mysql
@@ -150,7 +147,7 @@ class TestFastSyncTapMySql(TestCase):
     def test_csv_export_distinguishes_null_from_empty_string(self):
         """An empty string is quoted while SQL NULL remains an empty field."""
         output = io.StringIO()
-        writer = tap_mysql._create_csv_writer(output)  # pylint: disable=protected-access
+        writer = tap_mysql._create_csv_writer(output)
 
         writer.writerow([None, '', 'text', 0])
 
@@ -163,7 +160,7 @@ class TestFastSyncTapMySql(TestCase):
             '\tliteral \\n and \\t, "Unicode: 雪"\\'
         )
         output = io.StringIO()
-        writer = tap_mysql._create_csv_writer(output)  # pylint: disable=protected-access
+        writer = tap_mysql._create_csv_writer(output)
 
         writer.writerow([value])
 

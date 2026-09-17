@@ -74,18 +74,27 @@ SELECT
   attname                                               AS column_name,
   i.indisprimary                                        AS primary_key,
   format_type(a.atttypid, NULL::integer)                AS data_type,
-  information_schema._pg_char_max_length(CASE WHEN COALESCE(subpgt.typtype, pgt.typtype) = 'd'
-                                              THEN COALESCE(subpgt.typbasetype, pgt.typbasetype) ELSE COALESCE(subpgt.oid, pgt.oid)
-                                          END,
-                                          information_schema._pg_truetypmod(a.*, pgt.*))::information_schema.cardinal_number AS character_maximum_length,
-  information_schema._pg_numeric_precision(CASE WHEN COALESCE(subpgt.typtype, pgt.typtype) = 'd'
-                                                THEN COALESCE(subpgt.typbasetype, pgt.typbasetype) ELSE COALESCE(subpgt.oid, pgt.oid)
-                                            END,
-                                           information_schema._pg_truetypmod(a.*, pgt.*))::information_schema.cardinal_number AS numeric_precision,
-  information_schema._pg_numeric_scale(CASE WHEN COALESCE(subpgt.typtype, pgt.typtype) = 'd'
-                                                THEN COALESCE(subpgt.typbasetype, pgt.typbasetype) ELSE COALESCE(subpgt.oid, pgt.oid)
-                                        END,
-                                       information_schema._pg_truetypmod(a.*, pgt.*))::information_schema.cardinal_number AS numeric_scale,
+  information_schema._pg_char_max_length(
+    CASE WHEN COALESCE(subpgt.typtype, pgt.typtype) = 'd'
+      THEN COALESCE(subpgt.typbasetype, pgt.typbasetype)
+      ELSE COALESCE(subpgt.oid, pgt.oid)
+    END,
+    information_schema._pg_truetypmod(a.*, pgt.*)
+  )::information_schema.cardinal_number AS character_maximum_length,
+  information_schema._pg_numeric_precision(
+    CASE WHEN COALESCE(subpgt.typtype, pgt.typtype) = 'd'
+      THEN COALESCE(subpgt.typbasetype, pgt.typbasetype)
+      ELSE COALESCE(subpgt.oid, pgt.oid)
+    END,
+    information_schema._pg_truetypmod(a.*, pgt.*)
+  )::information_schema.cardinal_number AS numeric_precision,
+  information_schema._pg_numeric_scale(
+    CASE WHEN COALESCE(subpgt.typtype, pgt.typtype) = 'd'
+      THEN COALESCE(subpgt.typbasetype, pgt.typbasetype)
+      ELSE COALESCE(subpgt.oid, pgt.oid)
+    END,
+    information_schema._pg_truetypmod(a.*, pgt.*)
+  )::information_schema.cardinal_number AS numeric_scale,
   pgt.typcategory                       = 'A' AS is_array,
   COALESCE(subpgt.typtype, pgt.typtype) = 'e' AS is_enum
 FROM pg_attribute a
@@ -184,8 +193,7 @@ def discover_columns(connection, table_info):
     return entries
 
 
-# pylint: disable=too-many-return-statements,too-many-branches,too-many-statements
-def schema_for_column_datatype(col):
+def schema_for_column_datatype(col):  # noqa: C901
     """
     Build json schema for columns with non-array datatype
     """
@@ -283,7 +291,7 @@ def schema_for_column_datatype(col):
     return schema
 
 
-def schema_for_column(col_info):
+def schema_for_column(col_info):  # noqa: C901
     """
     Built json schema for the give column
     """
@@ -350,7 +358,6 @@ def schema_for_column(col_info):
     return column_schema
 
 
-# pylint: disable=invalid-name,missing-function-docstring
 def nullable_columns(col_types, pk):
     if pk:
         return col_types

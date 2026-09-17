@@ -488,12 +488,12 @@ make unit_test_cov
 make integration_test
 ```
 
-### To run pylint:
+### To run Ruff:
 
 After running `make venv`, run:
 
 ```bash
-make pylint
+make lint
 ```
 
 ---
