@@ -7,10 +7,11 @@
   the bundled PostgreSQL and Snowflake targets: process source-delete markers
   before acknowledging Singer state and remove missing rows from PartialSync
   ranges
-- Remove historical target rows already marked by a non-null
-  `_SDC_DELETED_AT` on the first post-upgrade flush; retired deletion-mode
-  settings are ignored, and existing generated configs remain usable without
-  reimport
+- Include historical target rows with a non-null `_SDC_DELETED_AT` in deletion
+  cleanup; Snowflake performs this cleanup after a non-empty stream load, and
+  streams receiving only SCHEMA/STATE messages are not cleaned. Retired
+  deletion-mode settings are ignored, and existing generated configs remain
+  usable without reimport
 - Retain `_SDC_DELETED_AT` for internal delete processing and automatically
   enable target metadata columns, even when `add_metadata_columns` is false
 
@@ -19,7 +20,8 @@
 - Preserve FastSync bookmarks when target runtime configuration cannot be
   loaded or combined for execution
 - Retry Snowflake table discovery once when another FastSync worker creates
-  the schema during discovery, while continuing to surface repeated failures
+  the schema during discovery; restrict recovery to the missing-object error
+  and surface unrelated errors and retry failures
 - Count PostgreSQL target deletions without fetching the deleted rows into
   memory
 

@@ -109,7 +109,9 @@ class TestDiscoveryPlanning:
 
     def test_inspection_returns_missing_when_schema_is_genuinely_absent(self, tmp_path, spec):
         """Inspection returns missing when schema is genuinely absent."""
-        missing_schema = snowflake_connector.errors.ProgrammingError(msg="Schema does not exist or not authorized")
+        missing_schema = snowflake_connector.errors.ProgrammingError(
+            msg='Object does not exist, or operation cannot be performed.', errno=2043,
+        )
         snowflake_adapter = FakeSnowflake(
             [
                 missing_schema,
@@ -156,19 +158,31 @@ class TestDiscoveryPlanning:
         assert snowflake.queries[0] == snowflake.queries[2]
         assert len(snowflake.queries) == 3 + len(extra_rows)
 
-    def test_inspection_preserves_table_discovery_error_when_schema_exists(self, tmp_path, spec):
-        """Inspection preserves table discovery error when schema exists."""
-        discovery_error = snowflake_connector.errors.ProgrammingError(msg="Table discovery is not authorized")
-        snowflake = FakeSnowflake([discovery_error, [{"name": spec.name.schema}], discovery_error])
+    @pytest.mark.parametrize('errno', [None, 1003, 3001])
+    def test_inspection_preserves_unrelated_discovery_errors(self, tmp_path, spec, errno):
+        """Unrelated errors cannot become a missing table through a successful retry."""
+        discovery_error = snowflake_connector.errors.ProgrammingError(msg='Discovery failed', errno=errno)
+        snowflake = FakeSnowflake([discovery_error, [{'name': spec.name.schema}], []])
         publisher = SnowflakeIcebergPublisher(snowflake, str(tmp_path))
 
-        with pytest.raises(
-            snowflake_connector.errors.ProgrammingError,
-            match="not authorized",
-        ) as error:
+        with pytest.raises(snowflake_connector.errors.ProgrammingError) as error:
             publisher.inspect_table(spec.name)
 
         assert error.value is discovery_error
+        assert len(snowflake.queries) == 1
+
+    def test_inspection_propagates_retry_failure_without_retrying_again(self, tmp_path, spec):
+        """A schema-race retry preserves a distinct second error and remains bounded."""
+        missing_schema = snowflake_connector.errors.ProgrammingError(msg='Schema does not exist', errno=2043)
+        retry_error = snowflake_connector.errors.ProgrammingError(msg='Retry is not authorized', errno=3001)
+        snowflake = FakeSnowflake([missing_schema, [{'name': spec.name.schema}], retry_error])
+        publisher = SnowflakeIcebergPublisher(snowflake, str(tmp_path))
+
+        with pytest.raises(snowflake_connector.errors.ProgrammingError) as error:
+            publisher.inspect_table(spec.name)
+
+        assert error.value is retry_error
+        assert error.value.__context__ is missing_schema
         assert snowflake.queries[0] == snowflake.queries[2]
         assert len(snowflake.queries) == 3
 

@@ -145,7 +145,9 @@ class SnowflakeTableInspector:
         )
         try:
             rows = self.snowflake.query(show_tables_sql)
-        except snowflake.connector.errors.ProgrammingError:
+        except snowflake.connector.errors.ProgrammingError as exc:
+            if exc.errno != 2043:  # Object does not exist, or operation cannot be performed.
+                raise
             schema_rows = self.snowflake.query(
                 f'SHOW SCHEMAS IN DATABASE {quote_identifier(target.database)} '
                 f'STARTS WITH {sql_string_literal(target.schema)}'

@@ -96,10 +96,12 @@ Metadata columns are always added automatically. `_SDC_EXTRACTED_AT` and
 events.
 
 Stream flushes remove target rows whose `_SDC_DELETED_AT` is not NULL before
-acknowledging state. Deletion scans the whole table, including when an initialized
-stream has no new rows. Metadata columns remain present for subsequent delete
-processing. Source deletes must be emitted by the tap; key-based incremental
-replication cannot discover them.
+acknowledging state. The deletion predicate covers the whole table. A stream
+participates only after receiving a RECORD in the current process; later flushes
+also run deletion when its buffer is empty. Streams receiving only SCHEMA/STATE
+messages are not cleaned.
+Metadata columns remain present for subsequent delete processing. Source deletes
+must be emitted by the tap; key-based incremental replication cannot discover them.
 
 ### To run tests:
 

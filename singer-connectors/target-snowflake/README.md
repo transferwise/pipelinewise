@@ -217,7 +217,7 @@ Metadata columns are always added automatically. `_SDC_EXTRACTED_AT` and
 events.
 
 Every non-empty stream load removes target rows whose `_SDC_DELETED_AT` is not
-NULL before acknowledging state. Deletion scans the whole table. Metadata
+NULL before acknowledging state. The deletion predicate covers the whole table. Metadata
 columns remain present for subsequent delete processing. Source deletes must be
 emitted by the tap; key-based incremental replication cannot discover them.
 
