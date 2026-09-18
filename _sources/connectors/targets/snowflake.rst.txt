@@ -62,10 +62,11 @@ Example stage and file format:
      MULTI_LINE = TRUE
      NULL_IF = ();
 
-``target-snowflake`` validates the effective options of a named CSV format
-before loading. The settings above let it distinguish SQL ``NULL``, an empty
+``target-snowflake`` supports CSV staging only. It validates the configured
+object type and the effective options of a named CSV format before consuming
+Singer input. The settings above let it distinguish SQL ``NULL``, an empty
 string, actual line breaks and tabs, and literal backslash sequences. It rejects
-an incompatible format without writing rows.
+a non-CSV or incompatible named format.
 
 Validation resolves the configured file format in its database and schema,
 including quoted identifiers; it does not use a same-named format elsewhere.

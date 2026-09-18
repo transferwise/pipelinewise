@@ -434,10 +434,11 @@ must create, merge, alter, or replace tables.</p>
 <span class="w">  </span><span class="n">NULL_IF</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">();</span>
 </pre></div>
 </div>
-<p><code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code> validates the effective options of a named CSV format
-before loading. The settings above let it distinguish SQL <code class="docutils literal notranslate"><span class="pre">NULL</span></code>, an empty
+<p><code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code> supports CSV staging only. It validates the configured
+object type and the effective options of a named CSV format before consuming
+Singer input. The settings above let it distinguish SQL <code class="docutils literal notranslate"><span class="pre">NULL</span></code>, an empty
 string, actual line breaks and tabs, and literal backslash sequences. It rejects
-an incompatible format without writing rows.</p>
+a non-CSV or incompatible named format.</p>
 <p>Validation resolves the configured file format in its database and schema,
 including quoted identifiers; it does not use a same-named format elsewhere.</p>
 <p>FastSync does not use this named object; it supplies its own inline CSV options.
