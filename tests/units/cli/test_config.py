@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 import pytest
@@ -61,6 +62,25 @@ class TestConfig:
         assert config.config_dir == PIPELINEWISE_TEST_HOME
         assert config.config_path == '{}/config.json'.format(PIPELINEWISE_TEST_HOME)
         assert config.targets == {}
+
+    @pytest.mark.parametrize('value', [True, False, None, 'false', 0])
+    @pytest.mark.parametrize('kind', ['tap', 'target'])
+    @pytest.mark.parametrize('placement', ['root', 'db_conn'])
+    def test_legacy_hard_delete_is_ignored_during_config_generation(self, tmp_path, value, kind, placement):
+        """Legacy options remain valid without restoring configurable retention."""
+        tap = self._table_format_tap()
+        target = self._table_format_target()
+        settings = tap if kind == 'tap' else target
+        (settings if placement == 'root' else settings['db_conn'])['hard_delete'] = value
+        yaml_dir = tmp_path / 'yaml'
+        yaml_dir.mkdir()
+        (yaml_dir / 'tap_test.yml').write_text(json.dumps(tap), encoding='utf-8')
+        (yaml_dir / 'target_test.yml').write_text(json.dumps(target), encoding='utf-8')
+        runtime_dir = tmp_path / 'runtime'
+
+        config = Config.from_yamls(str(runtime_dir), str(yaml_dir))
+        assert 'hard_delete' not in config.generate_inheritable_config(tap)
+        cli.utils.validate(settings, cli.utils.load_schema(kind))
 
     def test_connector_files(self):
         """Every singer connector must have a list of JSON files at certain locations"""
@@ -244,8 +264,8 @@ class TestConfig:
         ('tap_settings', 'error_message'),
         [
             ({'type': 'tap-salesforce'}, None),
-            ({'type': 'tap-mysql', 'hard_delete': False}, 'hard_delete: true'),
-            ({'type': 'tap-salesforce', 'hard_delete': False}, 'hard_delete: true'),
+            ({'type': 'tap-mysql', 'hard_delete': False}, None),
+            ({'type': 'tap-salesforce', 'hard_delete': False}, None),
             (
                 {'type': 'tap-mysql', 'data_flattening_max_level': 1},
                 'data_flattening_max_level: 0',
@@ -273,8 +293,8 @@ class TestConfig:
         inheritable = Config(PIPELINEWISE_TEST_HOME).generate_inheritable_config(tap)
         assert inheritable['target_table_format'] == 'iceberg'
         assert inheritable['iceberg_version'] == 3
-        assert inheritable['data_flattening_max_level'] == 10
-        assert inheritable['hard_delete'] is True
+        assert inheritable['data_flattening_max_level'] == (10 if tap['type'] == 'tap-salesforce' else 0)
+        assert 'hard_delete' not in inheritable
 
     def test_target_table_format_is_isolated_between_taps(self, tmp_path):
         """Taps sharing one target get independent generated format settings."""
@@ -631,7 +651,6 @@ class TestConfig:
             'batch_wait_limit_seconds': 3600,
             'data_flattening_max_level': 0,
             'flush_all_streams': True,
-            'hard_delete': True,
             'parallelism': 0,
             'parallelism_max': 4,
             'primary_key_required': True,
@@ -751,7 +770,6 @@ class TestConfig:
             'batch_wait_limit_seconds': 3600,
             'data_flattening_max_level': 0,
             'flush_all_streams': True,
-            'hard_delete': True,
             'parallelism': 0,
             'parallelism_max': 4,
             'primary_key_required': True,

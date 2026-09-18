@@ -472,7 +472,6 @@ class Config:
                 'batch_wait_limit_seconds': tap.get('batch_wait_limit_seconds', None),
                 'parallelism': tap.get('parallelism', 0),
                 'parallelism_max': tap.get('parallelism_max', 4),
-                'hard_delete': tap.get('hard_delete', True),
                 'flush_all_streams': tap.get('flush_all_streams', True),
                 'primary_key_required': tap.get('primary_key_required', True),
                 'default_target_schema': tap.get('default_target_schema'),
@@ -686,12 +685,6 @@ class Config:
     @classmethod
     def _validate_iceberg_tap_settings(cls, tap: Dict, target: Dict) -> None:
         """Validate tap settings supported by explicit Singer and FastSync Iceberg routes."""
-        if tap.get('hard_delete', True) is not True:
-            raise InvalidConfigException(
-                f'Tap "{tap.get("id")}" must use hard_delete: true with '
-                'target_table_format "iceberg".'
-            )
-
         capabilities = fastsync_capabilities.resolve_fastsync_capabilities(
             tap['type'],
             target['type'],

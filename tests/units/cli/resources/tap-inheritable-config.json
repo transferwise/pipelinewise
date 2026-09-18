@@ -5,7 +5,6 @@
   "default_target_schema_select_permissions": [
       "grp_power"
   ],
-  "hard_delete": true,
   "primary_key_required": true,
   "schema_mapping": {
       "jira": {

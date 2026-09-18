@@ -101,16 +101,15 @@ added first. Other FullSync mismatches require guarded replacement. PartialSync
 uses transactional range DML and requires a primary key.
 
 The route requires explicit ``target_table_format: iceberg``,
-``iceberg_version: 3``, ``data_flattening_max_level: 0``, and
-``hard_delete: true``. Native remains the default. See
-:ref:`snowflake_iceberg` for metadata limits, writer exclusion, and recovery.
+``iceberg_version: 3``, and ``data_flattening_max_level: 0``. Native remains the
+default. See :ref:`snowflake_iceberg` for metadata limits, writer exclusion, and
+recovery.
 After an eligible initial load, Singer continues LOG_BASED or INCREMENTAL
 replication against the same managed-v3 table in the same run.
 FastSync availability and its zero-flattening requirement are specific to these
 routes. A compatible Singer-only source such as Salesforce can load managed v3
 through ``target-snowflake`` without gaining a FastSync component; it retains
-its normal flattening setting, still requires ``hard_delete: true``, and sends
-``FULL_TABLE`` streams through Singer.
+its normal flattening setting and sends ``FULL_TABLE`` streams through Singer.
 
 
 Snowflake string widths

@@ -509,9 +509,6 @@ class FastSyncTargetSnowflake(SnowflakeSqlClient):
     def _partial_hard_delete_query(schema, table, where_clause_sql):
         return f'DELETE FROM {schema}."{table.upper()}"{where_clause_sql} AND _SDC_DELETED_AT IS NOT NULL'
 
-    def partial_hard_delete(self, schema, table, where_clause_sql):
-        self.query(self._partial_hard_delete_query(schema, table, where_clause_sql))
-
     def publish_partial_sync(
         self,
         schema,
@@ -520,16 +517,14 @@ class FastSyncTargetSnowflake(SnowflakeSqlClient):
         columns,
         primary_keys,
         where_clause_sql,
-        hard_delete,
     ):
-        """Atomically mark, merge, and optionally delete one partial range."""
+        """Atomically mark, merge, and delete missing rows in one partial range."""
         queries = [
             f'UPDATE {schema}."{target_table.upper()}" SET _SDC_DELETED_AT = CURRENT_TIMESTAMP()'
             f'{where_clause_sql} AND _SDC_DELETED_AT IS NULL',
             self._merge_tables_query(schema, source_table, target_table, columns, primary_keys),
+            self._partial_hard_delete_query(schema, target_table, where_clause_sql),
         ]
-        if hard_delete:
-            queries.append(self._partial_hard_delete_query(schema, target_table, where_clause_sql))
 
         self.execute_transaction(queries, query_tag_props={'schema': schema, 'table': target_table})
 

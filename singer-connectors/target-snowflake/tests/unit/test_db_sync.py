@@ -865,7 +865,6 @@ class TestDBSync(unittest.TestCase):
             'warehouse': 'dummy-wh',
             'default_target_schema': 'dummy-schema',
             'file_format': 'dummy_file_format',
-            'hard_delete': True,
         }
         config.update(overrides)
         return config
@@ -1654,6 +1653,13 @@ class TestDBSync(unittest.TestCase):
                     any("'iceberg_create' is no longer supported" in error for error in errors)
                 )
 
+    def test_legacy_hard_delete_setting_is_ignored_by_validation(self):
+        for table_format in ({}, {'target_table_format': 'iceberg', 'iceberg_version': 3}):
+            for value in (True, False, None, 'false'):
+                with self.subTest(table_format=table_format, value=value):
+                    config = self._table_sync_config(hard_delete=value, **table_format)
+                    self.assertEqual(db_sync.validate_config(config), [])
+
     def test_config_validation_explicit_table_format(self):
         base = self._table_sync_config()
 
@@ -1664,16 +1670,6 @@ class TestDBSync(unittest.TestCase):
         for extra_config in valid_configs:
             with self.subTest(extra_config=extra_config):
                 self.assertEqual(db_sync.validate_config({**base, **extra_config}), [])
-
-        direct_iceberg_config = {
-            **base,
-            'target_table_format': 'iceberg',
-            'iceberg_version': 3,
-        }
-        direct_iceberg_config.pop('hard_delete')
-        self.assertTrue(
-            any("'hard_delete'" in error for error in db_sync.validate_config(direct_iceberg_config))
-        )
 
         invalid_configs = (
             ({'target_table_format': None}, "'target_table_format'"),
@@ -1688,14 +1684,6 @@ class TestDBSync(unittest.TestCase):
             ({'target_table_format': 'native', 'iceberg_version': None}, "'iceberg_version'"),
             ({'iceberg_version': 3}, "'iceberg_version'"),
             ({'iceberg_version': None}, "'iceberg_version'"),
-            (
-                {'target_table_format': 'iceberg', 'iceberg_version': 3, 'hard_delete': False},
-                "'hard_delete'",
-            ),
-            (
-                {'target_table_format': 'iceberg', 'iceberg_version': 3, 'hard_delete': 'true'},
-                "'hard_delete'",
-            ),
         )
         for extra_config, expected_error in invalid_configs:
             with self.subTest(extra_config=extra_config):

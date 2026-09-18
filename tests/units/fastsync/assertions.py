@@ -404,7 +404,6 @@ def assert_snowflake_sync_table_iceberg_workflow(
                 **SNOWFLAKE_FASTSYNC_NS.target,
                 'dbname': 'TARGET_DB',
                 'default_target_schema': 'TARGET_SCHEMA',
-                'hard_delete': True,
                 'data_flattening_max_level': 0,
                 'target_table_format': 'iceberg',
                 'iceberg_version': 3,

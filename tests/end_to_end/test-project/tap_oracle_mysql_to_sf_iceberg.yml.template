@@ -18,7 +18,6 @@ target: "snowflake"
 target_table_format: iceberg
 iceberg_version: 3
 data_flattening_max_level: 0
-hard_delete: true
 batch_size_rows: 1000
 stream_buffer_size: 0
 

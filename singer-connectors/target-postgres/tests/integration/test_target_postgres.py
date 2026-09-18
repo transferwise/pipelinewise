@@ -30,7 +30,6 @@ class TestIntegration(unittest.TestCase):
     @classmethod
     def setUp(cls):
         cls.config = test_utils.get_test_config()
-        print(cls.config)
         cls.maxDiff = None
         postgres = DbSync(cls.config)
         if cls.config['default_target_schema']:
@@ -64,8 +63,7 @@ class TestIntegration(unittest.TestCase):
             for md_c in METADATA_COLUMNS:
                 self.assertFalse(md_c in r)
 
-    def assert_multiple_streams_are_into_postgres(self, should_metadata_columns_exist=False,
-                                                  should_hard_deleted_rows=False):
+    def assert_multiple_streams_are_into_postgres(self):
         """
         This is a helper assertion that checks if every data from the message-with-multiple-streams.json
         file is available in Postgres tables correctly.
@@ -101,16 +99,9 @@ class TestIntegration(unittest.TestCase):
         # ----------------------------------------------------------------------
         # Check rows in table_tow
         # ----------------------------------------------------------------------
-        expected_table_two = []
-        if not should_hard_deleted_rows:
-            expected_table_two = [
-                {'c_int': 1, 'c_pk': 1, 'c_varchar': '1', 'c_date': datetime.datetime(2019, 2, 1, 15, 12, 45)},
-                {'c_int': 2, 'c_pk': 2, 'c_varchar': '2', 'c_date': datetime.datetime(2019, 2, 10, 2, 0, 0)}
-            ]
-        else:
-            expected_table_two = [
-                {'c_int': 2, 'c_pk': 2, 'c_varchar': '2', 'c_date': datetime.datetime(2019, 2, 10, 2, 0, 0)}
-            ]
+        expected_table_two = [
+            {'c_int': 2, 'c_pk': 2, 'c_varchar': '2', 'c_date': datetime.datetime(2019, 2, 10, 2, 0, 0)}
+        ]
 
         self.assertEqual(
             self.remove_metadata_columns_from_rows(table_two), expected_table_two)
@@ -118,18 +109,10 @@ class TestIntegration(unittest.TestCase):
         # ----------------------------------------------------------------------
         # Check rows in table_three
         # ----------------------------------------------------------------------
-        expected_table_three = []
-        if not should_hard_deleted_rows:
-            expected_table_three = [
-                {'c_int': 1, 'c_pk': 1, 'c_varchar': '1', 'c_time': datetime.time(4, 0, 0)},
-                {'c_int': 2, 'c_pk': 2, 'c_varchar': '2', 'c_time': datetime.time(7, 15, 0)},
-                {'c_int': 3, 'c_pk': 3, 'c_varchar': '3', 'c_time': datetime.time(23, 0, 3)}
-            ]
-        else:
-            expected_table_three = [
-                {'c_int': 1, 'c_pk': 1, 'c_varchar': '1', 'c_time': datetime.time(4, 0, 0)},
-                {'c_int': 2, 'c_pk': 2, 'c_varchar': '2', 'c_time': datetime.time(7, 15, 0)}
-            ]
+        expected_table_three = [
+            {'c_int': 1, 'c_pk': 1, 'c_varchar': '1', 'c_time': datetime.time(4, 0, 0)},
+            {'c_int': 2, 'c_pk': 2, 'c_varchar': '2', 'c_time': datetime.time(7, 15, 0)}
+        ]
 
         self.assertEqual(
             self.remove_metadata_columns_from_rows(table_three), expected_table_three)
@@ -137,18 +120,10 @@ class TestIntegration(unittest.TestCase):
         # ----------------------------------------------------------------------
         # Check rows in table_four
         # ----------------------------------------------------------------------
-        expected_table_four = []
-        if not should_hard_deleted_rows:
-            expected_table_four = [
-                {'c_pk': 1, 'c_smallint': 1, 'c_integer': 1, 'c_bigint': 1, 'c_nobound_int': 1},
-                {'c_pk': 2, 'c_smallint': 2, 'c_integer': 2, 'c_bigint': 2, 'c_nobound_int': 2},
-                {'c_pk': 3, 'c_smallint': 3, 'c_integer': 3, 'c_bigint': 3, 'c_nobound_int': 3},
-            ]
-        else:
-            expected_table_four = [
-                {'c_pk': 1, 'c_smallint': 1, 'c_integer': 1, 'c_bigint': 1, 'c_nobound_int': 1},
-                {'c_pk': 2, 'c_smallint': 2, 'c_integer': 2, 'c_bigint': 2, 'c_nobound_int': 2},
-            ]
+        expected_table_four = [
+            {'c_pk': 1, 'c_smallint': 1, 'c_integer': 1, 'c_bigint': 1, 'c_nobound_int': 1},
+            {'c_pk': 2, 'c_smallint': 2, 'c_integer': 2, 'c_bigint': 2, 'c_nobound_int': 2},
+        ]
 
         self.assertEqual(
             self.remove_metadata_columns_from_rows(table_four), expected_table_four)
@@ -156,16 +131,10 @@ class TestIntegration(unittest.TestCase):
         # ----------------------------------------------------------------------
         # Check if metadata columns exist or not
         # ----------------------------------------------------------------------
-        if should_metadata_columns_exist:
-            self.assert_metadata_columns_exist(table_one)
-            self.assert_metadata_columns_exist(table_two)
-            self.assert_metadata_columns_exist(table_three)
-            self.assert_metadata_columns_exist(table_four)
-        else:
-            self.assert_metadata_columns_not_exist(table_one)
-            self.assert_metadata_columns_not_exist(table_two)
-            self.assert_metadata_columns_not_exist(table_three)
-            self.assert_metadata_columns_not_exist(table_four)
+        self.assert_metadata_columns_exist(table_one)
+        self.assert_metadata_columns_exist(table_two)
+        self.assert_metadata_columns_exist(table_three)
+        self.assert_metadata_columns_exist(table_four)
 
     def assert_logical_streams_are_in_postgres(self, should_metadata_columns_exist=False):
         # Get loaded rows from tables
@@ -303,7 +272,7 @@ class TestIntegration(unittest.TestCase):
         target_postgres.persist_lines(self.config, tap_lines)
 
         # Check if data loaded correctly and metadata columns exist
-        self.assert_multiple_streams_are_into_postgres(should_metadata_columns_exist=True)
+        self.assert_multiple_streams_are_into_postgres()
 
     def test_loading_tables_with_defined_parallelism(self):
         """Loading multiple tables from the same input tap with various columns types"""
@@ -315,19 +284,15 @@ class TestIntegration(unittest.TestCase):
 
         self.assert_multiple_streams_are_into_postgres()
 
-    def test_loading_tables_with_hard_delete(self):
-        """Loading multiple tables from the same input tap with deleted rows"""
+    def test_loading_tables_with_metadata_disabled_still_deletes(self):
+        """Deletion metadata remains available even when metadata is explicitly disabled."""
         tap_lines = test_utils.get_test_tap_lines('messages-with-multiple-streams.json')
 
-        # Turning on hard delete mode
-        self.config['hard_delete'] = True
+        self.config['add_metadata_columns'] = False
         target_postgres.persist_lines(self.config, tap_lines)
 
         # Check if data loaded correctly and metadata columns exist
-        self.assert_multiple_streams_are_into_postgres(
-            should_metadata_columns_exist=True,
-            should_hard_deleted_rows=True
-        )
+        self.assert_multiple_streams_are_into_postgres()
 
     def test_loading_with_multiple_schema(self):
         """Loading table with multiple SCHEMA messages"""
@@ -337,17 +302,12 @@ class TestIntegration(unittest.TestCase):
         target_postgres.persist_lines(self.config, tap_lines)
 
         # Check if data loaded correctly
-        self.assert_multiple_streams_are_into_postgres(
-            should_metadata_columns_exist=False,
-            should_hard_deleted_rows=False
-        )
+        self.assert_multiple_streams_are_into_postgres()
 
     def test_loading_table_with_reserved_word_as_name_and_hard_delete(self):
         """Loading a table where the name is a reserved word with deleted rows"""
         tap_lines = test_utils.get_test_tap_lines('messages-with-reserved-name-as-table-name.json')
 
-        # Turning on hard delete mode
-        self.config['hard_delete'] = True
         target_postgres.persist_lines(self.config, tap_lines)
 
         # Check if data loaded correctly and metadata columns exist
@@ -360,8 +320,6 @@ class TestIntegration(unittest.TestCase):
         """Loading a table where the name has space"""
         tap_lines = test_utils.get_test_tap_lines('messages-with-space-in-table-name.json')
 
-        # Turning on hard delete mode
-        self.config['hard_delete'] = True
         target_postgres.persist_lines(self.config, tap_lines)
 
         # Check if data loaded correctly and metadata columns exist
@@ -374,8 +332,11 @@ class TestIntegration(unittest.TestCase):
         """Loading unicode encoded characters"""
         tap_lines = test_utils.get_test_tap_lines('messages-with-unicode-characters.json')
 
-        # Load with default settings
-        target_postgres.persist_lines(self.config, tap_lines)
+        active_messages = [json.loads(line) for line in tap_lines]
+        for message in active_messages:
+            if message['type'] == 'RECORD':
+                message['record'].pop('_sdc_deleted_at', None)
+        target_postgres.persist_lines(self.config, [json.dumps(message) for message in active_messages])
 
         # Get loaded rows from tables
         postgres = DbSync(self.config)
@@ -394,12 +355,19 @@ class TestIntegration(unittest.TestCase):
                 {'c_int': 6, 'c_pk': 6, 'c_varchar': 'Special Characters: [",\'!@£$%^&*()]'}
             ])
 
+        target_postgres.persist_lines(self.config, tap_lines)
+        remaining_rows = postgres.query("SELECT c_pk FROM {}.test_table_unicode ORDER BY c_pk".format(target_schema))
+        self.assertEqual([row['c_pk'] for row in remaining_rows], [1, 2, 3, 6])
+
     def test_loading_long_text(self):
         """Loading long texts"""
         tap_lines = test_utils.get_test_tap_lines('messages-with-long-texts.json')
 
-        # Load with default settings
-        target_postgres.persist_lines(self.config, tap_lines)
+        active_messages = [json.loads(line) for line in tap_lines]
+        for message in active_messages:
+            if message['type'] == 'RECORD':
+                message['record'].pop('_sdc_deleted_at', None)
+        target_postgres.persist_lines(self.config, [json.dumps(message) for message in active_messages])
 
         # Get loaded rows from tables
         postgres = DbSync(self.config)
@@ -432,6 +400,10 @@ class TestIntegration(unittest.TestCase):
                 {'c_int': 4, 'c_pk': 4, 'len': 4017},
                 {'c_int': 5, 'c_pk': 5, 'len': 32003},
             ])
+
+        target_postgres.persist_lines(self.config, tap_lines)
+        remaining_rows = postgres.query("SELECT c_pk FROM {}.test_table_long_texts ORDER BY c_pk".format(target_schema))
+        self.assertEqual([row['c_pk'] for row in remaining_rows], [1, 2, 3])
 
     def test_non_db_friendly_columns(self):
         """Loading non-db friendly columns like, camelcase, minus signs, etc."""
@@ -537,7 +509,7 @@ class TestIntegration(unittest.TestCase):
              WHERE table_catalog = '{}'
                AND table_schema = '{}'
                AND table_name = 'test_table_two'
-               AND ordinal_position = 1
+               AND column_name LIKE 'c_date_%'
             """.format(
             self.config.get('dbname', '').lower(),
             target_schema.lower()))[0]["column_name"]
@@ -551,8 +523,6 @@ class TestIntegration(unittest.TestCase):
         self.assertEqual(
             self.remove_metadata_columns_from_rows(table_two),
             [
-                {previous_column_name: datetime.datetime(2019, 2, 1, 15, 12, 45), 'c_int': 1, 'c_pk': 1,
-                 'c_varchar': '1', 'c_date': None},
                 {previous_column_name: datetime.datetime(2019, 2, 10, 2), 'c_int': 2, 'c_pk': 2, 'c_varchar': '2',
                  'c_date': '2019-02-12 02:00:00'},
                 {previous_column_name: None, 'c_int': 3, 'c_pk': 3, 'c_varchar': '2', 'c_date': '2019-02-15 02:00:00'}
@@ -565,17 +535,13 @@ class TestIntegration(unittest.TestCase):
             [
                 {'c_int': 1, 'c_pk': 1, 'c_time': datetime.time(4, 0), 'c_varchar': '1', 'c_time_renamed': None},
                 {'c_int': 2, 'c_pk': 2, 'c_time': datetime.time(7, 15), 'c_varchar': '2', 'c_time_renamed': None},
-                {'c_int': 3, 'c_pk': 3, 'c_time': datetime.time(23, 0, 3), 'c_varchar': '3',
+                {'c_int': 3, 'c_pk': 3, 'c_time': None, 'c_varchar': '3',
                  'c_time_renamed': datetime.time(8, 15)},
-                {'c_int': 4, 'c_pk': 4, 'c_time': None, 'c_varchar': '4', 'c_time_renamed': datetime.time(23, 0, 3)}
             ])
 
     def test_schema_mapping(self):
         """Load stream into a specific schema, create indices and grant permissions"""
         tap_lines = test_utils.get_test_tap_lines('messages-with-multiple-streams.json')
-
-        # Turning on hard delete mode
-        self.config['hard_delete'] = True
 
         # Remove the default_target_schema and use schema mapping
         del self.config['default_target_schema']
@@ -593,10 +559,7 @@ class TestIntegration(unittest.TestCase):
         target_postgres.persist_lines(self.config, tap_lines)
 
         # Check if data loaded correctly and metadata columns exist
-        self.assert_multiple_streams_are_into_postgres(
-            should_metadata_columns_exist=True,
-            should_hard_deleted_rows=True
-        )
+        self.assert_multiple_streams_are_into_postgres()
 
     def test_grant_privileges(self):
         """Tests GRANT USAGE and SELECT privileges on newly created tables"""
@@ -652,8 +615,6 @@ class TestIntegration(unittest.TestCase):
         """Tests logical streams from pg with inserts, updates and deletes"""
         tap_lines = test_utils.get_test_tap_lines('messages-pg-logical-streams.json')
 
-        # Turning on hard delete mode
-        self.config['hard_delete'] = True
         target_postgres.persist_lines(self.config, tap_lines)
 
         self.assert_logical_streams_are_in_postgres(True)
@@ -662,8 +623,6 @@ class TestIntegration(unittest.TestCase):
         """Tests logical streams from pg with inserts, updates and deletes"""
         tap_lines = test_utils.get_test_tap_lines('messages-pg-logical-streams.json')
 
-        # Turning on hard delete mode
-        self.config['hard_delete'] = True
         self.config['batch_size_rows'] = 5
         target_postgres.persist_lines(self.config, tap_lines)
 
@@ -673,8 +632,6 @@ class TestIntegration(unittest.TestCase):
         """Tests logical streams from pg with inserts, updates and deletes"""
         tap_lines = test_utils.get_test_tap_lines('messages-pg-logical-streams-no-records.json')
 
-        # Turning on hard delete mode
-        self.config['hard_delete'] = True
         self.config['batch_size_rows'] = 5
         target_postgres.persist_lines(self.config, tap_lines)
 
@@ -687,7 +644,6 @@ class TestIntegration(unittest.TestCase):
         tap_lines = test_utils.get_test_tap_lines('messages-pg-logical-streams.json')
 
         # Set batch size big enough to never has to flush in the middle
-        self.config['hard_delete'] = True
         self.config['batch_size_rows'] = 1000
         target_postgres.persist_lines(self.config, tap_lines)
 
@@ -715,7 +671,6 @@ class TestIntegration(unittest.TestCase):
         tap_lines = test_utils.get_test_tap_lines('messages-pg-logical-streams.json')
 
         # Set batch size small enough to trigger multiple stream flushes
-        self.config['hard_delete'] = True
         self.config['batch_size_rows'] = 10
         target_postgres.persist_lines(self.config, tap_lines)
 
@@ -789,7 +744,6 @@ class TestIntegration(unittest.TestCase):
         tap_lines = test_utils.get_test_tap_lines('messages-pg-logical-streams.json')
 
         # Set batch size small enough to trigger multiple stream flushes
-        self.config['hard_delete'] = True
         self.config['batch_size_rows'] = 10
         self.config['flush_all_streams'] = True
         target_postgres.persist_lines(self.config, tap_lines)

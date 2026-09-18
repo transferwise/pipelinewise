@@ -109,7 +109,9 @@ class TestDiscoveryPlanning:
 
     def test_inspection_returns_missing_when_schema_is_genuinely_absent(self, tmp_path, spec):
         """Inspection returns missing when schema is genuinely absent."""
-        missing_schema = snowflake_connector.errors.ProgrammingError(msg="Schema does not exist or not authorized")
+        missing_schema = snowflake_connector.errors.ProgrammingError(
+            msg='Object does not exist, or operation cannot be performed.', errno=2043,
+        )
         snowflake_adapter = FakeSnowflake(
             [
                 missing_schema,
@@ -120,20 +122,69 @@ class TestDiscoveryPlanning:
 
         assert publisher.inspect_table(spec.name) == missing_snapshot()
         assert snowflake_adapter.queries[1][0] == ("SHOW SCHEMAS IN DATABASE \"TEST_DB\" STARTS WITH 'TEST_SCHEMA'")
+        assert len(snowflake_adapter.queries) == 2
 
-    def test_inspection_preserves_table_discovery_error_when_schema_exists(self, tmp_path, spec):
-        """Inspection preserves table discovery error when schema exists."""
-        discovery_error = snowflake_connector.errors.ProgrammingError(msg="Table discovery is not authorized")
-        publisher = SnowflakeIcebergPublisher(
-            FakeSnowflake([discovery_error, [{"name": spec.name.schema}]]),
-            str(tmp_path),
-        )
+    @pytest.mark.parametrize(
+        ('table_rows', 'extra_rows', 'expected'),
+        (
+            ([], (), TABLE_FORMAT_MISSING),
+            ([{'name': 'TABLE', 'is_iceberg': False}], (), TABLE_FORMAT_NATIVE),
+            (
+                [{'name': 'TABLE', 'is_iceberg': True}],
+                (
+                    [{'name': 'TABLE', 'catalog_name': 'SNOWFLAKE'}],
+                    [{'key': 'ICEBERG_VERSION', 'value': '3'}],
+                    [{
+                        'key': 'ICEBERG_MERGE_ON_READ_BEHAVIOR',
+                        'value': 'DISABLED',
+                        'level': 'TABLE',
+                    }],
+                ),
+                TABLE_FORMAT_MANAGED_ICEBERG_V3,
+            ),
+        ),
+    )
+    def test_discovery_retries_when_schema_appears(self, tmp_path, table_rows, extra_rows, expected):
+        """A concurrently created schema gets one retry with normal format checks."""
+        snowflake = FakeSnowflake([
+            snowflake_connector.errors.ProgrammingError(msg='Schema does not exist', errno=2043),
+            [{'name': 'SCHEMA'}],
+            table_rows,
+            *extra_rows,
+        ])
+        publisher = SnowflakeIcebergPublisher(snowflake, str(tmp_path))
 
-        with pytest.raises(
-            snowflake_connector.errors.ProgrammingError,
-            match="not authorized",
-        ):
+        assert publisher.discover_table_format('SCHEMA', 'TABLE') == expected
+        assert snowflake.queries[0] == snowflake.queries[2]
+        assert len(snowflake.queries) == 3 + len(extra_rows)
+
+    @pytest.mark.parametrize('errno', [None, 1003, 3001])
+    def test_inspection_preserves_unrelated_discovery_errors(self, tmp_path, spec, errno):
+        """Unrelated errors cannot become a missing table through a successful retry."""
+        discovery_error = snowflake_connector.errors.ProgrammingError(msg='Discovery failed', errno=errno)
+        snowflake = FakeSnowflake([discovery_error, [{'name': spec.name.schema}], []])
+        publisher = SnowflakeIcebergPublisher(snowflake, str(tmp_path))
+
+        with pytest.raises(snowflake_connector.errors.ProgrammingError) as error:
             publisher.inspect_table(spec.name)
+
+        assert error.value is discovery_error
+        assert len(snowflake.queries) == 1
+
+    def test_inspection_propagates_retry_failure_without_retrying_again(self, tmp_path, spec):
+        """A schema-race retry preserves a distinct second error and remains bounded."""
+        missing_schema = snowflake_connector.errors.ProgrammingError(msg='Schema does not exist', errno=2043)
+        retry_error = snowflake_connector.errors.ProgrammingError(msg='Retry is not authorized', errno=3001)
+        snowflake = FakeSnowflake([missing_schema, [{'name': spec.name.schema}], retry_error])
+        publisher = SnowflakeIcebergPublisher(snowflake, str(tmp_path))
+
+        with pytest.raises(snowflake_connector.errors.ProgrammingError) as error:
+            publisher.inspect_table(spec.name)
+
+        assert error.value is retry_error
+        assert error.value.__context__ is missing_schema
+        assert snowflake.queries[0] == snowflake.queries[2]
+        assert len(snowflake.queries) == 3
 
     @staticmethod
     def _managed_v3_inspection_responses(column_rows):

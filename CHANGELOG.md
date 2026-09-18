@@ -1,3 +1,35 @@
+0.88.0 (2026-09-17)
+-------------------
+
+**Breaking compatibility**
+
+- Make physical deletion of source-deleted rows mandatory in PipelineWise and
+  the bundled PostgreSQL and Snowflake targets: process source-delete markers
+  before acknowledging Singer state and remove missing rows from PartialSync
+  ranges
+- Include historical target rows with a non-null `_SDC_DELETED_AT` in deletion
+  cleanup; Snowflake performs this cleanup after a non-empty stream load, and
+  streams receiving only SCHEMA/STATE messages are not cleaned. Retired
+  deletion-mode settings are ignored, and existing generated configs remain
+  usable without reimport
+- Retain `_SDC_DELETED_AT` for internal delete processing and automatically
+  enable target metadata columns, even when `add_metadata_columns` is false
+
+**Fixes**
+
+- Preserve FastSync bookmarks when target runtime configuration cannot be
+  loaded or combined for execution
+- Retry Snowflake table discovery once when another FastSync worker creates
+  the schema during discovery; restrict recovery to the missing-object error
+  and surface unrelated errors and retry failures
+- Count PostgreSQL target deletions without fetching the deleted rows into
+  memory
+
+**Tests**
+
+- Verify native PostgreSQL and MariaDB PartialSync remove existing target rows
+  deleted at source while preserving rows outside the selected range
+
 0.87.0 (2026-09-17)
 -------------------
 

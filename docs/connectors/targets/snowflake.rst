@@ -7,6 +7,10 @@ Snowflake target
 CSV files into native or managed Iceberg v3 tables. It also supports FastSync
 for selected database sources.
 
+Source-delete markers always physically remove rows before Singer state is
+acknowledged. Metadata columns are enabled automatically; see
+:ref:`metadata_columns` for deletion processing.
+
 .. list-table:: Support
    :header-rows: 1
    :widths: 28 24 48

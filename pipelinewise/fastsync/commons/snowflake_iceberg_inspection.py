@@ -139,12 +139,15 @@ class SnowflakeTableInspector:
         schema_fqtn = '.'.join(
             quote_identifier(value) for value in (target.database, target.schema)
         )
+        show_tables_sql = (
+            f'SHOW TABLES IN SCHEMA {schema_fqtn} '
+            f'STARTS WITH {sql_string_literal(target.table)}'
+        )
         try:
-            rows = self.snowflake.query(
-                f'SHOW TABLES IN SCHEMA {schema_fqtn} '
-                f'STARTS WITH {sql_string_literal(target.table)}'
-            )
-        except snowflake.connector.errors.ProgrammingError:
+            rows = self.snowflake.query(show_tables_sql)
+        except snowflake.connector.errors.ProgrammingError as exc:
+            if exc.errno != 2043:  # Object does not exist, or operation cannot be performed.
+                raise
             schema_rows = self.snowflake.query(
                 f'SHOW SCHEMAS IN DATABASE {quote_identifier(target.database)} '
                 f'STARTS WITH {sql_string_literal(target.schema)}'
@@ -154,7 +157,8 @@ class SnowflakeTableInspector:
             ]
             if not exact_schemas:
                 return None
-            raise
+            # Another table worker may have created the schema after the first lookup.
+            rows = self.snowflake.query(show_tables_sql)
         exact_rows = exact_named_table_rows(rows, (target.table,))
         if not exact_rows:
             return None

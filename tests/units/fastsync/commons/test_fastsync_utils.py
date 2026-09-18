@@ -127,7 +127,8 @@ class TestFastSyncUtils(TestCase):
                         processes.append(process)
 
                     for ready in ready_events:
-                        self.assertTrue(ready.wait(timeout=10))
+                        # Coverage slows spawned-worker imports, especially in emulated dev containers.
+                        self.assertTrue(ready.wait(timeout=30))
                     self.assertFalse(
                         any(finished.wait(timeout=0.5) for finished in finished_events)
                     )
@@ -765,6 +766,12 @@ class TestFastSyncUtils(TestCase):
 
         with pytest.raises(Exception):
             utils.check_config(config, required_keys)
+
+    def test_check_config_ignores_legacy_delete_setting(self):
+        """Existing FullSync and PartialSync runtime JSON remains accepted."""
+        for value in (True, False, None, 'false'):
+            with self.subTest(value=value):
+                utils.check_config({'hard_delete': value}, [])
 
     @patch(
         'pipelinewise.fastsync.commons.utils.multiprocessing.cpu_count', return_value=10

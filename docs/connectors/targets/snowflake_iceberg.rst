@@ -116,15 +116,13 @@ Set the desired format in any tap whose Singer output is compatible with
    target: "snowflake"
    target_table_format: iceberg
    iceberg_version: 3
-   hard_delete: true
 
 These tap-level settings are the only valid Iceberg selection. Omitting
 ``target_table_format`` or selecting ``native`` creates native tables. Target
 configuration rejects these keys and the removed ``iceberg_create`` setting;
 remove ``iceberg_create`` and configure each Iceberg tap before upgrading.
 
-Every explicit managed Iceberg v3 tap requires ``hard_delete: true``. MariaDB,
-MySQL, and PostgreSQL taps also require ``data_flattening_max_level: 0`` because
+MariaDB, MySQL, and PostgreSQL taps require ``data_flattening_max_level: 0`` because
 their initial load can use FastSync before handing the stream to Singer.
 Singer-only sources retain their normal flattening setting; for example,
 Salesforce's default level ``10`` is valid. A physical format mismatch fails
@@ -246,7 +244,7 @@ PartialSync publication
 
 A missing Iceberg target is created from the selected range. An existing
 compatible target is updated through one transaction. PartialSync requires a
-primary key and supports only ``hard_delete: true``.
+primary key and physically deletes target rows missing from the source range.
 
 Compatible nullable columns are added before the merge. Any other schema or key
 mismatch fails before DML. Setting ``drop_target_table: true`` explicitly selects

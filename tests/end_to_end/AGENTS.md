@@ -73,7 +73,6 @@ run_e2e \
 
 run_e2e \
   tests/end_to_end/target_snowflake/tap_mariadb/test_iceberg_v3_mariadb_to_sf.py \
-  tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_soft_delete.py \
   tests/end_to_end/target_snowflake/tap_mongodb/test_replicate_mongodb_to_sf.py
 
 run_e2e \

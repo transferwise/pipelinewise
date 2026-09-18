@@ -55,17 +55,6 @@ class TestFastSyncTargetSnowflakePartialSync(TestCase):
             },
         )
 
-    def test_partial_hard_delete(self):
-        """Hard delete is limited to the selected, marked range."""
-        self.snowflake.partial_hard_delete(
-            'test_schema', 'target_table', ' WHERE updated_at >= \'2024-01-01\''
-        )
-
-        self.assertListEqual(self.snowflake.executed_queries, [
-            'DELETE FROM test_schema."TARGET_TABLE" WHERE updated_at >= \'2024-01-01\''
-            ' AND _SDC_DELETED_AT IS NOT NULL'
-        ])
-
     def test_publish_partial_sync_executes_one_atomic_transaction(self):
         """Marker, merge, and hard delete share one transaction."""
         self.snowflake.execute_transaction = MagicMock()
@@ -76,7 +65,6 @@ class TestFastSyncTargetSnowflakePartialSync(TestCase):
             ['id', 'value'],
             ['id'],
             ' WHERE updated_at >= \'2024-01-01\'',
-            hard_delete=True,
         )
 
         self.snowflake.execute_transaction.assert_called_once_with(
@@ -94,18 +82,6 @@ class TestFastSyncTargetSnowflakePartialSync(TestCase):
             ],
             query_tag_props={'schema': 'test_schema', 'table': 'target_table'},
         )
-
-    def test_publish_partial_sync_preserves_soft_deleted_rows(self):
-        """Soft-delete publication does not issue a physical delete."""
-        self.snowflake.execute_transaction = MagicMock()
-        self.snowflake.publish_partial_sync(
-            'test_schema', 'source_table', 'target_table', ['id'], ['id'],
-            ' WHERE updated_at >= \'2024-01-01\'', hard_delete=False,
-        )
-
-        transaction_queries = self.snowflake.execute_transaction.call_args.args[0]
-        self.assertEqual(len(transaction_queries), 2)
-        self.assertFalse(any(query.startswith('DELETE') for query in transaction_queries))
 
     def test_execute_transaction_commits_all_queries(self):
         """A successful transaction commits exactly once."""

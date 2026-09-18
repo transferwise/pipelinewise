@@ -304,17 +304,18 @@ class TestPartialSyncPGToSF(TapPostgres):
             self.e2e_env, 'postgres', self.table, additional_column, primary_key, expected_records_for_column
         )
 
-    def test_partial_sync_if_record_is_deleted_from_the_source_and_hard_delete(self):
-        """
-        Test partial sync table from PG to Snowflake if hard delete is selected and a record is deleted from the source
-        """
+    def test_partial_sync_removes_existing_row_deleted_from_source(self):
+        """Delete a stale target row within the range and preserve the row outside it."""
         self.e2e_env.delete_record_from_source('postgres', self.table, 'WHERE cid=5')
 
-        # Deleting all records from the target with primary key greater than 1
+        # Retain the source-deleted row so this proves deletion, not just absence of an insert.
         self.e2e_env.delete_record_from_target_snowflake(
             tap_type=self.tap_parameters['tap_type'],
             table=self.tap_parameters['table'],
-            where_clause=f'WHERE {self.column} > 1'
+            where_clause=f'WHERE {self.column} > 1 AND {self.column} <> 5'
+        )
+        assertions.assert_partial_sync_rows_in_target(
+            self.e2e_env, 'postgres', self.table, self.column, self.column, [1, 5]
         )
 
         assertions.assert_partial_sync_table_success(
@@ -332,7 +333,7 @@ class TestPartialSyncPGToSF(TapPostgres):
             operation='PartialSync',
         )
 
-        # for this test, all records with id > 1 are deleted from the target and then will do a partial sync
+        # Row 1 survives outside the range; row 5 is removed and rows 4 and 6 are inserted.
         expected_records_for_column = [1, 4, 6]
         column_to_check = primary_key = self.column
 
@@ -365,115 +366,3 @@ class TestPartialSyncPGToSF(TapPostgres):
         assertions.assert_partial_sync_rows_in_target(
             self.e2e_env, 'postgres', self.table, column_to_check, primary_key, expected_records_for_column
         )
-
-
-class TestPartialSyncPGToSFSoftDelete(TapPostgres):
-    """
-    Test cases for Partial sync table from Postgres to Snowflake if set to soft delete
-    """
-
-    def setUp(self):
-        self.table = 'edgydata'
-        self.column = 'cid'
-        super().setUp(tap_id='postgres_to_sf_soft_delete', target_id='snowflake')
-        self.tap_parameters = {
-            'env': self.e2e_env,
-            'tap': self.tap_id,
-            'tap_type': 'postgres',
-            'target': self.target_id,
-            'source_db': 'public',
-            'table': self.table,
-            'column': self.column,
-            'comparison_columns': POSTGRES_FASTSYNC_COMPARISON_COLUMNS,
-        }
-        assertions.assert_resync_populates_target(
-            self.tap_parameters, primary_key=self.column
-        )
-
-    def _get_deleted_row_state(self):
-        target_columns = [
-            column['target_expression']
-            for column in self.tap_parameters['comparison_columns']
-        ]
-        return self.e2e_env.get_rows_from_target_snowflake(
-            tap_type=self.tap_parameters['tap_type'],
-            table=self.table,
-            columns=[
-                *target_columns,
-                'TRY_TO_TIMESTAMP_TZ("_SDC_DELETED_AT")',
-            ],
-            primary_key=self.column,
-            where_clause=f'WHERE "{self.column.upper()}" = 5',
-        )
-
-    def _snowflake_current_timestamp(self):
-        return self.e2e_env.run_query_target_snowflake(
-            'SELECT CURRENT_TIMESTAMP()'
-        )[0][0]
-
-    def test_partial_sync_if_record_is_deleted_from_the_source_and_soft_delete(self):
-        """
-        Test partial sync table from PG to Snowflake if soft delete is selected and a record is deleted from the source
-        """
-        row_before = self._get_deleted_row_state()
-        self.assertEqual(len(row_before), 1)
-        self.assertIsNone(row_before[0][-1])
-
-        self.e2e_env.delete_record_from_source(
-            'postgres', self.table, 'WHERE cid=5'
-        )
-
-        # Deleting all records from the target with primary key greater than 5
-        self.e2e_env.delete_record_from_target_snowflake(
-            tap_type=self.tap_parameters['tap_type'],
-            table=self.tap_parameters['table'],
-            where_clause=f'WHERE {self.column} > 5'
-        )
-        started_at = self._snowflake_current_timestamp()
-        assertions.assert_partial_sync_table_success(
-            self.tap_parameters,
-            start_value=4,
-            end_value=6,
-        )
-        finished_at = self._snowflake_current_timestamp()
-
-        assertions.assert_source_target_rows_equal(
-            self.tap_parameters,
-            primary_key=self.column,
-            where_clause=f'WHERE {self.column} <= 6 AND {self.column} <> 5',
-            operation='PartialSync',
-        )
-
-        # for this test, all records with id > 3 are deleted from the target and then will do a partial sync
-        expected_records_for_column = [1, 2, 3, 4, 5, 6]
-        column_to_check = primary_key = self.column
-
-        assertions.assert_partial_sync_rows_in_target(
-            self.e2e_env, 'postgres', self.table, column_to_check, primary_key, expected_records_for_column
-        )
-
-        row_after = self._get_deleted_row_state()
-        self.assertEqual(len(row_after), 1)
-        self.assertEqual(row_after[0][:-1], row_before[0][:-1])
-
-        records = self.e2e_env.get_rows_from_target_snowflake(
-            tap_type='postgres',
-            table=self.table,
-            columns=[
-                '"CID"',
-                'TRY_TO_TIMESTAMP_TZ("_SDC_DELETED_AT")',
-            ],
-            primary_key=primary_key,
-        )
-        self.assertEqual([record[0] for record in records], expected_records_for_column)
-        self.assertTrue(all(
-            deleted_at is None
-            for record_id, deleted_at in records
-            if record_id != 5
-        ))
-
-        deleted_at = dict(records)[5]
-        self.assertIsNotNone(deleted_at)
-        self.assertEqual(deleted_at, row_after[0][-1])
-        self.assertLessEqual(started_at, deleted_at)
-        self.assertLessEqual(deleted_at, finished_at)

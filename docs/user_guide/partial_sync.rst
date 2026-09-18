@@ -58,17 +58,13 @@ Native-table merge outcomes
    * - Compatible text column is narrower than ``VARCHAR(134217728)``
      - PipelineWise widens the target column before applying the merge.
      - Values are unchanged; the wider column definition applies to the table.
-   * - ``hard_delete: true``
-     - Target rows absent from the source range are deleted.
-     - Unchanged.
-   * - ``hard_delete: false``
-     - Missing source rows are retained and marked in ``_SDC_DELETED_AT``.
+   * - Target row absent from the source range
+     - Deleted.
      - Unchanged.
 
-.. deprecated:: 0.79.0
-
-   Soft delete (``hard_delete: false``) is scheduled for removal. New pipelines
-   should use ``hard_delete: true``.
+Row marking, merging, and deletion run in one transaction. The internal
+``_SDC_DELETED_AT`` marker remains available for subsequent loads, but missing
+source rows are always physically deleted from the selected target range.
 
 Snowflake commits schema changes independently from the merge transaction.
 PipelineWise therefore widens compatible native text columns and adds missing
@@ -82,8 +78,8 @@ Managed Iceberg v3 outcomes
 ---------------------------
 
 MariaDB/MySQL and PostgreSQL taps can select managed Iceberg v3 through
-``target_table_format: iceberg``. This route requires a primary key,
-``hard_delete: true``, and ``data_flattening_max_level: 0``.
+``target_table_format: iceberg``. This route requires a primary key and
+``data_flattening_max_level: 0``.
 
 .. list-table::
    :header-rows: 1
@@ -95,7 +91,7 @@ MariaDB/MySQL and PostgreSQL taps can select managed Iceberg v3 through
    * - Missing
      - Creates a managed Iceberg v3 table containing the selected range.
    * - Exactly compatible
-     - Updates, inserts, and hard-deletes the range in one transaction.
+     - Updates, inserts, and deletes missing source rows in one range transaction.
    * - New nullable source column
      - Adds the column, then applies the range transaction.
    * - Other schema or primary-key mismatch
@@ -136,16 +132,6 @@ Source missing a target column:
 
 .. image:: ../img/partial_sync_case_3.png
 
-Soft-delete and hard-delete outcomes:
-
-.. image:: ../img/partial_sync_case_4.png
-
-.. image:: ../img/partial_sync_case_5.png
-
-Combined schema and delete changes:
-
-.. image:: ../img/partial_sync_case_all.png
-
 
 Safety and validation
 ---------------------
@@ -153,8 +139,9 @@ Safety and validation
 - Stop overlapping writes or replication when the selected range can change
   during export and merge.
 - Estimate the source range and target merge cost before running.
-- Confirm the boundary query returns the intended rows; an empty range is a
-  successful no-op.
+- Confirm the boundary query selects the intended range. A dynamic boundary
+  query returning no value skips publication; a resolved range with no source
+  rows can delete all target rows in that range.
 - Ensure transformations and canonical casts preserve non-NULL, unique
   composite primary keys; PipelineWise rejects rather than deduplicates an
   invalid staging result.

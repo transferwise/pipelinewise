@@ -220,11 +220,7 @@ class DbSync:
         # Init stream schema
         if stream_schema_message is not None:
             # Define initial list of indices to created
-            self.hard_delete = self.connection_config.get('hard_delete')
-            if self.hard_delete:
-                self.indices = ['_sdc_deleted_at']
-            else:
-                self.indices = []
+            self.indices = ['_sdc_deleted_at']
 
             #  Define target schema name.
             #  --------------------------
@@ -487,9 +483,14 @@ class DbSync:
 
     def delete_rows(self, stream):
         table = self.table_name(stream)
-        query = "DELETE FROM {} WHERE _sdc_deleted_at IS NOT NULL RETURNING _sdc_deleted_at".format(table)
+        query = "DELETE FROM {} WHERE _sdc_deleted_at IS NOT NULL".format(table)
         self.logger.info("Deleting rows from '%s' table... %s", table, query)
-        self.logger.info("DELETE %s", len(self.query(query)))
+        self.logger.debug("Running query: %s", query)
+        with self.open_connection() as connection:
+            with connection.cursor() as cur:
+                cur.execute(query)
+                deleted_rows = cur.rowcount
+        self.logger.info("DELETE %s", deleted_rows)
 
     def create_schema_if_not_exists(self, table_columns_cache=None):
         schema_name = self.schema_name
