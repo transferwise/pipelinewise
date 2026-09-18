@@ -6,8 +6,8 @@ from enum import Enum, unique
 from types import ModuleType
 from typing import Callable
 
-import target_snowflake.file_formats
 from target_snowflake.exceptions import FileFormatNotFoundException, InvalidFileFormatException
+from target_snowflake.file_formats import csv
 from target_snowflake.file_formats.csv import REQUIRED_FILE_FORMAT_OPTIONS
 from target_snowflake.managed_iceberg import sql_string_literal
 
@@ -18,20 +18,17 @@ class FileFormatTypes(str, Enum):
     """Enum of supported file format types"""
 
     CSV = 'csv'
-    PARQUET = 'parquet'
-
-    @staticmethod
-    def list():
-        """List of supported file type values"""
-        return list(map(lambda c: c.value, FileFormatTypes))
 
 
 class FileFormat:
     """File Format class"""
 
     def __init__(self, file_format: str, query_fn: Callable, file_format_type: FileFormatTypes=None):
-        """Find the file format in Snowflake, detect its type and
-        initialise file format specific functions"""
+        """Initialize the formatter, discovering and validating its Snowflake format.
+
+        An explicit file_format_type reuses startup validation and avoids repeating
+        metadata discovery for each stream.
+        """
         if file_format_type:
             self.file_format_type = file_format_type
         else:
@@ -49,18 +46,12 @@ class FileFormat:
             file_format_type: FileFormatTypes enum item
 
         Returns:
-            ModuleType implementation of the file ormatter
+            ModuleType implementation of the file formatter
         """
-        formatter = None
-
         if file_format_type == FileFormatTypes.CSV:
-            formatter = target_snowflake.file_formats.csv
-        elif file_format_type == FileFormatTypes.PARQUET:
-            formatter = target_snowflake.file_formats.parquet
-        else:
-            raise InvalidFileFormatException(f"Not supported file format: '{file_format_type}")
+            return csv
 
-        return formatter
+        raise InvalidFileFormatException(f"Not supported file format: '{file_format_type}'")
 
     @staticmethod
     def _parse_file_format_name(file_format: str) -> list[str]:
@@ -111,11 +102,11 @@ class FileFormat:
                 file_format_type = FileFormatTypes(file_format_metadata['type'].lower())
             except ValueError as ex:
                 raise InvalidFileFormatException(
-                    f"Not supported named file format {file_format}. Supported file formats: {FileFormatTypes}") \
-                    from ex
+                    f'Named file format {file_format} has unsupported type '
+                    f"{file_format_metadata['type']!r}; target-snowflake supports only CSV staging"
+                ) from ex
 
-            if file_format_type == FileFormatTypes.CSV:
-                cls._validate_csv_options(file_format, file_format_metadata)
+            cls._validate_csv_options(file_format, file_format_metadata)
         else:
             raise FileFormatNotFoundException(
                 f"Named file format not found: {file_format}")

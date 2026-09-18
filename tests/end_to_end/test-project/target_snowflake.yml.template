@@ -28,8 +28,7 @@ db_conn:
   # stage and file_format are pre-created objects in Snowflake that requires to load and
   # merge data correctly from S3 to tables in one step without using temp tables
   #  stage      : External stage object pointing to an S3 bucket
-  #  file_format: Named file format object used for bulk loading data from S3 into
+  #  file_format: Named CSV file format object used for bulk loading data from S3 into
   #               snowflake tables.
   stage: "${TARGET_SNOWFLAKE_STAGE}"
   file_format: "${TARGET_SNOWFLAKE_FILE_FORMAT}"
-

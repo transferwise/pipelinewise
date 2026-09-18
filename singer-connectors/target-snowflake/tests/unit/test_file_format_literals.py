@@ -2,12 +2,11 @@
 
 import pytest
 
-from target_snowflake.file_formats import csv, parquet
+from target_snowflake.file_formats import csv
 
 
-@pytest.mark.parametrize('formatter', [csv, parquet])
 @pytest.mark.parametrize('operation', ['copy', 'merge'])
-def test_load_sql_preserves_file_format_identifier(formatter, operation):
+def test_load_sql_preserves_file_format_identifier(operation):
     file_format = "\"DB\".\"A\\B\".\"it's_format\""
     expected_literal = "'\"DB\".\"A\\\\B\".\"it''s_format\"'"
     arguments = {
@@ -19,7 +18,7 @@ def test_load_sql_preserves_file_format_identifier(formatter, operation):
     }
     if operation == 'merge':
         arguments['pk_merge_condition'] = 's.ID = t.ID'
-    sql = getattr(formatter, f'create_{operation}_sql')(**arguments)
+    sql = getattr(csv, f'create_{operation}_sql')(**arguments)
 
     clause = 'format_name=' if operation == 'copy' else 'FILE_FORMAT => '
     assert clause + expected_literal in sql

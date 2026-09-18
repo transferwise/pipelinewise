@@ -11,7 +11,7 @@ from singer import get_logger
 from target_snowflake import flattening
 from target_snowflake import managed_iceberg
 from target_snowflake import stream_utils
-from target_snowflake.file_format import FileFormat, FileFormatTypes
+from target_snowflake.file_format import FileFormat
 
 from target_snowflake.exceptions import (
     PrimaryKeyNotFoundException,
@@ -197,11 +197,6 @@ class DbSync:
         self.schema_name = None
         self.grantees = None
         self.file_format = FileFormat(self.connection_config['file_format'], self.query, file_format_type)
-
-        if not self.connection_config.get('stage') and self.file_format.file_format_type == FileFormatTypes.PARQUET:
-            self.logger.error("Table stages with Parquet file format is not supported. "
-                              "Use named stages with Parquet file format or table stages with CSV files format")
-            sys.exit(1)
 
         # Init stream schema
         if self.stream_schema_message is not None:
