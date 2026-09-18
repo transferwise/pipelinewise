@@ -67,22 +67,21 @@ CSV suite needs standard Snowflake/S3 variables,
 `TARGET_SNOWFLAKE_SCHEMA`, and `TARGET_SNOWFLAKE_FILE_FORMAT_CSV` (which may
 reuse `TARGET_SNOWFLAKE_FILE_FORMAT`); ensure the private key is readable.
 
-Run the supported 48-test subset with plaintext upload explicitly selected:
+Run the supported 49-test suite with plaintext upload explicitly selected:
 
 ```bash
 docker exec -t -e CLIENT_SIDE_ENCRYPTION_MASTER_KEY= pipelinewise bash -lc '
   cd /opt/pipelinewise/singer-connectors/target-snowflake
   . ./venv/bin/activate
   pytest tests/integration -vvx \
-    -k "not test_parquet and not test_table_stage and \
-        (not test_loading_tables_with_client_side_encryption or wrong_master_key)"
+    -k "not test_loading_tables_with_client_side_encryption or wrong_master_key"
 '
 ```
 
-This excludes Parquet, mixed CSV/Parquet table-stage, and successful client-side
-encryption while retaining wrong-key rejection. Expect 48 passes, zero skips;
-anything else is non-green. Full `make integration_test` separately requires
-Parquet and a real client-side encryption master key.
+This excludes successful client-side encryption while retaining CSV external
+and table-stage loads plus wrong-key rejection. Expect 49 passes, zero skips;
+anything else is non-green. Full `make integration_test` separately requires a
+real client-side encryption master key and expects 50 passes.
 
 ## Versioning and upstream
 

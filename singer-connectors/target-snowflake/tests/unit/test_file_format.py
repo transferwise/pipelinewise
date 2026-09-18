@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from target_snowflake.exceptions import InvalidFileFormatException, FileFormatNotFoundException
 from target_snowflake.file_format import FileFormat, FileFormatTypes
-from target_snowflake.file_formats import csv, parquet
+from target_snowflake.file_formats import csv
 
 
 def _csv_file_format_result(name='FOO', database_name='DB', schema_name='SCHEMA', **overrides):
@@ -26,15 +26,11 @@ class TestFileFormat(unittest.TestCase):
 
     def test_get_formatter(self):
         self.assertEqual(FileFormat._get_formatter(FileFormatTypes.CSV), csv)
-        self.assertEqual(FileFormat._get_formatter(FileFormatTypes.PARQUET), parquet)
         with self.assertRaises(InvalidFileFormatException):
             FileFormat._get_formatter('UNKNOWN')
 
     @patch('target_snowflake.db_sync.DbSync.query')
     def test_detect_file_format_type(self, query_patch):
-        # List method should return values as list
-        self.assertEqual(FileFormatTypes.list(), ['csv', 'parquet'])
-
         # CSV should be supported
         query_patch.return_value = _csv_file_format_result()
         file_format = FileFormat('foo', query_patch)
@@ -45,15 +41,10 @@ class TestFileFormat(unittest.TestCase):
         self.assertEqual(file_format.formatter.create_merge_sql.__module__, csv.create_merge_sql.__module__)
         self.assertEqual(file_format.formatter.create_copy_sql.__module__, csv.create_copy_sql.__module__)
 
-        # Parquet should be supported
+        # Parquet staging should fail explicitly rather than falling back to CSV
         query_patch.return_value = [{'name': 'FOO', 'type': 'PARQUET'}]
-        file_format = FileFormat('foo', query_patch)
-        self.assertEqual(file_format.file_format_type, FileFormatTypes.PARQUET)
-
-        # File format functions should be mapped to parquet module
-        self.assertEqual(file_format.formatter.records_to_file.__module__, parquet.records_to_file.__module__)
-        self.assertEqual(file_format.formatter.create_merge_sql.__module__, parquet.create_merge_sql.__module__)
-        self.assertEqual(file_format.formatter.create_copy_sql.__module__, parquet.create_copy_sql.__module__)
+        with self.assertRaisesRegex(InvalidFileFormatException, 'CSV'):
+            FileFormat('foo', query_patch)
 
         # Empty result should raise exception
         query_patch.return_value = []

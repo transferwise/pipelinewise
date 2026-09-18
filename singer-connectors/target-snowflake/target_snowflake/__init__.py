@@ -14,14 +14,13 @@ from jsonschema import Draft7Validator, FormatChecker
 from singer import get_logger
 from datetime import datetime, timedelta
 
-# FileFormat resolves these modules through the initialized file_formats package.
-from target_snowflake.file_formats import csv as csv
-from target_snowflake.file_formats import parquet as parquet
 from target_snowflake import stream_utils
 
 from target_snowflake.db_sync import DbSync, RECORD_UPDATE_MODE_PATCH
 from target_snowflake.file_format import FileFormatTypes
 from target_snowflake.exceptions import (
+    FileFormatNotFoundException,
+    InvalidFileFormatException,
     RecordValidationException,
     UnexpectedValueTypeException as UnexpectedValueTypeException,
     InvalidValidationOperationException
@@ -71,11 +70,11 @@ def get_snowflake_statics(config):
     Returns:
         tuple of retrieved items: table_cache, file_format_type
     """
+    db = DbSync(config)
     table_cache = []
-    if not ('disable_table_cache' in config and config['disable_table_cache']):
+    if not config.get('disable_table_cache'):
         LOGGER.info('Getting catalog objects from PipelineWise table cache...')
 
-        db = DbSync(config)
         table_cache = db.get_table_columns(
             table_schemas=stream_utils.get_schema_names_from_config(config))
 
@@ -95,9 +94,8 @@ def persist_lines(config, lines, table_cache=None, file_format_type: FileFormatT
                      INFORMATION_SCHEMA and SHOW queries as possible.
                      If not provided then an SQL query will be generated at runtime to
                      get all the required information from Snowflake
-        file_format_type: Optional FileFormatTypes value that defines which supported file format to use
-                          to load data into Snowflake.
-                          If not provided then it will be detected automatically
+        file_format_type: Optional previously validated FileFormatTypes value from startup.
+                          Reuses validation across streams; if omitted, each stream detects and validates its format.
 
     Returns:
         tuple of retrieved items: table_cache, file_format_type
@@ -547,8 +545,12 @@ def main():
     else:
         config = {}
 
-    # Init columns cache
-    table_cache, file_format_type = get_snowflake_statics(config)
+    # Validate the named format and initialize the optional columns cache.
+    try:
+        table_cache, file_format_type = get_snowflake_statics(config)
+    except (InvalidFileFormatException, FileFormatNotFoundException) as ex:
+        LOGGER.error('%s', ex)
+        raise SystemExit(1) from None
 
     # Consume singer messages
     singer_messages = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8')

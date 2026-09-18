@@ -54,9 +54,8 @@ It's reading incoming messages from STDIN and using the properites in `config.js
 
 You need to create a few objects in snowflake in one schema before start using this target.
 
-1. Create a named file format. This will be used by the MERGE/COPY commands to parse the files correctly from S3. You can use CSV or Parquet file formats.
-
-To use CSV files:
+1. Create a named CSV file format. The MERGE/COPY commands use it to parse
+staged files correctly:
 
 ```sql
 CREATE FILE FORMAT {database}.{schema}.{file_format_name}
@@ -75,10 +74,10 @@ MULTI_LINE = TRUE
 NULL_IF = ();
 ```
 
-The target validates these effective CSV options before loading. They preserve
-SQL `NULL`, empty strings, LF, CR, CRLF, tabs, CSV punctuation, Unicode, and
-literal backslash sequences as distinct values. An incompatible named CSV
-format is rejected before rows are written.
+The target validates the configured object type and these effective CSV options
+before consuming Singer input. They preserve SQL `NULL`, empty strings, LF, CR,
+CRLF, tabs, CSV punctuation, Unicode, and literal backslash sequences as
+distinct values. A non-CSV or incompatible named format is rejected.
 
 Validation resolves the exact configured database, schema, and file-format
 name, including quoted identifiers, rather than a same-named format elsewhere.
@@ -94,14 +93,6 @@ as well; changing the format alone does not fix older writers' text handling.
 The change applies only to later loads. Resync affected tables from their source
 if an earlier target version normalized or removed control characters; the
 original values cannot be reconstructed from Snowflake.
-
-To use Parquet files (experimental):
-
-```
-CREATE FILE FORMAT {database}.{schema}.{file_format_name} TYPE = 'PARQUET';
-```
-
-**Important:** Parquet files are not supported with [table stages](https://docs.snowflake.com/en/user-guide/data-load-local-file-system-create-stage.html#table-stages). If you want to use Parquet files then you need to have an external stage in snowflake. Please read further for more details in point 4).
 
 2. Create a Role with all the required permissions:
 
@@ -189,7 +180,7 @@ Full list of options in `config.json`:
 | s3_region_name                      | String  | No         | Default region when creating new connections |
 | s3_acl                              | String  | No         | S3 ACL name to set on the uploaded files                                                   |
 | stage                               | String  | No         | Named external stage name created at pre-requirements section. Has to be a fully qualified name including the schema name. If not specified, table internal stage are used. When this is defined then `s3_bucket` has to be defined as well. |
-| file_format                         | String  | Yes        | Named file format name created at pre-requirements section. Has to be a fully qualified name including the schema name. |
+| file_format                         | String  | Yes        | Named CSV file format created in the pre-requirements section. Has to be a fully qualified name including the schema name. |
 | batch_size_rows                     | Integer |            | (Default: 100000) Maximum number of rows in each batch. At the end of each batch, the rows in the batch are loaded into Snowflake. |
 | batch_wait_limit_seconds            | Integer |            | (Default: None) Maximum time to wait for batch to reach `batch_size_rows`. |
 | flush_all_streams                   | Boolean |            | (Standalone default: False; PipelineWise default: True) Flush and load every buffered stream into Snowflake when one batch is full. Set `false` to flush only that stream. Enabling this can produce smaller, more frequent COPY/MERGE loads and increase loading cost. |
@@ -238,7 +229,6 @@ emitted by the tap; key-based incremental replication cannot discover them.
   export TARGET_SNOWFLAKE_S3_KEY_PREFIX=<bucket-directory>
   export TARGET_SNOWFLAKE_STAGE=<stage-object-with-schema-name>
   export TARGET_SNOWFLAKE_FILE_FORMAT_CSV=<file-format-csv-object-with-schema-name>
-  export TARGET_SNOWFLAKE_FILE_FORMAT_PARQUET=<file-format-parquet-object-with-schema-name>
   export CLIENT_SIDE_ENCRYPTION_MASTER_KEY=<client_side_encryption_master_key>
 ```
 

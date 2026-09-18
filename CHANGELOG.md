@@ -1,3 +1,25 @@
+0.89.0 (2026-09-18)
+-------------------
+
+**Breaking compatibility**
+
+- Remove experimental Parquet staging from the bundled Snowflake target;
+  require its configured named file format to be CSV and reject unsupported
+  types before consuming Singer input
+
+**Fixes**
+
+- Validate the Snowflake target's named file format even when table caching is
+  disabled, avoiding a startup crash
+- Report missing or incompatible Snowflake target file formats with a concise
+  error and exit code 1 before consuming Singer input
+
+**Dependencies**
+
+- Remove NumPy and pandas/PyArrow staging dependencies from PipelineWise core
+  and the bundled Snowflake target without changing CSV, FastSync, or
+  Snowflake-managed Iceberg loads
+
 0.88.0 (2026-09-17)
 -------------------
 
