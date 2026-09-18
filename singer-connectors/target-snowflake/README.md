@@ -55,7 +55,7 @@ It's reading incoming messages from STDIN and using the properites in `config.js
 You need to create a few objects in snowflake in one schema before start using this target.
 
 1. Create a named CSV file format. The MERGE/COPY commands use it to parse
-staged files correctly:
+   staged files correctly:
 
 ```sql
 CREATE FILE FORMAT {database}.{schema}.{file_format_name}
