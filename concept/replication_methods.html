@@ -249,9 +249,9 @@
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/transformations.html#validation-and-rollout">Validation and rollout</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/metadata_columns.html">Metadata columns and deletes</a><ul>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/metadata_columns.html">Metadata columns</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/metadata_columns.html#columns">Columns</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../user_guide/metadata_columns.html#configuration-outcomes">Configuration outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/metadata_columns.html#source-deletes">Source deletes</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/troubleshooting.html">Troubleshooting</a><ul>
@@ -423,6 +423,9 @@ stable increasing key. Use FULL_TABLE only when complete rescans are acceptable.
 <p>LOG_BASED reads inserts, updates, and deletes from a database change log.
 PipelineWise supports it for MariaDB/MySQL, PostgreSQL, and MongoDB connectors.
 Experimental connector status still applies.</p>
+<p>PostgreSQL and Snowflake targets physically remove source-deleted rows before
+acknowledging Singer state. See <a class="reference internal" href="../user_guide/metadata_columns.html#metadata-columns"><span class="std std-ref">Metadata columns</span></a> for deletion markers
+and processing.</p>
 <p>An initial table without a bookmark uses FullSync when the route supports it.
 The same <code class="docutils literal notranslate"><span class="pre">run_tap</span></code> invocation then starts Singer for ongoing log consumption.
 The source must retain change-log data until the target-acknowledged bookmark has

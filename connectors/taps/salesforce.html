@@ -249,9 +249,9 @@
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/transformations.html#validation-and-rollout">Validation and rollout</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/metadata_columns.html">Metadata columns and deletes</a><ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/metadata_columns.html">Metadata columns</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/metadata_columns.html#columns">Columns</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../user_guide/metadata_columns.html#configuration-outcomes">Configuration outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/metadata_columns.html#source-deletes">Source deletes</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/troubleshooting.html">Troubleshooting</a><ul>
@@ -441,14 +441,13 @@ before production use.</p>
 Iceberg v3 at tap level:</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">target_table_format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">iceberg</span>
 <span class="nt">iceberg_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
-<span class="nt">hard_delete</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 </pre></div>
 </div>
 <p>This route remains Singer-only, including <code class="docutils literal notranslate"><span class="pre">FULL_TABLE</span></code> streams; it does not
-enable FastSync FullSync or PartialSync. <code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">true</span></code> is required and is
-the default. Salesforce’s default <code class="docutils literal notranslate"><span class="pre">data_flattening_max_level:</span> <span class="pre">10</span></code> remains
-valid. Set the level to <code class="docutils literal notranslate"><span class="pre">0</span></code> only when nested values should remain unflattened
-and use the explicit-v3 <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> mapping. See <a class="reference internal" href="../targets/snowflake_iceberg.html#snowflake-iceberg"><span class="std std-ref">Snowflake Iceberg tables</span></a>.</p>
+enable FastSync FullSync or PartialSync. Salesforce’s default
+<code class="docutils literal notranslate"><span class="pre">data_flattening_max_level:</span> <span class="pre">10</span></code> remains valid. Set the level to <code class="docutils literal notranslate"><span class="pre">0</span></code> only when
+nested values should remain unflattened and use the explicit-v3 <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code>
+mapping. See <a class="reference internal" href="../targets/snowflake_iceberg.html#snowflake-iceberg"><span class="std std-ref">Snowflake Iceberg tables</span></a>.</p>
 </section>
 </section>
 

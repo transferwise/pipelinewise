@@ -249,9 +249,9 @@
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/transformations.html#validation-and-rollout">Validation and rollout</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/metadata_columns.html">Metadata columns and deletes</a><ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/metadata_columns.html">Metadata columns</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/metadata_columns.html#columns">Columns</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../user_guide/metadata_columns.html#configuration-outcomes">Configuration outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/metadata_columns.html#source-deletes">Source deletes</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/troubleshooting.html">Troubleshooting</a><ul>
@@ -476,6 +476,9 @@ target.</p>
 <li><p>Size transactions and <code class="docutils literal notranslate"><span class="pre">batch_size_rows</span></code> for available memory and WAL volume.</p></li>
 <li><p>The target must acknowledge Singer state only after the corresponding records
 are durable; PipelineWise persists that acknowledgement for source recovery.</p></li>
+<li><p>Source-delete markers always physically remove rows before state is
+acknowledged. Metadata columns are enabled automatically; see
+<a class="reference internal" href="../../user_guide/metadata_columns.html#metadata-columns"><span class="std std-ref">Metadata columns</span></a> for deletion processing.</p></li>
 <li><p>Schema evolution can add or version columns. See <a class="reference internal" href="../../user_guide/schema_changes.html#schema-changes"><span class="std std-ref">Schema changes</span></a> before
 granting downstream consumers direct access.</p></li>
 </ul>

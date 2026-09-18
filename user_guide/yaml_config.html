@@ -249,9 +249,9 @@
 <li class="toctree-l2"><a class="reference internal" href="transformations.html#validation-and-rollout">Validation and rollout</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="metadata_columns.html">Metadata columns and deletes</a><ul>
+<li class="toctree-l1"><a class="reference internal" href="metadata_columns.html">Metadata columns</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="metadata_columns.html#columns">Columns</a></li>
-<li class="toctree-l2"><a class="reference internal" href="metadata_columns.html#configuration-outcomes">Configuration outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="metadata_columns.html#source-deletes">Source deletes</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a><ul>
@@ -497,8 +497,6 @@ target. See <a class="reference internal" href="data_diff_backend.html#data-diff
 <span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">"snowflake"</span>
 <span class="nt">batch_size_rows</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20000</span>
 <span class="nt">stream_buffer_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
-<span class="nt">add_metadata_columns</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-<span class="nt">hard_delete</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 <span class="nt">schemas</span><span class="p">:</span>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source_schema</span><span class="p">:</span><span class="w"> </span><span class="s">"public"</span>
 <span class="w">    </span><span class="nt">target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">"repl_orders"</span>
@@ -572,11 +570,12 @@ to 10 MB, and the maximum is 2500 MB. See <a class="reference internal" href="..
 <td><p>Global channel</p></td>
 <td><p>Adds a tap-specific Slack destination; must start with <code class="docutils literal notranslate"><span class="pre">#</span></code>.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">add_metadata_columns</span></code> / <code class="docutils literal notranslate"><span class="pre">hard_delete</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">add_metadata_columns</span></code></p></td>
 <td><p>No</p></td>
-<td><p>See metadata guide</p></td>
-<td><p>Controls target metadata and delete handling. See
-<a class="reference internal" href="metadata_columns.html#metadata-columns"><span class="std std-ref">Metadata columns and deletes</span></a>.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">false</span></code></p></td>
+<td><p>Adds ingestion metadata to <a class="reference internal" href="../connectors/targets/s3_csv.html#target-s3-csv"><span class="std std-ref">S3 CSV target</span></a> output. PostgreSQL and
+Snowflake targets always include metadata automatically. See
+<a class="reference internal" href="metadata_columns.html#metadata-columns"><span class="std std-ref">Metadata columns</span></a>.</p></td>
 </tr>
 </tbody>
 </table>
@@ -681,10 +680,10 @@ wait for the corresponding loads to finish before acknowledging their state.</p>
 <p class="admonition-title">Important</p>
 <p>Any tap whose Singer output is compatible with <code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code> can
 select managed Iceberg v3. FastSync FullSync and PartialSync for managed v3
-remain limited to <code class="docutils literal notranslate"><span class="pre">tap-mysql</span></code> (MariaDB/MySQL) and <code class="docutils literal notranslate"><span class="pre">tap-postgres</span></code>. Every
-explicit v3 route requires <code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">true</span></code>; those two FastSync-capable
-taps also require <code class="docutils literal notranslate"><span class="pre">data_flattening_max_level:</span> <span class="pre">0</span></code>. Singer-only sources retain
-their normal flattening setting, including Salesforce’s default level <code class="docutils literal notranslate"><span class="pre">10</span></code>.
+remain limited to <code class="docutils literal notranslate"><span class="pre">tap-mysql</span></code> (MariaDB/MySQL) and <code class="docutils literal notranslate"><span class="pre">tap-postgres</span></code>. Those two
+FastSync-capable taps require <code class="docutils literal notranslate"><span class="pre">data_flattening_max_level:</span> <span class="pre">0</span></code>. Singer-only
+sources retain their normal flattening setting, including Salesforce’s
+default level <code class="docutils literal notranslate"><span class="pre">10</span></code>.
 Native remains the default, and PipelineWise does not convert an existing
 table when the requested format conflicts. Every managed Iceberg version
 other than v3 is rejected before mutation. See <a class="reference internal" href="../connectors/targets/snowflake_iceberg.html#snowflake-iceberg"><span class="std std-ref">Snowflake Iceberg tables</span></a>.</p>

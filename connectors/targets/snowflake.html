@@ -249,9 +249,9 @@
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/transformations.html#validation-and-rollout">Validation and rollout</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/metadata_columns.html">Metadata columns and deletes</a><ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/metadata_columns.html">Metadata columns</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/metadata_columns.html#columns">Columns</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../user_guide/metadata_columns.html#configuration-outcomes">Configuration outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/metadata_columns.html#source-deletes">Source deletes</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/troubleshooting.html">Troubleshooting</a><ul>
@@ -377,6 +377,9 @@
 <p><code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code> loads Singer records from compatible taps through staged
 CSV files into native or managed Iceberg v3 tables. It also supports FastSync
 for selected database sources.</p>
+<p>Source-delete markers always physically remove rows before Singer state is
+acknowledged. Metadata columns are enabled automatically; see
+<a class="reference internal" href="../../user_guide/metadata_columns.html#metadata-columns"><span class="std std-ref">Metadata columns</span></a> for deletion processing.</p>
 <table class="docutils align-default" id="id1" style="width: 100%">
 <caption><span class="caption-text">Support</span><a class="headerlink" href="#id1" title="Link to this table"></a></caption>
 <colgroup>

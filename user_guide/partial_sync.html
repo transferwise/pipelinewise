@@ -249,9 +249,9 @@
 <li class="toctree-l2"><a class="reference internal" href="transformations.html#validation-and-rollout">Validation and rollout</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="metadata_columns.html">Metadata columns and deletes</a><ul>
+<li class="toctree-l1"><a class="reference internal" href="metadata_columns.html">Metadata columns</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="metadata_columns.html#columns">Columns</a></li>
-<li class="toctree-l2"><a class="reference internal" href="metadata_columns.html#configuration-outcomes">Configuration outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="metadata_columns.html#source-deletes">Source deletes</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a><ul>
@@ -429,20 +429,15 @@ and can hand ongoing replication over from that position after the merge.</p>
 <td><p>PipelineWise widens the target column before applying the merge.</p></td>
 <td><p>Values are unchanged; the wider column definition applies to the table.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">true</span></code></p></td>
-<td><p>Target rows absent from the source range are deleted.</p></td>
-<td><p>Unchanged.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">false</span></code></p></td>
-<td><p>Missing source rows are retained and marked in <code class="docutils literal notranslate"><span class="pre">_SDC_DELETED_AT</span></code>.</p></td>
+<tr class="row-even"><td><p>Target row absent from the source range</p></td>
+<td><p>Deleted.</p></td>
 <td><p>Unchanged.</p></td>
 </tr>
 </tbody>
 </table>
-<div class="deprecated">
-<p><span class="versionmodified deprecated">Deprecated since version 0.79.0: </span>Soft delete (<code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">false</span></code>) is scheduled for removal. New pipelines
-should use <code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">true</span></code>.</p>
-</div>
+<p>Row marking, merging, and deletion run in one transaction. The internal
+<code class="docutils literal notranslate"><span class="pre">_SDC_DELETED_AT</span></code> marker remains available for subsequent loads, but missing
+source rows are always physically deleted from the selected target range.</p>
 <p>Snowflake commits schema changes independently from the merge transaction.
 PipelineWise therefore widens compatible native text columns and adds missing
 columns before starting DML. If the existing target type is not text, its width
@@ -453,8 +448,8 @@ the merge and state advancement. Run a FullSync or alter the column to
 <section id="managed-iceberg-v3-outcomes">
 <h2>Managed Iceberg v3 outcomes<a class="headerlink" href="#managed-iceberg-v3-outcomes" title="Link to this heading"></a></h2>
 <p>MariaDB/MySQL and PostgreSQL taps can select managed Iceberg v3 through
-<code class="docutils literal notranslate"><span class="pre">target_table_format:</span> <span class="pre">iceberg</span></code>. This route requires a primary key,
-<code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">true</span></code>, and <code class="docutils literal notranslate"><span class="pre">data_flattening_max_level:</span> <span class="pre">0</span></code>.</p>
+<code class="docutils literal notranslate"><span class="pre">target_table_format:</span> <span class="pre">iceberg</span></code>. This route requires a primary key and
+<code class="docutils literal notranslate"><span class="pre">data_flattening_max_level:</span> <span class="pre">0</span></code>.</p>
 <table class="docutils align-default" style="width: 100%">
 <colgroup>
 <col style="width: 34.0%" />
@@ -470,7 +465,7 @@ the merge and state advancement. Run a FullSync or alter the column to
 <td><p>Creates a managed Iceberg v3 table containing the selected range.</p></td>
 </tr>
 <tr class="row-odd"><td><p>Exactly compatible</p></td>
-<td><p>Updates, inserts, and hard-deletes the range in one transaction.</p></td>
+<td><p>Updates, inserts, and deletes missing source rows in one range transaction.</p></td>
 </tr>
 <tr class="row-even"><td><p>New nullable source column</p></td>
 <td><p>Adds the column, then applies the range transaction.</p></td>
@@ -509,11 +504,6 @@ recovery because the transaction may have committed.</p>
 <img alt="../_images/partial_sync_case_2.png" src="../_images/partial_sync_case_2.png" />
 <p>Source missing a target column:</p>
 <img alt="../_images/partial_sync_case_3.png" src="../_images/partial_sync_case_3.png" />
-<p>Soft-delete and hard-delete outcomes:</p>
-<img alt="../_images/partial_sync_case_4.png" src="../_images/partial_sync_case_4.png" />
-<img alt="../_images/partial_sync_case_5.png" src="../_images/partial_sync_case_5.png" />
-<p>Combined schema and delete changes:</p>
-<img alt="../_images/partial_sync_case_all.png" src="../_images/partial_sync_case_all.png" />
 </section>
 <section id="safety-and-validation">
 <h2>Safety and validation<a class="headerlink" href="#safety-and-validation" title="Link to this heading"></a></h2>
@@ -521,8 +511,9 @@ recovery because the transaction may have committed.</p>
 <li><p>Stop overlapping writes or replication when the selected range can change
 during export and merge.</p></li>
 <li><p>Estimate the source range and target merge cost before running.</p></li>
-<li><p>Confirm the boundary query returns the intended rows; an empty range is a
-successful no-op.</p></li>
+<li><p>Confirm the boundary query selects the intended range. A dynamic boundary
+query returning no value skips publication; a resolved range with no source
+rows can delete all target rows in that range.</p></li>
 <li><p>Ensure transformations and canonical casts preserve non-NULL, unique
 composite primary keys; PipelineWise rejects rather than deduplicates an
 invalid staging result.</p></li>

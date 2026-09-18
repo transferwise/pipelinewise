@@ -249,9 +249,9 @@
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/transformations.html#validation-and-rollout">Validation and rollout</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/metadata_columns.html">Metadata columns and deletes</a><ul>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/metadata_columns.html">Metadata columns</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/metadata_columns.html#columns">Columns</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../user_guide/metadata_columns.html#configuration-outcomes">Configuration outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/metadata_columns.html#source-deletes">Source deletes</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/troubleshooting.html">Troubleshooting</a><ul>
@@ -483,16 +483,15 @@ FullSync target uses <code class="docutils literal notranslate"><span class="pre
 added first. Other FullSync mismatches require guarded replacement. PartialSync
 uses transactional range DML and requires a primary key.</p>
 <p>The route requires explicit <code class="docutils literal notranslate"><span class="pre">target_table_format:</span> <span class="pre">iceberg</span></code>,
-<code class="docutils literal notranslate"><span class="pre">iceberg_version:</span> <span class="pre">3</span></code>, <code class="docutils literal notranslate"><span class="pre">data_flattening_max_level:</span> <span class="pre">0</span></code>, and
-<code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">true</span></code>. Native remains the default. See
-<a class="reference internal" href="../connectors/targets/snowflake_iceberg.html#snowflake-iceberg"><span class="std std-ref">Snowflake Iceberg tables</span></a> for metadata limits, writer exclusion, and recovery.
+<code class="docutils literal notranslate"><span class="pre">iceberg_version:</span> <span class="pre">3</span></code>, and <code class="docutils literal notranslate"><span class="pre">data_flattening_max_level:</span> <span class="pre">0</span></code>. Native remains the
+default. See <a class="reference internal" href="../connectors/targets/snowflake_iceberg.html#snowflake-iceberg"><span class="std std-ref">Snowflake Iceberg tables</span></a> for metadata limits, writer exclusion, and
+recovery.
 After an eligible initial load, Singer continues LOG_BASED or INCREMENTAL
 replication against the same managed-v3 table in the same run.
 FastSync availability and its zero-flattening requirement are specific to these
 routes. A compatible Singer-only source such as Salesforce can load managed v3
 through <code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code> without gaining a FastSync component; it retains
-its normal flattening setting, still requires <code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">true</span></code>, and sends
-<code class="docutils literal notranslate"><span class="pre">FULL_TABLE</span></code> streams through Singer.</p>
+its normal flattening setting and sends <code class="docutils literal notranslate"><span class="pre">FULL_TABLE</span></code> streams through Singer.</p>
 </section>
 <section id="snowflake-string-widths">
 <h2>Snowflake string widths<a class="headerlink" href="#snowflake-string-widths" title="Link to this heading"></a></h2>

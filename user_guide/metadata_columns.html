@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Metadata columns and deletes &mdash; PipelineWise  documentation</title>
+  <title>Metadata columns &mdash; PipelineWise  documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=1fecaf93" />
@@ -249,9 +249,9 @@
 <li class="toctree-l2"><a class="reference internal" href="transformations.html#validation-and-rollout">Validation and rollout</a></li>
 </ul>
 </li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Metadata columns and deletes</a><ul>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Metadata columns</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#columns">Columns</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#configuration-outcomes">Configuration outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#source-deletes">Source deletes</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a><ul>
@@ -361,7 +361,7 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">Metadata columns and deletes</li>
+      <li class="breadcrumb-item active">Metadata columns</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../_sources/user_guide/metadata_columns.rst.txt" rel="nofollow"> View page source</a>
       </li>
@@ -371,11 +371,10 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="metadata-columns-and-deletes">
-<span id="metadata-columns"></span><h1>Metadata columns and deletes<a class="headerlink" href="#metadata-columns-and-deletes" title="Link to this heading"></a></h1>
-<p>Targets can add <code class="docutils literal notranslate"><span class="pre">_SDC_</span></code> columns that describe ingestion time and source-delete
-events. Configure the behaviour per tap because pipelines sharing a target can
-have different delete requirements.</p>
+  <section id="metadata-columns">
+<span id="id1"></span><h1>Metadata columns<a class="headerlink" href="#metadata-columns" title="Link to this heading"></a></h1>
+<p>PostgreSQL and Snowflake targets automatically add <code class="docutils literal notranslate"><span class="pre">_SDC_</span></code> columns that
+describe ingestion time and source-delete events.</p>
 <section id="columns">
 <h2>Columns<a class="headerlink" href="#columns" title="Link to this heading"></a></h2>
 <table class="docutils align-default" style="width: 100%">
@@ -401,49 +400,14 @@ have different delete requirements.</p>
 </tbody>
 </table>
 </section>
-<section id="configuration-outcomes">
-<h2>Configuration outcomes<a class="headerlink" href="#configuration-outcomes" title="Link to this heading"></a></h2>
-<table class="docutils align-default" style="width: 100%">
-<colgroup>
-<col style="width: 35.0%" />
-<col style="width: 25.0%" />
-<col style="width: 40.0%" />
-</colgroup>
-<thead>
-<tr class="row-odd"><th class="head"><p>Settings</p></th>
-<th class="head"><p>Metadata</p></th>
-<th class="head"><p>Delete behaviour</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">true</span></code></p></td>
-<td><p>Enabled automatically</p></td>
-<td><p>Physically removes a target row after a source delete event.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">false</span></code> and <code class="docutils literal notranslate"><span class="pre">add_metadata_columns:</span> <span class="pre">true</span></code></p></td>
-<td><p>Enabled</p></td>
-<td><p>Retains the row and sets <code class="docutils literal notranslate"><span class="pre">_SDC_DELETED_AT</span></code>.</p></td>
-</tr>
-<tr class="row-even"><td><p>Both <code class="docutils literal notranslate"><span class="pre">false</span></code></p></td>
-<td><p>Disabled</p></td>
-<td><p>Retains the target row without marking the source delete.</p></td>
-</tr>
-</tbody>
-</table>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">add_metadata_columns</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-<span class="nt">hard_delete</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-</pre></div>
-</div>
-<p><code class="docutils literal notranslate"><span class="pre">hard_delete</span></code> defaults to <code class="docutils literal notranslate"><span class="pre">true</span></code>. Only LOG_BASED replication emits
-individual source-delete events; incremental replication cannot detect deletes.
-Full-table and PartialSync publication semantics can remove rows as part of
-replacing or reconciling a selected range.</p>
-<div class="deprecated">
-<p><span class="versionmodified deprecated">Deprecated since version 0.79.0: </span>Soft delete (<code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">false</span></code>) is scheduled for removal. New pipelines
-should use hard delete and model retention in a controlled downstream layer.</p>
-</div>
-<p>Changing delete mode does not rewrite historical target rows. Plan a resync or
-explicit target migration when existing data must adopt the new behaviour.</p>
+<section id="source-deletes">
+<h2>Source deletes<a class="headerlink" href="#source-deletes" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">_SDC_DELETED_AT</span></code> is an internal deletion marker. PostgreSQL and Snowflake
+targets physically remove marked rows before acknowledging Singer state.</p>
+<p>Only LOG_BASED replication emits individual source-delete events. Key-based
+incremental replication cannot detect deleted source rows. FullSync replaces the
+target table, while PartialSync removes target rows that are missing from its
+selected source range. Singer FULL_TABLE behaviour remains connector-specific.</p>
 </section>
 </section>
 

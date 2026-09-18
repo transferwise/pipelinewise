@@ -249,9 +249,9 @@
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/transformations.html#validation-and-rollout">Validation and rollout</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/metadata_columns.html">Metadata columns and deletes</a><ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/metadata_columns.html">Metadata columns</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/metadata_columns.html#columns">Columns</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../user_guide/metadata_columns.html#configuration-outcomes">Configuration outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/metadata_columns.html#source-deletes">Source deletes</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/troubleshooting.html">Troubleshooting</a><ul>
@@ -481,15 +481,13 @@ operation that might replace a table.</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">"snowflake"</span>
 <span class="nt">target_table_format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">iceberg</span>
 <span class="nt">iceberg_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
-<span class="nt">hard_delete</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 </pre></div>
 </div>
 <p>These tap-level settings are the only valid Iceberg selection. Omitting
 <code class="docutils literal notranslate"><span class="pre">target_table_format</span></code> or selecting <code class="docutils literal notranslate"><span class="pre">native</span></code> creates native tables. Target
 configuration rejects these keys and the removed <code class="docutils literal notranslate"><span class="pre">iceberg_create</span></code> setting;
 remove <code class="docutils literal notranslate"><span class="pre">iceberg_create</span></code> and configure each Iceberg tap before upgrading.</p>
-<p>Every explicit managed Iceberg v3 tap requires <code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">true</span></code>. MariaDB,
-MySQL, and PostgreSQL taps also require <code class="docutils literal notranslate"><span class="pre">data_flattening_max_level:</span> <span class="pre">0</span></code> because
+<p>MariaDB, MySQL, and PostgreSQL taps require <code class="docutils literal notranslate"><span class="pre">data_flattening_max_level:</span> <span class="pre">0</span></code> because
 their initial load can use FastSync before handing the stream to Singer.
 Singer-only sources retain their normal flattening setting; for example,
 Salesforce’s default level <code class="docutils literal notranslate"><span class="pre">10</span></code> is valid. A physical format mismatch fails
@@ -606,7 +604,7 @@ must be able to see every relevant dependency.</p>
 <h2>PartialSync publication<a class="headerlink" href="#partialsync-publication" title="Link to this heading"></a></h2>
 <p>A missing Iceberg target is created from the selected range. An existing
 compatible target is updated through one transaction. PartialSync requires a
-primary key and supports only <code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">true</span></code>.</p>
+primary key and physically deletes target rows missing from the source range.</p>
 <p>Compatible nullable columns are added before the merge. Any other schema or key
 mismatch fails before DML. Setting <code class="docutils literal notranslate"><span class="pre">drop_target_table:</span> <span class="pre">true</span></code> explicitly selects
 replacement CTAS and leaves the table containing only the selected range.</p>
