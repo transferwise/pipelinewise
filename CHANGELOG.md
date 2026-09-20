@@ -28,6 +28,9 @@
 
 **Compatibility and operations**
 
+- Run the dev-project and GitHub E2E MySQL and MariaDB sources with
+  `binlog_row_metadata=FULL` while retaining mysql-replication 0.46, proving
+  current replication remains compatible ahead of a future decoder upgrade
 - Recheck ROW/FULL binlog settings on resumed replication and fail instead of
   silently skipping events whose table metadata is unavailable
 - Require a one-time FullSync for existing MySQL/MariaDB GTID checkpoints that
