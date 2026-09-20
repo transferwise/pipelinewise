@@ -22,6 +22,9 @@ schemas:
   - source_schema: "${TAP_ORACLE_MYSQL_DB}"
     target_schema: "ppw_e2e_tap_oracle_mysql_2${TARGET_SNOWFLAKE_SCHEMA_POSTFIX}"
     tables:
+      - table_name: "replication_audit"
+        replication_method: "LOG_BASED"
+
       - table_name: "multiline_values"
         replication_method: "INCREMENTAL"
         replication_key: "id"

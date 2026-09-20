@@ -311,8 +311,8 @@ def persist_lines(config, lines, table_cache=None, file_format_type: FileFormatT
             LOGGER.debug('Setting state to %s', o['value'])
             state = o['value']
 
-            # # set flushed state if it's not defined or there are no records so far
-            if not flushed_state or sum(row_count.values()) == 0:
+            # A first state received after records is not durable until those records are loaded.
+            if sum(row_count.values()) == 0:
                 flushed_state = copy.deepcopy(state)
 
         else:
@@ -388,7 +388,7 @@ def flush_streams(
         streams[stream] = {}
 
         # Update flushed streams
-        if filter_streams:
+        if filter_streams and flushed_state is not None:
             # update flushed_state position if we have state information for the stream
             if state is not None and stream in state.get('bookmarks', {}):
                 # Create bookmark key if not exists
@@ -397,15 +397,14 @@ def flush_streams(
                 # Copy the stream bookmark from the latest state
                 flushed_state['bookmarks'][stream] = copy.deepcopy(state['bookmarks'][stream])
 
-        # If we flush every bucket use the latest state
-        else:
-            flushed_state = copy.deepcopy(state)
-
         if stream in archive_load_files_data:
             archive_load_files_data[stream]['min'] = None
             archive_load_files_data[stream]['max'] = None
 
-    # Return with state message with flushed positions
+    if not filter_streams or (flushed_state is None and not any(row_count.values())):
+        return copy.deepcopy(state)
+
+    # Without a durable baseline, a partial flush cannot safely acknowledge the first state.
     return flushed_state
 
 

@@ -1,10 +1,15 @@
 """Native Snowflake multiline FastSync coverage for MariaDB."""
 
 from tests.end_to_end.target_snowflake.multiline_values import (
+    PARTIALSYNC_TEXT_VALUES,
+    SOURCE_ONLY_SENTINEL,
     assert_native_multiline_table,
     exercise_multiline_fastsync,
     prepare_mysql_multiline_table,
+    snowflake_utf8_hex_rows,
+    utf8_hex_rows,
 )
+from tests.end_to_end.helpers import assertions
 from tests.end_to_end.target_snowflake.tap_mariadb import TapMariaDB
 
 
@@ -40,4 +45,9 @@ class TestNativeMultilineMariaDBToSnowflake(TapMariaDB):
             'mysql',
             self.target_schema,
             lambda: assert_native_multiline_table(self, self.target_schema),
+        )
+        assertions.assert_run_tap_success(self.tap_id, self.target_id, ['singer'])
+        self.assertEqual(
+            snowflake_utf8_hex_rows(self.e2e_env, self.target_schema),
+            utf8_hex_rows((SOURCE_ONLY_SENTINEL, *PARTIALSYNC_TEXT_VALUES)),
         )

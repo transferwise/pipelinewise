@@ -13,7 +13,8 @@ def get_db_config():
               'port': int(os.environ['TAP_MYSQL_PORT']),
               'user': os.environ['TAP_MYSQL_USER'],
               'password': os.environ['TAP_MYSQL_PASSWORD'],
-              'charset': 'utf8'}
+              'charset': 'utf8mb4',
+              'ssl': {'': True}}
     if not config['password']:
         del config['password']
 
@@ -27,11 +28,8 @@ def get_test_connection(extra_config=None):
 
     try:
         with con.cursor() as cur:
-            try:
-                cur.execute('DROP DATABASE {}'.format(DB_NAME))
-            except:
-                pass
-            cur.execute('CREATE DATABASE {}'.format(DB_NAME))
+            cur.execute('DROP DATABASE IF EXISTS {}'.format(DB_NAME))
+            cur.execute('CREATE DATABASE {} CHARACTER SET utf8mb4'.format(DB_NAME))
     finally:
         con.close()
 

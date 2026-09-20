@@ -133,6 +133,17 @@ def generate_select_sql(catalog_entry, columns):
     return select_sql
 
 
+def format_mysql_time(value):
+    """Preserve MySQL TIME's sign and microseconds without floating-point rounding."""
+    microseconds = (value.days * 86400 + value.seconds) * 1000000 + value.microseconds
+    sign = '-' if microseconds < 0 else ''
+    seconds, fraction = divmod(abs(microseconds), 1000000)
+    hours, seconds = divmod(seconds, 3600)
+    minutes, seconds = divmod(seconds, 60)
+    suffix = f'.{fraction:06}' if fraction else ''
+    return f'{sign}{hours:02}:{minutes:02}:{seconds:02}{suffix}'
+
+
 def row_to_singer_record(catalog_entry, version, row, columns, time_extracted):
     row_to_persist = ()
     for idx, elem in enumerate(row):
@@ -149,13 +160,7 @@ def row_to_singer_record(catalog_entry, version, row, columns, time_extracted):
 
         elif isinstance(elem, datetime.timedelta):
             if property_format == 'time':
-                _total_seconds = int(elem.total_seconds())
-                _hours, _remainder = divmod(_total_seconds, 3600)
-                _minutes, _seconds = divmod(_remainder, 60)
-                # Convert time columns to the MySQL-compatible HH:MM:SS form.
-                row_to_persist += (
-                    f"{_hours:02}:{_minutes:02}:{_seconds:02}",
-                )
+                row_to_persist += (format_mysql_time(elem),)
             else:
                 epoch = datetime.datetime.utcfromtimestamp(0)
                 timedelta_from_epoch = epoch + elem

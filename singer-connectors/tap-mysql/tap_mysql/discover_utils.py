@@ -58,7 +58,7 @@ BINARY_TYPES = {'binary', 'varbinary'}
 
 SPATIAL_TYPES = {'geometry', 'point', 'linestring',
                  'polygon', 'multipoint', 'multilinestring',
-                 'multipolygon', 'geometrycollection'}
+                 'multipolygon', 'geometrycollection', 'geomcollection'}
 
 # A set of all supported column types listed above
 SUPPORTED_COLUMN_TYPES_AGGREGATED = \

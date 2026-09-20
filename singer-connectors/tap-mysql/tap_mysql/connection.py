@@ -88,7 +88,7 @@ class MySQLConnection(pymysql.connections.Connection):
             "port": int(config["port"]),
             "cursorclass": config.get("cursorclass") or pymysql.cursors.SSCursor,
             "connect_timeout": CONNECT_TIMEOUT_SECONDS,
-            "charset": "utf8",
+            "charset": "utf8mb4",
         }
 
         ssl_arg = {"": True}
@@ -158,10 +158,22 @@ class MySQLConnection(pymysql.connections.Connection):
 def make_connection_wrapper(config):
     class ConnectionWrapper(MySQLConnection):
         def __init__(self, *args, **kwargs):
+            self._fail_on_disconnect = False
             config["cursorclass"] = kwargs.get('cursorclass')
             super().__init__(config)
 
             connect_with_backoff(self)
+            self._fail_on_disconnect = not config.get('use_gtid', False)
+
+        def _read_packet(self, *args, **kwargs):
+            try:
+                return super()._read_packet(*args, **kwargs)
+            except pymysql.OperationalError as exc:
+                # The decoder's automatic file-position reconnect can skip unread rows or their table map.
+                if self._fail_on_disconnect and exc.args[0] in {2006, 2013}:
+                    raise RuntimeError(
+                        'Binlog connection lost; restart replication from the durable checkpoint.') from exc
+                raise
 
     return ConnectionWrapper
 

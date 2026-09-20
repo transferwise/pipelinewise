@@ -5,7 +5,7 @@ from tests.end_to_end.target_snowflake.multiline_values import (
     exercise_multiline_fastsync,
     prepare_mysql_multiline_table,
 )
-from tests.end_to_end.target_snowflake.tap_mysql import TapMySQL
+from tests.end_to_end.target_snowflake.tap_mysql import TapMySQL, exercise_mysql_replication_audit
 
 
 TAP_ID = 'mysql_to_sf_native'
@@ -45,3 +45,7 @@ class TestNativeMultilineMySQLToSnowflake(TapMySQL):
             self.target_schema,
             lambda: assert_native_multiline_table(self, self.target_schema),
         )
+
+    def test_native_replication_preserves_keys_and_supplementary_unicode(self):
+        """Native FastSync and Singer retain every row through key changes."""
+        exercise_mysql_replication_audit(self, managed_iceberg=False)

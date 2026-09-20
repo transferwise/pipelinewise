@@ -28,6 +28,9 @@ schemas:
       - table_name: "iceberg_events"
         replication_method: "LOG_BASED"
 
+      - table_name: "replication_audit"
+        replication_method: "LOG_BASED"
+
       - table_name: "iceberg_incremental"
         replication_method: "INCREMENTAL"
         replication_key: "updated_at"

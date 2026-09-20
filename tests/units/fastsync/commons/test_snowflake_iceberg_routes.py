@@ -284,7 +284,7 @@ def _recovery_identity(args, table='source.table', partial_boundary=None):
         _recovery_args(tap_override={'host': 'other-source.example'}),
         _recovery_args(tap_override={'dbname': 'other_source'}),
         _recovery_args(tap_override={'user': 'other_user'}),
-        _recovery_args(tap_override={'charset': 'utf8mb4'}),
+        _recovery_args(tap_override={'charset': 'utf8'}),
         _recovery_args(tap_override={'session_sqls': ['SET time_zone="+01:00"']}),
         _recovery_args(tap_override={'use_gtid': True}),
         _recovery_args(target_override={'account': 'other_account'}),

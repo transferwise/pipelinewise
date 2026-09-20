@@ -116,7 +116,7 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
   existing-v3 width without implicit widening.
 - Preserve LF, CR, CRLF, tabs, CSV punctuation, and literal backslash sequences
   through Snowflake FullSync and PartialSync. MySQL/MariaDB export may remove
-  only NUL and remains limited to its three-byte `utf8` projection; PostgreSQL
+  only NUL and uses an `utf8mb4` projection and default connection; PostgreSQL
   COPY retains Unicode and the same remaining value set.
 - Key recovery by stable source stream, index active attempts by physical
   target, and hold both locks throughout; reject source, target, staging, role,

@@ -373,7 +373,8 @@ class DbSync:
 
             key_props.append(str(flatten[key_prop]))
 
-        return ','.join(key_props)
+        # Delimiters may occur inside key values; encode component boundaries unambiguously.
+        return json.dumps(key_props, ensure_ascii=False, separators=(',', ':'))
 
     def present_column_names(self, record):
         """Return flattened schema columns represented by a PATCH record."""

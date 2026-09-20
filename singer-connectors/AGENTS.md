@@ -99,6 +99,10 @@ real client-side encryption master key and expects 50 passes.
 - PostgreSQL/Snowflake targets silently ignore retired deletion-mode options,
   enable metadata automatically, and physically process `_SDC_DELETED_AT` before
   acknowledging state. Keep this marker in Singer schemas and transport.
+- MySQL binlog checkpoints must retain transaction/table-map boundaries and
+  each stream's acknowledged history. Preserve complete GTID sets and replay
+  fences; only new complete-history captures may set `gtid_complete: true`.
+  Test interrupted large transactions on both MySQL and MariaDB.
 
 ## Snowflake traps
 

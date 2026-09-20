@@ -295,6 +295,7 @@ def do_sync_historical_binlog(mysql_conn, catalog_entry, state, columns, use_gti
                                               catalog_entry.tap_stream_id,
                                               'gtid',
                                               current_gtid)
+                state = singer.write_bookmark(state, catalog_entry.tap_stream_id, 'gtid_complete', True)
 
             full_table.sync_table(mysql_conn, catalog_entry, state, columns, stream_version)
 
@@ -315,6 +316,7 @@ def do_sync_historical_binlog(mysql_conn, catalog_entry, state, columns, use_gti
                                               catalog_entry.tap_stream_id,
                                               'gtid',
                                               current_gtid)
+                state = singer.write_bookmark(state, catalog_entry.tap_stream_id, 'gtid_complete', True)
 
 
 def do_sync_full_table(mysql_conn, catalog_entry, state, columns):

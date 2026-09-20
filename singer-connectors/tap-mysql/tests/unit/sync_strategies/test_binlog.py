@@ -13,8 +13,10 @@ from unittest.mock import patch, Mock, call, MagicMock
 from pymysql import InternalError
 from pymysql.cursors import Cursor
 from pymysqlreplication.constants import FIELD_TYPE
-from pymysqlreplication.event import RotateEvent, MariadbGtidEvent, GtidEvent
-from pymysqlreplication.row_event import WriteRowsEvent, UpdateRowsEvent, DeleteRowsEvent
+from pymysqlreplication.event import (
+    RotateEvent, MariadbGtidEvent, GtidEvent, NotImplementedEvent, QueryEvent, XidEvent, XAPrepareEvent,
+)
+from pymysqlreplication.row_event import WriteRowsEvent, UpdateRowsEvent, DeleteRowsEvent, TableMapEvent
 from singer import CatalogEntry, Schema, Catalog, RecordMessage, StateMessage, SchemaMessage
 
 from tap_mysql import connection
@@ -26,6 +28,7 @@ Column = namedtuple('Column', ['name', 'type'])
 
 def get_binlogevent(class_name, attrs: Dict):
     mock = Mock(spec=class_name)
+    mock.flags = 0
 
     for att, val in attrs.items():
         setattr(mock, att, val)
@@ -78,6 +81,8 @@ class TestBinlogSyncStrategy(TestCase):
         self.assertTrue(binlog.binlog_filename_key('mysql-bin.2') > binlog.binlog_filename_key('mysql-bin.1'))
 
     @patch.dict(os.environ, {'TZ': 'Europe/Helsinki'})
+    @patch('tap_mysql.sync_strategies.binlog.verify_binlog_checkpoint')
+    @patch('tap_mysql.sync_strategies.binlog.verify_binlog_config')
     @patch('tap_mysql.sync_strategies.binlog.calculate_bookmark',
            return_value=('binlog0001', 50))
     @patch('tap_mysql.sync_strategies.binlog.fetch_current_log_file_and_pos',
@@ -634,8 +639,8 @@ class TestBinlogSyncStrategy(TestCase):
                 )
 
                 discover_catalog_mock.assert_has_calls([
-                    call(mysql_con, None, 'stream1'),
-                    call(mysql_con, None, 'stream2'),
+                    call(mysql_con, 'my_db', 'stream1'),
+                    call(mysql_con, 'my_db', 'stream2'),
                 ], any_order=False)
 
                 self.assertListEqual([type(msg) for msg in singer_messages], [
@@ -851,7 +856,11 @@ class TestBinlogSyncStrategy(TestCase):
                         'is_mariadb': False,
                         'server_id': 123,
                         'report_slave': socket.gethostname(),
-                        'only_events': [WriteRowsEvent, UpdateRowsEvent, DeleteRowsEvent, RotateEvent],
+                        'only_events': [WriteRowsEvent, UpdateRowsEvent, DeleteRowsEvent,
+                                        QueryEvent, NotImplementedEvent, GtidEvent, MariadbGtidEvent,
+                                        XidEvent, TableMapEvent, XAPrepareEvent, RotateEvent],
+                        'fail_on_table_metadata_unavailable': True,
+                        'filter_non_implemented_events': False,
                         'log_file': 'binlog0001',
                         'log_pos': 50,
                         'resume_stream': True,
@@ -861,6 +870,7 @@ class TestBinlogSyncStrategy(TestCase):
                 self.assertEqual(1, reader_mock.return_value.close.call_count)
 
     @patch.dict(os.environ, {'TZ': 'Europe/Helsinki'})
+    @patch('tap_mysql.sync_strategies.binlog.verify_binlog_config')
     @patch('tap_mysql.sync_strategies.binlog.calculate_gtid_bookmark',
            return_value='0-123-555')
     @patch('tap_mysql.sync_strategies.binlog.fetch_current_log_file_and_pos',
@@ -1281,9 +1291,11 @@ class TestBinlogSyncStrategy(TestCase):
                         reader_mock.return_value.log_file = log_files[idx]
                         reader_mock.return_value.log_pos = log_positions[idx]
                         yield x
+                    reader_mock.return_value.log_pos = 1000
+                    yield get_binlogevent(XidEvent, {})
 
                 reader_mock.close.return_value = 'Closing'
-                reader_mock.return_value.auto_position = None
+                reader_mock.return_value.auto_position = '0-123-555'
 
                 reader_mock.return_value.__iter__ = iter_mock
 
@@ -1425,8 +1437,8 @@ class TestBinlogSyncStrategy(TestCase):
                 )
 
                 discover_catalog_mock.assert_has_calls([
-                    call(mysql_con, None, 'stream1'),
-                    call(mysql_con, None, 'stream2'),
+                    call(mysql_con, 'my_db', 'stream1'),
+                    call(mysql_con, 'my_db', 'stream2'),
                 ], any_order=False)
 
                 self.assertListEqual([type(msg) for msg in singer_messages], [
@@ -1622,14 +1634,16 @@ class TestBinlogSyncStrategy(TestCase):
                                              'bookmarks': {
                                                  'my_db-stream1': {
                                                      'gtid': '0-123-558',
+                                                     'gtid_complete': True,
                                                      'log_file': 'binlog0003',
-                                                     'log_pos': 999,
+                                                     'log_pos': 1000,
                                                      'version': 1,
                                                  },
                                                  'my_db-stream2': {
                                                      'gtid': '0-123-558',
+                                                     'gtid_complete': True,
                                                      'log_file': 'binlog0003',
-                                                     'log_pos': 999,
+                                                     'log_pos': 1000,
                                                      'version': 1
                                                  },
 
@@ -1644,8 +1658,12 @@ class TestBinlogSyncStrategy(TestCase):
                         'is_mariadb': True,
                         'server_id': 123,
                         'report_slave': socket.gethostname(),
-                        'only_events': [WriteRowsEvent, UpdateRowsEvent, DeleteRowsEvent, GtidEvent, MariadbGtidEvent],
+                        'only_events': [WriteRowsEvent, UpdateRowsEvent, DeleteRowsEvent,
+                                        QueryEvent, NotImplementedEvent, GtidEvent, MariadbGtidEvent,
+                                        XidEvent, TableMapEvent, XAPrepareEvent],
                         'auto_position': '0-123-555',
+                        'fail_on_table_metadata_unavailable': True,
+                        'filter_non_implemented_events': False,
                     }
                 )
 
@@ -1659,7 +1677,10 @@ class TestBinlogSyncStrategy(TestCase):
         cur_mock = MagicMock(spec_set=Cursor).return_value
         cur_mock.__enter__.return_value.fetchone.side_effect = [
             ['ROW'],
-            ['FULL']
+            ['FULL'],
+            [''],
+            [0],
+            [0],
         ]
 
         mysql_con.__enter__.return_value.cursor.return_value = cur_mock
@@ -1870,8 +1891,7 @@ class TestBinlogSyncStrategy(TestCase):
         mysql_con = MagicMock(spec_set=MySQLConnection).return_value
         cur_mock = MagicMock(spec_set=Cursor).return_value
         cur_mock.__enter__.return_value.fetchone.side_effect = [
-            ['3E11FA47-71CA-11E1-9E21-C80AA9429562:1,3E11FA47-71BB-11E1-9E33-C80AA9429562:2:143,0-3-1123,,'
-             '3E11FA47-71CA-11E1-9E33-C80AA9429562:2:332'],
+            None,
         ]
 
         mysql_con.__enter__.return_value.cursor.return_value = cur_mock
@@ -1883,7 +1903,7 @@ class TestBinlogSyncStrategy(TestCase):
             binlog.fetch_current_gtid_pos(mysql_con, connection.MYSQL_ENGINE)
 
         connect_with_backoff.assert_called_with(mysql_con)
-        fetch_server_uuid.assert_called_with(mysql_con)
+        fetch_server_uuid.assert_not_called()
         cur_mock.__enter__.return_value.execute.assert_has_calls(
             [
                 call('select @@GLOBAL.gtid_executed;'),
@@ -1898,8 +1918,7 @@ class TestBinlogSyncStrategy(TestCase):
         mysql_con = MagicMock(spec_set=MySQLConnection).return_value
         cur_mock = MagicMock(spec_set=Cursor).return_value
         cur_mock.__enter__.return_value.fetchone.side_effect = [
-            ['3E11FA47-71CA-11E1-9E33-C80AA9429562:1,3E11FA47-71BB-11E1-9E33-C80AA9429562:2:143,0-3-1123,,'
-             '3E11FA47-71CA-11E1-9E33-C80AA9429562:2:332'],
+            ['3E11FA47-71CA-11E1-9E33-C80AA9429562:1-12:14-20,3E11FA47-71BB-11E1-9E33-C80AA9429562:1-3'],
         ]
 
         mysql_con.__enter__.return_value.cursor.return_value = cur_mock
@@ -1909,10 +1928,11 @@ class TestBinlogSyncStrategy(TestCase):
 
         result = binlog.fetch_current_gtid_pos(mysql_con, connection.MYSQL_ENGINE)
 
-        self.assertEqual('3E11FA47-71CA-11E1-9E33-C80AA9429562:1', result)
+        self.assertEqual('3e11fa47-71ca-11e1-9e33-c80aa9429562:1-12:14-20,'
+                         '3e11fa47-71bb-11e1-9e33-c80aa9429562:1-3', result)
 
         connect_with_backoff.assert_called_with(mysql_con)
-        fetch_server_uuid.assert_called_with(mysql_con)
+        fetch_server_uuid.assert_not_called()
 
         cur_mock.__enter__.return_value.execute.assert_has_calls(
             [
@@ -1941,7 +1961,7 @@ class TestBinlogSyncStrategy(TestCase):
         self.assertIn('GTID is not present on this server!', str(context.exception))
 
         connect_with_backoff.assert_called_with(mysql_con)
-        fetch_server_id.assert_called_with(mysql_con)
+        fetch_server_id.assert_not_called()
 
         cur_mock.__enter__.return_value.execute.assert_has_calls(
             [
@@ -1951,7 +1971,7 @@ class TestBinlogSyncStrategy(TestCase):
 
     @patch('tap_mysql.sync_strategies.binlog.connection.fetch_server_id')
     @patch('tap_mysql.sync_strategies.binlog.connect_with_backoff')
-    def test_fetch_current_gtid_pos_no_gtid_found_for_given_server_expect_exception(
+    def test_fetch_current_gtid_pos_rejects_invalid_mariadb_position(
             self, connect_with_backoff, fetch_server_id):
 
         mysql_con = MagicMock(spec_set=MySQLConnection).return_value
@@ -1969,10 +1989,10 @@ class TestBinlogSyncStrategy(TestCase):
         with self.assertRaises(Exception) as context:
             binlog.fetch_current_gtid_pos(mysql_con, connection.MARIADB_ENGINE)
 
-        self.assertIn('No suitable GTID was found for server', str(context.exception))
+        self.assertIn('Invalid MariaDB GTID position', str(context.exception))
 
         connect_with_backoff.assert_called_with(mysql_con)
-        fetch_server_id.assert_called_with(mysql_con)
+        fetch_server_id.assert_not_called()
         cur_mock.__enter__.return_value.execute.assert_has_calls(
             [
                 call('select @@gtid_current_pos;'),
@@ -1989,9 +2009,9 @@ class TestBinlogSyncStrategy(TestCase):
 
         state = {
             'bookmarks': {
-                'stream1': {'gtid': '0-3-165'},
-                'stream2': {'gtid': '0-20-12'},
-                'stream3': {'gtid': '0-12-43'},
+                'stream1': {'gtid': '0-3-165', 'gtid_complete': True},
+                'stream2': {'gtid': '0-20-12', 'gtid_complete': True},
+                'stream3': {'gtid': '0-12-43', 'gtid_complete': True},
                 'stream4': {'gtid': '0-1-1'},
                 'stream6': {'gtid': '0-3-4'},
                 'stream5': {},
@@ -2004,8 +2024,10 @@ class TestBinlogSyncStrategy(TestCase):
 
         self.assertEqual(result, '0-20-12')
 
+    @patch('tap_mysql.sync_strategies.binlog.verify_binlog_checkpoint')
     @patch('tap_mysql.sync_strategies.binlog.connect_with_backoff')
-    def test_calculate_gtid_bookmark_for_mariadb_no_gtid_found_would_infer_from_binlog(self, connect_with_backoff):
+    def test_calculate_gtid_bookmark_for_mariadb_no_gtid_found_would_infer_from_binlog(
+            self, connect_with_backoff, verify_checkpoint):
 
         binlog_streams = {
             'stream1': {'schema': {}},
@@ -2041,20 +2063,21 @@ class TestBinlogSyncStrategy(TestCase):
         connect_with_backoff.return_value = mysql_con
 
         result = binlog.calculate_gtid_bookmark(mysql_con, binlog_streams, state, connection.MARIADB_ENGINE)
+        verify_checkpoint.assert_called_once_with(mysql_con, 'binlog.032', 14, require_transaction_boundary=True)
 
         cur_mock.__enter__.return_value.execute.assert_has_calls(
             [
                 call('SHOW BINARY LOGS'),
                 call("select BINLOG_GTID_POS('binlog.032', 14);"),
-                call("SELECT @@server_id"),
             ]
         )
 
         self.assertEqual(result, '0-4-222')
 
+    @patch('tap_mysql.sync_strategies.binlog.verify_binlog_checkpoint')
     @patch('tap_mysql.sync_strategies.binlog.connect_with_backoff')
-    def test_calculate_gtid_bookmark_for_mariadb_no_gtid_found_would_infer_from_binlog_returns_many_gtids(self,
-                                                                                              connect_with_backoff):
+    def test_calculate_gtid_bookmark_for_mariadb_no_gtid_found_would_infer_from_binlog_returns_many_gtids(
+            self, connect_with_backoff, verify_checkpoint):
 
         binlog_streams = {
             'stream1': {'schema': {}},
@@ -2072,7 +2095,7 @@ class TestBinlogSyncStrategy(TestCase):
         mysql_con = MagicMock(spec_set=MySQLConnection).return_value
         cur_mock = MagicMock(spec_set=Cursor).return_value
         cur_mock.__enter__.return_value.fetchone.side_effect = [
-            ['0-4-222,,3-4,5-66-2213,6-89-7222'],
+            ['0-4-222,5-66-2213,6-89-7222'],
             [89]
         ]
         cur_mock.__enter__.return_value.fetchall.return_value = [
@@ -2090,16 +2113,16 @@ class TestBinlogSyncStrategy(TestCase):
         connect_with_backoff.return_value = mysql_con
 
         result = binlog.calculate_gtid_bookmark(mysql_con, binlog_streams, state, connection.MARIADB_ENGINE)
+        verify_checkpoint.assert_called_once_with(mysql_con, 'binlog.032', 14, require_transaction_boundary=True)
 
         cur_mock.__enter__.return_value.execute.assert_has_calls(
             [
                 call('SHOW BINARY LOGS'),
                 call("select BINLOG_GTID_POS('binlog.032', 14);"),
-                call("SELECT @@server_id"),
             ]
         )
 
-        self.assertEqual(result, '6-89-7222')
+        self.assertEqual(result, '0-4-222,5-66-2213,6-89-7222')
 
     @patch('tap_mysql.sync_strategies.binlog.calculate_bookmark')
     @patch('tap_mysql.sync_strategies.binlog.connect_with_backoff')
@@ -2137,10 +2160,10 @@ class TestBinlogSyncStrategy(TestCase):
 
         state = {
             'bookmarks': {
-                'stream1': {'gtid': '3E11FA47-71CA-11E1-9E33-C80AA9429562:1-165'},
-                'stream2': {'gtid': '3E11FA47-71CA-11E1-9E33-C80AA9429562:12'},
-                'stream3': {'gtid': '3E11FA47-71CA-11E1-9E33-C80AA9429562:1-43'},
-                'stream4': {'gtid': '3E11FA47-71CA-11E1-9E33-C80AA9429562:1-2'},
+                'stream1': {'gtid': '3E11FA47-71CA-11E1-9E33-C80AA9429562:1-165', 'gtid_complete': True},
+                'stream2': {'gtid': '3E11FA47-71CA-11E1-9E33-C80AA9429562:1-12', 'gtid_complete': True},
+                'stream3': {'gtid': '3E11FA47-71CA-11E1-9E33-C80AA9429562:1-43', 'gtid_complete': True},
+                'stream4': {'gtid': '3E11FA47-71CA-11E1-9E33-C80AA9429562:1-2', 'gtid_complete': True},
                 'stream6': {'gtid': '3E11FA47-71CA-11E1-9E33-C80AA9429562:1'},
                 'stream5': {},
             }
@@ -2148,7 +2171,7 @@ class TestBinlogSyncStrategy(TestCase):
         mysql_conn = Mock(spec_set=MySQLConnection)
         result = binlog.calculate_gtid_bookmark(mysql_conn, binlog_streams, state, connection.MYSQL_ENGINE)
 
-        self.assertEqual(result, '3E11FA47-71CA-11E1-9E33-C80AA9429562:1-2')
+        self.assertEqual(result, '3e11fa47-71ca-11e1-9e33-c80aa9429562:1-2')
 
     def test_calculate_gtid_bookmark_for_mysql_no_gtid_found_expect_exception(self):
 

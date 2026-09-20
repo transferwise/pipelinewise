@@ -90,8 +90,8 @@ run_e2e \
   tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_with_split_large_files.py
 ```
 
-Run all nine only for a full suite; otherwise run every affected group. MariaDB
-and PostgreSQL cover native and explicit v3; genuine MySQL covers explicit v3.
+Run all nine only for a full suite; otherwise run every affected group. MariaDB,
+PostgreSQL, and genuine MySQL cover native and explicit v3.
 Do not infer one format from another. `SHOW PRIMARY KEYS` does not prove Iceberg
 identifier fields; compare raw-metadata `identifier-field-ids` with current
 schema field IDs.

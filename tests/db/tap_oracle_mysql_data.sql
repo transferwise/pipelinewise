@@ -43,3 +43,16 @@ CREATE TABLE iceberg_full_reload (
 INSERT INTO iceberg_full_reload VALUES
   (1, 'full-one'),
   (2, 'full-two');
+
+DROP TABLE IF EXISTS replication_audit;
+CREATE TABLE replication_audit (
+  key_left VARCHAR(128) NOT NULL,
+  key_right VARCHAR(128) NOT NULL,
+  row_id INTEGER NOT NULL,
+  value_text LONGTEXT,
+  PRIMARY KEY (key_left, key_right)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+INSERT INTO replication_audit VALUES
+  ('base', 'one', 1, 'FullSync 🚀'),
+  ('base', 'two', 2, 'FullSync 🌍');

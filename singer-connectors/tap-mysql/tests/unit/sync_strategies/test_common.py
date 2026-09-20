@@ -2,10 +2,12 @@ import datetime
 import json
 from pathlib import Path
 
+import pytest
+from pymysqlreplication.constants import FIELD_TYPE
 from singer.catalog import CatalogEntry
 from singer.schema import Schema
 
-from tap_mysql.sync_strategies import common
+from tap_mysql.sync_strategies import binlog, common
 
 
 REPOSITORY_CONTRACT_PATH = (
@@ -23,6 +25,27 @@ def _mariadb_json_transport_case():
 
 
 class TestCommonSyncStrategyHelpers:
+
+    @pytest.mark.parametrize('value,expected', [
+        (datetime.timedelta(hours=8, minutes=30), '08:30:00'),
+        (datetime.timedelta(seconds=1, microseconds=123456), '00:00:01.123456'),
+        (datetime.timedelta(microseconds=-1), '-00:00:00.000001'),
+        (datetime.timedelta(hours=-25, minutes=-2), '-25:02:00'),
+    ])
+    @pytest.mark.parametrize('extractor', ['sql', 'binlog'])
+    def test_time_preserves_microseconds_and_sign(self, value, expected, extractor):
+        catalog = CatalogEntry(
+            stream='stream',
+            schema=Schema.from_dict({'properties': {'value': {'type': ['null', 'string'], 'format': 'time'}}}),
+        )
+        extracted_at = datetime.datetime.now(datetime.timezone.utc)
+        if extractor == 'sql':
+            message = common.row_to_singer_record(catalog, 1, (value,), ['value'], extracted_at)
+        else:
+            message = binlog.row_to_singer_record(
+                catalog, 1, {'value': FIELD_TYPE.TIME2}, {'value': value}, extracted_at,
+            )
+        assert message.record == {'value': expected}
 
     def test_is_invalid_mysql_datetime(self):
         assert common.is_invalid_mysql_datetime('INVALID_MYSQL_DATETIME')

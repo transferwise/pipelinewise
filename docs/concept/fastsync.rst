@@ -139,9 +139,9 @@ its declared width. See :ref:`target-snowflake`.
 
 MariaDB/MySQL and PostgreSQL Snowflake FullSync and PartialSync preserve LF, CR,
 CRLF, tab, CSV punctuation, and literal backslash sequences in string values.
-PostgreSQL preserves Unicode; MariaDB/MySQL remains limited to characters
-representable by its legacy three-byte ``utf8`` FastSync projection and
-continues to remove NUL characters. This preservation applies to native and
+PostgreSQL preserves Unicode; MariaDB/MySQL uses an ``utf8mb4`` projection and
+default connection encoding, including supplementary Unicode, while continuing
+to remove NUL characters. This preservation applies to native and
 managed Iceberg v3 publication; the table format does not change the staged
 string representation. SQL ``NULL`` and a literal ``\N`` string remain distinct.
 

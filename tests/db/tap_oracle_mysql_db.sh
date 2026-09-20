@@ -25,7 +25,7 @@ mysql --protocol TCP --ssl --disable-ssl-verify-server-cert \
   --port "${TAP_ORACLE_MYSQL_PORT}" \
   --user root \
   --password="${TAP_ORACLE_MYSQL_ROOT_PASSWORD}" \
-  -e "GRANT REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO '${TAP_ORACLE_MYSQL_USER}'@'%'; FLUSH PRIVILEGES;"
+  -e "GRANT REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO '${TAP_ORACLE_MYSQL_USER}'@'%'; GRANT ALL PRIVILEGES ON tap_mysql_test.* TO '${TAP_ORACLE_MYSQL_USER}'@'%'; FLUSH PRIVILEGES;"
 
 mysql --protocol TCP --ssl --disable-ssl-verify-server-cert \
   --host "${TAP_ORACLE_MYSQL_HOST}" \

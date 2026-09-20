@@ -45,6 +45,7 @@ class MySqlToSnowflake(unittest.TestCase):
             ('multilinestring', None): 'VARIANT',
             ('multipolygon', None): 'VARIANT',
             ('geometrycollection', None): 'VARIANT',
+            ('geomcollection', None): 'VARIANT',
             ('text', None): 'VARCHAR(134217728)',
             ('tinytext', None): 'VARCHAR(134217728)',
             ('mediumtext', None): 'VARCHAR(134217728)',

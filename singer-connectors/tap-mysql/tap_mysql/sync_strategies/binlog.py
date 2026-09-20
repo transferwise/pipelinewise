@@ -15,11 +15,15 @@ from typing import Dict, Set, Union, Optional, Any, Tuple
 from plpygis import Geometry
 from pymysqlreplication import BinLogStreamReader
 from pymysqlreplication.constants import FIELD_TYPE
-from pymysqlreplication.event import RotateEvent, MariadbGtidEvent, GtidEvent
+from pymysqlreplication.event import (
+    RotateEvent, MariadbGtidEvent, GtidEvent, NotImplementedEvent, QueryEvent, XidEvent, XAPrepareEvent,
+)
+from pymysqlreplication.gtid import Gtid, GtidSet
 from pymysqlreplication.row_event import (
     DeleteRowsEvent,
     UpdateRowsEvent,
     WriteRowsEvent,
+    TableMapEvent,
 )
 from singer import utils, Schema, metadata
 
@@ -38,7 +42,7 @@ LOGGER = singer.get_logger('tap_mysql')
 
 SDC_DELETED_AT = "_sdc_deleted_at"
 UPDATE_BOOKMARK_PERIOD = 1000
-BOOKMARK_KEYS = {'log_file', 'log_pos', 'version', 'gtid'}
+BOOKMARK_KEYS = {'log_file', 'log_pos', 'version', 'gtid', 'gtid_complete'}
 
 MYSQL_TIMESTAMP_TYPES = {
     FIELD_TYPE.TIMESTAMP,
@@ -98,6 +102,20 @@ def verify_binlog_config(mysql_conn):
                 raise Exception(f"Unable to replicate binlog stream because binlog_row_image is "
                                 f"not set to 'FULL': {binlog_row_image}.")
 
+            for variable, unsupported in (
+                    ('binlog_row_value_options', {'PARTIAL_JSON'}),
+                    ('binlog_transaction_compression', {'ON', '1'}),
+                    ('log_bin_compress', {'ON', '1'})):
+                try:
+                    cur.execute(f'SELECT @@{variable}')
+                    value = str(cur.fetchone()[0]).upper()
+                except (pymysql.err.OperationalError, pymysql.err.InternalError) as exc:
+                    if exc.args[0] == 1193:
+                        continue
+                    raise
+                if unsupported.intersection(value.split(',')):
+                    raise ValueError(f'tap-mysql cannot decode {variable}={value}; disable it before replicating.')
+
 
 def verify_gtid_config(mysql_conn: MySQLConnection):
     """
@@ -119,7 +137,12 @@ def verify_gtid_config(mysql_conn: MySQLConnection):
 def fetch_current_log_file_and_pos(mysql_conn):
     with connect_with_backoff(mysql_conn) as open_conn:
         with open_conn.cursor() as cur:
-            cur.execute("SHOW MASTER STATUS")
+            try:
+                cur.execute("SHOW MASTER STATUS")
+            except pymysql.err.ProgrammingError as exc:
+                if exc.args[0] != 1064:
+                    raise
+                cur.execute('SHOW BINARY LOG STATUS')
 
             result = cur.fetchone()
 
@@ -135,24 +158,7 @@ def fetch_current_gtid_pos(
         mysql_conn: MySQLConnection,
         engine: str
 ) -> str:
-    """
-    Find the given server's current GTID position.
-
-    The sever we're connected to can have a comma separated list of gtids (e.g from past server migrations),
-    the right gtid is the one with the same server ID as the given server ID.
-
-    Args:
-        mysql_conn: Mysql connection instance
-        engine: DB engine (mariadb/mysql)
-
-    Returns: Gtid position if found, otherwise raises exception
-    """
-
-    if engine == connection.MARIADB_ENGINE:
-        server = str(connection.fetch_server_id(mysql_conn))
-    else:
-        server = connection.fetch_server_uuid(mysql_conn)
-
+    """Capture all executed transactions, including history from previous source servers."""
     with connect_with_backoff(mysql_conn) as open_conn:
         with open_conn.cursor() as cur:
 
@@ -163,42 +169,21 @@ def fetch_current_gtid_pos(
 
             result = cur.fetchone()
 
-            if result is None:
+            if not result or not result[0]:
                 raise Exception("GTID is not present on this server!")
+            position = _normalize_gtid_position(result[0], engine)
+            LOGGER.info('Using GTID %s for state bookmark', position)
+            return position
 
-            gtids = result[0]
-            LOGGER.debug('Found GTID(s): %s in server %s', gtids, server)
 
-            gtid_to_use = None
-
-            for gtid in gtids.split(','):
-                gtid = gtid.strip()
-
-                if not gtid:
-                    continue
-
-                if engine != connection.MARIADB_ENGINE:
-                    gtid_parts = gtid.split(':')
-
-                    if len(gtid_parts) != 2:
-                        continue
-
-                    if gtid_parts[0] == server:
-                        gtid_to_use = gtid
-                else:
-                    gtid_parts = gtid.split('-')
-
-                    if len(gtid_parts) != 3:
-                        continue
-
-                    if gtid_parts[1] == server:
-                        gtid_to_use = gtid
-
-            if gtid_to_use:
-                LOGGER.info('Using GTID %s for state bookmark', gtid_to_use)
-                return gtid_to_use
-
-    raise Exception(f'No suitable GTID was found for server {server}.')
+def _normalize_gtid_position(position, engine):
+    """Validate the full checkpoint without dropping any source UUID or domain."""
+    if engine != connection.MARIADB_ENGINE:
+        return str(GtidSet(position.lower()))
+    values = [value.strip() for value in position.split(',')]
+    if not all(re.fullmatch(r'\d+-\d+-\d+', value) for value in values):
+        raise ValueError('Invalid MariaDB GTID position.')
+    return ','.join(values)
 
 
 def json_bytes_to_string(data):
@@ -245,11 +230,7 @@ def row_to_singer_record(catalog_entry, version, db_column_map, row, time_extrac
 
         elif isinstance(val, datetime.timedelta):
             if property_format == 'time':
-                # this should convert time column into 'HH:MM:SS' formatted string
-                _total_seconds = int(val.total_seconds())
-                _hours, _remainder = divmod(_total_seconds, 3600)
-                _minutes, _seconds = divmod(_remainder, 60)
-                row_to_persist[column_name] = f"{_hours:02}:{_minutes:02}:{_seconds:02}"
+                row_to_persist[column_name] = common.format_mysql_time(val)
             else:
                 timedelta_from_epoch = datetime.datetime.utcfromtimestamp(0) + val
                 row_to_persist[column_name] = timedelta_from_epoch.isoformat() + '+00:00'
@@ -293,6 +274,44 @@ def row_to_singer_record(catalog_entry, version, db_column_map, row, time_extrac
         time_extracted=time_extracted)
 
 
+def _intersect_gtid_positions(positions, engine):
+    """A restart may skip only transactions acknowledged by every selected stream."""
+    if engine == connection.MARIADB_ENGINE:
+        common_domains = None
+        for position in positions:
+            domains = {value.split('-')[0]: value for value in position.split(',')}
+            if common_domains is None:
+                common_domains = domains
+            else:
+                common_domains = {
+                    domain: min(value, domains[domain], key=lambda gtid: int(gtid.split('-')[2]))
+                    for domain, value in common_domains.items() if domain in domains
+                }
+        return ','.join(common_domains.values())
+
+    common_gtids = GtidSet(positions[0].lower()).gtids
+    for position in positions[1:]:
+        other = {gtid.sid: gtid for gtid in GtidSet(position.lower()).gtids}
+        intersection = []
+        for gtid in common_gtids:
+            intervals = [(max(start, other_start), min(end, other_end))
+                         for start, end in gtid.intervals
+                         for other_start, other_end in other[gtid.sid].intervals
+                         if max(start, other_start) < min(end, other_end)] if gtid.sid in other else []
+            if intervals:
+                intersection.append(Gtid('', sid=gtid.sid, intervals=intervals))
+        common_gtids = intersection
+    return str(GtidSet(common_gtids))
+
+
+def _verify_gtid_bookmarks(bookmarks):
+    """Legacy checkpoints may omit earlier transactions or other source UUIDs/domains."""
+    for bookmark in bookmarks:
+        if bookmark.get('gtid') and bookmark.get('gtid_complete') is not True:
+            raise ValueError('A legacy GTID bookmark cannot prove complete transaction history; '
+                             'perform a full resync before replication.')
+
+
 def calculate_gtid_bookmark(
         mysql_conn: MySQLConnection,
         binlog_streams_map: Dict[str, Any],
@@ -300,40 +319,24 @@ def calculate_gtid_bookmark(
         engine: str
 ) -> str:
     """
-    Finds the earliest bookmarked gtid in the state
+    Find the GTID history acknowledged by every selected stream.
     Args:
         mysql_conn: instance of MySqlConnection
         binlog_streams_map: dictionary of selected streams
         state: state dict with bookmarks
         engine: the DB flavor mysql/mariadb
 
-    Returns: Min Gtid
+    Returns: Common acknowledged GTID set, or its MariaDB file-position equivalent.
     """
-    min_gtid = None
-    min_seq_no = None
+    bookmarks = [state.get('bookmarks', {}).get(stream, {}) for stream in binlog_streams_map]
+    positions = [bookmark.get('gtid') for bookmark in bookmarks]
+    if any(positions) and not all(positions):
+        raise ValueError('Every selected stream needs a GTID bookmark before GTID replication can resume.')
+    _verify_gtid_bookmarks(bookmarks)
 
-    for tap_stream_id, bookmark in state.get('bookmarks', {}).items():
-        stream = binlog_streams_map.get(tap_stream_id)
-
-        if not stream:
-            continue
-
-        gtid = bookmark.get('gtid')
-
-        if gtid:
-            if engine == connection.MARIADB_ENGINE:
-                gtid_seq_no = int(gtid.split('-')[2])
-            else:
-                gtid_interval = gtid.split(':')[1]
-
-                if '-' in gtid_interval:
-                    gtid_seq_no = int(gtid_interval.split('-')[1])
-                else:
-                    gtid_seq_no = int(gtid_interval)
-
-            if min_seq_no is None or gtid_seq_no < min_seq_no:
-                min_seq_no = gtid_seq_no
-                min_gtid = gtid
+    min_gtid = _intersect_gtid_positions(positions, engine) if all(positions) and positions else None
+    if positions and all(positions) and not min_gtid:
+        raise ValueError('Selected streams have no shared GTID checkpoint; resync them before resuming replication.')
 
     if not min_gtid:
 
@@ -351,6 +354,7 @@ def calculate_gtid_bookmark(
         if not (log_file and log_pos):
             raise Exception("No binlog coordinates in state to infer gtid position! Cannot resume logical replication")
 
+        verify_binlog_checkpoint(mysql_conn, log_file, log_pos, require_transaction_boundary=True)
         min_gtid = _find_gtid_by_binlog_coordinates(mysql_conn, log_file, log_pos)
 
         if not min_gtid:
@@ -387,19 +391,7 @@ def _find_gtid_by_binlog_coordinates(mysql_conn: MySQLConnection, log_file: str,
     if not gtids:
         return None
 
-    server_id = str(connection.fetch_server_id(mysql_conn))
-
-    gtid_to_use = None
-    for gtid in gtids.split(','):
-        gtid_parts = gtid.split('-')
-
-        if len(gtid_parts) != 3:
-            continue
-
-        if gtid_parts[1] == server_id:
-            gtid_to_use = gtid
-
-    return gtid_to_use
+    return _normalize_gtid_position(gtids, connection.MARIADB_ENGINE)
 
 
 def get_min_log_pos_per_log_file(binlog_streams_map, state) -> Dict[str, Dict]:
@@ -455,6 +447,35 @@ def calculate_bookmark(mysql_conn, binlog_streams_map, state) -> Tuple[str, int]
             raise Exception("Unable to replicate binlog stream because no binary logs exist on the server.")
 
 
+def verify_binlog_checkpoint(mysql_conn, log_file, log_pos, require_transaction_boundary=False):
+    """Require decode context, or a whole-transaction boundary when converting to GTID."""
+    with connect_with_backoff(mysql_conn) as open_conn:
+        with open_conn.cursor() as cursor:
+            cursor.execute('SHOW BINLOG EVENTS IN %s FROM %s LIMIT 16', (log_file, log_pos))
+            events = cursor.fetchall()
+            if not events:
+                if not require_transaction_boundary:
+                    return
+                cursor.execute('SHOW BINARY LOGS')
+                if any(row[0] == log_file and row[1] == log_pos for row in cursor.fetchall()):
+                    return
+    safe_events = {'gtid', 'rotate'}
+    neutral_events = {'format_desc', 'gtid_list', 'previous_gtids', 'stop'}
+    if not require_transaction_boundary:
+        safe_events.update({'table_map', 'anonymous_gtid', 'query', 'xid'})
+        neutral_events.update({'annotate_rows', 'rows_query'})
+    for event in events:
+        if event[4] == 0:
+            break
+        event_type = event[2].lower()
+        if event_type in safe_events:
+            return
+        if event_type not in neutral_events:
+            break
+    raise ValueError('The binlog bookmark is not a safe transaction boundary and may omit its TABLE_MAP; '
+                     'perform a full resync before resuming replication.')
+
+
 def update_bookmarks(
         state: Dict,
         binlog_streams_map: Dict,
@@ -479,22 +500,26 @@ def update_bookmarks(
                          "to properly update the state")
 
     for tap_stream_id in binlog_streams_map.keys():
-        state = singer.write_bookmark(state,
-                                      tap_stream_id,
-                                      'log_file',
-                                      log_file)
-
-        state = singer.write_bookmark(state,
-                                      tap_stream_id,
-                                      'log_pos',
-                                      log_pos)
+        previous = state.get('bookmarks', {}).get(tap_stream_id, {})
+        previous_file = previous.get('log_file')
+        previous_pos = previous.get('log_pos')
+        if not (previous_file and previous_pos and _position_at_or_before(
+                log_file, log_pos, previous_file, previous_pos)):
+            state = singer.write_bookmark(state, tap_stream_id, 'log_file', log_file)
+            state = singer.write_bookmark(state, tap_stream_id, 'log_pos', log_pos)
 
         # update gtid only if it's not null
         if gtid:
+            if previous.get('gtid'):
+                engine = connection.MYSQL_ENGINE if ':' in gtid else connection.MARIADB_ENGINE
+                stream_gtid = merge_gtid_position(previous['gtid'], gtid, engine)
+            else:
+                stream_gtid = gtid
             state = singer.write_bookmark(state,
                                           tap_stream_id,
                                           'gtid',
-                                          gtid)
+                                          stream_gtid)
+            state = singer.write_bookmark(state, tap_stream_id, 'gtid_complete', True)
 
     return state
 
@@ -526,8 +551,19 @@ def handle_write_rows_event(event, catalog_entry, state, columns, rows_saved, ti
 def handle_update_rows_event(event, catalog_entry, state, columns, rows_saved, time_extracted):
     stream_version = common.get_stream_version(catalog_entry.tap_stream_id, state)
     db_column_types = get_db_column_types(event)
+    key_properties = common.get_key_properties(catalog_entry)
 
     for row in event.rows:
+        before_values = row.get('before_values', {})
+        if any(before_values.get(key) != row['after_values'].get(key)
+               for key in key_properties if key in before_values):
+            deleted_values = {key: value for key, value in before_values.items() if key in columns}
+            deleted_values[SDC_DELETED_AT] = datetime.datetime.fromtimestamp(
+                event.timestamp, tz=pytz.UTC).isoformat()
+            singer.write_message(row_to_singer_record(
+                catalog_entry, stream_version, db_column_types, deleted_values, time_extracted))
+            rows_saved += 1
+
         filtered_vals = {k: v for k, v in row['after_values'].items() if k in columns}
 
         record_message = row_to_singer_record(catalog_entry,
@@ -624,6 +660,130 @@ def __get_diff_in_columns_list(
     return set(binlog_columns_filtered).difference(schema_properties)
 
 
+def merge_gtid_position(position, transaction, engine):
+    """Retain every acknowledged GTID domain when completing a transaction."""
+    if engine == connection.MARIADB_ENGINE:
+        domains = {gtid.split('-')[0]: gtid for gtid in position.split(',') if gtid}
+        for gtid in transaction.split(','):
+            domain = gtid.split('-')[0]
+            domains[domain] = max(
+                domains.get(domain, gtid), gtid, key=lambda value: int(value.split('-')[2]))
+        return ','.join(domains.values())
+    executed = GtidSet(position.lower())
+    for completed in GtidSet(transaction.lower()).gtids:
+        for acknowledged in executed.gtids:
+            completed = completed - acknowledged
+        if completed.intervals:
+            executed = executed + completed
+    return str(executed)
+
+
+def _position_at_or_before(log_file, log_pos, other_file, other_pos):
+    """Compare positions only within the same binlog filename namespace."""
+    current = binlog_filename_key(log_file)
+    other = binlog_filename_key(other_file)
+    if current[0] != other[0]:
+        return False
+    return current < other or (current == other and log_pos <= other_pos)
+
+
+def _event_already_bookmarked(bookmark, log_file, log_pos, transaction, engine):
+    """Do not replay an advanced stream while catching up another stream."""
+    position = bookmark.get('gtid')
+    if position and transaction:
+        if engine != connection.MARIADB_ENGINE:
+            return Gtid(transaction.lower()) in GtidSet(position.lower())
+        domain, _, sequence = transaction.split('-')
+        return any(value.split('-')[0] == domain and int(value.split('-')[2]) >= int(sequence)
+                   for value in position.split(','))
+    return bool(bookmark.get('log_file') and bookmark.get('log_pos') and _position_at_or_before(
+        log_file, log_pos, bookmark['log_file'], bookmark['log_pos']))
+
+
+class _BinlogCheckpoint:
+    """Keep restart positions behind transactions whose rows are still arriving."""
+
+    def __init__(self, reader, config):
+        self.reader = reader
+        self.engine = config['engine']
+        self.use_gtid = config['use_gtid']
+        self.position = reader.auto_position
+        self.pending = None
+        self.standalone = False
+        self.in_transaction = False
+
+    def observe(self, event):
+        """Advance a GTID only after its complete transaction was emitted."""
+        if isinstance(event, XAPrepareEvent) or (
+                isinstance(event, QueryEvent) and event.query.strip().upper().startswith('XA ')):
+            raise ValueError('XA transactions cannot be safely checkpointed by tap-mysql binlog replication.')
+        if isinstance(event, (MariadbGtidEvent, GtidEvent)):
+            self.pending = event.gtid
+            self.standalone = isinstance(event, MariadbGtidEvent) and bool(event.flags & 1)
+            self.in_transaction = False
+            return
+        if isinstance(event, TableMapEvent) and self.pending is None:
+            self.pending = True
+            self.standalone = True
+        if isinstance(event, QueryEvent) and event.query.strip().upper() == 'BEGIN' and self.pending is None:
+            self.pending = True
+        if not self.pending:
+            return
+
+        completed = isinstance(event, XidEvent)
+        if isinstance(event, QueryEvent):
+            query = event.query.strip().upper()
+            if query == 'BEGIN':
+                self.in_transaction = True
+                self.standalone = False
+            else:
+                completed = query in {'COMMIT', 'ROLLBACK'} or not self.in_transaction
+        elif self.standalone and isinstance(event, (WriteRowsEvent, UpdateRowsEvent, DeleteRowsEvent)):
+            completed = bool(event.flags & 1)
+
+        if completed:
+            if self.use_gtid:
+                if self.pending is True:
+                    raise ValueError('GTID replication encountered a transaction without a GTID marker.')
+                self.position = merge_gtid_position(self.position, self.pending, self.engine)
+                self.reader.auto_position = self.position
+            self.pending = None
+            self.in_transaction = False
+            self.standalone = False
+
+
+def _reject_unsupported_query(event, streams, bookmarks, reader, transaction, engine):
+    """TRUNCATE has no row delete images and cannot be applied by the Singer target."""
+    tokens = re.findall(r'`(?:``|[^`])*`|"(?:""|[^"])*"|/\*.*?\*/|--(?=\s)[^\r\n]*|\#[^\r\n]*|[\w$]+|[^\s]',
+                        event.query, flags=re.DOTALL)
+    query = ' '.join(re.sub(r'/\*(?:M)?!\d*\s*(.*?)\*/', r'\1', token, flags=re.DOTALL)
+                     for token in tokens if not token.startswith(('--', '#')) and (
+                         not token.startswith('/*') or re.match(r'/\*(?:M)?!', token)))
+    if not re.match(r'TRUNCATE\b', query, re.IGNORECASE):
+        return
+    identifier = r'(?:`(?:``|[^`])+`|"(?:""|[^"])+"|[\w$]+)'
+    matched = re.match(
+        rf'TRUNCATE\s+(?:TABLE\s+)?({identifier})(?:\s*\.\s*({identifier}))?', query, re.IGNORECASE)
+    schema = event.schema.decode('utf-8') if isinstance(event.schema, bytes) else event.schema
+    if matched:
+        first, second = [value[1:-1].replace(value[0] * 2, value[0])
+                         if value and value.startswith(('`', '"')) else value
+                         for value in matched.groups()]
+        database, table = (first, second) if second else (schema, first)
+        stream_id = common.generate_tap_stream_id(database, table)
+        # Case-equivalent names may address the selected table on lower_case_table_names sources.
+        candidates = [stream_id] if stream_id in streams else [
+            candidate for candidate in streams if candidate.casefold() == stream_id.casefold()]
+        if not any(not _event_already_bookmarked(
+                bookmarks.get(candidate, {}), reader.log_file, reader.log_pos, transaction, engine)
+                   for candidate in candidates):
+            return
+    elif not any(common.get_database_name(entry['catalog_entry']) == schema for entry in streams.values()):
+        return
+    raise ValueError('tap-mysql cannot replicate TRUNCATE for a selected or case-equivalent table; '
+                     'perform a full resync.')
+
+
 def _run_binlog_sync(  # noqa: C901
         mysql_conn: MySQLConnection,
         reader: BinLogStreamReader,
@@ -638,11 +798,15 @@ def _run_binlog_sync(  # noqa: C901
 
     log_file = None
     log_pos = None
-    gtid_pos = reader.auto_position  # initial gtid, we set this when we created the reader's instance
+    checkpoint = _BinlogCheckpoint(reader, config)
+    gtid_pos = reader.auto_position
+    bookmark_log_file = bookmark_log_pos = None
+    last_checkpoint_count = 0
+    initial_bookmarks = copy.deepcopy(state.get('bookmarks', {}))
 
     # A set to hold all columns that are detected as we sync but should be ignored cuz they are unsupported types.
     # Saving them here to avoid doing the check if we should ignore a column over and over again
-    ignored_columns = set()
+    ignored_columns = {}
     # Exit from the loop when the reader either runs out of streams to return or we reach
     # the end position (which is Master's)
     for binlog_event in reader:
@@ -655,7 +819,7 @@ def _run_binlog_sync(  # noqa: C901
         # upon receiving an EOF packet. There seem to be some cases when a MySQL server will not send
         # one causing binlog replication to hang.
         if (binlog_filename_key(log_file) > binlog_filename_key(end_log_file)) or (
-                end_log_file == log_file and log_pos >= end_log_pos):
+                end_log_file == log_file and log_pos > end_log_pos):
             LOGGER.info('BinLog reader (file: %s, pos:%s) has reached or exceeded end position, exiting!',
                         log_file,
                         log_pos)
@@ -664,8 +828,9 @@ def _run_binlog_sync(  # noqa: C901
             # binlog file and position above, making the latter behind the stream reader and it causes some data loss
             # in the next run by skipping everything between end_log_file and log_pos
             # so we need to update log_pos back to master's position
-            log_file = end_log_file
-            log_pos = end_log_pos
+            if not checkpoint.use_gtid and checkpoint.pending is None:
+                bookmark_log_file = end_log_file
+                bookmark_log_pos = end_log_pos
 
             break
 
@@ -674,33 +839,21 @@ def _run_binlog_sync(  # noqa: C901
                          binlog_event.next_binlog,
                          binlog_event.position)
 
-            state = update_bookmarks(state,
-                                     binlog_streams_map,
-                                     binlog_event.next_binlog,
-                                     binlog_event.position,
-                                     gtid_pos
-                                     )
-
         elif isinstance(binlog_event, (MariadbGtidEvent, GtidEvent)):
-            gtid_pos = binlog_event.gtid
-
             LOGGER.debug('%s: gtid=%s',
                          binlog_event.__class__.__name__,
-                         gtid_pos)
-
-            state = update_bookmarks(state,
-                                     binlog_streams_map,
-                                     log_file,
-                                     log_pos,
-                                     gtid_pos
-                                     )
-
-            # There is strange behavior happening when using GTID in the pymysqlreplication lib,
-            # explained here: https://github.com/noplay/python-mysql-replication/issues/367
-            # Fix: Updating the reader's auto-position to the newly encountered gtid means we won't have to restart
-            # consuming binlog from old GTID pos when connection to server is lost.
-            reader.auto_position = gtid_pos
-
+                         binlog_event.gtid)
+        elif isinstance(binlog_event, QueryEvent):
+            _reject_unsupported_query(
+                binlog_event, binlog_streams_map, initial_bookmarks, reader,
+                checkpoint.pending if checkpoint.use_gtid else None, config['engine'])
+        elif isinstance(binlog_event, NotImplementedEvent):
+            # MySQL partial rows/transaction payloads and MariaDB compressed query/row events.
+            if binlog_event.event_type in {39, 40, 165, 166, 167, 168, 169, 170, 171}:
+                raise ValueError('tap-mysql cannot decode partial-JSON or compressed binlog events; '
+                                 'disable these source features and resync affected tables.')
+        elif isinstance(binlog_event, (XidEvent, TableMapEvent, XAPrepareEvent)):
+            pass
         else:
             time_extracted = utils.now()
 
@@ -709,7 +862,9 @@ def _run_binlog_sync(  # noqa: C901
             catalog_entry = streams_map_entry.get('catalog_entry')
             columns = streams_map_entry.get('desired_columns')
 
-            if not catalog_entry:
+            if not catalog_entry or _event_already_bookmarked(
+                    initial_bookmarks.get(tap_stream_id, {}), log_file, log_pos,
+                    checkpoint.pending if checkpoint.use_gtid else None, config['engine']):
                 events_skipped += 1
 
                 if events_skipped % UPDATE_BOOKMARK_PERIOD == 0:
@@ -720,7 +875,7 @@ def _run_binlog_sync(  # noqa: C901
                 # Compare event's columns to the schema properties
                 diff = __get_diff_in_columns_list(binlog_event,
                                                   catalog_entry.schema.properties.keys(),
-                                                  ignored_columns)
+                                                  ignored_columns.get(tap_stream_id, set()))
 
                 # If there are additional cols in the event then run discovery if needed and update the catalog
                 if diff:
@@ -733,7 +888,7 @@ def _run_binlog_sync(  # noqa: C901
                         LOGGER.info('Stream `%s`: Not running discovery. Ignoring all detected columns in %s',
                                     tap_stream_id,
                                     diff)
-                        ignored_columns = ignored_columns.union(diff)
+                        ignored_columns.setdefault(tap_stream_id, set()).update(diff)
 
                     else:
                         LOGGER.info('Stream `%s`: Running discovery ... ', tap_stream_id)
@@ -746,7 +901,7 @@ def _run_binlog_sync(  # noqa: C901
                         )
                         new_catalog_entry = discover_catalog(
                             mysql_conn,
-                            config.get('filter_dbs'),
+                            common.get_database_name(catalog_entry),
                             catalog_entry.table,
                             **discovery_options,
                         ).streams[0]
@@ -809,9 +964,16 @@ def _run_binlog_sync(  # noqa: C901
                                  binlog_event.schema,
                                  binlog_event.table)
 
-        # Update singer bookmark and send STATE message periodically
-        if ((processed_rows_events and processed_rows_events % UPDATE_BOOKMARK_PERIOD == 0) or
-                (events_skipped and events_skipped % UPDATE_BOOKMARK_PERIOD == 0)):
+        checkpoint.observe(binlog_event)
+        gtid_pos = checkpoint.position
+
+        if checkpoint.pending is None:
+            bookmark_log_file, bookmark_log_pos = log_file, log_pos
+
+        # Mid-transaction restarts either skip its GTID or miss the earlier TABLE_MAP event.
+        event_count = processed_rows_events + events_skipped
+        if (event_count - last_checkpoint_count >= UPDATE_BOOKMARK_PERIOD
+                and checkpoint.pending is None):
             state = update_bookmarks(state,
                                      binlog_streams_map,
                                      log_file,
@@ -819,15 +981,19 @@ def _run_binlog_sync(  # noqa: C901
                                      gtid_pos
                                      )
             singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
+            last_checkpoint_count = event_count
+
+        if log_file == end_log_file and log_pos == end_log_pos:
+            break
 
     LOGGER.info('Processed %s rows', processed_rows_events)
 
     # Update singer bookmark at the last time to point it the last processed binlog event
-    if log_file and log_pos:
+    if bookmark_log_file and bookmark_log_pos:
         state = update_bookmarks(state,
                                  binlog_streams_map,
-                                 log_file,
-                                 log_pos,
+                                 bookmark_log_file,
+                                 bookmark_log_pos,
                                  gtid_pos)
 
 
@@ -860,10 +1026,14 @@ def create_binlog_stream_reader(
     kwargs = {
         'connection_settings': {},
         'pymysql_wrapper': make_connection_wrapper(config),
-        'is_mariadb': connection.MARIADB_ENGINE == engine,
+        # The MariaDB-specific dump protocol ignores file/position arguments unless GTID is used.
+        'is_mariadb': connection.MARIADB_ENGINE == engine and config['use_gtid'],
         'server_id': server_id,  # slave server ID
         'report_slave': socket.gethostname() or 'pipelinewise',  # this is so this slave appears in SHOW SLAVE HOSTS;
-        'only_events': [WriteRowsEvent, UpdateRowsEvent, DeleteRowsEvent],
+        'only_events': [WriteRowsEvent, UpdateRowsEvent, DeleteRowsEvent, QueryEvent, NotImplementedEvent,
+                        GtidEvent, MariadbGtidEvent, XidEvent, TableMapEvent, XAPrepareEvent],
+        'fail_on_table_metadata_unavailable': True,
+        'filter_non_implemented_events': False,
     }
 
     # only fetch events pertaining to the schemas in filter db.
@@ -878,7 +1048,6 @@ def create_binlog_stream_reader(
         LOGGER.info("Starting logical replication from GTID '%s' on engine '%s'", gtid_pos, engine)
 
         # When using GTID, we want to listen in for GTID events and start from given gtid pos
-        kwargs['only_events'].extend([GtidEvent, MariadbGtidEvent])
         kwargs['auto_position'] = gtid_pos
 
     else:
@@ -911,6 +1080,8 @@ def sync_binlog_stream(
         binlog_streams_map: tables to stream using binlog
         state: the current state
     """
+    verify_binlog_config(mysql_conn)
+
     for tap_stream_id in binlog_streams_map:
         common.whitelist_bookmark_keys(BOOKMARK_KEYS, tap_stream_id, state)
 
@@ -920,6 +1091,7 @@ def sync_binlog_stream(
         gtid = calculate_gtid_bookmark(mysql_conn, binlog_streams_map, state, config['engine'])
     else:
         log_file, log_pos = calculate_bookmark(mysql_conn, binlog_streams_map, state)
+        verify_binlog_checkpoint(mysql_conn, log_file, log_pos)
 
     reader = None
 

@@ -17,7 +17,7 @@ from .partial_sync_boundary import PartialSyncBoundary
 
 LOGGER = logging.getLogger(__name__)
 
-DEFAULT_CHARSET = 'utf8'
+DEFAULT_CHARSET = 'utf8mb4'
 DEFAULT_EXPORT_BATCH_ROWS = 50000
 MARIADB_ENGINE = 'mariadb'
 MYSQL_ENGINE = 'mysql'
@@ -268,13 +268,26 @@ class FastSyncTapMySql:
         Returns: Dict with GTID position
         Examples:
             {
-                "gtid": "0-1774983-23"
+                "gtid": "0-1774983-23",
+                "gtid_complete": True
             }
         """
         if self.is_mariadb:
-            return self.__find_mariadb_gtid_pos()
+            bookmark = self.__find_mariadb_gtid_pos()
+        else:
+            bookmark = self.__find_mysql_gtid_pos()
+        return {**bookmark, 'gtid_complete': True}
 
-        return self.__find_mysql_gtid_pos()
+    def _query_binlog_status(self, statement: str, legacy_statement: str):
+        """Use current MySQL syntax, falling back only when it is unsupported."""
+        if self.is_mariadb:
+            return self.query(legacy_statement)
+        try:
+            return self.query(statement)
+        except pymysql.err.ProgrammingError as exc:
+            if exc.args[0] != 1064:
+                raise
+            return self.query(legacy_statement)
 
     def _get_binlog_coordinates(self) -> Dict:
         """
@@ -292,17 +305,23 @@ class FastSyncTapMySql:
         """
         if self.is_replica:
             LOGGER.debug('Connecting to replica to get binlog coordinates...')
-            result = self.query('SHOW SLAVE STATUS')
+            result = self._query_binlog_status('SHOW REPLICA STATUS', 'SHOW SLAVE STATUS')
             if len(result) == 0:
                 raise Exception('MySQL binary logging is not enabled.')
+            if len(result) != 1:
+                raise Exception('FastSync requires a replica with a single replication channel.')
             binlog_pos = result[0]
-            log_file = binlog_pos.get('Master_Log_File')
-            log_pos = binlog_pos.get('Read_Master_Log_Pos')
+            # Received events may still be absent from the replica snapshot.
+            # Resume Singer from the applied coordinates to replay that gap.
+            log_file = binlog_pos.get('Relay_Source_Log_File', binlog_pos.get('Relay_Master_Log_File'))
+            log_pos = binlog_pos.get('Exec_Source_Log_Pos', binlog_pos.get('Exec_Master_Log_Pos'))
+            if not log_file or not log_pos:
+                raise Exception('MySQL replica has no applied binary log coordinates.')
             version = binlog_pos.get('version', 1)
 
         else:
             LOGGER.debug('Connecting to primary to get binlog coordinates...')
-            result = self.query('SHOW MASTER STATUS')
+            result = self._query_binlog_status('SHOW BINARY LOG STATUS', 'SHOW MASTER STATUS')
             if len(result) == 0:
                 raise Exception('MySQL binary logging is not enabled.')
             binlog_pos = result[0]
@@ -434,7 +453,7 @@ class FastSyncTapMySql:
                                     THEN concat('CASE WHEN YEAR(`', column_name, '`) = 0 OR MONTH(`', column_name, '`) NOT BETWEEN 1 AND 12 OR DAY(`', column_name, '`) = 0 OR DAY(`', column_name, '`) > DAY(LAST_DAY(DATE_FORMAT(`', column_name, '`, "%Y-%m-01"))) THEN NULL ELSE `', column_name, '` END')
                             WHEN LOWER(column_type) REGEXP '^tinyint[(]1[)]( unsigned)?( zerofill)?$'
                                     THEN concat('CASE WHEN `' , column_name , '` is null THEN null WHEN `' , column_name , '` = 0 THEN 0 ELSE 1 END')
-                            WHEN column_type IN ('geometry', 'point', 'linestring', 'polygon', 'multipoint', 'multilinestring', 'multipolygon', 'geometrycollection')
+                            WHEN column_type IN ('geometry', 'point', 'linestring', 'polygon', 'multipoint', 'multilinestring', 'multipolygon', 'geometrycollection', 'geomcollection')
                                     THEN concat('ST_AsGeoJSON(', column_name, ')')
                             WHEN column_name = 'raw_data_hash'
                                     THEN concat('REPLACE(REPLACE(hex(`', column_name, '`)', ", '\n', ' '), '\r', '')")
@@ -442,7 +461,7 @@ class FastSyncTapMySql:
                                     THEN {decimal_format}
                             WHEN data_type IN ('smallint', 'integer', 'bigint', 'mediumint', 'int')
                                     THEN {integer_format}
-                            ELSE concat('REPLACE(cast(`', column_name, '` AS char CHARACTER SET utf8)', ", CHAR(0), '')")
+                            ELSE concat('REPLACE(cast(`', column_name, '` AS char CHARACTER SET utf8mb4)', ", CHAR(0), '')")
                                 END AS safe_sql_value{json_alias_projection},
                             ordinal_position
                     FROM {columns_relation}
@@ -600,44 +619,6 @@ class FastSyncTapMySql:
         file_parts = glob.glob(f'{filepath}*')
         return file_parts
 
-    def __get_primary_server_uuid(self) -> str:
-        """
-        Fetches the primary server's UUID
-
-        Returns: server uuid
-        """
-        conn = pymysql.connect(
-            **self.get_connection_parameters(prioritize_primary=True)[0],
-            cursorclass=pymysql.cursors.DictCursor,
-            ssl={'': True}
-        ) if self.is_replica else None
-
-        result = self.query('select @@server_uuid as server_uuid;', conn)
-
-        if conn:
-            conn.close()
-
-        return result[0]['server_uuid']
-
-    def __get_primary_server_id(self) -> int:
-        """
-        Fetches the primary server's ID
-
-        Returns: server uuid
-        """
-        conn = pymysql.connect(
-            **self.get_connection_parameters(prioritize_primary=True)[0],
-            cursorclass=pymysql.cursors.DictCursor,
-            ssl={'': True}
-        ) if self.is_replica else None
-
-        result = self.query('select @@server_id as server_id;', conn)
-
-        if conn:
-            conn.close()
-
-        return result[0]['server_id']
-
     def __find_mariadb_gtid_pos(self) -> Dict[str, str]:
         """
         Finds the current GTID pos in mariadb
@@ -652,36 +633,16 @@ class FastSyncTapMySql:
             LOGGER.info('Connecting to primary to get gtid...')
             result = self.query('select @@gtid_current_pos as current_gtids;')
 
-        if not result:
+        if not result or not result[0].get('current_gtids'):
             raise Exception('GTID is not enabled.')
 
         gtids = result[0]['current_gtids']
-
-        server_id = str(self.__get_primary_server_id())
-
-        LOGGER.info('Found GTID(s): %s in server "%s"', gtids, server_id)
-
-        for gtid in gtids.split(','):
-            gtid = gtid.strip()
-
-            if not gtid:
-                continue
-
-            gtid_parts = gtid.split('-')
-            if len(gtid_parts) != 3:
-                continue
-
-            if gtid_parts[1] == server_id:
-                LOGGER.info('Using GTID %s for state bookmark', gtid)
-                return {
-                    'gtid': gtid,
-                }
-
-        raise Exception('No suitable GTID was found.')
+        LOGGER.info('Using GTID(s) %s for state bookmark', gtids)
+        return {'gtid': gtids}
 
     def __find_mysql_gtid_pos(self) -> Dict[str, str]:
         """
-        Finds the current GTID pos in mariadb
+        Find all executed MySQL GTIDs, including previous primaries and gaps.
         Returns: Dict with gtid key
         Raises: Exception if GTID is not enabled or not found
        """
@@ -693,30 +654,9 @@ class FastSyncTapMySql:
 
         result = self.query('select @@GLOBAL.gtid_executed as current_gtids;')
 
-        if not result:
+        if not result or not result[0].get('current_gtids'):
             raise Exception('No GTID was found with "@@GLOBAL.gtid_executed".')
 
         gtids = result[0]['current_gtids']
-
-        server_uuid = self.__get_primary_server_uuid()
-
-        LOGGER.info('Found GTID(s): %s', gtids)
-
-        for gtid in gtids.split(','):
-            gtid = gtid.strip()
-
-            if not gtid:
-                continue
-
-            gtid_parts = gtid.split(':')
-
-            if len(gtid_parts) != 2:
-                continue
-
-            if gtid_parts[0] == server_uuid:
-                LOGGER.info('Using GTID %s for state bookmark', gtid)
-                return {
-                    'gtid': gtid,
-                }
-
-        raise Exception('No suitable GTID was found.')
+        LOGGER.info('Using GTID(s) %s for state bookmark', gtids)
+        return {'gtid': gtids}
