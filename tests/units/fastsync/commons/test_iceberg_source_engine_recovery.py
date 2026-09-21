@@ -146,7 +146,7 @@ def test_reexport_rejects_missing_or_changed_engine_before_source_export(
             rdbms_to_snowflake._export_full_source(run)
         else:
             run = SimpleNamespace(
-                args=SimpleNamespace(tap={}),
+                args=SimpleNamespace(tap={}, transform=None),
                 source_adapter=adapter,
                 iceberg_requested=True,
                 attempt=attempt,

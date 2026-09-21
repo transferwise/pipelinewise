@@ -17,6 +17,8 @@ from pipelinewise.fastsync.commons import snowflake_iceberg_routes as iceberg_ro
 from pipelinewise.fastsync.commons.snowflake_types import (
     SNOWFLAKE_MAX_VARCHAR,
     SNOWFLAKE_MAX_VARCHAR_LENGTH,
+    canonical_native_metadata_type,
+    canonical_native_type,
 )
 from pipelinewise.fastsync.commons.target_snowflake import FastSyncTargetSnowflake
 
@@ -91,6 +93,7 @@ def diff_source_target_columns(target_sf: dict, source_columns: list) -> dict:
         source_columns_dict,
         target_columns_info,
     )
+    _validate_existing_column_types(target_sf, source_columns_dict, target_columns_info)
 
     return {
         'added_columns': added_columns,
@@ -101,6 +104,29 @@ def diff_source_target_columns(target_sf: dict, source_columns: list) -> dict:
     }
 
 
+def report_source_target_columns(target_sf: dict, source_columns: list, target_columns: list) -> list:
+    """Report every mapped column using the same checks as native PartialSync."""
+    rows_by_name = {}
+    for row in target_columns:
+        normalized = {key.lower(): value for key, value in row.items()}
+        rows_by_name[_quote_identifier(normalized['column_name'])] = normalized
+    results = []
+    for name, source_type in _get_source_columns_dict(source_columns).items():
+        row = rows_by_name.get(name)
+        result = {'column': name, 'mapped_type': source_type, 'status': 'would_add', 'target_type': None}
+        if row is not None:
+            try:
+                metadata = _get_target_columns_info([row])
+                result['target_type'] = canonical_native_metadata_type(metadata['type_metadata'][name])
+                widening = _get_varchar_columns_to_widen(target_sf, {name: source_type}, metadata)
+                _validate_existing_column_types(target_sf, {name: source_type}, metadata)
+                result['status'] = 'would_widen' if widening else 'compatible'
+            except (NativePartialSyncCompatibilityError, ValueError, TypeError, KeyError) as exc:
+                result.update(status='incompatible', reason=str(exc))
+        results.append(result)
+    return results
+
+
 def load_into_snowflake(target, args, source_columns, primary_keys, s3_key_pattern, size_bytes,
                         where_clause_sql):
     """Load staging data before creating or modifying the live target table."""
@@ -109,7 +135,6 @@ def load_into_snowflake(target, args, source_columns, primary_keys, s3_key_patte
     snowflake.copy_to_table(
         s3_key_pattern, target['schema'], args.table, size_bytes, is_temporary=True
     )
-    snowflake.obfuscate_columns(target['schema'], args.table)
 
     if args.drop_target_table:
         common_utils.apply_snowflake_table_grants(
@@ -336,8 +361,10 @@ def _get_target_columns_info(target_column):
     target_columns_dict = {}
     character_maximum_lengths = {}
     raw_column_names = {}
+    type_metadata = {}
     list_of_target_column_names = []
     for column in target_column:
+        column = {key.lower(): value for key, value in column.items()}
         list_of_target_column_names.append(column['column_name'])
         column_type_str = column['data_type']
         column_type_dict = json.loads(column_type_str)
@@ -347,11 +374,13 @@ def _get_target_columns_info(target_column):
             'length'
         )
         raw_column_names[quoted_column_name] = column['column_name']
+        type_metadata[quoted_column_name] = column_type_dict
     return {
         'character_maximum_lengths': character_maximum_lengths,
         'column_names': list_of_target_column_names,
         'columns_dict': target_columns_dict,
         'raw_column_names': raw_column_names,
+        'type_metadata': type_metadata,
     }
 
 
@@ -363,7 +392,10 @@ def _get_source_columns_dict(source_columns):
             raise NativePartialSyncCompatibilityError(
                 f'Invalid native PartialSync source column definition: {column!r}'
             )
-        source_columns_dict[match.group('name')] = match.group('data_type')
+        name = match.group('name')
+        if not name.startswith('"'):
+            name = _quote_identifier(name.upper())
+        source_columns_dict[name] = match.group('data_type')
     return source_columns_dict
 
 
@@ -378,6 +410,43 @@ def _normalized_data_type(data_type):
 
 def _native_target_name(target_sf):
     return f'{target_sf["schema"]}."{target_sf["table"].upper()}"'
+
+
+def _validate_existing_column_types(target_sf, source_columns_dict, target_columns_info):
+    for name, source_type in source_columns_dict.items():
+        metadata = target_columns_info['type_metadata'].get(name)
+        if metadata is None:
+            continue
+        try:
+            expected = canonical_native_type(source_type)
+            actual = canonical_native_metadata_type(metadata)
+        except ValueError as exc:
+            raise NativePartialSyncCompatibilityError(
+                f'Native PartialSync cannot verify the type of {_native_target_name(target_sf)}.{name}: {exc}'
+            ) from exc
+        if not _native_type_accepts(actual, expected):
+            raise NativePartialSyncCompatibilityError(
+                f'Native PartialSync cannot safely publish {name} as {expected}: '
+                f'existing target {_native_target_name(target_sf)} has type {actual}. '
+                'Run a FullSync to recreate the target with the mapped column types, then retry PartialSync.'
+            )
+
+
+def _native_type_accepts(actual, expected):
+    actual_base, expected_base = (value.split('(', maxsplit=1)[0] for value in (actual, expected))
+    if actual_base != expected_base:
+        return False
+    if actual == expected or expected == SNOWFLAKE_MAX_VARCHAR:
+        return True
+    actual_dimensions, expected_dimensions = (
+        tuple(int(value) for value in re.findall(r'\d+', data_type))
+        for data_type in (actual, expected)
+    )
+    if actual_base == 'NUMBER':
+        actual_precision, actual_scale = actual_dimensions
+        expected_precision, expected_scale = expected_dimensions
+        return actual_scale >= expected_scale and actual_precision - actual_scale >= expected_precision - expected_scale
+    return bool(actual_dimensions and actual_dimensions[0] >= expected_dimensions[0])
 
 
 def _get_varchar_columns_to_widen(

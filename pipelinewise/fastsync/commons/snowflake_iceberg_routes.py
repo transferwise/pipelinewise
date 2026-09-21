@@ -209,6 +209,9 @@ def fastsync_recovery_identity(
     elif engine == 'postgres':
         source_identity['ssl'] = source_config.get('ssl')
 
+    if _uses_source_transformations(args.transform or {}, source_table):
+        source_identity['transformation_execution'] = 'source_select_v1'
+
     identity = {
         'source': source_identity,
         'target': {
@@ -236,6 +239,17 @@ def fastsync_recovery_identity(
         },
         target_table_format=target_config['target_table_format'],
         iceberg_version=iceberg_version,
+    )
+
+
+def _uses_source_transformations(transformation_config, source_table):
+    """Invalidate retained raw staging only for affected or malformed rules."""
+    stream_name = source_table.replace('.', '-', 1).lower()
+    return any(
+        not isinstance(rule, dict)
+        or not isinstance(rule.get('tap_stream_name'), str)
+        or rule['tap_stream_name'].lower() == stream_name
+        for rule in transformation_config.get('transformations', [])
     )
 
 

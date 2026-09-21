@@ -25,9 +25,26 @@ def test_postgres_hstore_projection(iceberg_requested):
     factory = mock.Mock(return_value=source)
     mapper = mock.Mock()
     adapter = RdbmsSnowflakeSource.postgres(factory, mapper)
-    args = Namespace(tap={'dbname': 'source'})
+    args = Namespace(tap={'dbname': 'source'}, transform={'transformations': []})
 
     assert adapter.create(args, iceberg_requested) is source
 
     factory.assert_called_once_with(args.tap, mapper)
     assert source.hstore_as_json is iceberg_requested
+    assert source.source_transformations is args.transform
+    assert source.target_iceberg_version == (3 if iceberg_requested else None)
+
+
+@pytest.mark.parametrize('iceberg_requested', [False, True])
+def test_mysql_source_transformations(iceberg_requested):
+    """Both Snowflake formats pass transformation config to the source export."""
+    factory = mock.Mock()
+    mapper = mock.Mock()
+    adapter = RdbmsSnowflakeSource.mysql(factory, mapper)
+    args = Namespace(tap={'dbname': 'source'}, transform={'transformations': []})
+
+    source = adapter.create(args, iceberg_requested)
+
+    factory.assert_called_once_with(args.tap, mapper)
+    assert source.source_transformations is args.transform
+    assert source.target_iceberg_version == (3 if iceberg_requested else None)

@@ -74,6 +74,10 @@ class MySqlSnowflakeSource(RdbmsSnowflakeSource):
 
     def create(self, args, iceberg_requested: bool):
         source = self.factory(args.tap, self.type_mapper)
+        source.source_transformations = args.transform
+        source.target_iceberg_version = (
+            getattr(args, 'target', {}).get('iceberg_version', 3) if iceberg_requested else None
+        )
         if iceberg_requested:
             source.set_mariadb_json_aliases_enabled(True)
         return source
@@ -123,6 +127,10 @@ class PostgresSnowflakeSource(RdbmsSnowflakeSource):
 
     def create(self, args, iceberg_requested: bool):
         source = self.factory(args.tap, self.type_mapper)
+        source.source_transformations = args.transform
+        source.target_iceberg_version = (
+            getattr(args, 'target', {}).get('iceberg_version', 3) if iceberg_requested else None
+        )
         source.hstore_as_json = iceberg_requested
         return source
 

@@ -282,6 +282,8 @@ def test_snowflake_e2e_matrix_contract():
         'mysql-iceberg': (
             'e2e_tests_08',
             (
+                'tests/end_to_end/target_snowflake/test_source_transformation_exports.py',
+                'tests/end_to_end/target_snowflake/test_source_transformation_publication.py',
                 'tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_mysql/test_multiline_native_mysql_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_table_size_check.py',

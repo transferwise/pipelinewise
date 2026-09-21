@@ -245,6 +245,7 @@ def _plan_full_iceberg_export(run: _FullSyncRun) -> None:
         run.publisher.plan_full_sync(run.attempt, run.spec)
         return
 
+    run.source.validate_source_transformations(run.table)
     run.spec = current_spec
     run.bookmark = run.route_utils.get_bookmark_for_table(
         run.table,
@@ -343,11 +344,6 @@ def _stage_full_export(run: _FullSyncRun) -> None:
             run.snowflake.copy_to_archive(
                 s3_key, run.args.target.get('tap_id'), run.table
             )
-    run.snowflake.obfuscate_columns(
-        run.target_schema,
-        run.table,
-        **staging_options,
-    )
 
 
 def _publish_full_iceberg(run: _FullSyncRun) -> bool:

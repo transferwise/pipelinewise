@@ -118,6 +118,12 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
   through Snowflake FullSync and PartialSync. MySQL/MariaDB export may remove
   only NUL and uses an `utf8mb4` projection and default connection; PostgreSQL
   COPY retains Unicode and the same remaining value set.
+- PostgreSQL/MySQL/MariaDB-to-Snowflake FullSync/PartialSync transformations run
+  in the source SELECT before CSV/S3/archive/staging. Preserve legacy FastSync
+  conditional-first ordering and source normalization; reject unsupported
+  semantics before export. Keep range filtering on raw source columns and
+  reject transformed INCREMENTAL keys before reading bookmarks. Version recovery
+  identity when transformation execution semantics change.
 - Key recovery by stable source stream, index active attempts by physical
   target, and hold both locks throughout; reject source, target, staging, role,
   transformation, or boundary drift. `RecoveryCoordinator` owns target runtime

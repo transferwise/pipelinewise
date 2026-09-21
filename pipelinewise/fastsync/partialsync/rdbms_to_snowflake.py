@@ -55,6 +55,7 @@ class _PartialSyncRun:
     )
     grants_attempted: bool = False
     target_sf: Any = None
+    native_target_exists: bool = False
 
 
 def partial_sync_table(
@@ -146,13 +147,14 @@ def _resolve_partial_target(run: _PartialSyncRun) -> None:
 
 
 def _require_native_partial_target(run: _PartialSyncRun) -> None:
-    iceberg_routes.require_native_target_format(
+    table_format = iceberg_routes.require_native_target_format(
         run.snowflake,
         run.args,
         run.target_schema,
         run.table_name,
         allow_missing=True,
     )
+    run.native_target_exists = table_format == iceberg_routes.TABLE_FORMAT_NATIVE
 
 
 def _recover_partial_attempt(run: _PartialSyncRun) -> bool:
@@ -257,6 +259,7 @@ def _prepare_iceberg_partial_export(run: _PartialSyncRun) -> bool:
         run.publisher.plan_partial_sync(run.attempt, run.spec)
         return True
 
+    run.source.validate_source_transformations(run.table_name)
     run.spec = current_spec
     iceberg_routes.require_partial_sync_primary_key(
         run.primary_keys, run.table_name
@@ -304,6 +307,12 @@ def _prepare_native_partial_export(run: _PartialSyncRun) -> bool:
     if run.has_dynamic_boundary:
         _resolve_partial_target(run)
         _require_native_partial_target(run)
+
+    if run.native_target_exists and not run.args.drop_target_table:
+        utils.diff_source_target_columns(
+            {'sf_object': run.snowflake, 'schema': run.target_schema, 'table': run.target_table},
+            run.source_columns,
+        )
 
     run.bookmark = common_utils.get_bookmark_for_table(
         run.table_name,
@@ -415,11 +424,6 @@ def _publish_partial_iceberg(run: _PartialSyncRun) -> bool:
         run.target_table,
         run.size_bytes,
         is_temporary=True,
-        staging_table_name=run.attempt.staging_table,
-    )
-    run.snowflake.obfuscate_columns(
-        run.target_schema,
-        run.table_name,
         staging_table_name=run.attempt.staging_table,
     )
     staged_row_count, staged_fingerprint = run.publisher.staging_evidence(

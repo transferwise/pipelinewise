@@ -9,9 +9,14 @@ import json
 from typing import Dict, List, Union
 
 from pipelinewise.data_diff.config import extract_check_definitions
+from pipelinewise.fastsync.commons.source_transformations import (
+    UnsupportedSourceTransformation,
+    validate_bookmark_column,
+    validate_source_transformation_config,
+)
 from pipelinewise.utils import safe_column_name
 from . import fastsync_capabilities, utils
-from .errors import InvalidConfigException
+from .errors import InvalidConfigException, InvalidTransformationException
 
 
 class Config:
@@ -119,6 +124,7 @@ class Config:
                 sys.exit(1)
 
             cls.validate_target_table_format(tap_data, targets[target_id])
+            cls.validate_source_transformations(tap_data, targets[target_id])
 
             # Add generated extra keys that not available in the YAML
             tap_data['files'] = config.get_connector_files(
@@ -386,6 +392,29 @@ class Config:
                 )
 
         return selection
+
+    @classmethod
+    def validate_source_transformations(cls, tap: Dict, target: Dict) -> None:
+        """Validate source-select rules before either validate or import discovers columns."""
+        if target['type'] != 'target-snowflake' or tap['type'] not in {'tap-mysql', 'tap-postgres'}:
+            return
+        capabilities = fastsync_capabilities.resolve_fastsync_capabilities(
+            tap['type'], target['type'], tap.get('target_table_format'),
+        )
+        if not capabilities.available:
+            return
+        transformation_config = {'transformations': cls.generate_transformations(tap)}
+        for schema in tap.get('schemas', []):
+            for table in schema.get('tables', []):
+                table_name = f'{schema["source_schema"]}.{table["table_name"]}'
+                try:
+                    validate_source_transformation_config(table_name, transformation_config)
+                    if table.get('replication_method', utils.get_tap_default_replication_method(tap)) == 'INCREMENTAL':
+                        validate_bookmark_column(table_name, table.get('replication_key'), transformation_config)
+                except UnsupportedSourceTransformation as exc:
+                    raise InvalidTransformationException(
+                        f'Invalid source transformation for tap {tap["id"]!r}, table {table_name!r}: {exc}'
+                    ) from exc
 
     @classmethod
     def generate_transformations(cls, tap: Dict) -> List[Dict]:

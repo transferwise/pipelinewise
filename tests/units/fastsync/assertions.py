@@ -224,7 +224,6 @@ def assert_snowflake_sync_table_native_workflow(
         source_close_method.side_effect = record('source.close')
 
         target.copy_to_table.side_effect = record('target.copy')
-        target.obfuscate_columns.side_effect = record('obfuscate')
 
         def publish(*_args, **_kwargs):
             timeline.append('publish')
@@ -305,7 +304,6 @@ def assert_snowflake_sync_table_native_workflow(
         call.create_schema('TARGET_SCHEMA'),
         call.create_table('TARGET_SCHEMA', table, columns, primary_key, is_temporary=True),
         call.copy_to_table('loads/export.csv.gz', 'TARGET_SCHEMA', table, 30, is_temporary=True),
-        call.obfuscate_columns('TARGET_SCHEMA', table),
         call.create_table(
             'TARGET_SCHEMA',
             table,
@@ -317,6 +315,7 @@ def assert_snowflake_sync_table_native_workflow(
         call.swap_tables('TARGET_SCHEMA', table, cleanup_old_table=False),
     ]
     assert target.method_calls == expected_target_calls
+    target.obfuscate_columns.assert_not_called()
 
     expected_utils_calls = [
         call.gen_export_filename(tap_id='tap-id', table=table),
@@ -341,7 +340,7 @@ def assert_snowflake_sync_table_native_workflow(
         publication_error=publish_error,
     ))
     expected_timeline = ['format.guard'] + source_timeline + [
-        'upload_all', 'target.copy', 'obfuscate', 'format.guard',
+        'upload_all', 'target.copy', 'format.guard',
         'pregrant', 'publish', 'finalize',
     ]
 
@@ -553,7 +552,6 @@ def assert_snowflake_sync_table_iceberg_workflow(
         source_close_method.side_effect = record('source.close')
         target.create_schema.side_effect = record('target.create_schema')
         target.copy_to_table.side_effect = record('target.copy', 1)
-        target.obfuscate_columns.side_effect = record('obfuscate')
         publisher.prepare_full_sync.side_effect = record('prepare', attempt)
         publisher.plan_full_sync.side_effect = record('plan')
         publisher.record_uploaded.side_effect = record('record_uploaded')
@@ -719,9 +717,7 @@ def assert_snowflake_sync_table_iceberg_workflow(
             is_temporary=True,
             staging_table_name='PW_STAGE_123',
         )
-        target.obfuscate_columns.assert_called_once_with(
-            'TARGET_SCHEMA', table, staging_table_name='PW_STAGE_123'
-        )
+        target.obfuscate_columns.assert_not_called()
         publisher.record_uploaded.assert_called_once_with(attempt, s3_keys)
         plan_staging_uploads_mock.assert_called_once_with(
             publisher, attempt, target, file_parts
@@ -757,7 +753,7 @@ def assert_snowflake_sync_table_iceberg_workflow(
             'record_staging_created'
         )
         assert timeline.index('plan_uploads') < timeline.index('upload_all')
-        assert timeline.index('obfuscate') < timeline.index('staging_evidence')
+        assert timeline.index('target.copy') < timeline.index('staging_evidence')
         assert timeline.index('record_staged') < timeline.index('publish')
 
     target.swap_tables.assert_not_called()

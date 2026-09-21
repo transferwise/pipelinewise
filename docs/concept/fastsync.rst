@@ -112,6 +112,18 @@ through ``target-snowflake`` without gaining a FastSync component; it retains
 its normal flattening setting and sends ``FULL_TABLE`` streams through Singer.
 
 
+Snowflake source-side transformations
+-------------------------------------
+
+PostgreSQL and MySQL/MariaDB FullSync and PartialSync apply configured top-level
+transformations in the source ``SELECT``, before generating CSV. Native and
+managed Iceberg v3 staging, S3 uploads, and archived load files contain only the
+configured transformed output. Unsupported rules fail before export rather than
+falling back to Snowflake updates. Source range selection and replication
+bookmarks remain unchanged. See :ref:`transformations` for execution order,
+conditional rules, supported SQL semantics, and upgrade recovery requirements.
+
+
 Snowflake string widths
 -----------------------
 

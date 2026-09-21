@@ -1,3 +1,39 @@
+0.92.0 (TBD)
+-------------------
+
+**FastSync transformations**
+
+- Apply PostgreSQL and MySQL/MariaDB Snowflake FullSync and PartialSync
+  transformations in the source SELECT before CSV generation, so new export,
+  S3/archive, and staging files contain only the configured transformed output
+- Remove the corresponding Snowflake post-load transformation updates for
+  native and managed Iceberg v3 publication
+- Preserve conditional-first FastSync ordering, source export normalization,
+  output aliases and types, Unicode/NULL handling, and original range selection
+- Reject unsupported transformation or condition semantics before export
+  instead of falling back to transferring untransformed values
+- Validate source-side rule syntax and transformed replication keys during
+  configuration validation and import, before connecting to databases
+- Check source regex support on the export connection before creating CSV files
+- Reject ambiguous regex character classes that could bypass masking on MySQL
+- Validate transformations before creating Iceberg recovery attempts so rejected
+  rules can be corrected and retried
+- Preserve numeric conditions on PostgreSQL BIT VARYING columns
+- Validate each transformation against the existing mapped target type and
+  reject outputs that cannot fit, without changing the column's mapping
+- Check every existing native PartialSync column before export and merge;
+  reject type or precision loss while retaining compatible text widening
+- Add a read-only native PartialSync compatibility report for deployment checks
+- Reuse FastSync metadata queries and mappings in the report; distinguish invalid
+  input from execution errors and include sanitized diagnostic codes and locations
+- Test Singer, native FastSync, and Iceberg target types and transformation
+  results, and document existing differences between those paths
+- Reject transformed INCREMENTAL replication keys before reading their raw
+  maximum, preventing sensitive values from entering checkpoint files
+- Reject retained managed-Iceberg attempts for transformed streams created
+  under the previous target-side execution contract; finish recovery before
+  upgrading, and manage historical raw staging/archive files separately
+
 0.91.1 (2026-09-23)
 -------------------
 

@@ -14,10 +14,15 @@ from typing import Callable, Dict, Optional
 
 from . import utils, split_gzip
 from .partial_sync_boundary import PartialSyncBoundary
+from .source_transformations import compile_source_select, validate_bookmark_column
 from ...utils import safe_column_name
 
 LOGGER = logging.getLogger(__name__)
 MIN_SUPPORTED_POSTGRES_VERSION = 110002
+
+
+class UnsupportedPostgresVersionError(RuntimeError):
+    """The source server is older than the supported PostgreSQL version floor."""
 
 
 class FastSyncTapPostgres:
@@ -29,6 +34,8 @@ class FastSyncTapPostgres:
         self.connection_config = connection_config
         self.tap_type_to_target_type = tap_type_to_target_type
         self.target_quote = target_quote
+        self.source_transformations = None
+        self.target_iceberg_version = None
         self.hstore_as_json = False
         self.conn = None
         self.curr = None
@@ -268,7 +275,7 @@ class FastSyncTapPostgres:
             try:
                 conn.close()
             finally:
-                raise RuntimeError(
+                raise UnsupportedPostgresVersionError(
                     'PostgreSQL 11.2 or later is required; '
                     f'connected server reports server_version_num {server_version}'
                 )
@@ -419,6 +426,7 @@ class FastSyncTapPostgres:
         """
         Get the actual incremental key position in the table
         """
+        validate_bookmark_column(table, replication_key, self.source_transformations)
         schema_name, table_name = table.split('.')
         result = self.query(
             f'SELECT MAX({replication_key}) AS key_value FROM {schema_name}."{table_name}"'
@@ -481,7 +489,7 @@ class FastSyncTapPostgres:
 
         return None
 
-    def get_table_columns(self, table_name, max_num=None, date_type='date'):
+    def get_table_columns(self, table_name, max_num=None, date_type='date', *, metadata_query=None):
         """
         Get PG table column details from information_schema
         """
@@ -539,37 +547,31 @@ class FastSyncTapPostgres:
                 END AS safe_sql_value,
                 character_maximum_length
                 FROM information_schema.columns
-                WHERE table_schema = '{schema_name}'
-                    AND table_name = '{table_name}'
+                WHERE table_schema = %s
+                    AND table_name = %s
                 ORDER BY ordinal_position
                 ) AS x
             """  # noqa: E501
 
-        return self.query(sql)
+        query = self.query if metadata_query is None else metadata_query
+        return query(sql, params=(schema_name, table_name))
+
+    def map_table_columns(self, columns):
+        """Map already-read metadata without connections or primary-key queries."""
+        return [
+            '{} {}'.format(
+                safe_column_name(column[0], self.target_quote), self._mapped_column_type(column[1], column[3]),
+            )
+            for column in columns
+        ]
 
     def map_column_types_to_target(self, table_name):
         """
         Map PG column types to equivalent types in target
         """
         postgres_columns = self.get_table_columns(table_name)
-        mapped_columns = []
-        for pc in postgres_columns:
-            column_type = (
-                'VARIANT'
-                if pc[1] == 'hstore' and self.hstore_as_json
-                else self.tap_type_to_target_type(pc[1])
-            )
-            # postgres bit type can have length greater than 1
-            # most targets would want to map length 1 to boolean and the rest to number
-            if isinstance(column_type, list):
-                column_type = column_type[1 if pc[3] > 1 else 0]
-            mapping = '{} {}'.format(
-                safe_column_name(pc[0], self.target_quote), column_type
-            )
-            mapped_columns.append(mapping)
-
         return {
-            'columns': mapped_columns,
+            'columns': self.map_table_columns(postgres_columns),
             'primary_key': self.get_primary_keys(table_name),
             'source_column_names': [column[0] for column in postgres_columns],
         }
@@ -612,13 +614,15 @@ class FastSyncTapPostgres:
             else None
         )
 
+        source_table = table_name
         schema_name, table_name = table_name.split('.')
 
-        column_safe_sql_values = column_safe_sql_values + [
+        metadata_columns = [
             "now() AT TIME ZONE 'UTC' AS _SDC_EXTRACTED_AT",
             "now() AT TIME ZONE 'UTC' AS _SDC_BATCHED_AT",
             'null _SDC_DELETED_AT'
         ]
+        column_safe_sql_values += metadata_columns
 
         if source_boundary is not None:
             where_clause = self.curr.mogrify(
@@ -634,9 +638,11 @@ class FastSyncTapPostgres:
         else:
             where_clause = ''
 
-        sql = f"""COPY (SELECT {','.join(column_safe_sql_values)}
-        FROM {schema_name}."{table_name}"{where_clause}) TO STDOUT with CSV DELIMITER ','
-        """
+        select_sql = f'SELECT {",".join(column_safe_sql_values)} FROM {schema_name}."{table_name}"{where_clause}'
+        transformed = self._compile_source_projection(source_table, table_columns, where_clause)
+        if transformed is not None:
+            select_sql = f'SELECT _ppw_export.*, {",".join(metadata_columns)} FROM ({transformed}) AS _ppw_export'
+        sql = f"COPY ({select_sql}) TO STDOUT with CSV DELIMITER ','"
 
         LOGGER.info('Exporting data: %s', sql)
 
@@ -650,6 +656,34 @@ class FastSyncTapPostgres:
 
         with gzip_splitter as split_gzip_files:
             self.curr.copy_expert(sql, split_gzip_files, size=131072)
+
+    def _mapped_column_type(self, data_type, character_maximum_length):
+        """Share the existing target mapping between DDL and transformation validation."""
+        column_type = (
+            'VARIANT' if data_type == 'hstore' and self.hstore_as_json else self.tap_type_to_target_type(data_type)
+        )
+        if isinstance(column_type, list):
+            column_type = column_type[1 if character_maximum_length > 1 else 0]
+        return column_type
+
+    def _compile_source_projection(self, table_name, table_columns, where_clause=''):
+        """Share projection validation between recovery preflight and export."""
+        if self.source_transformations is None:
+            return None
+        columns = []
+        for column in table_columns:
+            target_type = self._mapped_column_type(column['data_type'], column.get('character_maximum_length'))
+            columns.append(dict(column, target_type=target_type))
+        table_reference = '.'.join('"' + part.replace('"', '""') + '"' for part in table_name.split('.'))
+        return compile_source_select(
+            table_name, table_reference, where_clause, columns,
+            self.source_transformations, 'postgres', self.target_iceberg_version,
+        )
+
+    def validate_source_transformations(self, table_name):
+        """Reject invalid rules before binding a new Iceberg recovery attempt."""
+        if self.source_transformations is not None:
+            self._compile_source_projection(table_name, self.get_table_columns(table_name))
 
     def export_source_table_data(
             self, args: Namespace, tap_id: str,

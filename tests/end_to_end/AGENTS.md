@@ -76,6 +76,8 @@ run_e2e \
   tests/end_to_end/target_snowflake/tap_mongodb/test_replicate_mongodb_to_sf.py
 
 run_e2e \
+  tests/end_to_end/target_snowflake/test_source_transformation_exports.py \
+  tests/end_to_end/target_snowflake/test_source_transformation_publication.py \
   tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py \
   tests/end_to_end/target_snowflake/tap_mysql/test_multiline_native_mysql_to_sf.py \
   tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_table_size_check.py \
