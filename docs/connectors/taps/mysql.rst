@@ -138,6 +138,8 @@ Operational notes
   previous-primary UUIDs or MariaDB domains. New snapshots set this marker only
   after capturing complete history. Do not add it manually or invent GTID ranges.
   Rejection does not modify the saved state or automatically resync the target.
+  The startup error lists all selected streams with missing or incomplete legacy
+  GTIDs so the required resync can be planned together.
 - File/position checkpoints also wait for safe transaction boundaries. An
   identifiable unsafe legacy bookmark inside row events is rejected before decoding;
   resync the affected tables instead of manually advancing the bookmark.
@@ -148,6 +150,7 @@ Operational notes
 - A lost binlog connection in file/position mode stops the run. Retry normally
   to resume from durable state; the decoder cannot safely reconnect using its
   last packet position inside a transaction. GTID mode retains safe reconnects.
+  Separate table-metadata connections can still retry transient disconnects.
 - ``TRUNCATE`` on a selected table stops binlog replication because it has no
   per-row delete images. FullSync that table to capture the resulting contents
   before resuming Singer.

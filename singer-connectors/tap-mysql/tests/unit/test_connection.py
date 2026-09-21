@@ -2,8 +2,9 @@ import unittest
 
 from unittest.mock import patch, MagicMock, call
 
-from pymysql.cursors import Cursor
+from pymysql.cursors import Cursor, DictCursor
 from pymysql.err import OperationalError
+from pymysqlreplication import BinLogStreamReader
 from tap_mysql.connection import MySQLConnection, fetch_server_id, fetch_server_uuid, make_connection_wrapper
 
 
@@ -31,6 +32,56 @@ class TestConnection(unittest.TestCase):
                 patch('tap_mysql.connection.connect_with_backoff', side_effect=lambda conn: conn._read_packet()):
             with self.assertRaises(OperationalError):
                 make_connection_wrapper(config)()
+
+    def test_binlog_initial_connection_retries_before_enabling_disconnect_guard(self):
+        config = {'host': 'localhost', 'port': 3306, 'user': 'test', 'password': 'test', 'use_gtid': False}
+        with patch.object(MySQLConnection, '_read_packet',
+                          side_effect=[OperationalError(2006, 'network lost'), None]) as read_packet, \
+                patch.object(MySQLConnection, 'connect', autospec=True,
+                             side_effect=lambda conn: conn._read_packet()), \
+                patch('tap_mysql.connection.run_session_sqls'), patch('backoff._sync.time.sleep'):
+            conn = make_connection_wrapper(config)()
+        self.assertEqual(read_packet.call_count, 2)
+        with patch.object(MySQLConnection, '_read_packet', side_effect=OperationalError(2006, 'network lost')):
+            with self.assertRaisesRegex(RuntimeError, 'durable checkpoint'):
+                conn._read_packet()
+
+    def test_file_position_metadata_connection_reconnects_after_network_error(self):
+        config = {'host': 'localhost', 'port': 3306, 'user': 'test', 'password': 'test', 'use_gtid': False}
+        expected_columns = [{'COLUMN_NAME': 'id', 'ORDINAL_POSITION': 1}]
+        for error_code in (2006, 2013):
+            with self.subTest(error_code=error_code):
+                connections = []
+                wrapper = make_connection_wrapper(config)
+
+                def connection_factory(**kwargs):
+                    conn = wrapper(**kwargs)
+                    cur = MagicMock()
+                    cur.execute.side_effect = lambda *_: conn._read_packet()
+                    cur.fetchall.return_value = expected_columns
+                    conn.cursor = MagicMock(return_value=cur)
+                    connections.append(conn)
+                    return conn
+
+                reader = BinLogStreamReader({}, 123, pymysql_wrapper=connection_factory)
+                with patch('tap_mysql.connection.connect_with_backoff'), \
+                        patch.object(MySQLConnection, '_read_packet',
+                                     side_effect=[OperationalError(error_code, 'network lost'), None]):
+                    columns = reader._BinLogStreamReader__get_table_information('db', 'items')
+                self.assertEqual(columns, expected_columns)
+                self.assertEqual(len(connections), 2)
+                self.assertTrue(all(conn.cursorclass is DictCursor for conn in connections))
+                self.assertNotIn('cursorclass', config)
+
+    def test_stream_disconnect_guard_does_not_depend_on_cursor_class(self):
+        config = {'host': 'localhost', 'port': 3306, 'user': 'test', 'password': 'test', 'use_gtid': False}
+        for error_code in (2006, 2013):
+            with self.subTest(error_code=error_code):
+                with patch('tap_mysql.connection.connect_with_backoff'):
+                    conn = make_connection_wrapper(config)(cursorclass=DictCursor)
+                with patch.object(MySQLConnection, '_read_packet', side_effect=OperationalError(error_code, 'lost')):
+                    with self.assertRaisesRegex(RuntimeError, 'durable checkpoint'):
+                        conn._read_packet()
 
     @patch('tap_mysql.connection.connect_with_backoff')
     def test_fetch_server_id(self, connect_with_backoff):

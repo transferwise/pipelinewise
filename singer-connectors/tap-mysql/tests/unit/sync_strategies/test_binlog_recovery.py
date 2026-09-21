@@ -175,6 +175,170 @@ def test_mariadb_standalone_statement_commits_after_last_row(stream):
     assert state['bookmarks']['db-items']['gtid'] == '0-1-11'
 
 
+@pytest.mark.parametrize('use_gtid', [False, True])
+def test_mariadb_savepoint_without_begin_waits_for_commit(stream, use_gtid):
+    initial = '0-1-10' if use_gtid else None
+    reader = Reader([
+        (100, event(MariadbGtidEvent, gtid='0-1-11', flags=4)),
+        (200, event(TableMapEvent)), (300, write_event(flags=1)),
+        (400, event(QueryEvent, query='SAVEPOINT s1', schema=b'db')),
+        (500, event(TableMapEvent)), (600, write_event(2, flags=1)),
+        (700, event(XidEvent)),
+    ], initial)
+    with patch.object(binlog, 'UPDATE_BOOKMARK_PERIOD', 1):
+        state, messages = run(reader, stream, engine='mariadb')
+    assert reader.positions == [initial] * 7
+    assert [message.record['id'] for message in messages if isinstance(message, RecordMessage)] == [1, 2]
+    assert [message.value['bookmarks']['db-items']['log_pos']
+            for message in messages if isinstance(message, StateMessage)] == [700]
+    assert state['bookmarks']['db-items']['log_pos'] == 700
+    if use_gtid:
+        assert state['bookmarks']['db-items']['gtid'] == '0-1-11'
+
+
+@pytest.mark.parametrize('use_gtid', [False, True])
+def test_mariadb_interruption_after_savepoint_keeps_durable_position(stream, use_gtid):
+    initial = '0-1-10' if use_gtid else None
+    reader = Reader([
+        (100, event(MariadbGtidEvent, gtid='0-1-11', flags=4)),
+        (200, event(TableMapEvent)), (300, write_event(flags=1)),
+        (400, event(QueryEvent, query='SAVEPOINT s1', schema=b'db')),
+        (500, RuntimeError('interrupted after savepoint')),
+    ], initial)
+    state = {'bookmarks': {'db-items': {'version': 1, 'log_file': reader.log_file, 'log_pos': 4}}}
+    if use_gtid:
+        state['bookmarks']['db-items']['gtid'] = initial
+    original = copy.deepcopy(state)
+    with patch.object(binlog, 'UPDATE_BOOKMARK_PERIOD', 1):
+        with pytest.raises(RuntimeError, match='interrupted after savepoint'):
+            run(reader, stream, engine='mariadb', state=state)
+    assert state == original
+    assert reader.auto_position == initial
+
+
+class FilteredReader(Reader):
+    """Advance through schema-filtered packets before the decoder returns EOF."""
+
+    def __init__(self, events, eof_pos, gtid=None):
+        super().__init__(events, gtid)
+        self.eof_pos = eof_pos
+
+    def __iter__(self):
+        yield from super().__iter__()
+        self.log_pos = self.eof_pos
+
+
+@pytest.mark.parametrize('use_gtid', [False, True])
+def test_filtered_standalone_suffix_advances_at_exact_consumed_eof(stream, use_gtid):
+    reader = FilteredReader([
+        (100, event(MariadbGtidEvent, gtid='0-1-11', flags=1)),
+    ], 300, '0-1-10' if use_gtid else None)
+    state, messages = run(reader, stream, engine='mariadb', end_pos=300)
+    assert not messages
+    assert state['bookmarks']['db-items']['log_pos'] == 300
+    if use_gtid:
+        assert state['bookmarks']['db-items']['gtid'] == '0-1-11'
+
+
+@pytest.mark.parametrize('flags,eof_pos,end_pos', [(1, 250, 300), (1, 350, 300), (1, 100, 100), (4, 300, 300)])
+def test_filtered_suffix_needs_standalone_and_proven_endpoint(stream, flags, eof_pos, end_pos):
+    reader = FilteredReader([
+        (100, event(MariadbGtidEvent, gtid='0-1-11', flags=flags)),
+    ], eof_pos, '0-1-10')
+    state, messages = run(reader, stream, engine='mariadb', end_pos=end_pos)
+    assert not messages
+    assert state['bookmarks']['db-items']['log_pos'] == 4
+    assert state['bookmarks']['db-items']['gtid'] == '0-1-10'
+    assert reader.auto_position == '0-1-10'
+
+
+@pytest.mark.parametrize('use_gtid', [False, True])
+@pytest.mark.parametrize('end_pos', [450, 500])
+def test_next_gtid_proves_filtered_standalone_boundary_without_acknowledging_new_group(stream, use_gtid, end_pos):
+    reader = Reader([
+        (100, event(MariadbGtidEvent, gtid='0-1-11', flags=1)),
+        (500, event(MariadbGtidEvent, gtid='1-2-21', flags=4,
+                    packet=SimpleNamespace(log_pos=500, event_size=50))),
+    ], '0-1-10,1-2-20' if use_gtid else None)
+    state, messages = run(reader, stream, engine='mariadb', end_pos=end_pos)
+    assert not messages
+    assert state['bookmarks']['db-items']['log_pos'] == 450
+    if use_gtid:
+        assert state['bookmarks']['db-items']['gtid'] == '0-1-11,1-2-20'
+
+
+def test_filtered_standalone_is_not_acknowledged_past_sampled_end(stream):
+    reader = Reader([
+        (100, event(MariadbGtidEvent, gtid='0-1-11', flags=1)),
+        (500, event(MariadbGtidEvent, gtid='0-1-12', flags=4,
+                    packet=SimpleNamespace(log_pos=500, event_size=50))),
+    ], '0-1-10')
+    state, _ = run(reader, stream, engine='mariadb', end_pos=400)
+    assert state['bookmarks']['db-items']['log_pos'] == 4
+    assert reader.auto_position == '0-1-10'
+
+
+def test_reconnected_standalone_marker_does_not_advance_before_a_second_disconnect(stream):
+    marker = event(MariadbGtidEvent, gtid='0-1-11', flags=1,
+                   packet=SimpleNamespace(log_pos=100, event_size=50))
+    reader = Reader([
+        (100, marker), (200, write_event()),
+        (100, marker), (150, RuntimeError('second disconnect')),
+    ], '0-1-10')
+    state = {'bookmarks': {'db-items': {
+        'version': 1, 'log_file': reader.log_file, 'log_pos': 4, 'gtid': '0-1-10',
+    }}}
+    original = copy.deepcopy(state)
+
+    with pytest.raises(RuntimeError, match='second disconnect'):
+        run(reader, stream, engine='mariadb', end_pos=300, state=state)
+
+    assert state == original
+    assert reader.auto_position == '0-1-10'
+    assert reader.positions == ['0-1-10'] * 4
+
+
+def test_reconnected_standalone_rows_replay_until_the_real_statement_end(stream):
+    marker = event(MariadbGtidEvent, gtid='0-1-11', flags=1,
+                   packet=SimpleNamespace(log_pos=100, event_size=50))
+    reader = Reader([
+        (100, marker), (200, write_event()),
+        (100, marker), (200, write_event()), (300, write_event(2, flags=1)),
+    ], '0-1-10')
+
+    state, messages = run(reader, stream, engine='mariadb', end_pos=300)
+
+    assert [message.record['id'] for message in messages if isinstance(message, RecordMessage)] == [1, 1, 2]
+    assert reader.positions == ['0-1-10'] * 5
+    assert state['bookmarks']['db-items']['gtid'] == '0-1-11'
+    assert state['bookmarks']['db-items']['log_pos'] == 300
+
+
+@pytest.mark.parametrize('start', [event(TableMapEvent), event(QueryEvent, query='BEGIN', schema=b'db')])
+def test_missing_gtid_marker_fails_before_emitting_rows(stream, start):
+    reader = Reader([(100, start), (200, write_event(flags=1))], f'{MYSQL_SID}:1-10')
+    with patch.object(binlog.singer, 'write_message') as output:
+        with pytest.raises(ValueError, match='without a GTID marker'):
+            binlog._run_binlog_sync(
+                None, reader, {'db-items': {'catalog_entry': stream}}, {},
+                {'engine': 'mysql', 'use_gtid': True}, reader.log_file, 1000)
+    output.assert_not_called()
+    assert reader.auto_position == f'{MYSQL_SID}:1-10'
+
+
+def test_anonymous_gtid_has_actionable_error(stream):
+    reader = Reader([(100, event(NotImplementedEvent, event_type=34))], f'{MYSQL_SID}:1-10')
+    with pytest.raises(ValueError, match='anonymous transaction.*full resync'):
+        run(reader, stream)
+    assert reader.auto_position == f'{MYSQL_SID}:1-10'
+
+
+@pytest.mark.parametrize('engine', ['mysql', 'mariadb'])
+def test_replay_fence_never_parses_untagged_transaction_sentinel(engine):
+    with pytest.raises(ValueError, match='without a GTID marker'):
+        binlog._event_already_bookmarked({}, 'mysql-bin.000001', 100, True, engine)
+
+
 def test_gtid_ddl_without_begin_completes_position(stream):
     reader = Reader([
         (100, event(GtidEvent, gtid=f'{MYSQL_SID}:11', flags=0)),

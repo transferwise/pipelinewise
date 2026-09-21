@@ -306,10 +306,18 @@ def _intersect_gtid_positions(positions, engine):
 
 def _verify_gtid_bookmarks(bookmarks):
     """Legacy checkpoints may omit earlier transactions or other source UUIDs/domains."""
-    for bookmark in bookmarks:
-        if bookmark.get('gtid') and bookmark.get('gtid_complete') is not True:
-            raise ValueError('A legacy GTID bookmark cannot prove complete transaction history; '
-                             'perform a full resync before replication.')
+    missing = sorted(stream for stream, bookmark in bookmarks.items() if not bookmark.get('gtid'))
+    legacy = sorted(stream for stream, bookmark in bookmarks.items()
+                    if bookmark.get('gtid') and bookmark.get('gtid_complete') is not True)
+    issues = []
+    if missing and len(missing) != len(bookmarks):
+        issues.append('Every selected stream needs a GTID bookmark before GTID replication can resume; '
+                      f'missing GTID bookmarks: {", ".join(missing)}.')
+    if legacy:
+        issues.append('A legacy GTID bookmark cannot prove complete transaction history; '
+                      f'affected streams: {", ".join(legacy)}.')
+    if issues:
+        raise ValueError(' '.join(issues) + ' Perform a full resync of the affected streams before replication.')
 
 
 def calculate_gtid_bookmark(
@@ -328,10 +336,8 @@ def calculate_gtid_bookmark(
 
     Returns: Common acknowledged GTID set, or its MariaDB file-position equivalent.
     """
-    bookmarks = [state.get('bookmarks', {}).get(stream, {}) for stream in binlog_streams_map]
-    positions = [bookmark.get('gtid') for bookmark in bookmarks]
-    if any(positions) and not all(positions):
-        raise ValueError('Every selected stream needs a GTID bookmark before GTID replication can resume.')
+    bookmarks = {stream: state.get('bookmarks', {}).get(stream, {}) for stream in binlog_streams_map}
+    positions = [bookmark.get('gtid') for bookmark in bookmarks.values()]
     _verify_gtid_bookmarks(bookmarks)
 
     min_gtid = _intersect_gtid_positions(positions, engine) if all(positions) and positions else None
@@ -346,7 +352,9 @@ def calculate_gtid_bookmark(
         # hence, this functionality of inferring gtid is not implemented for it.
 
         if engine != connection.MARIADB_ENGINE:
-            raise Exception("Couldn't find any gtid in state bookmarks to resume logical replication")
+            raise ValueError("Couldn't find any gtid in state bookmarks to resume logical replication; "
+                             f'missing GTID bookmarks: {", ".join(sorted(bookmarks))}. '
+                             'Perform a full resync of the affected streams before replication.')
 
         LOGGER.info("Couldn't find a gtid in state, will try to infer one from binlog coordinates if they exist ..")
         log_file, log_pos = calculate_bookmark(mysql_conn, binlog_streams_map, state)
@@ -449,29 +457,39 @@ def calculate_bookmark(mysql_conn, binlog_streams_map, state) -> Tuple[str, int]
 
 def verify_binlog_checkpoint(mysql_conn, log_file, log_pos, require_transaction_boundary=False):
     """Require decode context, or a whole-transaction boundary when converting to GTID."""
-    with connect_with_backoff(mysql_conn) as open_conn:
-        with open_conn.cursor() as cursor:
-            cursor.execute('SHOW BINLOG EVENTS IN %s FROM %s LIMIT 16', (log_file, log_pos))
-            events = cursor.fetchall()
-            if not events:
-                if not require_transaction_boundary:
-                    return
-                cursor.execute('SHOW BINARY LOGS')
-                if any(row[0] == log_file and row[1] == log_pos for row in cursor.fetchall()):
-                    return
     safe_events = {'gtid', 'rotate'}
-    neutral_events = {'format_desc', 'gtid_list', 'previous_gtids', 'stop'}
+    neutral_events = {'format_desc', 'gtid_list', 'previous_gtids', 'binlog_checkpoint', 'stop'}
     if not require_transaction_boundary:
         safe_events.update({'table_map', 'anonymous_gtid', 'query', 'xid'})
         neutral_events.update({'annotate_rows', 'rows_query'})
-    for event in events:
-        if event[4] == 0:
-            break
-        event_type = event[2].lower()
-        if event_type in safe_events:
-            return
-        if event_type not in neutral_events:
-            break
+    with connect_with_backoff(mysql_conn) as open_conn:
+        with open_conn.cursor() as cursor:
+            try:
+                cursor.execute('SHOW BINLOG EVENTS IN %s FROM %s LIMIT 16', (log_file, log_pos))
+            except (pymysql.err.InternalError, pymysql.err.OperationalError) as exc:
+                if exc.args[0] != 1220:
+                    raise
+                raise ValueError(
+                    f'Cannot validate binlog bookmark {log_file}:{log_pos}: the server could not decode the event. '
+                    'Check the bookmark and source binlog integrity; perform a full resync if the checkpoint '
+                    f'cannot be recovered safely. Server error: {exc}') from exc
+            events = cursor.fetchall()
+            if not events and not require_transaction_boundary:
+                return
+            for event in events:
+                if event[4] == 0:
+                    break
+                event_type = event[2].lower()
+                if event_type in safe_events:
+                    return
+                if event_type not in neutral_events:
+                    break
+            else:
+                # A newly rotated log can contain only headers; prove their end is the actual EOF.
+                end_pos = events[-1][4] if events else log_pos
+                cursor.execute('SHOW BINARY LOGS')
+                if any(row[0] == log_file and row[1] == end_pos for row in cursor.fetchall()):
+                    return
     raise ValueError('The binlog bookmark is not a safe transaction boundary and may omit its TABLE_MAP; '
                      'perform a full resync before resuming replication.')
 
@@ -689,6 +707,8 @@ def _position_at_or_before(log_file, log_pos, other_file, other_pos):
 
 def _event_already_bookmarked(bookmark, log_file, log_pos, transaction, engine):
     """Do not replay an advanced stream while catching up another stream."""
+    if transaction is True:
+        raise ValueError('GTID replication encountered a transaction without a GTID marker; perform a full resync.')
     position = bookmark.get('gtid')
     if position and transaction:
         if engine != connection.MARIADB_ENGINE:
@@ -720,13 +740,17 @@ class _BinlogCheckpoint:
         if isinstance(event, (MariadbGtidEvent, GtidEvent)):
             self.pending = event.gtid
             self.standalone = isinstance(event, MariadbGtidEvent) and bool(event.flags & 1)
-            self.in_transaction = False
+            # MariaDB's non-standalone GTID replaces the BEGIN query event.
+            self.in_transaction = isinstance(event, MariadbGtidEvent) and not self.standalone
             return
-        if isinstance(event, TableMapEvent) and self.pending is None:
+        starts_without_gtid = isinstance(event, TableMapEvent) or (
+            isinstance(event, QueryEvent) and event.query.strip().upper() == 'BEGIN')
+        if starts_without_gtid and self.pending is None:
+            if self.use_gtid:
+                raise ValueError('GTID replication encountered a transaction without a GTID marker; '
+                                 'perform a full resync.')
             self.pending = True
-            self.standalone = True
-        if isinstance(event, QueryEvent) and event.query.strip().upper() == 'BEGIN' and self.pending is None:
-            self.pending = True
+            self.standalone = isinstance(event, TableMapEvent)
         if not self.pending:
             return
 
@@ -742,14 +766,19 @@ class _BinlogCheckpoint:
             completed = bool(event.flags & 1)
 
         if completed:
-            if self.use_gtid:
-                if self.pending is True:
-                    raise ValueError('GTID replication encountered a transaction without a GTID marker.')
-                self.position = merge_gtid_position(self.position, self.pending, self.engine)
-                self.reader.auto_position = self.position
-            self.pending = None
-            self.in_transaction = False
-            self.standalone = False
+            self.complete()
+
+    def complete(self):
+        """Record a transaction only after its terminating boundary was consumed."""
+        if self.use_gtid:
+            if self.pending is True:
+                raise ValueError('GTID replication encountered a transaction without a GTID marker; '
+                                 'perform a full resync.')
+            self.position = merge_gtid_position(self.position, self.pending, self.engine)
+            self.reader.auto_position = self.position
+        self.pending = None
+        self.in_transaction = False
+        self.standalone = False
 
 
 def _reject_unsupported_query(event, streams, bookmarks, reader, transaction, engine):
@@ -815,6 +844,16 @@ def _run_binlog_sync(  # noqa: C901
         log_file = reader.log_file
         log_pos = reader.log_pos
 
+        # Schema filtering hides row endings; a different GTID proves the standalone group finished.
+        # A repeated marker can replay an unacknowledged group after a GTID reconnect.
+        if (checkpoint.standalone and isinstance(binlog_event, (MariadbGtidEvent, GtidEvent))
+                and binlog_event.gtid != checkpoint.pending):
+            previous_end = binlog_event.packet.log_pos - binlog_event.packet.event_size
+            if _position_at_or_before(log_file, previous_end, end_log_file, end_log_pos):
+                checkpoint.complete()
+                gtid_pos = checkpoint.position
+                bookmark_log_file, bookmark_log_pos = log_file, previous_end
+
         # The iterator across python-mysql-replication's fetchone method should ultimately terminate
         # upon receiving an EOF packet. There seem to be some cases when a MySQL server will not send
         # one causing binlog replication to hang.
@@ -848,6 +887,8 @@ def _run_binlog_sync(  # noqa: C901
                 binlog_event, binlog_streams_map, initial_bookmarks, reader,
                 checkpoint.pending if checkpoint.use_gtid else None, config['engine'])
         elif isinstance(binlog_event, NotImplementedEvent):
+            if checkpoint.use_gtid and binlog_event.event_type == 34:
+                raise ValueError('GTID replication encountered an anonymous transaction; perform a full resync.')
             # MySQL partial rows/transaction payloads and MariaDB compressed query/row events.
             if binlog_event.event_type in {39, 40, 165, 166, 167, 168, 169, 170, 171}:
                 raise ValueError('tap-mysql cannot decode partial-JSON or compressed binlog events; '
@@ -985,6 +1026,13 @@ def _run_binlog_sync(  # noqa: C901
 
         if log_file == end_log_file and log_pos == end_log_pos:
             break
+    else:
+        # EOF must reach the sampled endpoint after consuming hidden rows, not merely the standalone GTID.
+        if (checkpoint.standalone and reader.log_file == end_log_file
+                and reader.log_pos == end_log_pos and reader.log_pos != log_pos):
+            checkpoint.complete()
+            gtid_pos = checkpoint.position
+            bookmark_log_file, bookmark_log_pos = end_log_file, end_log_pos
 
     LOGGER.info('Processed %s rows', processed_rows_events)
 

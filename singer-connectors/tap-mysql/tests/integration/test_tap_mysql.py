@@ -1117,11 +1117,14 @@ class TestBinlogReplication(unittest.TestCase):
         config['use_gtid'] = True
         config['engine'] = engine
 
-        with self.assertRaises(Exception) as context:
+        with self.assertRaises(ValueError) as context:
             tap_mysql.do_sync(self.conn, config, self.catalog, self.state)
 
-        self.assertEqual("Couldn't find any gtid in state bookmarks to resume logical replication",
-                         str(context.exception))
+        self.assertEqual(
+            "Couldn't find any gtid in state bookmarks to resume logical replication; "
+            'missing GTID bookmarks: tap_mysql_test-binlog_1, tap_mysql_test-binlog_2. '
+            'Perform a full resync of the affected streams before replication.',
+            str(context.exception))
 
     def test_binlog_stream_switching_from_binlog_to_gtid_with_mariadb_success(self):
         global SINGER_MESSAGES

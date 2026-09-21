@@ -1,4 +1,4 @@
-0.90.0 (2026-09-20)
+0.90.0 (2026-09-21)
 -------------------
 
 **Replication correctness**
@@ -6,6 +6,8 @@
 - Keep MySQL and MariaDB file/position and GTID checkpoints behind incomplete
   transactions so restarts retain table mappings and all rows; preserve
   complete server/domain history for GTID restart and reconnect
+- Keep MariaDB savepoints inside their transaction until commit, and advance
+  past schema-filtered standalone transactions only at proven boundaries
 - Skip already acknowledged events per stream when restarting from a shared
   binlog position, preventing replay from overwriting newer target rows
 - Process binlog row events at the sampled end position instead of skipping
@@ -35,14 +37,21 @@
   silently skipping events whose table metadata is unavailable
 - Require a one-time FullSync for existing MySQL/MariaDB GTID checkpoints that
   lack the new complete-history marker; older checkpoints can omit source history
+- List every selected stream with missing or legacy GTIDs in startup errors
+  so operators can identify the required resync scope
 - Reject unsafe legacy row-event bookmarks with a resync requirement; reject
   multi-channel replica coordinates, XA transactions, selected-table TRUNCATE,
   and unsupported partial-JSON or compressed binlog events instead of
   acknowledging lost data
 - Infer MariaDB GTIDs from file/position bookmarks only at verified transaction
   boundaries, avoiding acknowledgements of partially consumed transactions
+- Accept MariaDB rotated-binlog headers, including header-only files at verified
+  EOF, without unnecessary resync demands
+- Report undecodable bookmarks and missing or anonymous GTID markers with
+  actionable recovery errors
 - Stop file/position binlog reads on connection loss so retries use durable
-  checkpoints rather than the decoder's potentially mid-transaction position
+  checkpoints rather than the decoder's potentially mid-transaction position;
+  retain retries for separate table-metadata connections
 - Retain complete GTID sets in state; older versions cannot reliably resume
   multi-server or multi-domain checkpoints. Resolve pending managed-Iceberg
   recovery with its original charset before adopting the new default

@@ -159,11 +159,11 @@ def make_connection_wrapper(config):
     class ConnectionWrapper(MySQLConnection):
         def __init__(self, *args, **kwargs):
             self._fail_on_disconnect = False
-            config["cursorclass"] = kwargs.get('cursorclass')
-            super().__init__(config)
+            super().__init__({**config, 'cursorclass': kwargs.get('cursorclass')})
 
             connect_with_backoff(self)
-            self._fail_on_disconnect = not config.get('use_gtid', False)
+            # The decoder also uses this wrapper for retryable information_schema lookups.
+            self._fail_on_disconnect = kwargs.get('db') != 'information_schema' and not config.get('use_gtid', False)
 
         def _read_packet(self, *args, **kwargs):
             try:

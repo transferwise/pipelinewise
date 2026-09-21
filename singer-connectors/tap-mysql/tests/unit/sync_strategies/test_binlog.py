@@ -2189,8 +2189,11 @@ class TestBinlogSyncStrategy(TestCase):
         with self.assertRaises(Exception) as context:
             binlog.calculate_gtid_bookmark(mysql_conn, binlog_streams, state, connection.MYSQL_ENGINE)
 
-        self.assertEqual("Couldn't find any gtid in state bookmarks to resume logical replication",
-                         str(context.exception))
+        self.assertEqual(
+            "Couldn't find any gtid in state bookmarks to resume logical replication; "
+            'missing GTID bookmarks: stream1, stream2, stream3. '
+            'Perform a full resync of the affected streams before replication.',
+            str(context.exception))
 
     def test_row_to_singer_record(self):
         catalog_entry = CatalogEntry(
