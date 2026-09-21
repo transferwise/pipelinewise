@@ -41,6 +41,7 @@ def tap_type_to_target_type(mysql_type, mysql_column_type):
         'multilinestring': 'JSONB',
         'multipolygon': 'JSONB',
         'geometrycollection': 'JSONB',
+        'geomcollection': 'JSONB',
         'text': 'CHARACTER VARYING',
         'tinytext': 'CHARACTER VARYING',
         'mediumtext': 'CHARACTER VARYING',

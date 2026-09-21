@@ -1,4 +1,5 @@
 import os
+import re
 import unittest
 from unittest.mock import patch
 
@@ -46,6 +47,11 @@ class TestTypeMapping(unittest.TestCase):
         conn = test_utils.get_test_connection()
 
         with connect_with_backoff(conn) as open_conn:
+            version = open_conn.get_server_info()
+            cls.modern_mysql = (
+                'MariaDB' not in version
+                and tuple(int(part) for part in version.split('-')[0].split('.')[:3]) >= (8, 0, 19)
+            )
             with open_conn.cursor() as cur:
                 cur.execute('''
                 CREATE TABLE test_type_mapping (
@@ -86,6 +92,10 @@ class TestTypeMapping(unittest.TestCase):
     def get_metadata_for_column(self, colName):
         return next(md for md in self.metadata if md['breadcrumb'] == ('properties', colName))['metadata']
 
+    def integer_column_type(self, legacy_type):
+        # MySQL 8.0.19 removes display widths except signed TINYINT(1).
+        return re.sub(r'\(\d+\)', '', legacy_type) if self.modern_mysql else legacy_type
+
     def test_decimal(self):
         self.assertEqual(self.schema.properties['c_decimal'],
                          Schema(['null', 'number'],
@@ -124,7 +134,7 @@ class TestTypeMapping(unittest.TestCase):
                                 maximum=127))
         self.assertEqual(self.get_metadata_for_column('c_tinyint'),
                          {'selected-by-default': True,
-                          'sql-datatype': 'tinyint(4)',
+                          'sql-datatype': self.integer_column_type('tinyint(4)'),
                           'datatype': 'tinyint'})
 
     def test_tinyint_1(self):
@@ -137,12 +147,15 @@ class TestTypeMapping(unittest.TestCase):
                           'datatype': 'tinyint'})
 
     def test_tinyint_1_unsigned(self):
+        expected_schema = (
+            Schema(['null', 'integer'], inclusion='available', minimum=0, maximum=255)
+            if self.modern_mysql else Schema(['null', 'boolean'], inclusion='available')
+        )
         self.assertEqual(self.schema.properties['c_tinyint_1_unsigned'],
-                         Schema(['null', 'boolean'],
-                                inclusion='available'))
+                         expected_schema)
         self.assertEqual(self.get_metadata_for_column('c_tinyint_1_unsigned'),
                          {'selected-by-default': True,
-                          'sql-datatype': 'tinyint(1) unsigned',
+                          'sql-datatype': self.integer_column_type('tinyint(1) unsigned'),
                           'datatype': 'tinyint'})
 
     def test_smallint(self):
@@ -153,7 +166,7 @@ class TestTypeMapping(unittest.TestCase):
                                 maximum=32767))
         self.assertEqual(self.get_metadata_for_column('c_smallint'),
                          {'selected-by-default': True,
-                          'sql-datatype': 'smallint(6)',
+                          'sql-datatype': self.integer_column_type('smallint(6)'),
                           'datatype': 'smallint'})
 
     def test_mediumint(self):
@@ -164,7 +177,7 @@ class TestTypeMapping(unittest.TestCase):
                                 maximum=8388607))
         self.assertEqual(self.get_metadata_for_column('c_mediumint'),
                          {'selected-by-default': True,
-                          'sql-datatype': 'mediumint(9)',
+                          'sql-datatype': self.integer_column_type('mediumint(9)'),
                           'datatype': 'mediumint'})
 
     def test_int(self):
@@ -175,7 +188,7 @@ class TestTypeMapping(unittest.TestCase):
                                 maximum=2147483647))
         self.assertEqual(self.get_metadata_for_column('c_int'),
                          {'selected-by-default': True,
-                          'sql-datatype': 'int(11)',
+                          'sql-datatype': self.integer_column_type('int(11)'),
                           'datatype': 'int'})
 
     def test_bigint(self):
@@ -186,7 +199,7 @@ class TestTypeMapping(unittest.TestCase):
                                 maximum=9223372036854775807))
         self.assertEqual(self.get_metadata_for_column('c_bigint'),
                          {'selected-by-default': True,
-                          'sql-datatype': 'bigint(20)',
+                          'sql-datatype': self.integer_column_type('bigint(20)'),
                           'datatype': 'bigint'})
 
     def test_bigint_unsigned(self):
@@ -198,7 +211,7 @@ class TestTypeMapping(unittest.TestCase):
 
         self.assertEqual(self.get_metadata_for_column('c_bigint_unsigned'),
                          {'selected-by-default': True,
-                          'sql-datatype': 'bigint(20) unsigned',
+                          'sql-datatype': self.integer_column_type('bigint(20) unsigned'),
                           'datatype': 'bigint'})
 
     def test_float(self):
@@ -253,7 +266,7 @@ class TestTypeMapping(unittest.TestCase):
                          'unsupported')
         self.assertEqual(self.get_metadata_for_column('c_year'),
                          {'selected-by-default': False,
-                          'sql-datatype': 'year(4)',
+                          'sql-datatype': self.integer_column_type('year(4)'),
                           'datatype': 'year'})
 
     def test_pk(self):
@@ -332,14 +345,15 @@ class TestTypeMapping(unittest.TestCase):
                           'datatype': 'multipolygon'})
 
     def test_geometrycollection(self):
+        data_type = 'geomcollection' if self.modern_mysql else 'geometrycollection'
         self.assertEqual(self.schema.properties['c_geometrycollection'],
                          Schema(['null', 'object'],
                                 format='spatial',
                                 inclusion='available'))
         self.assertEqual(self.get_metadata_for_column('c_geometrycollection'),
                          {'selected-by-default': True,
-                          'sql-datatype': 'geometrycollection',
-                          'datatype': 'geometrycollection'})
+                          'sql-datatype': data_type,
+                          'datatype': data_type})
 
 
 class TestSelectsAppropriateColumns(unittest.TestCase):
@@ -1028,11 +1042,13 @@ class TestBinlogReplication(unittest.TestCase):
                                            'tap_mysql_test-binlog_1',
                                            'gtid',
                                            gtid)
+        self.state = singer.write_bookmark(self.state, 'tap_mysql_test-binlog_1', 'gtid_complete', True)
 
         self.state = singer.write_bookmark(self.state,
                                            'tap_mysql_test-binlog_2',
                                            'gtid',
                                            gtid)
+        self.state = singer.write_bookmark(self.state, 'tap_mysql_test-binlog_2', 'gtid_complete', True)
 
         with connect_with_backoff(self.conn) as open_conn:
             with open_conn.cursor() as cursor:
@@ -1101,11 +1117,14 @@ class TestBinlogReplication(unittest.TestCase):
         config['use_gtid'] = True
         config['engine'] = engine
 
-        with self.assertRaises(Exception) as context:
+        with self.assertRaises(ValueError) as context:
             tap_mysql.do_sync(self.conn, config, self.catalog, self.state)
 
-        self.assertEqual("Couldn't find any gtid in state bookmarks to resume logical replication",
-                         str(context.exception))
+        self.assertEqual(
+            "Couldn't find any gtid in state bookmarks to resume logical replication; "
+            'missing GTID bookmarks: tap_mysql_test-binlog_1, tap_mysql_test-binlog_2. '
+            'Perform a full resync of the affected streams before replication.',
+            str(context.exception))
 
     def test_binlog_stream_switching_from_binlog_to_gtid_with_mariadb_success(self):
         global SINGER_MESSAGES
@@ -1256,8 +1275,8 @@ class TestJsonTables(unittest.TestCase):
 
         with connect_with_backoff(self.conn) as open_conn:
             with open_conn.cursor() as cursor:
-                cursor.execute('CREATE TABLE json_table (val json)')
-                cursor.execute('INSERT INTO json_table (val) VALUES ( \'{"a": 10, "b": "c"}\')')
+                cursor.execute('CREATE TABLE `json_table` (val json)')
+                cursor.execute('INSERT INTO `json_table` (val) VALUES ( \'{"a": 10, "b": "c"}\')')
 
         self.catalog = test_utils.discover_catalog(self.conn, {})
         for stream in self.catalog.streams:

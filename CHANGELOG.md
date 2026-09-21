@@ -1,3 +1,72 @@
+0.90.0 (2026-09-21)
+-------------------
+
+**Replication correctness**
+
+- Keep MySQL and MariaDB file/position and GTID checkpoints behind incomplete
+  transactions so restarts retain table mappings and all rows; preserve
+  complete server/domain history for GTID restart and reconnect
+- Keep MariaDB savepoints inside their transaction until commit, and advance
+  past schema-filtered standalone transactions only at proven boundaries
+- Skip already acknowledged events per stream when restarting from a shared
+  binlog position, preventing replay from overwriting newer target rows
+- Process binlog row events at the sampled end position instead of skipping
+  the final event, and honour MariaDB file/position bookmarks without GTID
+- Delete the previous target identity when a MySQL or MariaDB primary-key value
+  changes during binlog replication
+- Preserve distinct composite and empty-string primary keys in Snowflake target
+  buffers, avoiding silent row loss and duplicate merge inputs
+- Withhold Snowflake target state until the corresponding streams are durable,
+  including the first checkpoint when per-stream flushing is enabled
+- Start Singer from the replica's applied primary-binlog coordinates after
+  FastSync, replaying changes missing from a lagging replica snapshot
+- Preserve supplementary Unicode through MySQL and MariaDB Singer, FullSync,
+  and PartialSync with an `utf8mb4` connection default and FastSync projection
+- Scope binlog column rediscovery to the affected schema and stream so another
+  table's ignored columns cannot suppress schema updates
+- Recognize MySQL's `geomcollection` type in Singer discovery and FastSync
+  mappings instead of silently omitting geometry-collection columns
+- Preserve MySQL and MariaDB TIME microseconds and signs in Singer records
+
+**Compatibility and operations**
+
+- Run the dev-project and GitHub E2E MySQL and MariaDB sources with
+  `binlog_row_metadata=FULL` while retaining mysql-replication 0.46, proving
+  current replication remains compatible ahead of a future decoder upgrade
+- Recheck ROW/FULL binlog settings on resumed replication and fail instead of
+  silently skipping events whose table metadata is unavailable
+- Require a one-time FullSync for existing MySQL/MariaDB GTID checkpoints that
+  lack the new complete-history marker; older checkpoints can omit source history
+- List every selected stream with missing or legacy GTIDs in startup errors
+  so operators can identify the required resync scope
+- Reject unsafe legacy row-event bookmarks with a resync requirement; reject
+  multi-channel replica coordinates, XA transactions, selected-table TRUNCATE,
+  and unsupported partial-JSON or compressed binlog events instead of
+  acknowledging lost data
+- Infer MariaDB GTIDs from file/position bookmarks only at verified transaction
+  boundaries, avoiding acknowledgements of partially consumed transactions
+- Accept MariaDB rotated-binlog headers, including header-only files at verified
+  EOF, without unnecessary resync demands
+- Report undecodable bookmarks and missing or anonymous GTID markers with
+  actionable recovery errors
+- Stop file/position binlog reads on connection loss so retries use durable
+  checkpoints rather than the decoder's potentially mid-transaction position;
+  retain retries for separate table-metadata connections
+- Retain complete GTID sets in state; older versions cannot reliably resume
+  multi-server or multi-domain checkpoints. Resolve pending managed-Iceberg
+  recovery with its original charset before adopting the new default
+- Support current MySQL binary-log status statements with legacy syntax
+  fallback; existing missing or corrupted target data still requires resync
+
+**Dependencies**
+
+- Update the Snowflake Python connector to 4.7.3 in core and target-snowflake,
+  PyMySQL to 1.1.3 in core and tap-mysql, and the target's Boto3 pin to 1.43.94
+- Update sqlparse to 0.6.0 to include denial-of-service fixes in PartialSync SQL
+  parsing and validation
+- Retain mysql-replication 0.46: newer releases require additional source-binlog
+  metadata for reliable type decoding, so that upgrade needs separate validation
+
 0.89.0 (2026-09-18)
 -------------------
 

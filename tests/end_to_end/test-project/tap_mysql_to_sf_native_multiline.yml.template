@@ -23,5 +23,4 @@ schemas:
     target_schema: "ppw_e2e_tap_mysql_2${TARGET_SNOWFLAKE_SCHEMA_POSTFIX}"
     tables:
       - table_name: "multiline_values"
-        replication_method: "INCREMENTAL"
-        replication_key: "id"
+        replication_method: "LOG_BASED"

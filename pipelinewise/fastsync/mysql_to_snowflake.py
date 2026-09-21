@@ -67,6 +67,7 @@ def tap_type_to_target_type(mysql_type, mysql_column_type):
         'multilinestring': 'VARIANT',
         'multipolygon': 'VARIANT',
         'geometrycollection': 'VARIANT',
+        'geomcollection': 'VARIANT',
         'text': SNOWFLAKE_MAX_VARCHAR,
         'tinytext': SNOWFLAKE_MAX_VARCHAR,
         'mediumtext': SNOWFLAKE_MAX_VARCHAR,

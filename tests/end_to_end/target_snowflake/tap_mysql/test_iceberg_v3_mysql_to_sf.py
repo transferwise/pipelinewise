@@ -7,6 +7,7 @@ from tests.end_to_end.target_snowflake.multiline_values import (
 )
 from tests.end_to_end.target_snowflake.tap_mysql import (
     TapMySQL,
+    exercise_mysql_replication_audit,
     mysql_initial_state_expectations,
     mysql_recurring_state_expectations,
 )
@@ -72,6 +73,12 @@ class TestIcebergV3MySQLToSnowflake(TapMySQL):
             'SELECT "ID", "VALUE_TEXT" '
             f'FROM "{self.target_schema}"."{table_name.upper()}" ORDER BY "ID"'
         )
+
+    def test_iceberg_replication_preserves_keys_and_supplementary_unicode(self):
+        """Iceberg FastSync and Singer retain every row through key changes."""
+        exercise_mysql_replication_audit(self, managed_iceberg=True)
+        self._assert_managed_v3('replication_audit')
+        self.assert_iceberg_fastsync_cleanup(self.target_schema, self.initial_s3_keys)
 
     def test_fullsync_hands_over_to_singer_on_managed_iceberg_v3(self):
         """Initial FastSync and later Singer writes preserve exact MySQL values."""

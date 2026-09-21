@@ -766,7 +766,9 @@ class TestIntegration(unittest.TestCase):
         self.config['batch_size_rows'] = 10
         self.persist_lines_with_cache(tap_lines)
 
-        # State should be emitted multiple times, updating the positions only in the stream which got flushed
+        # The fixture's first STATE follows buffered records and is not a durable baseline.
+        # The first flush drains every buffer and establishes the latest whole-state baseline;
+        # subsequent partial flushes advance only the stream which was flushed.
         self.assertEqual(
             mock_emit_state.call_args_list,
             [
@@ -774,11 +776,11 @@ class TestIntegration(unittest.TestCase):
                 mock.call({"currently_syncing": None, "bookmarks": {
                     "logical1-logical1_edgydata": {"last_replication_method": "LOG_BASED", "lsn": 108197216,
                                                    "version": 1570922723596, "xmin": None},
-                    "logical1-logical1_table1": {"last_replication_method": "LOG_BASED", "lsn": 108196176,
+                    "logical1-logical1_table1": {"last_replication_method": "LOG_BASED", "lsn": 108197216,
                                                  "version": 1570922723618, "xmin": None},
-                    "logical1-logical1_table2": {"last_replication_method": "LOG_BASED", "lsn": 108196176,
+                    "logical1-logical1_table2": {"last_replication_method": "LOG_BASED", "lsn": 108197216,
                                                  "version": 1570922723635, "xmin": None},
-                    "logical2-logical2_table1": {"last_replication_method": "LOG_BASED", "lsn": 108196176,
+                    "logical2-logical2_table1": {"last_replication_method": "LOG_BASED", "lsn": 108197216,
                                                  "version": 1570922723651, "xmin": None},
                     "public-city": {"last_replication_method": "INCREMENTAL", "replication_key": "id",
                                     "version": 1570922723667, "replication_key_value": 4079},
@@ -788,11 +790,11 @@ class TestIntegration(unittest.TestCase):
                 mock.call({"currently_syncing": None, "bookmarks": {
                     "logical1-logical1_edgydata": {"last_replication_method": "LOG_BASED", "lsn": 108197216,
                                                    "version": 1570922723596, "xmin": None},
-                    "logical1-logical1_table1": {"last_replication_method": "LOG_BASED", "lsn": 108196176,
+                    "logical1-logical1_table1": {"last_replication_method": "LOG_BASED", "lsn": 108197216,
                                                  "version": 1570922723618, "xmin": None},
                     "logical1-logical1_table2": {"last_replication_method": "LOG_BASED", "lsn": 108201336,
                                                  "version": 1570922723635, "xmin": None},
-                    "logical2-logical2_table1": {"last_replication_method": "LOG_BASED", "lsn": 108196176,
+                    "logical2-logical2_table1": {"last_replication_method": "LOG_BASED", "lsn": 108197216,
                                                  "version": 1570922723651, "xmin": None},
                     "public-city": {"last_replication_method": "INCREMENTAL", "replication_key": "id",
                                     "version": 1570922723667, "replication_key_value": 4079},
@@ -802,11 +804,11 @@ class TestIntegration(unittest.TestCase):
                 mock.call({"currently_syncing": None, "bookmarks": {
                     "logical1-logical1_edgydata": {"last_replication_method": "LOG_BASED", "lsn": 108197216,
                                                    "version": 1570922723596, "xmin": None},
-                    "logical1-logical1_table1": {"last_replication_method": "LOG_BASED", "lsn": 108196176,
+                    "logical1-logical1_table1": {"last_replication_method": "LOG_BASED", "lsn": 108197216,
                                                  "version": 1570922723618, "xmin": None},
                     "logical1-logical1_table2": {"last_replication_method": "LOG_BASED", "lsn": 108237600,
                                                  "version": 1570922723635, "xmin": None},
-                    "logical2-logical2_table1": {"last_replication_method": "LOG_BASED", "lsn": 108196176,
+                    "logical2-logical2_table1": {"last_replication_method": "LOG_BASED", "lsn": 108197216,
                                                  "version": 1570922723651, "xmin": None},
                     "public-city": {"last_replication_method": "INCREMENTAL", "replication_key": "id",
                                     "version": 1570922723667, "replication_key_value": 4079},
@@ -816,11 +818,11 @@ class TestIntegration(unittest.TestCase):
                 mock.call({"currently_syncing": None, "bookmarks": {
                     "logical1-logical1_edgydata": {"last_replication_method": "LOG_BASED", "lsn": 108197216,
                                                    "version": 1570922723596, "xmin": None},
-                    "logical1-logical1_table1": {"last_replication_method": "LOG_BASED", "lsn": 108196176,
+                    "logical1-logical1_table1": {"last_replication_method": "LOG_BASED", "lsn": 108197216,
                                                  "version": 1570922723618, "xmin": None},
                     "logical1-logical1_table2": {"last_replication_method": "LOG_BASED", "lsn": 108238768,
                                                  "version": 1570922723635, "xmin": None},
-                    "logical2-logical2_table1": {"last_replication_method": "LOG_BASED", "lsn": 108196176,
+                    "logical2-logical2_table1": {"last_replication_method": "LOG_BASED", "lsn": 108197216,
                                                  "version": 1570922723651, "xmin": None},
                     "public-city": {"last_replication_method": "INCREMENTAL", "replication_key": "id",
                                     "version": 1570922723667, "replication_key_value": 4079},
@@ -830,11 +832,11 @@ class TestIntegration(unittest.TestCase):
                 mock.call({"currently_syncing": None, "bookmarks": {
                     "logical1-logical1_edgydata": {"last_replication_method": "LOG_BASED", "lsn": 108197216,
                                                    "version": 1570922723596, "xmin": None},
-                    "logical1-logical1_table1": {"last_replication_method": "LOG_BASED", "lsn": 108196176,
+                    "logical1-logical1_table1": {"last_replication_method": "LOG_BASED", "lsn": 108197216,
                                                  "version": 1570922723618, "xmin": None},
                     "logical1-logical1_table2": {"last_replication_method": "LOG_BASED", "lsn": 108239896,
                                                  "version": 1570922723635, "xmin": None},
-                    "logical2-logical2_table1": {"last_replication_method": "LOG_BASED", "lsn": 108196176,
+                    "logical2-logical2_table1": {"last_replication_method": "LOG_BASED", "lsn": 108197216,
                                                  "version": 1570922723651, "xmin": None},
                     "public-city": {"last_replication_method": "INCREMENTAL", "replication_key": "id",
                                     "version": 1570922723667, "replication_key_value": 4079},

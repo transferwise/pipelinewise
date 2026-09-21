@@ -303,8 +303,26 @@ The tap support two ways of consuming log events: using binlog coordinates or GT
 binlog coordinates, when turning the `use_gtid` flag, you have to specify the engine flavor (mariadb/mysql) due to 
 how different are the GTID implementations in these two engines.
 
-When enabling the `use_gtid` flag and the engine is MariaDB, the tap will dynamically infer the GTID pos from 
-existing binlog coordinate in the state, if the engine is mysql, it will fail.
+When enabling `use_gtid`, MariaDB can infer the GTID position from existing
+file/position state only at a verified transaction boundary; ambiguous positions
+require FullSync. MySQL does not support this conversion.
+
+Checkpoints advance only at safe transaction boundaries. GTID bookmarks retain
+the complete MySQL UUID or MariaDB domain set, and each stream skips events it
+has already acknowledged. New complete sets include `gtid_complete: true`.
+Existing MySQL/MariaDB GTID checkpoints without that marker require a one-time
+FullSync: both singletons and ranges can omit previously acknowledged history.
+Do not add the marker manually or invent executed ranges. Rejection does not
+reset state or automatically resync the target. Identifiably unsafe legacy
+file/position bookmarks inside row events also require a resync. A saved
+position cannot prove that older runs emitted every row; resync tables with
+suspected historical omissions. In file/position mode a lost binlog connection
+stops the run; retry normally from durable state instead of resuming at the
+decoder's potentially mid-transaction packet position. GTID reconnects remain enabled.
+
+Keep `binlog_format=ROW` and `binlog_row_image=FULL`. Partial-JSON events,
+compressed binlog events, XA transactions, and selected-table `TRUNCATE` are
+unsupported and stop replication rather than silently acknowledging lost data.
 
 #### State when using binlog coordinates
 ```json
@@ -321,12 +339,16 @@ existing binlog coordinate in the state, if the engine is mysql, it will fail.
 ```json
 {
   "bookmarks": {
-    "example_db-table1": {"log_file": "mysql-binlog.0003", "log_pos": 3244, "gtid": "0:364864374:599"},
-    "example_db-table2": {"log_file": "mysql-binlog.0001", "log_pos": 42, "gtid": "0:364864374:375"},
-    "example_db-table3": {"log_file": "mysql-binlog.0003", "log_pos": 100, "gtid": "0:364864374:399"}
+    "example_db-table1": {"gtid": "0-364864374-599", "gtid_complete": true},
+    "example_db-table2": {"gtid": "0-364864374-375", "gtid_complete": true},
+    "example_db-table3": {"gtid": "0-364864374-399", "gtid_complete": true}
   }
 }
 ```
+
+This GTID example uses MariaDB's `domain-server-sequence` syntax. MySQL uses
+UUID interval sets, for example `24bc7850-2c16-11e6-a073-0242ac110002:1-599`;
+complete sets can contain multiple UUIDs/domains and MySQL interval gaps.
 
 ### Full Table
 

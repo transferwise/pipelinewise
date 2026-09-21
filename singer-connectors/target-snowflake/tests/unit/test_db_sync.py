@@ -327,12 +327,12 @@ class TestDBSync(unittest.TestCase):
 
         # Single primary key string
         dbsync = db_sync.DbSync(minimal_config, stream_schema_message)
-        self.assertEqual(dbsync.record_primary_key_string({'id': 123}), '123')
+        self.assertEqual(dbsync.record_primary_key_string({'id': 123}), '["123"]')
 
         # Composite primary key string
         stream_schema_message['key_properties'] = ['id', 'c_str']
         dbsync = db_sync.DbSync(minimal_config, stream_schema_message)
-        self.assertEqual(dbsync.record_primary_key_string({'id': 123, 'c_str': 'xyz'}), '123,xyz')
+        self.assertEqual(dbsync.record_primary_key_string({'id': 123, 'c_str': 'xyz'}), '["123","xyz"]')
 
         # Missing field as PK
         stream_schema_message['key_properties'] = ['invalid_col']
@@ -353,12 +353,12 @@ class TestDBSync(unittest.TestCase):
         # falsy PK field accepted
         stream_schema_message['key_properties'] = ['id']
         dbsync = db_sync.DbSync(minimal_config, stream_schema_message)
-        self.assertEqual(dbsync.record_primary_key_string({'id': 0, 'c_str': 'xyz'}), '0')
+        self.assertEqual(dbsync.record_primary_key_string({'id': 0, 'c_str': 'xyz'}), '["0"]')
 
         # falsy PK field accepted
         stream_schema_message['key_properties'] = ['id', 'c_bool']
         dbsync = db_sync.DbSync(minimal_config, stream_schema_message)
-        self.assertEqual(dbsync.record_primary_key_string({'id': 1, 'c_bool': False, 'c_str': 'xyz'}), '1,False')
+        self.assertEqual(dbsync.record_primary_key_string({'id': 1, 'c_bool': False, 'c_str': 'xyz'}), '["1","False"]')
 
     @patch('target_snowflake.db_sync.DbSync.query')
     def test_patch_record_mode_and_present_flattened_columns(self, query_patch):
