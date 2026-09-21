@@ -59,6 +59,11 @@ The same ``run_tap`` invocation then starts Singer for ongoing log consumption.
 The source must retain change-log data until the target-acknowledged bookmark has
 advanced beyond it.
 
+MySQL/MariaDB checkpoints wait for complete transactions and preserve each
+stream's acknowledged history. Unsupported binlog encodings and selected-table
+``TRUNCATE`` stop replication; see :ref:`tap-mysql` for source settings and
+legacy-checkpoint recovery requirements.
+
 .. warning::
 
    Losing a binlog, logical replication slot, WAL range, or change-stream token

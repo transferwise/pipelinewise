@@ -484,12 +484,17 @@ position is purged, the affected tables require a resync.</p>
 <td><p><code class="docutils literal notranslate"><span class="pre">50000</span></code></p></td>
 <td><p>Controls rows written per FastSync export batch.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">session_sqls</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">charset</span></code></p></td>
+<td><p>No</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">utf8mb4</span></code></p></td>
+<td><p>FastSync connection encoding; Singer connections always use <code class="docutils literal notranslate"><span class="pre">utf8mb4</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">session_sqls</span></code></p></td>
 <td><p>No</p></td>
 <td><p>Connector defaults</p></td>
 <td><p>Sets session variables after connecting.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fastsync_parallelism</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fastsync_parallelism</span></code></p></td>
 <td><p>No</p></td>
 <td><p>CPU count</p></td>
 <td><p>Controls concurrent FastSync table exports.</p></td>
@@ -504,15 +509,61 @@ full template with <code class="docutils literal notranslate"><span class="pre">
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">binlog_row_image</span></code> must remain <code class="docutils literal notranslate"><span class="pre">FULL</span></code>; sparse row images can omit values
 required to reconstruct a target row.</p></li>
-<li><p>The connector interprets <code class="docutils literal notranslate"><span class="pre">TINYINT</span></code> as Boolean. Values outside <code class="docutils literal notranslate"><span class="pre">0</span></code> and <code class="docutils literal notranslate"><span class="pre">1</span></code>
-can fail when the target column is Boolean.</p></li>
+<li><p>MySQL partial-JSON events and MySQL/MariaDB compressed binlog events are not
+supported by the bundled decoder. Keep <code class="docutils literal notranslate"><span class="pre">binlog_row_value_options</span></code> empty,
+<code class="docutils literal notranslate"><span class="pre">binlog_transaction_compression</span></code> disabled, and MariaDB <code class="docutils literal notranslate"><span class="pre">log_bin_compress</span></code>
+disabled where these variables exist.
+Previously logged unsupported events still require a resync.</p></li>
+<li><p>GTID checkpoints advance only after the transaction has been emitted and
+retain all source UUIDs or MariaDB domains. Keep the upgraded connector when
+resuming these complete-set bookmarks; older versions cannot reliably parse
+multi-source history. XA transactions are not supported.</p></li>
+<li><p>Existing MySQL/MariaDB GTID bookmarks without <code class="docutils literal notranslate"><span class="pre">gtid_complete:</span> <span class="pre">true</span></code> require
+a one-time FullSync before resuming. Older taps retained only a latest
+transaction or partial source history; even a range-shaped bookmark can omit
+previous-primary UUIDs or MariaDB domains. New snapshots set this marker only
+after capturing complete history. Do not add it manually or invent GTID ranges.
+Rejection does not modify the saved state or automatically resync the target.
+The startup error lists all selected streams with missing or incomplete legacy
+GTIDs so the required resync can be planned together.</p></li>
+<li><p>File/position checkpoints also wait for safe transaction boundaries. An
+identifiable unsafe legacy bookmark inside row events is rejected before decoding;
+resync the affected tables instead of manually advancing the bookmark.
+MariaDB can infer a GTID from a saved file/position only at a verified
+transaction boundary; ambiguous positions require FullSync instead.
+Not every historical omission can be detected from a saved position; resync
+affected tables when upgrading a tap suspected of dropping rows.</p></li>
+<li><p>A lost binlog connection in file/position mode stops the run. Retry normally
+to resume from durable state; the decoder cannot safely reconnect using its
+last packet position inside a transaction. GTID mode retains safe reconnects.
+Separate table-metadata connections can still retry transient disconnects.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">TRUNCATE</span></code> on a selected table stops binlog replication because it has no
+per-row delete images. FullSync that table to capture the resulting contents
+before resuming Singer.</p></li>
+<li><p>The connector interprets <code class="docutils literal notranslate"><span class="pre">TINYINT(1)</span></code> as Boolean; other display widths are
+integers. Snowflake bulk mappings use floating-point <code class="docutils literal notranslate"><span class="pre">DECIMAL</span></code> and Boolean
+<code class="docutils literal notranslate"><span class="pre">BIT</span></code> values, so they do not preserve arbitrary decimal precision or
+multi-bit bitsets. MySQL <code class="docutils literal notranslate"><span class="pre">TIME</span></code> values outside a 24-hour clock cannot be
+represented by Snowflake <code class="docutils literal notranslate"><span class="pre">TIME</span></code>.</p></li>
+<li><p>The bundled decoder does not distinguish SQL <code class="docutils literal notranslate"><span class="pre">NULL</span></code> from JSON literal
+<code class="docutils literal notranslate"><span class="pre">null</span></code> in native MySQL JSON binlog values. Do not rely on Singer preserving
+that distinction; this limitation does not apply to MariaDB’s JSON text alias.</p></li>
 <li><p>After an initial FastSync, LOG_BASED or INCREMENTAL replication continues from
 the captured bookmark in the Singer portion of the same run.</p></li>
+<li><p>Replica FullSync captures the primary’s applied binlog coordinates, not the
+receiver’s potentially newer position. Singer replays changes not yet present
+in the replica snapshot. Multi-channel replicas require an unambiguous source
+and are rejected rather than choosing an arbitrary channel.</p></li>
 <li><p>Snowflake Singer loading, FullSync, and PartialSync preserve line breaks,
-tabs, CSV punctuation, and literal backslash sequences in string values.
-The MySQL/MariaDB source connection and FastSync projection remain limited
-to the legacy three-byte <code class="docutils literal notranslate"><span class="pre">utf8</span></code> character set; FastSync also removes NUL
-characters.</p></li>
+tabs, CSV punctuation, literal backslash sequences, and supplementary Unicode
+in string values. Singer connections use <code class="docutils literal notranslate"><span class="pre">utf8mb4</span></code>. FastSync defaults to
+<code class="docutils literal notranslate"><span class="pre">utf8mb4</span></code> connections and uses an <code class="docutils literal notranslate"><span class="pre">utf8mb4</span></code> text projection; an explicitly
+narrower FastSync connection charset can still limit representable characters.
+FastSync removes NUL characters.</p></li>
+<li><p>Finish pending managed-Iceberg FastSync recovery before upgrading from the
+previous default charset, or retain explicit <code class="docutils literal notranslate"><span class="pre">charset:</span> <span class="pre">utf8</span></code> while finishing
+recovery. Recovery rejects a changed source encoding; use <code class="docutils literal notranslate"><span class="pre">utf8mb4</span></code> for
+subsequent runs after clearing the pending attempt.</p></li>
 <li><p>Snowflake Singer, FullSync, and PartialSync can target managed Iceberg v3 with
 explicit tap-level configuration. See <a class="reference internal" href="../targets/snowflake_iceberg.html#snowflake-iceberg"><span class="std std-ref">Snowflake Iceberg tables</span></a>.</p></li>
 <li><p>On an explicit v3 route with <code class="docutils literal notranslate"><span class="pre">engine:</span> <span class="pre">mariadb</span></code>, MariaDB’s generated
@@ -522,6 +573,12 @@ Object, array, string, number, Boolean, and null JSON roots are carried as
 validated JSON text and restored as <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code>. JSON null remains distinct
 from SQL <code class="docutils literal notranslate"><span class="pre">NULL</span></code>.</p></li>
 <li><p>Use <a class="reference internal" href="../../user_guide/troubleshooting.html#troubleshooting"><span class="std std-ref">Troubleshooting</span></a> for missing-binlog and packet-size failures.</p></li>
+<li><p>Primary-key value changes are replicated as deletion of the previous key and
+insertion of the new key. After changing the primary-key definition itself,
+refresh the catalog and resync the table; ordinary binlog replication does not
+automatically detect every key-definition change.</p></li>
+<li><p>Fixes prevent new omissions but do not repair rows already lost or corrupted.
+Use <a class="reference internal" href="../../user_guide/resync.html#resync"><span class="std std-ref">Resync and repair</span></a> to reload affected tables or an appropriate PartialSync range.</p></li>
 </ul>
 </section>
 </section>
