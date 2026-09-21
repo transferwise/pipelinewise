@@ -107,8 +107,11 @@ Configuration
      - FastSync connection encoding; Singer connections always use ``utf8mb4``.
    * - ``session_sqls``
      - No
-     - Connector defaults
-     - Sets session variables after connecting.
+     - Server-specific connector defaults
+     - Runs after the connector defaults and can extend or override them.
+       Defaults set UTC, ``wait_timeout=28800``, ``net_read_timeout=3600``, and
+       ``innodb_lock_wait_timeout=3600``. MariaDB also sets
+       ``max_statement_time=0``.
    * - ``fastsync_parallelism``
      - No
      - CPU count
@@ -123,6 +126,9 @@ Operational notes
 
 - ``binlog_row_image`` must remain ``FULL``; sparse row images can omit values
   required to reconstruct a target row.
+- PipelineWise uses an explicit ``engine`` value when present and otherwise
+  detects the connected server. MariaDB sessions set ``max_statement_time=0``
+  for Singer, FullSync, and PartialSync; MySQL sessions do not.
 - MySQL partial-JSON events and MySQL/MariaDB compressed binlog events are not
   supported by the bundled decoder. Keep ``binlog_row_value_options`` empty,
   ``binlog_transaction_compression`` disabled, and MariaDB ``log_bin_compress``
@@ -132,25 +138,27 @@ Operational notes
   retain all source UUIDs or MariaDB domains. Keep the upgraded connector when
   resuming these complete-set bookmarks; older versions cannot reliably parse
   multi-source history. XA transactions are not supported.
-- Existing MySQL/MariaDB GTID bookmarks without ``gtid_complete: true`` require
-  a one-time FullSync before resuming. Older taps retained only a latest
-  transaction or partial source history; even a range-shaped bookmark can omit
-  previous-primary UUIDs or MariaDB domains. New snapshots set this marker only
-  after capturing complete history. Do not add it manually or invent GTID ranges.
-  Rejection does not modify the saved state or automatically resync the target.
-  The startup error lists all selected streams with missing or incomplete legacy
-  GTIDs so the required resync can be planned together.
+- Legacy GTID bookmarks without ``gtid_complete: true`` are upgraded when their
+  file/position coordinates remain available. This does not require FastSync.
+  GTID-only bookmarks cannot be recovered and fail without changing state. Do
+  not add the marker manually or invent GTID ranges.
 - File/position checkpoints also wait for safe transaction boundaries. An
-  identifiable unsafe legacy bookmark inside row events is rejected before decoding;
-  resync the affected tables instead of manually advancing the bookmark.
+  unsafe legacy bookmark replays from the nearest proven boundary and skips rows
+  already acknowledged by each stream. State advances only after target
+  acknowledgement. Recovery fails without changing state if the retained binlog
+  cannot prove a boundary.
+  Proving the boundary scans that retained binlog from its beginning. Large
+  binlogs can take time and temporarily increase source read load.
   MariaDB can infer a GTID from a saved file/position only at a verified
-  transaction boundary; ambiguous positions require FullSync instead.
+  transaction boundary.
   Not every historical omission can be detected from a saved position; resync
   affected tables when upgrading a tap suspected of dropping rows.
-- A lost binlog connection in file/position mode stops the run. Retry normally
-  to resume from durable state; the decoder cannot safely reconnect using its
-  last packet position inside a transaction. GTID mode retains safe reconnects.
-  Separate table-metadata connections can still retry transient disconnects.
+- MariaDB 11.4 zero ``End_log_pos`` values are supported. Do not enable
+  ``binlog_legacy_event_pos`` for PipelineWise.
+- PipelineWise retries a lost file/position connection twice from
+  target-acknowledged state. Retries are at-least-once and remain in the run's
+  single terminal log. Standalone ``tap-mysql`` exits for its supervisor to
+  restart; GTID and metadata connections keep their safe reconnect behavior.
 - ``TRUNCATE`` on a selected table stops binlog replication because it has no
   per-row delete images. FullSync that table to capture the resulting contents
   before resuming Singer.

@@ -575,6 +575,162 @@ def test_resumed_binlog_validates_row_image_before_reading_or_acknowledging():
     output.assert_not_called()
 
 
+def test_unsafe_legacy_file_checkpoint_rewinds_runtime_reader_without_mutating_state():
+    config = {'engine': 'mariadb', 'use_gtid': False}
+    streams = {'db-items': {}}
+    state = {'bookmarks': {'db-items': {
+        'log_file': 'mysql-bin.000001', 'log_pos': 123, 'version': 1,
+    }}}
+    original = copy.deepcopy(state)
+    reader = Mock()
+
+    with patch.object(binlog, 'verify_binlog_config'), \
+            patch.object(binlog, 'calculate_bookmark', return_value=('mysql-bin.000001', 123)), \
+            patch.object(binlog, 'verify_binlog_checkpoint',
+                         side_effect=binlog.UnsafeBinlogCheckpointError('unsafe')), \
+            patch.object(binlog, 'find_binlog_transaction_start', return_value=88), \
+            patch.object(binlog, 'create_binlog_stream_reader', return_value=reader) as create_reader, \
+            patch.object(binlog, 'fetch_current_log_file_and_pos', return_value=('mysql-bin.000001', 200)), \
+            patch.object(binlog, '_run_binlog_sync', return_value=('mysql-bin.000001', 200)) as run_sync, \
+            patch.object(binlog.singer, 'write_message'):
+        binlog.sync_binlog_stream(None, config, streams, state)
+
+    create_reader.assert_called_once_with(config, 'mysql-bin.000001', 88, None)
+    run_sync.assert_called_once_with(None, reader, streams, state, config, 'mysql-bin.000001', 200)
+    reader.close.assert_called_once_with()
+    assert state == original
+
+
+def test_unknown_unsafe_checkpoint_is_not_automatically_rewound():
+    config = {'engine': 'mariadb', 'use_gtid': False}
+    state = {'bookmarks': {'db-items': {
+        'log_file': 'mysql-bin.000001', 'log_pos': 123, 'version': 1,
+    }}}
+    with patch.object(binlog, 'verify_binlog_config'), \
+            patch.object(binlog, 'calculate_bookmark', return_value=('mysql-bin.000001', 123)), \
+            patch.object(binlog, 'verify_binlog_checkpoint', side_effect=ValueError('unknown unsafe checkpoint')), \
+            patch.object(binlog, 'create_binlog_stream_reader') as create_reader:
+        with pytest.raises(ValueError, match='unknown unsafe checkpoint'):
+            binlog.sync_binlog_stream(None, config, {'db-items': {}}, state)
+    create_reader.assert_not_called()
+
+
+def test_unsafe_row_checkpoint_without_proven_boundary_fails_before_runtime_reader():
+    config = {'engine': 'mariadb', 'use_gtid': False}
+    state = {'bookmarks': {'db-items': {
+        'log_file': 'mysql-bin.000001', 'log_pos': 123, 'version': 1,
+    }}}
+    original = copy.deepcopy(state)
+    with patch.object(binlog, 'verify_binlog_config'), \
+            patch.object(binlog, 'calculate_bookmark', return_value=('mysql-bin.000001', 123)), \
+            patch.object(binlog, 'verify_binlog_checkpoint',
+                         side_effect=binlog.UnsafeBinlogCheckpointError('unsafe')), \
+            patch.object(binlog, 'find_binlog_transaction_start',
+                         side_effect=ValueError('Cannot prove a transaction boundary')), \
+            patch.object(binlog, 'create_binlog_stream_reader') as create_reader:
+        with pytest.raises(ValueError, match='Cannot prove a transaction boundary'):
+            binlog.sync_binlog_stream(None, config, {'db-items': {}}, state)
+    create_reader.assert_not_called()
+    assert state == original
+
+
+def test_legacy_gtid_checkpoint_migrates_through_file_replay_at_the_sampled_endpoint():
+    config = {'engine': 'mariadb', 'use_gtid': True}
+    streams = {'db-items': {}}
+    state = {'bookmarks': {'db-items': {
+        'log_file': 'mysql-bin.000001', 'log_pos': 123,
+        'gtid': '0-1-10', 'version': 1,
+    }}}
+    reader = Mock()
+
+    with patch.object(binlog, 'verify_binlog_config'), \
+            patch.object(binlog, 'calculate_bookmark', return_value=('mysql-bin.000001', 123)), \
+            patch.object(binlog, 'verify_binlog_checkpoint'), \
+            patch.object(binlog, 'fetch_current_binlog_checkpoint',
+                         return_value=('mysql-bin.000001', 200, '0-1-12')), \
+            patch.object(binlog, 'create_binlog_stream_reader', return_value=reader) as create_reader, \
+            patch.object(binlog, '_run_binlog_sync', return_value=('mysql-bin.000001', 200)) as run_sync, \
+            patch.object(binlog.singer, 'write_message') as output:
+        binlog.sync_binlog_stream(None, config, streams, state)
+
+    runtime_config = {'engine': 'mariadb', 'use_gtid': False}
+    create_reader.assert_called_once_with(runtime_config, 'mysql-bin.000001', 123, None)
+    run_sync.assert_called_once_with(
+        None, reader, streams, state, runtime_config, 'mysql-bin.000001', 200)
+    assert state['bookmarks']['db-items'] == {
+        'log_file': 'mysql-bin.000001', 'log_pos': 200,
+        'gtid': '0-1-12', 'gtid_complete': True, 'version': 1,
+    }
+    assert output.call_args.args[0].value == state
+
+
+def test_unsafe_legacy_gtid_checkpoint_rewinds_before_file_replay():
+    config = {'engine': 'mysql', 'use_gtid': True}
+    streams = {'db-items': {}}
+    state = {'bookmarks': {'db-items': {
+        'log_file': 'mysql-bin.000001', 'log_pos': 123,
+        'gtid': f'{MYSQL_SID}:1-10', 'gtid_complete': False, 'version': 1,
+    }}}
+    reader = Mock()
+
+    with patch.object(binlog, 'verify_binlog_config'), \
+            patch.object(binlog, 'calculate_bookmark', return_value=('mysql-bin.000001', 123)), \
+            patch.object(binlog, 'verify_binlog_checkpoint',
+                         side_effect=binlog.UnsafeBinlogCheckpointError('unsafe')), \
+            patch.object(binlog, 'find_binlog_transaction_start', return_value=88), \
+            patch.object(binlog, 'fetch_current_binlog_checkpoint',
+                         return_value=('mysql-bin.000001', 200, f'{MYSQL_SID}:1-12')), \
+            patch.object(binlog, 'create_binlog_stream_reader', return_value=reader) as create_reader, \
+            patch.object(binlog, '_run_binlog_sync', return_value=('mysql-bin.000001', 200)), \
+            patch.object(binlog.singer, 'write_message'):
+        binlog.sync_binlog_stream(None, config, streams, state)
+
+    create_reader.assert_called_once_with(
+        {'engine': 'mysql', 'use_gtid': False}, 'mysql-bin.000001', 88, None)
+    assert state['bookmarks']['db-items']['gtid'] == f'{MYSQL_SID}:1-12'
+    assert state['bookmarks']['db-items']['gtid_complete'] is True
+
+
+def test_legacy_gtid_migration_without_file_coordinates_does_not_mutate_or_emit_state():
+    config = {'engine': 'mariadb', 'use_gtid': True}
+    state = {'bookmarks': {'db-items': {'gtid': '0-1-10', 'version': 1}}}
+    original = copy.deepcopy(state)
+    with patch.object(binlog, 'verify_binlog_config'), \
+            patch.object(binlog, 'create_binlog_stream_reader') as create_reader, \
+            patch.object(binlog.singer, 'write_message') as output:
+        with pytest.raises(ValueError, match='require retained file/position coordinates'):
+            binlog.sync_binlog_stream(None, config, {'db-items': {}}, state)
+    create_reader.assert_not_called()
+    output.assert_not_called()
+    assert state == original
+
+
+def test_legacy_gtid_migration_promotes_no_gtid_before_reaching_sampled_endpoint():
+    config = {'engine': 'mariadb', 'use_gtid': True}
+    streams = {'db-items': {}}
+    state = {'bookmarks': {'db-items': {
+        'log_file': 'mysql-bin.000001', 'log_pos': 123,
+        'gtid': '0-1-10', 'version': 1,
+    }}}
+    original = copy.deepcopy(state)
+    reader = Mock()
+
+    with patch.object(binlog, 'verify_binlog_config'), \
+            patch.object(binlog, 'calculate_bookmark', return_value=('mysql-bin.000001', 123)), \
+            patch.object(binlog, 'verify_binlog_checkpoint'), \
+            patch.object(binlog, 'fetch_current_binlog_checkpoint',
+                         return_value=('mysql-bin.000001', 200, '0-1-12')), \
+            patch.object(binlog, 'create_binlog_stream_reader', return_value=reader), \
+            patch.object(binlog, '_run_binlog_sync', return_value=('mysql-bin.000001', 199)), \
+            patch.object(binlog.singer, 'write_message') as output:
+        with pytest.raises(RuntimeError, match='did not reach the sampled binlog endpoint'):
+            binlog.sync_binlog_stream(None, config, streams, state)
+
+    output.assert_not_called()
+    reader.close.assert_called_once_with()
+    assert state == original
+
+
 @pytest.mark.parametrize('values, setting', [
     (['ROW', 'FULL', 'PARTIAL_JSON'], 'binlog_row_value_options'),
     (['ROW', 'FULL', '', 1], 'binlog_transaction_compression'),
@@ -682,6 +838,25 @@ def test_advanced_stream_does_not_replay_acknowledged_file_position(stream):
     assert state['bookmarks']['db-items']['log_pos'] == 300
 
 
+@pytest.mark.parametrize('durable_pos, expected_ids', [(100, [1]), (200, [])])
+def test_zero_end_position_replay_fence_does_not_hide_new_rows(stream, durable_pos, expected_ids):
+    row = write_event()
+    row.packet = SimpleNamespace(log_pos=0, event_size=50)
+    reader = Reader([
+        (100, event(MariadbGtidEvent, gtid='0-1-11', flags=4)),
+        (100, row),
+        (200, event(XidEvent)),
+    ])
+    state = {'bookmarks': {'db-items': {
+        'log_file': reader.log_file, 'log_pos': durable_pos, 'version': 1,
+    }}}
+
+    state, messages = run(reader, stream, 'mariadb', state=state)
+
+    assert [message.record['id'] for message in messages if isinstance(message, RecordMessage)] == expected_ids
+    assert state['bookmarks']['db-items']['log_pos'] == 200
+
+
 @pytest.mark.parametrize('engine, initial, committed, older, marker', [
     ('mysql', f'{MYSQL_SID}:1-10', f'{MYSQL_SID}:1-12', f'{MYSQL_SID}:11', GtidEvent),
     ('mariadb', '0-1-10', '0-1-12', '0-1-11', MariadbGtidEvent),
@@ -694,7 +869,8 @@ def test_advanced_stream_does_not_replay_acknowledged_gtid(
         (300, event(XidEvent)),
     ], initial)
     state = {'bookmarks': {'db-items': {
-        'log_file': reader.log_file, 'log_pos': 400, 'gtid': committed, 'version': 1,
+        'log_file': reader.log_file, 'log_pos': 400, 'gtid': committed,
+        'gtid_complete': True, 'version': 1,
     }}}
     state, messages = run(reader, stream, engine, state=state)
     assert not messages
@@ -731,14 +907,16 @@ def test_schema_ignores_are_scoped_to_the_source_stream(stream):
     assert records[1].record['added'] == 42
 
 
-@pytest.mark.parametrize('event_types', [[], ['Gtid'], ['Anonymous_Gtid'], ['Table_map'], ['Xid'],
+@pytest.mark.parametrize('event_types', [['Gtid'], ['Anonymous_Gtid'], ['Table_map'], ['Xid'],
                                       ['Annotate_rows', 'Table_map'], ['Rows_query', 'Query']])
 def test_safe_binlog_checkpoint_requires_one_bounded_query(event_types):
     with patch.object(binlog, 'connect_with_backoff') as connect:
         cursor = connect.return_value.__enter__.return_value.cursor.return_value.__enter__.return_value
         cursor.fetchall.return_value = [('mysql-bin.000001', 100, name, 1, 200, '') for name in event_types]
         binlog.verify_binlog_checkpoint(None, 'mysql-bin.000001', 100)
-    cursor.execute.assert_called_once_with('SHOW BINLOG EVENTS IN %s FROM %s LIMIT 16', ('mysql-bin.000001', 100))
+    assert cursor.execute.call_count == 2
+    cursor.execute.assert_called_with(
+        'SHOW BINLOG EVENTS IN %s FROM %s LIMIT 16', ('mysql-bin.000001', 100))
 
 
 @pytest.mark.parametrize('event_types', [['Write_rows'], ['Update_rows_v1'], ['Delete_rows_v2'],
@@ -747,20 +925,32 @@ def test_safe_binlog_checkpoint_requires_one_bounded_query(event_types):
 def test_unsafe_legacy_checkpoint_stops_before_rows_can_be_skipped(event_types):
     with patch.object(binlog, 'connect_with_backoff') as connect:
         cursor = connect.return_value.__enter__.return_value.cursor.return_value.__enter__.return_value
-        cursor.fetchall.return_value = [('mysql-bin.000001', 100, name, 1, 200, '') for name in event_types]
+        events = [('mysql-bin.000001', 100, name, 1, 200, '') for name in event_types]
+        cursor.fetchall.side_effect = [events, [('mysql-bin.000001', 999)]]
         with pytest.raises(ValueError, match='perform a full resync'):
             binlog.verify_binlog_checkpoint(None, 'mysql-bin.000001', 100)
 
 
-@pytest.mark.parametrize('event_type', ['Annotate_rows', 'Table_map', 'Query'])
-def test_mariadb_zero_position_legacy_checkpoint_cannot_hide_unread_rows(event_type):
+@pytest.mark.parametrize('event_types', [
+    ['Gtid'], ['Annotate_rows', 'Table_map'], ['Rows_query', 'Query'], ['Table_map'],
+])
+def test_mariadb_zero_end_positions_do_not_reject_valid_file_checkpoints(event_types):
     with patch.object(binlog, 'connect_with_backoff') as connect:
         cursor = connect.return_value.__enter__.return_value.cursor.return_value.__enter__.return_value
         cursor.fetchall.return_value = [
-            ('mysql-bin.000001', 100, event_type, 1, 0, ''),
-            ('mysql-bin.000001', 200, 'Table_map', 1, 0, ''),
+            ('mysql-bin.000001', 100 + index, event_type, 1, 0, '')
+            for index, event_type in enumerate(event_types)
         ]
-        with pytest.raises(ValueError, match='full resync'):
+        binlog.verify_binlog_checkpoint(None, 'mysql-bin.000001', 100)
+
+
+def test_mariadb_zero_end_position_row_checkpoint_is_recoverable():
+    with patch.object(binlog, 'connect_with_backoff') as connect:
+        cursor = connect.return_value.__enter__.return_value.cursor.return_value.__enter__.return_value
+        cursor.fetchall.return_value = [
+            (b'mysql-bin.000001', 100, b'Write_rows_v1', 1, 0, b'\xa0'),
+        ]
+        with pytest.raises(binlog.UnsafeBinlogCheckpointError):
             binlog.verify_binlog_checkpoint(None, 'mysql-bin.000001', 100)
 
 

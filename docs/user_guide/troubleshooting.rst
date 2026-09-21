@@ -151,21 +151,21 @@ Lost connection to MySQL server (Errno 104, Connection reset by peer)
     during query ([Errno 104] Connection reset by peer)')
 
 *Why it happens:*
-Server session defaults are not conducive to PipelineWise type workloads.
+A large export can exceed a source session timeout.
 
 *How to fix:*
-Add the following ``session_sqls`` block to your ``tap.yml``:
+PipelineWise applies its session defaults first, then runs configured
+``session_sqls``. Add only the extra setting or override you need. For large
+exports, increase the write timeout:
 
 .. code-block:: yaml
 
     dbname: "your_database"
     session_sqls:
-      - SET SESSION max_statement_time=0
       - SET SESSION net_write_timeout=3600
-      - SET SESSION time_zone="+0:00"
-      - SET SESSION wait_timeout=28800
-      - SET SESSION net_read_timeout=3600
-      - SET SESSION innodb_lock_wait_timeout=3600
+
+MariaDB ``max_statement_time`` is disabled automatically. Do not configure this
+MariaDB-only variable for MySQL.
 
 .. _troubleshooting_mysql_utf8mb3:
 

@@ -301,6 +301,31 @@ def test_fastsync_recovery_identity_detects_execution_contract_drift(changed_arg
     assert changed['fingerprint'] != original['fingerprint']
 
 
+def test_fastsync_recovery_identity_keeps_server_detected_timeout_non_semantic():
+    identities = []
+
+    def capture_identity(_scope, identity, **_kwargs):
+        identities.append(identity)
+        return {}
+
+    with mock.patch.object(routes, 'build_recovery_identity', side_effect=capture_identity):
+        _recovery_identity(_recovery_args())
+        _recovery_identity(_recovery_args(tap_override={'engine': 'mysql'}))
+        _recovery_identity(_recovery_args(tap_override={
+            'session_sqls': ['SET custom_session_setting=1'],
+        }))
+
+    detected_sqls = identities[0]['source']['session_sqls']
+    mysql_sqls = identities[1]['source']['session_sqls']
+    custom_sqls = identities[2]['source']['session_sqls']
+    assert detected_sqls == routes.DEFAULT_SESSION_SQLS
+    assert mysql_sqls == routes.DEFAULT_SESSION_SQLS
+    assert custom_sqls == [
+        *routes.DEFAULT_SESSION_SQLS,
+        'SET custom_session_setting=1',
+    ]
+
+
 def test_fastsync_recovery_identity_uses_separate_opaque_stream_keys():
     first = _recovery_identity(_recovery_args(), 'source.first')
     second = _recovery_identity(_recovery_args(), 'source.second')

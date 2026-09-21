@@ -120,9 +120,9 @@ severity; if there are no concerns, say so explicitly.
 
 - Branch from `master`; keep diffs task-scoped. Sign every commit with
   `git commit -S`; never create or push an unsigned commit.
-- CHANGELOG bullets are atomic and outcome-focused: start with an action verb,
-  name the component and operational result, group related bullets, and include
-  implementation detail only to explain risk.
+- Keep CHANGELOG entries concise and outcome-focused. Start each bullet with an
+  action verb, state one user-visible result, and include implementation detail
+  only when needed for compatibility, risk, or recovery.
 - Before creating a PR or pushing to an open PR, compare the complete branch
   diff with the current CHANGELOG entry; do not proceed if the entry omits or
   misstates the diff or claims absent changes. Set that release to today's date

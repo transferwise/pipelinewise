@@ -14,7 +14,7 @@ import psutil
 import pidfile
 
 from datetime import datetime
-from time import time
+from time import sleep, time
 from uuid import uuid4
 from typing import Dict, Optional, List, Any, NoReturn, Tuple
 from joblib import Parallel, delayed, parallel_backend
@@ -50,6 +50,31 @@ from pipelinewise.data_diff.runtime import RuntimeConnectorConfigLoader
 FASTSYNC_PAIRS = fastsync_capability_policy.FASTSYNC_PAIRS
 ICEBERG_FASTSYNC_PAIRS = fastsync_capability_policy.ICEBERG_FASTSYNC_PAIRS
 PARTIAL_SYNC_PAIRS = fastsync_capability_policy.PARTIAL_SYNC_PAIRS
+
+MYSQL_BINLOG_DISCONNECT_MARKER = {
+    'type': 'PIPELINEWISE_CONTROL',
+    'component': 'tap-mysql',
+    'event': 'binlog_stream_disconnected',
+    'version': 1,
+}
+MYSQL_BINLOG_DISCONNECT_MAX_ATTEMPTS = 3
+MYSQL_BINLOG_DISCONNECT_RETRY_DELAY_SECONDS = 1
+
+
+def _persist_singer_state(path: str, state: str) -> None:
+    fastsync_utils.save_dict_to_json(path, json.loads(state), log_level=logging.DEBUG)
+
+
+def _is_retryable_mysql_disconnect(
+        tap_type: str,
+        line: str) -> bool:
+    if tap_type != ConnectorType.TAP_MYSQL.value:
+        return False
+    try:
+        marker = json.loads(line)
+        return marker == MYSQL_BINLOG_DISCONNECT_MARKER and type(marker['version']) is int
+    except (ValueError, TypeError):
+        return False
 
 
 class PipelineWise:
@@ -1035,30 +1060,21 @@ class PipelineWise:
         """
         Generate and run piped shell command to sync tables using singer taps and targets
         """
-        # Build the piped executable command
-        command = commands.build_singer_command(
-            tap=tap,
-            target=target,
-            transform=transform,
-            stream_buffer_size=stream_buffer_size,
-            stream_buffer_log_file=self.tap_run_log_file,
-            profiling_mode=self.profiling_mode,
-            profiling_dir=self.profiling_dir,
-        )
-
         start = None
         state = None
+        retryable_disconnect = False
 
         def update_state_file(line: str) -> str:
+            nonlocal start, state, retryable_disconnect
+            if _is_retryable_mysql_disconnect(tap.type, line):
+                retryable_disconnect = True
+
             # Update state variable with latest state
             if utils.is_state_message(line):
                 # if it has been more than 2 seconds since we last updated the state file
                 # update it again with newly received state
-                nonlocal start, state
-
                 if start is None or time() - start >= 2:
-                    with open(tap.state, 'w', encoding='utf-8') as state_file:
-                        state_file.write(line)
+                    _persist_singer_state(tap.state, line)
 
                     # Update start time to be the current time.
                     start = time()
@@ -1077,18 +1093,52 @@ class PipelineWise:
             sys.stdout.write(line)
             return update_state_file(line)
 
-        # Run command with update_state_file as a callback to call for every stdout line
-        if self.extra_log:
-            commands.run_command(
-                command, self.tap_run_log_file, update_state_file_with_extra_log
+        line_callback = update_state_file_with_extra_log if self.extra_log else update_state_file
+
+        for attempt in range(1, MYSQL_BINLOG_DISCONNECT_MAX_ATTEMPTS + 1):
+            retryable_disconnect = False
+            # Rebuild on every attempt because the previous target can have persisted newer state.
+            command = commands.build_singer_command(
+                tap=tap,
+                target=target,
+                transform=transform,
+                stream_buffer_size=stream_buffer_size,
+                stream_buffer_log_file=self.tap_run_log_file,
+                profiling_mode=self.profiling_mode,
+                profiling_dir=self.profiling_dir,
             )
-        else:
-            commands.run_command(command, self.tap_run_log_file, update_state_file)
+
+            try:
+                commands.run_command(command, self.tap_run_log_file, line_callback)
+                break
+            except commands.RunCommandException:
+                # The target emitted this state only after making the corresponding rows durable.
+                if retryable_disconnect and state is not None:
+                    _persist_singer_state(tap.state, state)
+
+                if not retryable_disconnect or attempt == MYSQL_BINLOG_DISCONNECT_MAX_ATTEMPTS:
+                    raise
+
+                failed_log = commands.log_file_with_status(
+                    self.tap_run_log_file, commands.STATUS_FAILED)
+                if os.path.isfile(failed_log):
+                    running_log = commands.log_file_with_status(self.tap_run_log_file, commands.STATUS_RUNNING)
+                    os.replace(failed_log, running_log)
+                    with open(running_log, 'a', encoding='utf-8') as logfile:
+                        logfile.write(f'\nRetrying Singer pipeline: attempt {attempt + 1} '
+                                      f'of {MYSQL_BINLOG_DISCONNECT_MAX_ATTEMPTS}\n')
+
+                self.logger.warning(
+                    'MySQL binlog connection lost; retrying the Singer pipeline from durable state '
+                    '(attempt %s of %s).',
+                    attempt + 1,
+                    MYSQL_BINLOG_DISCONNECT_MAX_ATTEMPTS,
+                )
+                sleep(MYSQL_BINLOG_DISCONNECT_RETRY_DELAY_SECONDS)
 
         # update the state file one last time to make sure it always has the last state message.
         if state is not None:
-            with open(tap.state, 'w', encoding='utf-8') as statefile:
-                statefile.write(state)
+            _persist_singer_state(tap.state, state)
 
     def run_tap_partialsync(self, tap: TapParams, target: TargetParams, transform: TransformParams):
         """Running the tap for partial sync table"""

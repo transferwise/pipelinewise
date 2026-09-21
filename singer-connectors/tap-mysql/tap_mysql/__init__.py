@@ -1,14 +1,18 @@
 
 import copy
+import json
 import pymysql
 import singer
+import sys
 
 from singer import metadata, get_logger
 from singer import metrics
 from singer.catalog import Catalog
 
 from tap_mysql.connection import (
+    BinlogStreamDisconnectedError,
     connect_with_backoff,
+    MYSQL_BINLOG_DISCONNECT_MARKER,
     MySQLConnection,
     fetch_server_id as fetch_server_id,
     MYSQL_ENGINE,
@@ -460,5 +464,8 @@ def main():
     try:
         main_impl()
     except Exception as exc:
+        if isinstance(exc, BinlogStreamDisconnectedError):
+            sys.stderr.write(json.dumps(MYSQL_BINLOG_DISCONNECT_MARKER) + '\n')
+            sys.stderr.flush()
         LOGGER.critical(exc)
         raise exc

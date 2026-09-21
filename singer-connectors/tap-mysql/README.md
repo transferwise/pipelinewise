@@ -82,7 +82,7 @@ List of config parameters:
 | ssl_cert          | string                        | No       | -                                                                                                                                                                 | for self-signed SSL                                                                                                       |
 | ssl_key           | string                        | No       | -                                                                                                                                                                 | for self-signed SSL                                                                                                       |
 | internal_hostname | string | No       | -                                                                                                                                                                 | Override match hostname for google cloud                                                                                  |
-| session_sqls      | List of strings               | No       | ```['SET @@session.time_zone="+0:00"', 'SET @@session.wait_timeout=28800', 'SET @@session.net_read_timeout=3600', 'SET @@session.innodb_lock_wait_timeout=3600']``` | Set session variables dynamically.                                                                                        |
+| session_sqls      | List of strings               | No       | MySQL: ```['SET @@session.time_zone="+0:00"', 'SET @@session.wait_timeout=28800', 'SET @@session.net_read_timeout=3600', 'SET @@session.innodb_lock_wait_timeout=3600']```<br/>MariaDB: the MySQL list plus ```SET @@session.max_statement_time=0``` | Set session variables dynamically. Defaults use the explicit `engine` when configured and otherwise detect the connected server. Configured statements run afterward, so later values override defaults. |
 
 
 ### Discovery mode
@@ -303,22 +303,31 @@ The tap support two ways of consuming log events: using binlog coordinates or GT
 binlog coordinates, when turning the `use_gtid` flag, you have to specify the engine flavor (mariadb/mysql) due to 
 how different are the GTID implementations in these two engines.
 
-When enabling `use_gtid`, MariaDB can infer the GTID position from existing
-file/position state only at a verified transaction boundary; ambiguous positions
-require FullSync. MySQL does not support this conversion.
+When enabling `use_gtid`, older MySQL and MariaDB GTID bookmarks are upgraded
+automatically when retained file/position coordinates remain available. The tap
+performs one file-position catch-up and records complete GTID history only at a
+target-acknowledged endpoint, without requiring FastSync. A legacy GTID-only
+bookmark without a retained physical anchor fails unchanged.
 
 Checkpoints advance only at safe transaction boundaries. GTID bookmarks retain
 the complete MySQL UUID or MariaDB domain set, and each stream skips events it
 has already acknowledged. New complete sets include `gtid_complete: true`.
-Existing MySQL/MariaDB GTID checkpoints without that marker require a one-time
-FullSync: both singletons and ranges can omit previously acknowledged history.
-Do not add the marker manually or invent executed ranges. Rejection does not
-reset state or automatically resync the target. Identifiably unsafe legacy
-file/position bookmarks inside row events also require a resync. A saved
-position cannot prove that older runs emitted every row; resync tables with
-suspected historical omissions. In file/position mode a lost binlog connection
-stops the run; retry normally from durable state instead of resuming at the
-decoder's potentially mid-transaction packet position. GTID reconnects remain enabled.
+Existing checkpoints without that marker can omit previously acknowledged
+history, so do not add it manually or invent executed ranges. Identifiably
+mid-row-event file/position bookmarks replay from the nearest proven transaction
+boundary while filtering rows already acknowledged by each stream; saved state
+does not move backwards. Recovery fails unchanged if the retained file cannot
+prove a boundary. Proving the boundary scans that retained binlog from its
+beginning, so large files can take time and temporarily increase source read
+load. A saved position still cannot prove that older runs emitted every row, so
+resync tables with suspected historical omissions.
+
+MariaDB 11.4 intermediate events with zero `End_log_pos` are supported without
+enabling `binlog_legacy_event_pos`. On a lost file/position connection,
+PipelineWise retries the complete Singer pipeline twice from target-acknowledged
+state and retains all attempts in one terminal run log. Standalone `tap-mysql`
+exits for its supervisor to restart; the decoder does not reconnect from a
+potentially mid-transaction packet. GTID reconnects remain enabled.
 
 Keep `binlog_format=ROW` and `binlog_row_image=FULL`. Partial-JSON events,
 compressed binlog events, XA transactions, and selected-table `TRUNCATE` are

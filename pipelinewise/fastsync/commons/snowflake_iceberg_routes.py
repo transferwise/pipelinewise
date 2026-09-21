@@ -194,11 +194,13 @@ def fastsync_recovery_identity(
         'table': source_table,
     }
     if engine in ('mysql', 'mariadb'):
+        configured_session_sqls = source_config.get('session_sqls')
         source_identity.update({
             'charset': source_config.get('charset', DEFAULT_CHARSET),
-            'session_sqls': list(
-                source_config.get('session_sqls', DEFAULT_SESSION_SQLS)
-            ),
+            'session_sqls': [
+                *DEFAULT_SESSION_SQLS,
+                *(configured_session_sqls if isinstance(configured_session_sqls, list) else []),
+            ],
             'use_gtid': source_config.get('use_gtid', DEFAULT_USE_GTID),
         })
     elif engine == 'postgres':
