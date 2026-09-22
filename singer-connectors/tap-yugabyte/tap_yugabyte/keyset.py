@@ -416,17 +416,23 @@ def _hashable(cur, type_name):
     Probed against a NULL literal rather than a type allow-list: it costs no
     storage read, it is authoritative for the server actually being talked to,
     and the set of accepted types is not something the tap should be tracking.
-    Runs inside a savepoint because the rejection is an error, which would
-    otherwise poison the surrounding transaction.
+    The rejection is an error, so inside a transaction the probe is wrapped in a
+    savepoint to keep it from poisoning the surrounding work. Under autocommit
+    each statement is already its own transaction and SAVEPOINT is itself an
+    error, so the guard is skipped rather than assumed either way.
     """
-    cur.execute('SAVEPOINT yb_hash_probe')
+    in_transaction = not getattr(cur.connection, 'autocommit', False)
+    if in_transaction:
+        cur.execute('SAVEPOINT yb_hash_probe')
     try:
         cur.execute(f'SELECT yb_hash_code(NULL::{type_name})')
         cur.fetchone()
-        cur.execute('RELEASE SAVEPOINT yb_hash_probe')
+        if in_transaction:
+            cur.execute('RELEASE SAVEPOINT yb_hash_probe')
         return True
     except psycopg2.Error:
-        cur.execute('ROLLBACK TO SAVEPOINT yb_hash_probe')
+        if in_transaction:
+            cur.execute('ROLLBACK TO SAVEPOINT yb_hash_probe')
         return False
 
 

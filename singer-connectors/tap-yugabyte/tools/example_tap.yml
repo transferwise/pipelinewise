@@ -1,0 +1,16 @@
+id: "tap_yugabyte"
+type: "tap-yugabyte"
+schemas:
+  - source_schema: "svc"
+    target_schema: "ppw_svc"
+    tables:
+      - table_name: "candidate"
+        replication_method: "INCREMENTAL"
+        replication_key: "updated_at"
+      - table_name: "service"
+        replication_method: "INCREMENTAL"
+        replication_key: "last_updated"
+      - table_name: "batch"
+        replication_method: "FULL_TABLE"
+      - table_name: "already_fine"
+        replication_method: "FULL_TABLE"
