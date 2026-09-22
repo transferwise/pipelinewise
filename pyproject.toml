@@ -13,6 +13,7 @@ extend-exclude = [
     "singer-connectors/tap-slack/tests",
     "singer-connectors/tap-snowflake/tests",
     "singer-connectors/tap-twilio/tests",
+    "singer-connectors/tap-yugabyte/tests/integration",
     "singer-connectors/tap-zendesk/spikes",
     "singer-connectors/tap-zendesk/test",
     "singer-connectors/target-postgres/tests",

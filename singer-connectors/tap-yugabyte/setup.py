@@ -28,7 +28,7 @@ setup(name='pipelinewise-tap-yugabyte',
       extras_require={
           "test": [
               'pytest==9.1.1',
-              'pylint==4.0.6',
+              'ruff==0.16.1',
               'pytest-cov==7.1.0'
           ]
       },

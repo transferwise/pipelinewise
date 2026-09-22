@@ -103,7 +103,7 @@ def filter_tables_sql_clause(sql, tables: List[str]):
 
 
 # pylint: disable=too-many-branches,too-many-nested-blocks,too-many-statements
-def selected_value_to_singer_value_impl(elem, sql_datatype):
+def selected_value_to_singer_value_impl(elem, sql_datatype):  # noqa: C901
     """Coerce a value read from YSQL into the Singer type implied by its sql_datatype."""
     sql_datatype = sql_datatype.replace('[]', '')
     if elem is None:

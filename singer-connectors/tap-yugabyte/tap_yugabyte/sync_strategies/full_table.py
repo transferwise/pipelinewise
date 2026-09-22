@@ -1,6 +1,5 @@
 import copy
 import time
-import psycopg2
 import psycopg2.extras
 import singer
 

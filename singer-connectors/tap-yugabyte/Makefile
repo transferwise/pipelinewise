@@ -6,9 +6,10 @@ venv:
 	pip install --upgrade pip setuptools wheel;\
 	pip install -e .[test]
 
-pylint:
-	. ./venv/bin/activate ;\
-	pylint --rcfile .pylintrc tap_yugabyte/
+lint:
+	cd ../.. && singer-connectors/tap-yugabyte/venv/bin/ruff check \
+		singer-connectors/tap-yugabyte/tap_yugabyte/ singer-connectors/tap-yugabyte/tests/unit/ \
+		singer-connectors/tap-yugabyte/tests/__init__.py singer-connectors/tap-yugabyte/tests/utils.py
 
 start_db:
 	docker-compose up -d
