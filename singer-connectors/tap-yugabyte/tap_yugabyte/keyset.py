@@ -975,6 +975,15 @@ def replication_key_index_ddl(fq_table_name, table_name, replication_key,
     ORDER BY does: without the predicate the plan is a sort, and on a full drain
     a sequential scan and an external merge. incremental.py emits it.
     """
+    if list(pk_columns) == [replication_key]:
+        # the primary-key index already is this index -- see
+        # index_for_replication_key, which is what the scan hints. Emitting the
+        # replication-key form here names an index nothing uses and repeats the
+        # key column, `(bucket ASC, "id" ASC, "id" ASC)`, which the server
+        # accepts: a service owner running it builds a second copy of an index
+        # they already have, and nothing ever reads it.
+        return index_ddl(fq_table_name, table_name, pk_columns, buckets)
+
     trailing = ', '.join(f'{c} ASC' for c in quoted(pk_columns))
     return (
         f'CREATE UNIQUE INDEX '

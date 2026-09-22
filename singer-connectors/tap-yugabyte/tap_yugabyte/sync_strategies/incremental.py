@@ -171,7 +171,10 @@ def _get_select_sql(params):
     # run. The bookmark is still the replication key alone and the predicate is
     # still >=, so a resume re-reads that group -- deterministically, rather than
     # in whatever order the storage layer happened to return.
-    order_by = keyset.order_by_sql([params['replication_key']] + list(pk_columns))
+    # dedupe: when the replication key IS the primary key this would otherwise
+    # emit `ORDER BY "id" ASC, "id" ASC`
+    ordering = list(dict.fromkeys([params['replication_key']] + list(pk_columns)))
+    order_by = keyset.order_by_sql(ordering)
 
     select_sql = f"""
     SELECT {','.join(escaped_columns)}

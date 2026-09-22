@@ -504,3 +504,28 @@ class TestIndexHint:
         # the plan is otherwise a cost decision, and the cost model prefers the
         # sequential scan and the spill it brings
         assert sql.startswith('/*+ IndexScan(orders orders_pw_keyset) */ SELECT')
+
+
+class TestReplicationKeyThatIsThePrimaryKey:
+    """When the replication key IS the primary key, the primary-key index
+    already is the replication-key index. Asking for a separate one produced
+    `(bucket ASC, "id" ASC, "id" ASC)` under a name nothing hints at -- the
+    server accepts it, so a service owner running it builds a second copy of an
+    index they already have and nothing ever reads it."""
+
+    def test_ddl_is_the_primary_key_index(self):
+        assert (keyset.replication_key_index_ddl('s.t', 't', 'id', ['id'], 3)
+                == keyset.index_ddl('s.t', 't', ['id'], 3))
+
+    def test_the_key_column_is_not_repeated(self):
+        ddl = keyset.replication_key_index_ddl('s.t', 't', 'id', ['id'], 3)
+        assert '"id" ASC, "id" ASC' not in ddl
+
+    def test_the_ddl_matches_the_index_the_scan_hints(self):
+        ddl = keyset.replication_key_index_ddl('s.t', 't', 'id', ['id'], 3)
+        assert keyset.index_for_replication_key('t', 'id', ['id']) in ddl
+
+    def test_a_distinct_replication_key_still_gets_its_own(self):
+        ddl = keyset.replication_key_index_ddl('s.t', 't', 'created_at', ['id'], 3)
+        assert '"created_at" ASC, "id" ASC' in ddl
+        assert 't_created_at_pw_keyset' in ddl

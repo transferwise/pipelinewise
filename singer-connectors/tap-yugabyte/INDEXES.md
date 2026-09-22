@@ -187,8 +187,39 @@ Neither shape 3 nor shape 4 sees **deletes**. Only `LOG_BASED` does.
 | ⮑ sees inserts | — | ✅ | ✅ | ✅ |
 | ⮑ sees updates | — | ❌ | ❌ | ✅ *trigger required* |
 | ⮑ sees deletes | — | ❌ | ❌ | ❌ |
-| ⮑ resumes inside a tie | — | ✅ *(key is unique)* | ✅ | ✅ |
+| ⮑ resumes inside a tie | — | ✅ *(key is unique)* | ❌ *see below* | ❌ *see below* |
 | PartialSync bounded export | ❌ | ✅ on the PK | ✅ | ✅ |
+
+### Resuming inside a tie group
+
+The index makes the order total — the primary key trails, so rows sharing a
+timestamp have a fixed sequence. **The tap cannot use that**, and shapes 3 and 4
+are marked ❌ above because of it.
+
+Singer's `INCREMENTAL` state carries one scalar, `replication_key_value`, and the
+tap rejects any other bookmark key outright. So a resume can only say
+`WHERE key >= <last timestamp seen>` — it cannot say "and after this primary
+key". Every row sharing the last timestamp is therefore re-read. Measured on a
+10,000-row tie group, interrupting at different points:
+
+| interrupted after | rows re-emitted on resume |
+|---|---|
+| 5 rows into the group | 5 |
+| 3,000 rows into the group | 3,000 |
+| the whole group | 10,000 |
+
+Re-emission equals how far into the group the run got, so the worst case is the
+size of the group. This is at-least-once by design and the target deduplicates on
+the primary key, so it is not a correctness problem — but there is a failure mode
+worth knowing:
+
+**A tie group larger than one run can drain will never advance the bookmark.**
+The resume restarts the group every time. If a single timestamp covers more rows
+than a run completes, the sync makes no progress at all.
+
+This is a reason to prefer a replication key with high cardinality. A bulk load
+stamps every row in one transaction with the same `now()`, so a table loaded in
+large batches can carry very large tie groups. `LOG_BASED` has none of this.
 
 ### Which do I need?
 
@@ -248,10 +279,37 @@ YugabyteDB 2026.1.1.1).
 | Bucket declared `HASH` instead of `ASC` | `SPLIT AT VALUES` rejected outright |
 | Primary key omitted from the trailing columns | Resume re-reads the whole group of rows sharing the last timestamp seen, every run |
 | `ORDER BY` written as a row constructor — `ORDER BY (a, b)` | Opaque to the planner: a blocking sort where the index could have supplied the order. 48 MB spill against 81 kB streaming |
+| Capturing a plan on a table that has never been `ANALYZE`d | Not a mistake in the index — but see the note below before reading a `Sort` as one |
 | Keyset resume written as a row constructor — `WHERE (a, b) > (%s, %s)` | Reads `Index Cond`, so the plan looks correct, but every remaining index entry in the bucket is read and dropped. 9,221 index rows to return 5, against 22 for the expanded form. The tap emits the expanded form; this matters if you hand-write a probe |
 | `N` in the config ≠ `N` in the index | Full table scan, silently. The tap validates this against the live index and refuses |
 
 ---
+
+## `ANALYZE` before you read a plan
+
+A `Sort` in the plan usually means the bucket predicate or the index is wrong.
+There is one case where it does not, and it is easy to hit: **a table with no
+statistics.**
+
+With no `reltuples`, YugabyteDB underestimates the row count badly — measured at
+roughly 1/66 of reality — and once the estimate falls under about 20 rows the
+cost model prefers an index scan plus a quicksort over the merge. The index is
+still the right one and the scan still reads only the rows it returns; the sort
+is a bounded in-memory sort of the result, not an external merge. Same query,
+same settings, same table:
+
+```
+                 est     actual   plan
+before ANALYZE    15      1,000   Sort Method: quicksort  Memory: 87kB
+before ANALYZE   150     10,000   Merge Streams: 3
+after  ANALYZE 1,000      1,000   Merge Streams: 3
+after  ANALYZE   100        100   Merge Streams: 3
+```
+
+So: between a bulk load and the first auto-analyze, an incremental run with a
+small delta will plan with a sort. Run `ANALYZE` on the table before capturing a
+plan to check it against this document, or you will be reading a statistics
+problem as an index problem.
 
 ## Checking a config before you run it
 

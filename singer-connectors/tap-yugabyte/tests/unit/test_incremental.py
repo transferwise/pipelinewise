@@ -139,6 +139,9 @@ class TestIncrementalSelectSql(TestCase):
                         replication_key_value=25000)
         self.assertIn('IndexScan(event event_pw_keyset)', sql)
         self.assertNotIn('event_id_pw_keyset', sql)
+        # and the ordering columns are deduped, not `ORDER BY "id" ASC, "id" ASC`
+        self.assertIn('ORDER BY "id" ASC', sql)
+        self.assertNotIn('"id" ASC, "id" ASC', sql)
 
     def test_bookmark_is_cast_to_the_discovered_column_type(self):
         # a timestamptz literal against a timestamp column is accepted as an index
