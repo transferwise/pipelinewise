@@ -26,6 +26,25 @@ from tap_yugabyte import keyset  # noqa: E402  pylint: disable=wrong-import-posi
 OK, ACTION, BLOCK = 'OK', 'ACTION', 'BLOCK'
 
 
+def _repair_ddl(schema_name, found, create_statement):
+    """The statements that actually turn this line into OK.
+
+    A CREATE on its own only works when nothing is there. When the index exists
+    but is the wrong shape -- wrong bucket count, hashed discriminator, missing
+    trailing key, not unique, one tablet, or a backfill that never completed --
+    the CREATE fails with `relation "..." already exists`, and the operator is
+    left holding a statement that cannot run. It has to be dropped first.
+
+    Dropping is safe here precisely because the index is wrong: nothing the tap
+    issues can use it.
+    """
+    statements = []
+    if found is not None:
+        statements.append(f'DROP INDEX "{schema_name}"."{found["name"]}";')
+    statements.append(create_statement + ';')
+    return statements
+
+
 def _primary_key(cur, schema_name, table_name):
     """Key columns in index order, with their types."""
     cur.execute("""
@@ -65,7 +84,7 @@ def _pk_index(cur, schema_name, table_name, pk_columns, pk_types, buckets):
     notes = ['Primary key is hash-sharded, so it has no order to page along. '
              'Without this index every resume re-reads the whole table.']
     notes.extend(problems)
-    return ACTION, notes, [plan['index_ddl'] + ';']
+    return ACTION, notes, _repair_ddl(schema_name, found, plan['index_ddl'])
 
 
 def check_full_table(cur, schema_name, table_name, buckets):
@@ -133,8 +152,8 @@ def check_incremental(cur, schema_name, table_name, replication_key, buckets):
     else:
         notes.extend(problems)
         fq_table_name = f'"{schema_name}"."{table_name}"'
-        ddl.append(keyset.replication_key_index_ddl(
-            fq_table_name, table_name, replication_key, pk_columns, buckets) + ';')
+        ddl.extend(_repair_ddl(schema_name, found, keyset.replication_key_index_ddl(
+            fq_table_name, table_name, replication_key, pk_columns, buckets)))
         if status != BLOCK:
             status = ACTION
 
