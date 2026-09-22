@@ -156,3 +156,21 @@ class TestRetryPolicy:
         with pytest.raises(psycopg2.Error):
             retry_read(always_fails, 'scan', max_attempts=3, initial_backoff=0,
                        max_backoff=0)
+
+
+class TestMergeScan:
+    def test_in_list_covers_every_bucket(self):
+        assert keyset.bucket_in_sql(['id'], 3) == \
+            '(yb_hash_code("id") % 3) IN (0, 1, 2)'
+
+    def test_in_list_escapes_the_modulo_for_parameterised_statements(self):
+        assert keyset.bucket_in_sql(['id'], 3, escape_percent=True) == \
+            '(yb_hash_code("id") %% 3) IN (0, 1, 2)'
+
+    def test_guc_covers_the_bucket_count(self):
+        # below the bucket count the planner cannot merge every stream and falls
+        # back to sorting the whole result
+        assert keyset.merge_scan_guc_sql(16) == 'SET yb_max_merge_scan_streams = 16'
+
+    def test_guc_has_a_floor_for_small_bucket_counts(self):
+        assert keyset.merge_scan_guc_sql(3) == 'SET yb_max_merge_scan_streams = 8'

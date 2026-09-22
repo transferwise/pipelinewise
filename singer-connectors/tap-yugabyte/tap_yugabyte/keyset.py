@@ -65,6 +65,32 @@ def placeholders(pk_columns):
     return f"({', '.join(['%s'] * len(pk_columns))})"
 
 
+def bucket_in_sql(pk_columns, buckets, escape_percent=False):
+    """`(<bucket expr>) IN (0, 1, ... N-1)` -- every bucket, as one predicate.
+
+    YugabyteDB turns this into a single index condition over all N values and,
+    with yb_max_merge_scan_streams >= N, merges the N per-bucket sorted streams
+    into one ordered result. That replaces the UNION ALL the scan used to need,
+    and it works against the expression index directly -- the source table needs
+    no generated column and no schema change, only the index.
+
+    It has to be a literal IN list: the planner does not derive one from a CHECK
+    constraint, and BETWEEN degrades to a storage filter over the whole index.
+    """
+    values = ', '.join(str(b) for b in range(buckets))
+    return f'{bucket_expr(pk_columns, buckets, escape_percent)} IN ({values})'
+
+
+def merge_scan_guc_sql(buckets):
+    """Session setting that lets an index scan merge the per-bucket streams.
+
+    Without it the planner has no way to produce ordered output from a
+    multi-valued leading column and falls back to a sort over the whole result,
+    even when the index condition is already right.
+    """
+    return f'SET yb_max_merge_scan_streams = {max(buckets, 8)}'
+
+
 def index_name(table_name):
     return f'{table_name}{INDEX_SUFFIX}'
 
