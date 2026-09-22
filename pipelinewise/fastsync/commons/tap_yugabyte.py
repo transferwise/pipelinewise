@@ -26,8 +26,8 @@ LOGGER = logging.getLogger(__name__)
 _DROP_SLOT_RETRY_ATTEMPTS = 10
 _DROP_SLOT_RETRY_INTERVAL_SECONDS = 30
 _RETRYABLE_DROP_SLOT_ERRORS = (
-    psycopg2.errors.InFailedSqlTransaction,  # pylint: disable=no-member
-    psycopg2.errors.SerializationFailure,  # pylint: disable=no-member
+    psycopg2.errors.InFailedSqlTransaction,
+    psycopg2.errors.SerializationFailure,
 )
 
 # A `yb_read_time`-pinned read validates its session's cached catalog snapshot against
@@ -244,7 +244,6 @@ class FastSyncTapYugabyte:
 
         return {'lsn': current_lsn, 'version': 1}
 
-    # pylint: disable=invalid-name
     def fetch_current_incremental_key_pos(self, table, replication_key):
         """
         Get the actual incremental key position in the table
@@ -322,7 +321,7 @@ class FastSyncTapYugabyte:
 
             decimal_format = f"""
               'CASE WHEN "' || column_name || '" IS NULL THEN NULL ELSE GREATEST(LEAST({max_num}, ROUND("' || column_name || '"::numeric , {decimals})), -{max_num}) END'
-            """  # noqa E501 pylint: disable=line-too-long
+            """  # noqa: E501
             integer_format = """
               '"' || column_name || '"'
             """
@@ -340,7 +339,6 @@ class FastSyncTapYugabyte:
             if self.hstore_as_json else ''
         )
 
-        # pylint: disable = line-too-long
         sql = f"""
                 SELECT
                     column_name
@@ -375,7 +373,6 @@ class FastSyncTapYugabyte:
                 ORDER BY ordinal_position
                 ) AS x
             """  # noqa: E501
-        # pylint: enable = line-too-long
 
         return self.query(sql)
 
@@ -406,7 +403,6 @@ class FastSyncTapYugabyte:
             'source_column_names': [column[0] for column in yb_columns],
         }
 
-    # pylint: disable=too-many-arguments, too-many-locals, too-many-positional-arguments
     def copy_table(
         self,
         table_name,
@@ -494,7 +490,7 @@ class FastSyncTapYugabyte:
                 with gzip_splitter as split_gzip_files:
                     self.curr.copy_expert(sql, split_gzip_files, size=131072)
                 return
-            except psycopg2.errors.InternalError_ as exc:  # pylint: disable=no-member
+            except psycopg2.errors.InternalError_ as exc:
                 if 'MISMATCHED_SCHEMA' not in str(exc) or attempt == _MISMATCHED_SCHEMA_RETRY_ATTEMPTS:
                     raise
                 LOGGER.warning(

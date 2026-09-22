@@ -66,7 +66,6 @@ class TestPartialSyncYugabyteToSF(TapYugabyte):
     Test cases for Partial sync table from YugabyteDB to Snowflake
     """
 
-    # pylint: disable=arguments-differ
     def setUp(self):
         self.table = 'edgydata'
         self.column = 'cid'

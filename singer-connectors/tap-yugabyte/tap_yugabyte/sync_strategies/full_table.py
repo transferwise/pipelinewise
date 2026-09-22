@@ -14,7 +14,6 @@ LOGGER = singer.get_logger('tap_yugabyte')
 UPDATE_BOOKMARK_PERIOD = 1000
 
 
-# pylint: disable=invalid-name,missing-function-docstring,too-many-locals,duplicate-code
 def sync_view(conn_info, stream, state, desired_columns, md_map):
     time_extracted = utils.now()
 
@@ -102,8 +101,6 @@ def _fetch_max_pk_values(conn_info, fq_table_name, pk_columns):
             return [row[i] for i in range(len(pk_columns))]
 
 
-# pylint: disable=too-many-statements,too-many-locals,duplicate-code
-# pylint: disable-next=too-many-arguments,too-many-positional-arguments
 def _sync_table_with_pk(conn_info, stream, state, desired_columns, md_map, pk_columns):
     """Resumable full-table scan using primary-key keyset pagination.
 
@@ -212,7 +209,6 @@ def _sync_table_with_pk(conn_info, stream, state, desired_columns, md_map, pk_co
     return state
 
 
-# pylint: disable=too-many-locals,duplicate-code
 def _sync_table_without_pk(conn_info, stream, state, desired_columns, md_map):
     """Plain, non-resumable full scan for tables with no usable primary key."""
     time_extracted = utils.now()

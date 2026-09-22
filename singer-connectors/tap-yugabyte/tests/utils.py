@@ -208,7 +208,7 @@ def drop_replication_slot(tap_id='tap_test'):
 class MockedConnect:
     """Mocks psycopg2.connect so full_table sync can be unit tested without a live DB."""
 
-    class cursor:  # noqa: N801 pylint: disable=invalid-name
+    class cursor:  # noqa: N801
         return_value = 1234
         counter_limit = 3
         fetchone_return_value = [5]

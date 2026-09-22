@@ -184,7 +184,6 @@ def sync_traditional_stream(conn_config, stream, state, sync_method, end_lsn):
     return state
 
 
-# pylint: disable-next=too-many-arguments
 def sync_logical_streams(conn_config, logical_streams, state, end_lsn, state_file, *, wal_progress_content=None):
     """
     Sync streams that use LOG_BASED method
@@ -221,7 +220,6 @@ def sync_logical_streams(conn_config, logical_streams, state, end_lsn, state_fil
     return state
 
 
-# pylint: disable-next=too-many-locals
 def do_sync(conn_config, catalog, default_replication_method, state, state_file=None):
     """
     Orchestrates sync of all streams

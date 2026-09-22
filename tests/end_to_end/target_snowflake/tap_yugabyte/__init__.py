@@ -38,7 +38,6 @@ class TapYugabyte(TargetSnowflake):
     Base class for E2E tests for tap yugabyte -> target snowflake
     """
 
-    # pylint: disable=arguments-differ
     def setUp(self, tap_id: str, target_id: str):
         super().setUp(tap_id=tap_id, target_id=target_id, tap_type='TAP_YUGABYTE')
 

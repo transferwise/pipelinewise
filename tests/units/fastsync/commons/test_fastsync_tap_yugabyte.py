@@ -14,7 +14,7 @@ from pipelinewise.fastsync.commons.partial_sync_boundary import (
 )
 
 
-class TestFastSyncTapYugabyte(TestCase):  # pylint: disable=too-many-public-methods
+class TestFastSyncTapYugabyte(TestCase):
     """
     Unit tests for fastsync tap yugabyte
     """
@@ -104,7 +104,7 @@ class TestFastSyncTapYugabyte(TestCase):  # pylint: disable=too-many-public-meth
             "SELECT yb_restart_commit_ht FROM pg_replication_slots WHERE "
             "slot_name = 'pipelinewise_test_database_test_tap'"
         )
-        self.assertEqual(123456789, self.yugabyte._snapshot_ht)  # pylint: disable=protected-access
+        self.assertEqual(123456789, self.yugabyte._snapshot_ht)
 
     def test_fetch_current_log_pos_raises_if_slot_missing_after_creation(self):
         """An empty result after slot creation is unexpected and must raise"""
@@ -378,7 +378,7 @@ class TestFastSyncTapYugabyte(TestCase):  # pylint: disable=too-many-public-meth
         """copy_table must pin yb_read_time to the captured snapshot boundary before exporting"""
         table_columns = [{'safe_sql_value': '"id"'}]
         self.yugabyte.curr = MagicMock()
-        self.yugabyte._snapshot_ht = 123456789  # pylint: disable=protected-access
+        self.yugabyte._snapshot_ht = 123456789
 
         with patch.object(
             self.yugabyte, 'get_table_columns', return_value=table_columns
@@ -466,8 +466,8 @@ class TestFastSyncTapYugabyte(TestCase):  # pylint: disable=too-many-public-meth
         """A transient MISMATCHED_SCHEMA catalog-version race must be retried, not fatal"""
         table_columns = [{'safe_sql_value': '"id"'}]
         self.yugabyte.curr = MagicMock()
-        self.yugabyte._snapshot_ht = 123456789  # pylint: disable=protected-access
-        mismatched_schema_error = psycopg2.errors.InternalError_(  # pylint: disable=no-member
+        self.yugabyte._snapshot_ht = 123456789
+        mismatched_schema_error = psycopg2.errors.InternalError_(
             'The catalog snapshot used for this transaction has been invalidated: '
             'expected: 1044, got: 1042: MISMATCHED_SCHEMA'
         )
@@ -488,8 +488,8 @@ class TestFastSyncTapYugabyte(TestCase):  # pylint: disable=too-many-public-meth
         """Persistent MISMATCHED_SCHEMA must exhaust retries and propagate"""
         table_columns = [{'safe_sql_value': '"id"'}]
         self.yugabyte.curr = MagicMock()
-        self.yugabyte._snapshot_ht = 123456789  # pylint: disable=protected-access
-        mismatched_schema_error = psycopg2.errors.InternalError_(  # pylint: disable=no-member
+        self.yugabyte._snapshot_ht = 123456789
+        mismatched_schema_error = psycopg2.errors.InternalError_(
             'The catalog snapshot used for this transaction has been invalidated: '
             'expected: 1044, got: 1042: MISMATCHED_SCHEMA'
         )
@@ -500,15 +500,15 @@ class TestFastSyncTapYugabyte(TestCase):  # pylint: disable=too-many-public-meth
         ), patch.object(
             tap_yugabyte.split_gzip, 'open', side_effect=lambda *args, **kwargs: io.BytesIO()
         ), patch.object(tap_yugabyte.time, 'sleep') as sleep_mock:
-            with self.assertRaises(psycopg2.errors.InternalError_):  # pylint: disable=no-member
+            with self.assertRaises(psycopg2.errors.InternalError_):
                 self.yugabyte.copy_table('public.my_table', 'unused.csv')
 
         self.assertEqual(
-            tap_yugabyte._MISMATCHED_SCHEMA_RETRY_ATTEMPTS,  # pylint: disable=protected-access
+            tap_yugabyte._MISMATCHED_SCHEMA_RETRY_ATTEMPTS,
             self.yugabyte.curr.copy_expert.call_count,
         )
         self.assertEqual(
-            tap_yugabyte._MISMATCHED_SCHEMA_RETRY_ATTEMPTS - 1,  # pylint: disable=protected-access
+            tap_yugabyte._MISMATCHED_SCHEMA_RETRY_ATTEMPTS - 1,
             sleep_mock.call_count,
         )
 
@@ -516,8 +516,8 @@ class TestFastSyncTapYugabyte(TestCase):  # pylint: disable=too-many-public-meth
         """An InternalError_ that is not MISMATCHED_SCHEMA must propagate without retrying"""
         table_columns = [{'safe_sql_value': '"id"'}]
         self.yugabyte.curr = MagicMock()
-        self.yugabyte._snapshot_ht = 123456789  # pylint: disable=protected-access
-        other_internal_error = psycopg2.errors.InternalError_('some other internal error')  # pylint: disable=no-member
+        self.yugabyte._snapshot_ht = 123456789
+        other_internal_error = psycopg2.errors.InternalError_('some other internal error')
         self.yugabyte.curr.copy_expert.side_effect = other_internal_error
 
         with patch.object(
@@ -525,7 +525,7 @@ class TestFastSyncTapYugabyte(TestCase):  # pylint: disable=too-many-public-meth
         ), patch.object(
             tap_yugabyte.split_gzip, 'open', return_value=io.BytesIO()
         ), patch.object(tap_yugabyte.time, 'sleep') as sleep_mock:
-            with self.assertRaises(psycopg2.errors.InternalError_):  # pylint: disable=no-member
+            with self.assertRaises(psycopg2.errors.InternalError_):
                 self.yugabyte.copy_table('public.my_table', 'unused.csv')
 
         self.assertEqual(1, self.yugabyte.curr.copy_expert.call_count)

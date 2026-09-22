@@ -15,7 +15,6 @@ LOGGER = singer.get_logger('tap_yugabyte')
 CURSOR_ITER_SIZE = 20000
 
 
-# pylint: disable=invalid-name,missing-function-docstring
 def calculate_destination_stream_name(stream, md_map):
     return f"{md_map.get((), {}).get('schema-name')}-{stream['stream']}"
 
@@ -102,7 +101,6 @@ def filter_tables_sql_clause(sql, tables: List[str]):
     return sql + in_clause
 
 
-# pylint: disable=too-many-branches,too-many-nested-blocks,too-many-statements
 def selected_value_to_singer_value_impl(elem, sql_datatype):  # noqa: C901
     """Coerce a value read from YSQL into the Singer type implied by its sql_datatype."""
     sql_datatype = sql_datatype.replace('[]', '')
@@ -194,7 +192,6 @@ def selected_value_to_singer_value(elem, sql_datatype):
     return selected_value_to_singer_value_impl(elem, sql_datatype)
 
 
-# pylint: disable-next=too-many-arguments,too-many-positional-arguments
 def selected_row_to_singer_message(stream, row, version, columns, time_extracted, md_map):
     """Build a Singer RecordMessage for one selected row."""
     row_to_persist = ()

@@ -22,7 +22,7 @@ class PartialSyncTestCase(TestCase):
     def setUp(self) -> None:
         resources_dir = f'{os.path.dirname(__file__)}/resources'
         self.config_dir = f'{resources_dir}/test_partial_sync'
-        self.maxDiff = None  # pylint: disable=invalid-name
+        self.maxDiff = None
 
     def test_yugabyte_partial_sync_rejects_removed_iceberg_create_before_connectors(self):
         """Reject legacy routing before creating source or target connectors."""
@@ -267,7 +267,6 @@ class PartialSyncTestCase(TestCase):
         with TemporaryDirectory() as temp_test_dir:
             args = PartialSync2SFArgs(temp_test_dir=temp_test_dir)
 
-            # pylint: disable=unused-argument
             def mocked_copy_table_method(table, filepath, **kwargs):
                 for part_number in range(3):
                     with open(f'{filepath}{part_number}', 'w', encoding='utf8') as data_file:
@@ -309,15 +308,12 @@ class PartialSyncTestCase(TestCase):
         for file_part in expected_file_parts:
             self.assertIn(file_part, actual_file_parts)
 
-    # pylint: disable=too-many-locals, too-many-arguments
-
     @mock.patch('pipelinewise.fastsync.partialsync.yugabyte_to_snowflake.multiprocessing.Pool')
     def test_running_partial_sync_yugabyte_to_snowflake(self, mocked_pool):
         """Test the whole partial_sync_yugabyte_to_snowflake module works as expected"""
         test_table = {}
         expected_args = None
 
-        # pylint: disable=too-few-public-methods
         class MockedMultiprocessor:
             """"Mocked multiprocessing class"""
             @staticmethod
@@ -394,7 +390,6 @@ class PartialSyncTestCase(TestCase):
                         for message in log_messages:
                             self.assertIn(message, actual_logs.output[log_index])
 
-    # pylint: disable=too-many-positional-arguments
     @mock.patch('pipelinewise.fastsync.partialsync.utils.load_into_snowflake')
     @mock.patch('pipelinewise.fastsync.partialsync.utils.upload_to_s3')
     @mock.patch('pipelinewise.fastsync.commons.utils.save_state_file')
@@ -434,8 +429,7 @@ class PartialSyncTestCase(TestCase):
                     'source_column_names': ['foo_column'],
                 }
 
-                # pylint: disable=cell-var-from-loop
-                def export_data_to_file(*args, **kwargs):  # pylint: disable=unused-argument
+                def export_data_to_file(*args, **kwargs):
                     with open(f'{temp_directory}/t1', 'w', encoding='utf8') as exported_file:
                         exported_file.write('F' * file_size)
 

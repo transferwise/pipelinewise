@@ -37,7 +37,6 @@ class UnsupportedPayloadKindError(Exception):
     """Custom exception when waljson payload is not insert, update nor delete"""
 
 
-# pylint: disable=invalid-name,missing-function-docstring,too-many-branches,too-many-statements,too-many-arguments
 def fetch_current_lsn(conn_config):
     """Return the current HYBRID_TIME LSN boundary, usable as a slot-independent replication end point."""
     with yb_db.open_connection(conn_config) as conn:
@@ -191,7 +190,6 @@ def create_array_elem(elem, sql_datatype, conn_info):  # noqa: C901
             return res
 
 
-# pylint: disable=too-many-branches,too-many-nested-blocks,too-many-return-statements
 def selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info):  # noqa: C901
     sql_datatype = og_sql_datatype.replace('[]', '')
 
@@ -362,7 +360,6 @@ def row_to_singer_message(stream, row, version, columns, time_extracted, md_map,
         time_extracted=time_extracted)
 
 
-# pylint: disable=unused-argument,too-many-locals
 def consume_message(streams, state, msg, time_extracted, conn_info, *, message_payload=None):
     if message_payload is None:
         try:
