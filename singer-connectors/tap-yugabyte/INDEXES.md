@@ -597,6 +597,79 @@ Run each `CREATE UNIQUE INDEX` as its own statement, not wrapped in
 transaction. If you have to serialise a batch of these, note that YugabyteDB
 serialises index backfills within a database anyway, so batching buys nothing.
 
+## What a sync sees when the table is being written to
+
+Measured, not inferred: the scan was frozen at a known key and the writes landed
+while it was stopped there.
+
+**An uninterrupted, retry-free `FULL_TABLE` sync is a consistent image, and that
+is better than it sounds.** The per-bucket statements start within 0–1 ms of each
+other, and a row reaches the target only if it existed, under a key inside that
+statement's range, at the instant the statement ran. No concurrent write reaches
+the sync at all — not above the bound, not below it, not even in a region the
+scan has not got to yet. With a writer running at 28 rows/s through a 9.4 s sync,
+**7 of 262 rows** arrived, all committed before the cursors were declared.
+
+Two consequences that follow from the same fact:
+
+- **Rows deleted during the scan are still delivered, as live rows.** 120 of 120,
+  measured. `ACTIVATE_VERSION` cannot remove them: they carry the current version.
+- **A row whose primary key changes mid-scan is emitted once, under its old key.**
+  The target then holds a key the source no longer has, and never receives the
+  key it does.
+
+### Where it stops being consistent
+
+**A resumed sync is not one image, it is two.** So is a sync in which any bucket
+retried — and `retry_read` exists because leader elections and read restarts are
+expected, not rare. Across that boundary a row whose primary key moves is either
+delivered twice or not at all, depending on which side of the cursor each key
+falls:
+
+| interrupted at | rows whose PK moved | duplicated | lost |
+|---|---|---|---|
+| 25% drained | 600 | **17.8%** | **17.7%** |
+| midpoint | — | **25%** | **25%** |
+
+A single bucket retry inside one otherwise-normal sync produced 60 duplicated and
+60 lost, and **the sync reported success** — 400,060 records, no error, three
+warning lines the only trace.
+
+The composite resume ladder adds one more window of its own: a row that moves
+from a later rung's range into an earlier one while rung 1 is still draining is
+lost, where a single-statement resume would have caught it. That window is rung 1's
+*entire drain time* — 2,168 ms measured — and it is longest exactly where the
+ladder matters most, because a low-cardinality leading column makes rung 1 large.
+
+### The fix, and it is a config key
+
+`snapshot_hybrid_time` pins every reader to one instant and removes all of it.
+Measured on the same resume:
+
+| | late inserts | PK moves duplicated | PK moves lost | distinct keys delivered |
+|---|---|---|---|---|
+| unpinned | 60/60 | 60 | 60 | 400,060 |
+| **pinned** | **0/60** | **0** | **0** | **400,000** |
+
+Get the value from `yb_get_current_hybrid_time_lsn()`. `SET yb_read_time` is
+superuser-only, so a least-privilege tap user needs the `SECURITY DEFINER`
+procedure named by `yb_read_time_proc` — **which this branch references but does
+not create.**
+
+**If a table's primary key is ever updated, do not run `FULL_TABLE` against it
+unpinned.** Use `snapshot_hybrid_time`, or use `LOG_BASED`.
+
+### INCREMENTAL and long write transactions
+
+`now()` is transaction-start time, so a row committed by a long transaction
+carries a timestamp from when that transaction *began*. If a sync advances the
+bookmark past it in the meantime, the row is permanently missed. Measured: a
+transaction open for 4.26 s had **500 of 500 rows** missed for ever. Rewinding
+2.1 s recovered none of them; rewinding 5.3 s recovered all 500.
+
+The lag window has to exceed your longest write transaction. There is no safe
+fixed constant.
+
 ## Checking a config before you run it
 
 ```bash

@@ -175,7 +175,14 @@ def _fetch_max_pk_values(conn_info, fq_table_name, table_name, pk_columns, bucke
     sort the table to return a single row.
     """
     def probe():
-        with yb_db.open_connection(conn_info) as conn:
+        # pinned like the bucket scans are: on a pinned run this bound was read
+        # at wall clock while the scans read an earlier instant, so the two came
+        # from different moments. The direction was safe -- a bound at or above
+        # what the scans can see only widens it -- but a bound and a scan that
+        # disagree about when "now" is are hard to reason about, and the fix is
+        # to open the probe the same way every other reader is opened.
+        with _open_reader(conn_info, conn_info.get('snapshot_hybrid_time'),
+                          conn_info.get('yb_read_time_proc')) as conn:
             with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
                 merge_scan = keyset.merge_scan_available(cur)
                 if merge_scan:
