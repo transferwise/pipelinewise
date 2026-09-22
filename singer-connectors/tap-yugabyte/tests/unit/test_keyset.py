@@ -271,26 +271,25 @@ class TestMergeScan:
 
 
 class TestLeadingColumnOrdering:
-    """Whether a column leads an index in sorted order decides if it can bound a range."""
+    """Whether a column leads an index in sorted order decides if it can bound a
+    range. Read from pg_index.indoption, not from pg_get_indexdef's text.
 
-    @pytest.mark.parametrize('indexdef,column,expected', [
-        # range-sharded primary key: the column leads it, sorted
-        ('CREATE UNIQUE INDEX t_pkey ON s.t USING lsm (id ASC)', 'id', True),
-        ('CREATE UNIQUE INDEX t_pkey ON s.t USING lsm (id DESC)', 'id', True),
-        ('CREATE UNIQUE INDEX i ON s.t USING lsm (created_at ASC, id ASC)',
-         'created_at', True),
-        # hash-sharded: ordered by hash, which says nothing about the column's order
-        ('CREATE UNIQUE INDEX t_pkey ON s.t USING lsm (id HASH)', 'id', False),
-        ('CREATE UNIQUE INDEX t_pkey ON s.t USING lsm (tenant HASH, id ASC)',
-         'tenant', False),
-        # the column is present but does not lead
-        ('CREATE UNIQUE INDEX i ON s.t USING lsm (tenant ASC, id ASC)', 'id', False),
-        # a bucket index leads with the discriminator, never with the key
-        ('CREATE UNIQUE INDEX t_pw_keyset ON s.t USING lsm '
-         '(((yb_hash_code(id) % 3)) HASH, id ASC)', 'id', False),
+    Every value below was observed on YugabyteDB 2026.1.1.1 by creating the index
+    and reading the catalog back."""
+
+    @pytest.mark.parametrize('indoption,expected,shape', [
+        (0, True,  'a ASC'),
+        (3, True,  'b DESC -- DESC sets NULLS FIRST too, neither is the hash bit'),
+        (2, True,  'a ASC NULLS FIRST'),
+        (4, False, 'c HASH'),
     ])
-    def test_leading_column_detection(self, indexdef, column, expected):
-        assert keyset._leading_column_is_ordered(indexdef, column) is expected
+    def test_leading_column_detection(self, indoption, expected, shape):
+        assert keyset._column_is_ordered(indoption) is expected, shape
+
+    def test_only_the_hash_bit_matters(self):
+        # a composite hash index reads `4 4 0 3` for ((a,b) HASH, c ASC, d DESC)
+        assert [keyset._column_is_ordered(o) for o in (4, 4, 0, 3)] == \
+            [False, False, True, True]
 
 
 class TestStrategyNames:

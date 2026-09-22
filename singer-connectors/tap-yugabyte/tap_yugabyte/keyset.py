@@ -569,9 +569,13 @@ WHERE n.nspname = %s AND c.relname = %s
 # An index can serve ordered range access on `column` when that column leads it
 # and is stored in sorted order. A HASH leading column cannot: it is ordered by
 # hash, which has nothing to do with the column's own ordering.
+# The join on indkey[0] is what restricts this to indexes the column LEADS --
+# and it also excludes every expression index, because an expression key is
+# stored as attnum 0 and matches no column. A bucket index is therefore never
+# returned here: it leads with the discriminator, not with the column.
 _RANGE_INDEX_SQL = """
 SELECT i.relname,
-       pg_get_indexdef(i.oid)                       AS indexdef,
+       x.indoption[0]                               AS leading_indoption,
        x.indpred IS NOT NULL                        AS is_partial,
        pg_get_expr(x.indpred, x.indrelid)           AS predicate
 FROM pg_index x
@@ -621,11 +625,24 @@ def _hashable(cur, type_name):
         return False
 
 
-def _leading_column_is_ordered(indexdef, column):
-    """True when `column` leads the index in sorted, not hashed, order."""
-    inside = indexdef[indexdef.index('(') + 1:]
-    leading = inside.split(',')[0].strip()
-    return leading.startswith(f'{column} ') and 'HASH' not in leading
+# pg_index.indoption carries one bitmask per key column. Bits 0 and 1 are
+# PostgreSQL's DESC and NULLS FIRST; YugabyteDB adds bit 2 for a hash-sharded
+# column. Observed on this server: ASC 0, NULLS FIRST 2, DESC 3 (DESC implies
+# NULLS FIRST), HASH 4 -- and `(a, b) HASH, c ASC, d DESC` reads `4 4 0 3`,
+# agreeing with yb_table_properties' num_hash_key_columns of 2.
+INDOPTION_HASH = 4
+
+
+def _column_is_ordered(indoption):
+    """True when an index key column is stored sorted rather than hashed.
+
+    Read from the catalog rather than from pg_get_indexdef's text. The text is a
+    rendering meant for people: it is not a stable interface, a change to how it
+    spells a modifier would be silent here, and matching a column name inside it
+    invites confusing a name with a prefix of another. The bitmask is the thing
+    the planner itself uses.
+    """
+    return (indoption & INDOPTION_HASH) == 0
 
 
 # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-return-statements
@@ -695,8 +712,8 @@ def plan_partial_sync(cur, schema_name, table_name, boundary_column, start_value
     """
     cur.execute(_RANGE_INDEX_SQL, (schema_name, table_name, boundary_column))
     usable, partial = [], []
-    for name, indexdef, is_partial, predicate in cur.fetchall():
-        if not _leading_column_is_ordered(indexdef, boundary_column):
+    for name, leading_indoption, is_partial, predicate in cur.fetchall():
+        if not _column_is_ordered(leading_indoption):
             continue
         (partial if is_partial else usable).append((name, predicate))
 
