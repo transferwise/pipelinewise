@@ -138,7 +138,73 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
 
                     counter.increment()
 
+    _warn_if_bookmark_stalled(stream, state, replication_key,
+                              replication_key_value, rows_saved,
+                              conn_info['limit'])
     return state
+
+
+def _warn_if_bookmark_stalled(stream, state, replication_key, started_at,
+                              rows_saved, run_limit):
+    """Say so when a run emitted rows and the bookmark did not move at all.
+
+    Singer INCREMENTAL state carries one scalar, `replication_key_value`, and the
+    resume predicate is `>=`, so a run advances only by reaching a value LARGER
+    than the one it started on -- which means draining the whole group of rows
+    sharing that starting value first. When the group holds at least `limit`
+    rows, the run reads `limit` rows all carrying it, writes back the bookmark it
+    already had, and the next run issues a byte-identical statement. The sync
+    never progresses, and nothing said so: every run looks healthy, emitting a
+    full batch of records on schedule. See INDEXES.md, "Resuming inside a tie
+    group".
+
+    This detects and reports. It does not fix: fixing means a composite bookmark,
+    which is not a shape Singer INCREMENTAL state has.
+
+    Three conditions have to hold together, and dropping any one of them makes
+    this fire on a healthy sync:
+
+    rows were emitted       an empty run moves no bookmark and is simply "no new
+                            data".
+    there WAS a bookmark    a first run has none, so it cannot fail to advance
+                            one; it writes the group's value and the run after it
+                            is the one that can stall.
+    the bookmark is unchanged
+                            a run that ends inside a tie having made progress has
+                            moved it. Re-reading the tail of the last group on
+                            the next run is at-least-once by design, not this.
+    the LIMIT truncated it  without this a single-row table warns on every run:
+                            it re-reads its one row, the bookmark cannot move
+                            because nothing lies beyond it, and the sync is just
+                            caught up. A run returning fewer rows than its cap
+                            drained everything there was, and with no `limit`
+                            configured a run always drains to the end.
+
+    Bookmark is compared against bookmark, not against record values: the
+    bookmark is whatever `write_bookmark` stored -- a string for a timestamp, an
+    int for a sequence -- and comparing a live column value against the
+    JSON-decoded state value would differ by type and silently never match.
+    """
+    if not rows_saved or started_at is None or not run_limit:
+        return
+    if rows_saved < run_limit:
+        return
+    ended_at = singer.get_bookmark(state, stream['tap_stream_id'],
+                                   'replication_key_value')
+    if ended_at != started_at:
+        return
+
+    LOGGER.warning(
+        'INCREMENTAL sync of %s MADE NO PROGRESS and cannot make any: all %s rows '
+        'it emitted carry the same %s (%r), the run stopped on LIMIT %s, and the '
+        'bookmark ends where it started. The bookmark is one scalar and the resume '
+        'predicate is >=, so the next run reads exactly these rows again -- this '
+        'sync will never advance past %r. At least %s rows share that value, and a '
+        'run reads %s. Raise limit above the size of that group, choose a '
+        'replication key with higher cardinality, or replicate this table with '
+        'LOG_BASED.',
+        stream['tap_stream_id'], rows_saved, replication_key, started_at,
+        run_limit, started_at, rows_saved, run_limit)
 
 
 def _get_select_sql(params):

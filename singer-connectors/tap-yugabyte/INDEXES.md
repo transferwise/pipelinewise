@@ -5,10 +5,17 @@ a table is added to a tap config. Without them the tap still returns correct
 rows — it just reads the whole table to do it, on every run and every resume, and
 neither the query plan nor the tap log says that happened.
 
-The reason is that YugabyteDB shards a primary key by hash unless it was declared
-`ASC`/`DESC`, and a hash-sharded key has no order to scan along. Every ordered,
-resumable read the tap performs therefore needs an index to supply an order the
-table itself does not have.
+The reason is that the tap pages by **bucket**, not by the primary key: it
+partitions the table into N groups of `yb_hash_code(<pk>) % N` and gives each one
+to a worker. That expression is not stored on the table, so no table can order by
+it, and every ordered, resumable read the tap performs needs an index to supply
+the order.
+
+**This holds whatever the sharding.** YugabyteDB shards a primary key by hash
+unless it was declared `ASC`/`DESC`, and a hash-sharded key has no order to scan
+along at all — but a range-sharded one is no help either, because the order it
+has is on the key and the tap pages on the bucket. Shape 1 is required for every
+table with a primary key.
 
 ---
 
@@ -81,7 +88,11 @@ The primary key does **not** need to be monotonic, sequential, or numeric. A
 `uuid`, a `text`, a composite `(tenant_id, id)` — all page identically. Keyset
 paging wants a total order, which every primary key has by definition.
 
-**Required for every table synced by `FULL_TABLE` or `LOG_BASED`.**
+**Required for every table synced by `FULL_TABLE` or `LOG_BASED`** — including one
+whose primary key is range-sharded, because the tap pages on the bucket rather
+than on the key and nothing in it reads a range-sharded key in key order.
+Without this index `full_table.sync_table` falls through to a single
+non-resumable, non-parallel pass.
 
 Enables:
 - `FULL_TABLE` — the whole table, in key order
@@ -221,9 +232,51 @@ This is a reason to prefer a replication key with high cardinality. A bulk load
 stamps every row in one transaction with the same `now()`, so a table loaded in
 large batches can carry very large tie groups. `LOG_BASED` has none of this.
 
+#### Both ends now say when this is happening
+
+No index fixes it, so the tap **detects and reports** it instead. Nothing here
+changes the state shape or the predicate.
+
+**Before the run** — the preflight measures the largest tie group for every
+`INCREMENTAL` replication key. It reads `pg_stats` rather than the table, so it
+costs a catalog lookup and no scan: `most_common_freqs` × `reltuples` is the
+size of the largest group, measured within 0.02% on a 40,000-row group. Tell it
+the tap's row cap with `--limit N` and the verdict is exact rather than a guess:
+
+```
+BLOCK  rt.bulkload  [INCREMENTAL on updated_at]
+       - 39,995 of 40,050 rows (100%) share one updated_at value, estimated from
+         most_common_vals -- at or above the configured limit of 10,000. A run
+         that starts on that value reads 10,000 rows all carrying it, writes the
+         bookmark it already had, and the next run issues the identical
+         statement: the sync cannot advance past this value, ever.
+```
+
+A run reads `WHERE key >= <bookmark> ORDER BY key, pk LIMIT <limit>`, so a group
+of `limit` rows or more is a livelock by arithmetic, not by luck — hence `BLOCK`.
+Without `--limit` there is no row cap, a run that completes drains to the end and
+always advances, and the failure needs a run to be *killed* inside the group; the
+group is then reported as a risk note rather than as a verdict. A column with no
+statistics is reported as unknown, not as fine — run `ANALYZE` and re-check.
+
+**During the run** — `incremental.py` warns when a run emitted rows and the
+bookmark ends exactly where it started:
+
+```
+INCREMENTAL sync of rt-bulkload MADE NO PROGRESS and cannot make any: all 10000
+rows it emitted carry the same updated_at ('2026-09-22T14:21:22.858584+00:00'),
+the run stopped on LIMIT 10000, and the bookmark ends where it started.
+```
+
+It needs all of: rows emitted, a bookmark that already existed, that bookmark
+unchanged, and the `LIMIT` reached. Dropping the last one makes a one-row table
+warn on every run — it re-reads its single row forever and the bookmark cannot
+move, because nothing lies beyond it. That is caught up, not stuck.
+
 ### Which do I need?
 
-- Table is `FULL_TABLE` or `LOG_BASED` → **shape 1**.
+- Table is `FULL_TABLE` or `LOG_BASED` → **shape 1**, whether the primary key is
+  hash- or range-sharded. Sharding changes nothing: the tap pages on the bucket.
 - Table is `INCREMENTAL` on the primary key → **shape 2**, which *is* shape 1.
   Do not create a second index.
 - Table is `INCREMENTAL` on a timestamp → **shape 3 or 4** for that column.
@@ -422,8 +475,12 @@ serialises index backfills within a database anyway, so batching buys nothing.
 
 ```bash
 singer-connectors/tap-yugabyte/tools/yb_index_check.py tap_yugabyte.yml \
-  --host <host> --port 5433 --user <user> --dbname <db> [--buckets N]
+  --host <host> --port 5433 --user <user> --dbname <db> [--buckets N] [--limit N]
 ```
+
+Pass `--limit` whatever the tap config's `limit` is. It is what caps the rows one
+`INCREMENTAL` run reads, and it is the difference between the tie-group check
+guessing and knowing — see "Both ends now say when this is happening" above.
 
 It reads the tap YAML the service owner already maintains, checks every table
 against the live source, and prints one of:

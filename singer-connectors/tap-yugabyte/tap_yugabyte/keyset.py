@@ -774,53 +774,93 @@ def _column_is_ordered(indoption):
 
 
 # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-return-statements
+def _no_index_possible(blockers):
+    return {'strategy': STRATEGY_PLAIN_SCAN, 'index_ddl': None,
+            'index_required': False, 'note': None, 'blockers': blockers}
+
+
 def plan_keyset_strategy(cur, schema_name, table_name, pk_columns, pk_types, buckets):
     """Decide how this table can be scanned, and what creating the index would need.
 
-    Three outcomes, in descending order of preference:
+    Three outcomes:
 
-    `pk_range`    the primary key is already range-sharded, so it is directly
-                  scannable in key order and no extra index is wanted -- adding
-                  one would cost writes for nothing.
-    `bucket_index` the key is hash-sharded, so ordered access needs the bucket
-                  index; `index_ddl` is the statement that would create it.
-    `plain_scan`  nothing can give ordered access, so the sync is a single
-                  non-resumable pass. `blockers` says why.
+    `bucket_index` the primary key is hash-sharded, so it has no order at all and
+                  ordered access needs the bucket index.
+    `pk_range`    the primary key is range-sharded, so the TABLE is scannable in
+                  key order -- but the tap is not written to exploit that, so the
+                  same index is required. See below.
+    `plain_scan`  no index can be built, so the sync is a single non-resumable
+                  pass. `blockers` says why, and `index_required` is False.
+
+    `index_required` is True for both of the first two and `index_ddl` carries
+    the statement that satisfies it. `strategy` says only what the table's
+    sharding is; it does not say whether an index is needed.
+
+    WHY A RANGE-SHARDED PRIMARY KEY STILL NEEDS THE INDEX. It reads as though it
+    should not: the key is stored sorted, so `ORDER BY <pk>` streams and a cursor
+    can resume inside it. The tap does not scan that way. full_table partitions
+    the table into N buckets and gives each one to a worker, and a bucket is
+    `yb_hash_code(<pk>) % N` -- an expression the base table does not carry and
+    cannot order by. So every bucket predicate against the bare table is a full
+    scan whatever the sharding, and full_table.sync_table gates on
+    `validate_index`, which requires this index unconditionally.
+
+    Reporting `pk_range` as needing nothing was therefore a contract the code
+    never honoured: the preflight said OK, the operator created nothing, and the
+    sync silently fell through to `_sync_table_without_pk` -- one non-resumable,
+    non-parallel pass. The index is the cheaper half of that trade, so the
+    contract is what changes here, not the scan.
     """
     cur.execute(_SHARDING_SQL, (schema_name, table_name))
     row = cur.fetchone()
     if row is None:
-        return {'strategy': STRATEGY_PLAIN_SCAN, 'index_ddl': None,
-                'blockers': [f'{schema_name}.{table_name} was not found']}
+        return _no_index_possible([f'{schema_name}.{table_name} was not found'])
     relkind, num_hash_key_columns, num_tablets = row[0], row[1], row[2]
 
     if relkind in ('v', 'm'):
-        return {'strategy': STRATEGY_PLAIN_SCAN, 'index_ddl': None,
-                'blockers': ['a view has no primary key and cannot be indexed']}
+        return _no_index_possible(['a view has no primary key and cannot be indexed'])
 
     if not pk_columns:
-        return {'strategy': STRATEGY_PLAIN_SCAN, 'index_ddl': None,
-                'blockers': ['the table has no primary key to page on']}
+        return _no_index_possible(['the table has no primary key to page on'])
 
-    if num_hash_key_columns == 0:
-        # already ordered by the key itself; the bucket index would be pure overhead
-        return {'strategy': STRATEGY_PK_RANGE, 'index_ddl': None, 'blockers': []}
-
+    # probed before the sharding is considered, because the bucket index hashes
+    # the primary key in both cases: a range-sharded key of a type yb_hash_code
+    # refuses cannot get one either, and saying `pk_range` there would promise a
+    # parallel scan that cannot be built
     unhashable = [c for c, t in zip(pk_columns, pk_types) if not _hashable(cur, t)]
     if unhashable:
-        return {
-            'strategy': STRATEGY_PLAIN_SCAN, 'index_ddl': None,
-            'blockers': [
-                f'yb_hash_code does not accept {", ".join(unhashable)}, so the '
-                f'bucket discriminator cannot be computed'
-            ],
-        }
+        return _no_index_possible([
+            f'yb_hash_code does not accept {", ".join(unhashable)}, so the '
+            f'bucket discriminator cannot be computed'
+        ])
 
     fq_table_name = f'"{schema_name}"."{table_name}"'
+    ddl = index_ddl(fq_table_name, table_name, pk_columns, buckets,
+                    tablets=num_tablets or buckets)
+    if num_hash_key_columns == 0:
+        return {
+            'strategy': STRATEGY_PK_RANGE,
+            'index_ddl': ddl,
+            'index_required': True,
+            'note': (
+                f'The primary key is range-sharded, so the table itself is '
+                f'scannable in key order -- but the tap partitions by '
+                f'yb_hash_code({", ".join(pk_columns)}) % {buckets}, which the '
+                f'table cannot order by, so it needs {index_name(table_name)} '
+                f'exactly as a hash-sharded key does. Without it the sync drops '
+                f'to a single non-resumable, non-parallel pass.'
+            ),
+            'blockers': [],
+        }
     return {
         'strategy': STRATEGY_BUCKET_INDEX,
-        'index_ddl': index_ddl(fq_table_name, table_name, pk_columns, buckets,
-                               tablets=num_tablets or buckets),
+        'index_ddl': ddl,
+        'index_required': True,
+        'note': (
+            f'The primary key is hash-sharded, so it has no order to page along. '
+            f'Without {index_name(table_name)} every resume re-reads the whole '
+            f'table.'
+        ),
         'blockers': [],
     }
 
@@ -1056,6 +1096,156 @@ def require_monotonic_key(cur, schema_name, table_name, column, pk_columns=()):
     return {'usable': not hard_failures, 'column': column, 'tiebreaker': tiebreaker,
             'hard_failures': hard_failures, 'risks': risks,
             'is_identity': is_identity, 'sequence': sequence_name}
+
+
+# ------------------------------------------------ INCREMENTAL tie groups
+
+# Rows sharing one replication-key value. Singer INCREMENTAL state carries one
+# scalar and the resume predicate is `>=`, so a run advances only by reaching a
+# LARGER value than the one it started on -- which means draining the whole
+# starting group first. A group bigger than one run can drain therefore never
+# advances the bookmark, and the sync makes no progress ever. See INDEXES.md,
+# "Resuming inside a tie group".
+
+# Below this many rows a group is not worth a warning whatever the table: it is
+# one bookmark flush (incremental.UPDATE_BOOKMARK_PERIOD, 10,000), so the re-read
+# a resume costs is smaller than the state the run writes while doing it. Named
+# here rather than imported because incremental imports this module.
+TIE_GROUP_MIN_ROWS = 10_000
+
+# With no `limit` configured a run has no row cap: it drains to the end in one
+# statement and always advances, so a livelock needs the run to be KILLED before
+# it clears the group. How far a run gets before dying is roughly a share of the
+# table, so that is what the group is measured against. Half is the point past
+# which a run reliably getting halfway through the table still cannot clear the
+# group. It is the soft half of the rule -- the `limit` comparison below is
+# exact and needs no judgement.
+TIE_GROUP_TABLE_FRACTION = 0.5
+
+# reltuples, null_frac, n_distinct and the largest frequency in the MCV list.
+# All four come from ANALYZE's stored statistics, so this reads catalog rows
+# only and never touches the table -- the alternative, `GROUP BY key ORDER BY
+# count DESC LIMIT 1`, is a full scan and an aggregate, which is not something
+# to run against production on every preflight.
+#
+# max() over the array rather than most_common_freqs[1]: the list is documented
+# as descending, but taking the maximum of at most 100 floats costs nothing and
+# does not depend on that holding.
+_TIE_GROUP_SQL = """
+SELECT c.reltuples,
+       s.attname IS NOT NULL                              AS analyzed,
+       s.null_frac,
+       s.n_distinct,
+       (SELECT max(f) FROM unnest(s.most_common_freqs) f) AS top_freq
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+LEFT JOIN pg_stats s ON s.schemaname = n.nspname
+                    AND s.tablename = c.relname
+                    AND s.attname = %s
+WHERE n.nspname = %s AND c.relname = %s
+"""
+
+
+def _estimate_largest_tie_group(rows, n_distinct, top_freq):
+    """Largest number of rows sharing one value, and where the number came from.
+
+    The MCV list is the direct answer when there is one: ANALYZE stores the most
+    common values with their frequencies, so the largest frequency times the row
+    estimate IS the largest group. Measured against a 40,050-row table with a
+    40,000-row group: 0.9986333 x 40050 = 39,995, against 40,000 actual.
+
+    With no MCV list, no value was common enough to store, and n_distinct
+    supplies an AVERAGE group instead -- negative is a ratio of distinct values
+    to rows, so -1 is a column with no ties at all. An average is a floor, not a
+    bound, which is why it is labelled.
+    """
+    if rows is None:
+        return None, None
+    if top_freq is not None:
+        return max(1, int(top_freq * rows + 0.5)), 'most_common_vals'
+    if n_distinct is None or n_distinct == 0:       # 0 is ANALYZE's "unknown"
+        return None, None
+    if n_distinct < 0:
+        return max(1, int(1.0 / -n_distinct + 0.5)), 'n_distinct (average)'
+    return max(1, int(rows / n_distinct + 0.5)), 'n_distinct (average)'
+
+
+def measure_tie_groups(cur, schema_name, table_name, replication_key, run_limit=None):
+    """Largest group of rows sharing one replication-key value, and what it means.
+
+    `run_limit` is the tap's `limit` config -- the LIMIT incremental.py puts on
+    the extraction query. When it is set the verdict is exact rather than a
+    heuristic:
+
+        a run reads `WHERE key >= <bookmark> ORDER BY key, pk LIMIT <run_limit>`
+
+    so if the group at the bookmark holds `run_limit` rows or more, every row the
+    run reads carries that same value, the bookmark is rewritten to the value it
+    already held, and the next run issues the identical statement. It is not a
+    slowdown; the sync never advances again, and nothing in the log says so. That
+    is severity `livelock`.
+
+    With no `limit` there is no row cap -- a run drains to the end of the table in
+    one statement and the bookmark moves as rows are emitted -- so a run that
+    COMPLETES always advances. The failure then needs a run to be killed before it
+    clears the group, which is a wall-clock question this cannot answer, so a
+    large group is reported as `risk` rather than as a verdict.
+
+    Returns severity one of None, 'risk', 'livelock', 'unknown', plus the
+    measurement and `risks`, a list of sentences in the shape
+    require_monotonic_key returns them.
+    """
+    cur.execute(_TIE_GROUP_SQL, (replication_key, schema_name, table_name))
+    row = cur.fetchone()
+    if row is None:
+        return {'column': replication_key, 'rows': None, 'largest_tie_group': None,
+                'fraction': None, 'source': None, 'severity': 'unknown',
+                'risks': [f'{schema_name}.{table_name} was not found.']}
+    reltuples, analyzed, _null_frac, n_distinct, top_freq = row
+
+    # PostgreSQL 15 stores -1 for "never analysed"; 0 is an empty table or the
+    # same thing on older rows. Either way there is no row count to scale by.
+    rows = int(reltuples) if reltuples is not None and reltuples > 0 else None
+    largest, source = _estimate_largest_tie_group(rows, n_distinct, top_freq)
+
+    result = {'column': replication_key, 'rows': rows, 'largest_tie_group': largest,
+              'fraction': (largest / rows) if largest and rows else None,
+              'source': source, 'severity': None, 'risks': []}
+
+    if not analyzed or largest is None:
+        result['severity'] = 'unknown'
+        result['risks'].append(
+            f'{replication_key} has no column statistics, so the size of its '
+            f'largest tie group is unknown. A tie group bigger than one run can '
+            f'drain never advances the bookmark. Run ANALYZE '
+            f'{schema_name}.{table_name} and re-check.'
+        )
+        return result
+
+    shared = (f'{largest:,} of {rows:,} rows ({result["fraction"]:.0%}) share one '
+              f'{replication_key} value, estimated from {source}')
+
+    if run_limit and largest >= run_limit:
+        result['severity'] = 'livelock'
+        result['risks'].append(
+            f'{shared} -- at or above the configured limit of {run_limit:,}. A run '
+            f'that starts on that value reads {run_limit:,} rows all carrying it, '
+            f'writes the bookmark it already had, and the next run issues the '
+            f'identical statement: the sync cannot advance past this value, ever. '
+            f'Raise limit above {largest:,}, pick a higher-cardinality replication '
+            f'key, or use LOG_BASED.'
+        )
+        return result
+
+    if largest >= TIE_GROUP_MIN_ROWS and result['fraction'] >= TIE_GROUP_TABLE_FRACTION:
+        result['severity'] = 'risk'
+        result['risks'].append(
+            f'{shared}. The resume predicate is >=, so a run has to drain the whole '
+            f'group before the bookmark can move; a run killed inside it restarts '
+            f'the group from the beginning. Prefer a higher-cardinality replication '
+            f'key, or use LOG_BASED.'
+        )
+    return result
 
 
 # --------------------------------------------- replication-key keyset index

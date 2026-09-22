@@ -720,3 +720,192 @@ class TestRuntimeGateMatchesThePreflight:
             self._cursor(None), 's', 't', ['id'], 3)
         assert usable is False
         assert 'CREATE UNIQUE INDEX t_pw_keyset' in reason
+
+
+class PlanCursor:
+    """Enough of a cursor for plan_keyset_strategy: one sharding row, then one
+    yb_hash_code probe per key column."""
+
+    class _Connection:
+        autocommit = True          # so _hashable skips the savepoint dance
+
+    def __init__(self, sharding, hashable=True):
+        self.connection = self._Connection()
+        self.sharding = sharding
+        self.hashable = hashable
+        self.executed = []
+        self._next = None
+
+    def execute(self, sql, params=None):
+        self.executed.append(sql)
+        if 'yb_hash_code(NULL' in sql:
+            if not self.hashable:
+                raise psycopg2.Error('yb_hash_code does not accept this type')
+            self._next = (1,)
+        else:
+            self._next = self.sharding
+
+    def fetchone(self):
+        return self._next
+
+
+class TestPlanKeysetStrategy:
+    """Shape 1 is required for every table with a primary key, whatever the
+    sharding. The tap pages on yb_hash_code(pk) % N, which no table can order
+    by, so a range-sharded key is no more scannable by this code than a hashed
+    one -- and reporting it as needing nothing made the preflight print OK for a
+    table full_table.sync_table then refused, dropping it to a single
+    non-resumable pass."""
+
+    HASH_PK = ('r', 1, 3)        # relkind, num_hash_key_columns, num_tablets
+    RANGE_PK = ('r', 0, 1)
+
+    def _plan(self, sharding, pk=('id',), types=('bigint',), hashable=True):
+        return keyset.plan_keyset_strategy(
+            PlanCursor(sharding, hashable), 's', 't', list(pk), list(types), 3)
+
+    def test_a_range_sharded_key_still_requires_the_index(self):
+        plan = self._plan(self.RANGE_PK)
+        assert plan['strategy'] == keyset.STRATEGY_PK_RANGE
+        assert plan['index_required'] is True
+        assert plan['blockers'] == []
+
+    def test_a_range_sharded_key_reports_the_ddl_that_satisfies_it(self):
+        plan = self._plan(self.RANGE_PK)
+        assert plan['index_ddl'] == keyset.index_ddl('"s"."t"', 't', ['id'], 3)
+        assert 'CREATE UNIQUE INDEX t_pw_keyset' in plan['index_ddl']
+
+    def test_both_shardings_ask_for_the_same_index(self):
+        # the index is a function of the key and the bucket count, not of how
+        # the table happens to be sharded
+        assert self._plan(self.RANGE_PK)['index_ddl'] == \
+            self._plan(self.HASH_PK)['index_ddl']
+
+    def test_the_range_note_says_why_the_order_it_has_is_not_enough(self):
+        note = self._plan(self.RANGE_PK)['note']
+        assert 'range-sharded' in note
+        assert 'yb_hash_code(id) % 3' in note
+
+    def test_a_hash_sharded_key_needs_the_bucket_index(self):
+        plan = self._plan(self.HASH_PK)
+        assert plan['strategy'] == keyset.STRATEGY_BUCKET_INDEX
+        assert plan['index_required'] is True
+
+    def test_no_primary_key_is_not_indexable(self):
+        plan = self._plan(self.HASH_PK, pk=(), types=())
+        assert plan['strategy'] == keyset.STRATEGY_PLAIN_SCAN
+        assert plan['index_required'] is False
+        assert plan['index_ddl'] is None
+        assert 'no primary key' in plan['blockers'][0]
+
+    def test_a_view_is_not_indexable(self):
+        plan = self._plan(('v', 0, 1))
+        assert plan['strategy'] == keyset.STRATEGY_PLAIN_SCAN
+        assert plan['index_required'] is False
+
+    def test_a_missing_relation_is_not_indexable(self):
+        plan = keyset.plan_keyset_strategy(
+            PlanCursor(None), 's', 't', ['id'], ['bigint'], 3)
+        assert plan['strategy'] == keyset.STRATEGY_PLAIN_SCAN
+        assert plan['index_required'] is False
+
+    def test_an_unhashable_range_key_cannot_be_bucketed_either(self):
+        # the probe has to run BEFORE the sharding is considered: promising
+        # pk_range here would promise a parallel scan whose index cannot be built
+        plan = self._plan(self.RANGE_PK, types=('point',), hashable=False)
+        assert plan['strategy'] == keyset.STRATEGY_PLAIN_SCAN
+        assert plan['index_required'] is False
+        assert 'yb_hash_code does not accept' in plan['blockers'][0]
+
+    def test_an_unhashable_hash_key_is_still_refused(self):
+        plan = self._plan(self.HASH_PK, types=('point',), hashable=False)
+        assert plan['strategy'] == keyset.STRATEGY_PLAIN_SCAN
+        assert plan['index_required'] is False
+
+
+class TestMeasureTieGroups:
+    """(reltuples, analyzed, null_frac, n_distinct, top_freq) from ANALYZE's
+    stored statistics -- no table read.
+
+    The numbers in the first two cases are the ones YugabyteDB 2026.1.1.1
+    actually reported for a 40,050-row table whose first 40,000 rows were
+    inserted in one transaction, and for a 40,000-row table with distinct
+    timestamps."""
+
+    BULK_LOADED = (40050.0, True, 0.0, 42.0, 0.9986333)
+    ALL_DISTINCT = (40000.0, True, 0.0, -1.0, None)
+
+    def _measure(self, row, run_limit=None):
+        return keyset.measure_tie_groups(FakeCursor([row]), 's', 't',
+                                         'updated_at', run_limit)
+
+    def test_the_mcv_list_recovers_the_group_size(self):
+        m = self._measure(self.BULK_LOADED)
+        assert m['largest_tie_group'] == 39995        # 40,000 actual
+        assert m['source'] == 'most_common_vals'
+
+    def test_a_group_at_or_above_the_limit_is_a_proven_livelock(self):
+        m = self._measure(self.BULK_LOADED, run_limit=10000)
+        assert m['severity'] == 'livelock'
+        assert 'cannot advance past this value, ever' in m['risks'][0]
+
+    def test_a_group_below_the_limit_is_not_a_livelock(self):
+        # the run drains the group and reaches the next value, so it advances
+        m = self._measure(self.BULK_LOADED, run_limit=50000)
+        assert m['severity'] != 'livelock'
+
+    def test_a_large_group_with_no_limit_configured_is_a_risk_not_a_verdict(self):
+        # with no LIMIT a run that completes always advances; the failure needs
+        # the run to be killed, which is a wall-clock question this cannot answer
+        m = self._measure(self.BULK_LOADED)
+        assert m['severity'] == 'risk'
+        assert 'drain the whole group' in m['risks'][0]
+
+    def test_a_key_with_no_ties_is_silent(self):
+        m = self._measure(self.ALL_DISTINCT)
+        assert m['largest_tie_group'] == 1
+        assert m['severity'] is None
+        assert m['risks'] == []
+
+    def test_a_small_table_is_not_warned_about_on_the_fraction_alone(self):
+        # 90 of 100 rows share a value, but 90 rows drain instantly -- below
+        # TIE_GROUP_MIN_ROWS nothing is reported without a limit to compare to
+        m = self._measure((100.0, True, 0.0, 2.0, 0.9))
+        assert m['largest_tie_group'] == 90
+        assert m['severity'] is None
+
+    def test_a_small_table_is_still_a_livelock_against_a_smaller_limit(self):
+        m = self._measure((100.0, True, 0.0, 2.0, 0.9), run_limit=50)
+        assert m['severity'] == 'livelock'
+
+    def test_a_big_group_in_a_much_bigger_table_is_not_warned_about(self):
+        # 20,000 rows share a value in 100M -- over the absolute floor, which is
+        # exactly why the floor alone is not the signal
+        m = self._measure((100_000_000.0, True, 0.0, 5000.0, 0.0002))
+        assert m['largest_tie_group'] == 20000
+        assert m['severity'] is None
+
+    def test_no_statistics_is_reported_as_unknown_rather_than_as_fine(self):
+        m = keyset.measure_tie_groups(
+            FakeCursor([(-1.0, False, None, None, None)]), 's', 't', 'updated_at')
+        assert m['severity'] == 'unknown'
+        assert 'Run ANALYZE' in m['risks'][0]
+
+    def test_a_missing_column_statistic_is_unknown_too(self):
+        m = self._measure((40000.0, False, None, None, None))
+        assert m['severity'] == 'unknown'
+
+    def test_n_distinct_supplies_an_average_when_there_is_no_mcv_list(self):
+        m = self._measure((1000.0, True, 0.0, 10.0, None))
+        assert m['largest_tie_group'] == 100
+        assert 'average' in m['source']
+
+    def test_a_negative_n_distinct_is_a_ratio_not_a_count(self):
+        # -0.25 means distinct values are a quarter of the rows: groups of four
+        m = self._measure((40000.0, True, 0.0, -0.25, None))
+        assert m['largest_tie_group'] == 4
+
+    def test_a_missing_table_is_unknown(self):
+        m = keyset.measure_tie_groups(FakeCursor([]), 's', 't', 'updated_at')
+        assert m['severity'] == 'unknown'
+        assert 'not found' in m['risks'][0]

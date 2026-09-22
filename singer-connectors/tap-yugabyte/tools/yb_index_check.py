@@ -65,24 +65,25 @@ def _pk_index(cur, schema_name, table_name, pk_columns, pk_types, buckets):
     """Shape 1/2: ((yb_hash_code(pk) % N) ASC, pk ASC) UNIQUE.
 
     Required by FULL_TABLE and by the full-table bootstrap stage of LOG_BASED,
-    which runs the same code.
+    which runs the same code -- for every table with a primary key, whatever the
+    sharding. A range-sharded key used to be reported OK with nothing to do; the
+    tap has no code path that exploits it, so that OK predicted a parallel
+    resumable sync the operator never got. plan_keyset_strategy says which
+    sharding it is and why the index is needed either way.
     """
     plan = keyset.plan_keyset_strategy(cur, schema_name, table_name,
                                        pk_columns, pk_types, buckets)
-    if plan['strategy'] == keyset.STRATEGY_PK_RANGE:
-        return OK, ['Primary key is range-sharded, so it already pages in key '
-                    'order. Adding an index here would only cost writes.'], []
-    if plan['strategy'] != keyset.STRATEGY_BUCKET_INDEX:
+    if not plan['index_required']:
         return BLOCK, plan['blockers'], []
 
     name = keyset.index_name(table_name)
     found, problems = keyset.check_index(cur, schema_name, table_name, name,
                                          pk_columns, pk_columns, buckets)
     if found is not None and not problems:
-        return OK, [f'{name} supplies the order the hash-sharded primary key '
-                    f'lacks, {buckets} buckets over {found["tablets"]} tablets.'], []
-    notes = ['Primary key is hash-sharded, so it has no order to page along. '
-             'Without this index every resume re-reads the whole table.']
+        return OK, [f'{name} supplies the bucket order the parallel scan pages '
+                    f'along, {buckets} buckets over {found["tablets"]} '
+                    f'tablets.'], []
+    notes = [plan['note']]
     notes.extend(problems)
     return ACTION, notes, _repair_ddl(schema_name, found, plan['index_ddl'])
 
@@ -107,7 +108,8 @@ def check_log_based(cur, schema_name, table_name, buckets):
     return status, notes, ddl
 
 
-def check_incremental(cur, schema_name, table_name, replication_key, buckets):
+def check_incremental(cur, schema_name, table_name, replication_key, buckets,
+                      run_limit=None):
     """INCREMENTAL pages by the replication key, so the key -- not the primary
     key -- is what has to be indexed, non-null and actually increasing."""
     if not replication_key:
@@ -127,6 +129,17 @@ def check_incremental(cur, schema_name, table_name, replication_key, buckets):
         status = BLOCK
         notes.extend(key['hard_failures'])
     notes.extend(key['risks'])
+
+    # No index fixes a tie group -- the bookmark is one scalar and the resume is
+    # `>=`, so a group larger than one run can drain never lets the bookmark
+    # move. With `limit` known that is provable rather than likely, and a
+    # configuration that provably cannot make progress is a BLOCK even though
+    # there is no DDL to print for it.
+    ties = keyset.measure_tie_groups(cur, schema_name, table_name,
+                                     replication_key, run_limit)
+    notes.extend(ties['risks'])
+    if ties['severity'] == 'livelock':
+        status = BLOCK
 
     # when the replication key IS the primary key the shape-1 index already is
     # the shape-2 index; asking for a second one would ask for a duplicate
@@ -164,14 +177,14 @@ def check_incremental(cur, schema_name, table_name, replication_key, buckets):
     return status, notes, ddl
 
 
-def check_table(cur, schema_name, table, buckets):
+def check_table(cur, schema_name, table, buckets, run_limit=None):
     method = (table.get('replication_method') or '').upper()
     table_name = table['table_name']
     if method == 'FULL_TABLE':
         return check_full_table(cur, schema_name, table_name, buckets)
     if method == 'INCREMENTAL':
         return check_incremental(cur, schema_name, table_name,
-                                 table.get('replication_key'), buckets)
+                                 table.get('replication_key'), buckets, run_limit)
     if method == 'LOG_BASED':
         return check_log_based(cur, schema_name, table_name, buckets)
     return BLOCK, [f'Unknown replication_method {method!r}.'], []
@@ -187,6 +200,12 @@ def main():
     parser.add_argument('--password', default=os.environ.get('PGPASSWORD'))
     parser.add_argument('--buckets', type=int, default=keyset.BUCKETS_DEFAULT,
                         help='keyset_buckets the tap is configured for')
+    parser.add_argument('--limit', type=int, default=None,
+                        help='`limit` the tap is configured for, which caps the '
+                             'rows one INCREMENTAL run reads. Given it, the tie-'
+                             'group check is exact rather than a heuristic: a '
+                             'group of at least this many rows can never advance '
+                             'the bookmark')
     args = parser.parse_args()
 
     with open(args.config, encoding='utf-8') as handle:
@@ -201,7 +220,8 @@ def main():
         for schema in config.get('schemas') or []:
             schema_name = schema['source_schema']
             for table in schema.get('tables') or []:
-                status, notes, ddl = check_table(cur, schema_name, table, args.buckets)
+                status, notes, ddl = check_table(cur, schema_name, table,
+                                                 args.buckets, args.limit)
                 method = table.get('replication_method')
                 key = table.get('replication_key')
                 heading = f"{schema_name}.{table['table_name']}  [{method}"

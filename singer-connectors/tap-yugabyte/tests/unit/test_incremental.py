@@ -154,3 +154,57 @@ class TestIncrementalSelectSql(TestCase):
         self.assertNotIn('yb_hash_code', sql)
         self.assertNotIn('IndexScan', sql)
         self.assertIn('ORDER BY "created_at" ASC', sql)
+
+
+class TestBookmarkStalledWarning(TestCase):
+    """A tie group larger than one run can drain never advances the bookmark, so
+    the sync makes no progress ever -- while every run still looks healthy,
+    emitting a full batch of records on schedule.
+
+    Singer INCREMENTAL state carries one scalar and the resume predicate is >=,
+    so this is detected and reported, not fixed: fixing it means a composite
+    bookmark, which is not a shape this state has. See INDEXES.md, "Resuming
+    inside a tie group".
+    """
+
+    STREAM = {'tap_stream_id': 'rt-bulkload'}
+    STAMP = '2026-09-22T14:21:22.858584+00:00'
+    LATER = '2026-09-22T14:30:00.000000+00:00'
+
+    def _warning(self, ended_at, started_at, rows_saved, run_limit):
+        state = {'bookmarks': {'rt-bulkload': {'replication_key_value': ended_at}}}
+        with patch.object(incremental.LOGGER, 'warning') as warning:
+            incremental._warn_if_bookmark_stalled(
+                self.STREAM, state, 'updated_at', started_at, rows_saved, run_limit)
+        return warning
+
+    def test_a_full_batch_that_moved_nothing_is_reported(self):
+        warning = self._warning(self.STAMP, self.STAMP, 10000, 10000)
+        assert warning.called
+        message = warning.call_args[0][0] % warning.call_args[0][1:]
+        assert 'MADE NO PROGRESS' in message
+        assert self.STAMP in message
+        assert 'LOG_BASED' in message
+
+    def test_an_empty_run_is_not_a_livelock(self):
+        # no rows emitted is "no new data", which moves no bookmark by design
+        assert not self._warning(self.STAMP, self.STAMP, 0, 10000).called
+
+    def test_a_first_run_has_no_bookmark_to_fail_to_advance(self):
+        assert not self._warning(self.STAMP, None, 10000, 10000).called
+
+    def test_a_run_that_advanced_the_bookmark_is_fine(self):
+        # a run ending inside a tie having made progress is exactly the
+        # at-least-once behaviour the design accepts
+        assert not self._warning(self.LATER, self.STAMP, 10000, 10000).called
+
+    def test_a_single_row_table_does_not_warn_every_run(self):
+        # it re-reads its one row forever and the bookmark cannot move, because
+        # nothing lies beyond it -- the sync is caught up, not stuck
+        assert not self._warning(self.STAMP, self.STAMP, 1, 10000).called
+
+    def test_a_short_run_drained_everything_there_was(self):
+        assert not self._warning(self.STAMP, self.STAMP, 9999, 10000).called
+
+    def test_no_limit_configured_means_a_run_always_drains_to_the_end(self):
+        assert not self._warning(self.STAMP, self.STAMP, 500000, None).called
