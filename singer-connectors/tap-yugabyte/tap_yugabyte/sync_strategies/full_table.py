@@ -154,24 +154,19 @@ def _fetch_max_pk_values(conn_info, fq_table_name, pk_columns, buckets):
     """Snapshot the largest primary-key tuple, bounding the scan against inserts
     that land while it runs.
 
-    One statement over every bucket. `IN (0..N-1)` gives the planner a single
-    index condition across all of them, and yb_max_merge_scan_streams lets it
-    merge the per-bucket streams into one ordered result, so the whole probe is
-    N index entries rather than a sort of the table. Ordering by the key columns
-    individually keeps it on the index; a ROW() expression here would sort the
-    table to return a single row.
+    Reads N index entries, one per bucket, in whichever form this server can
+    serve -- see keyset.max_pk_values_sql. Ordering by the key columns
+    individually keeps it on the index either way; a ROW() expression here would
+    sort the table to return a single row.
     """
-    cols = ', '.join(keyset.quoted(pk_columns))
-    select_sql = (
-        f'SELECT {cols} FROM {fq_table_name} '
-        f'WHERE {keyset.bucket_in_sql(pk_columns, buckets)} '
-        f'ORDER BY {keyset.order_by_sql(pk_columns, "DESC")} LIMIT 1'
-    )
-
     def probe():
         with yb_db.open_connection(conn_info) as conn:
             with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
-                cur.execute(keyset.merge_scan_guc_sql(buckets))
+                merge_scan = keyset.merge_scan_available(cur)
+                if merge_scan:
+                    cur.execute(keyset.merge_scan_guc_sql(buckets))
+                select_sql = keyset.max_pk_values_sql(
+                    fq_table_name, pk_columns, buckets, merge_scan)
                 LOGGER.info('select %s', select_sql)
                 cur.execute(select_sql)
                 row = cur.fetchone()
@@ -216,7 +211,8 @@ def _scan_bucket(conn_info, stream, state, desired_columns, md_map, pk_columns,
 
         with _open_reader(conn_info, hybrid_time, proc) as conn:
             with conn.cursor() as setup:
-                setup.execute(keyset.merge_scan_guc_sql(buckets))
+                if keyset.merge_scan_available(setup):
+                    setup.execute(keyset.merge_scan_guc_sql(buckets))
             with conn.cursor(cursor_factory=psycopg2.extras.DictCursor,
                              name=f'stitch_cursor_bucket_{bucket}') as cur:
                 cur.itersize = yb_db.CURSOR_ITER_SIZE

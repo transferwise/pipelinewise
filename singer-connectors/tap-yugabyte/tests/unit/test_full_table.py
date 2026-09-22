@@ -141,7 +141,9 @@ class TestSyncTableResumeQuery(unittest.TestCase):
             self.executed.append((sql, params))
 
         def fetchone(self):
-            return None
+            # the only fetchone on this path is the merge-scan availability probe,
+            # which expects a count
+            return (1,)
 
     class _RecordingConnect:
         def __init__(self, cursor):

@@ -44,6 +44,7 @@ PERMANENT_SQLSTATES = frozenset({
     '3F000',  # invalid_schema_name
     '25001',  # active_sql_transaction -- yb_read_time inside BEGIN/COMMIT
     '22023',  # invalid_parameter_value
+    '42704',  # undefined_object -- e.g. a GUC this server build does not have
 })
 
 # Named only so operators can recognise them in logs; the policy retries anything

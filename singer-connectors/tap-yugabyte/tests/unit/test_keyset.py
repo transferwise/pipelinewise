@@ -357,3 +357,45 @@ class TestModificationTimestampIsAClaim:
         # both sit in the same rank group: they fail differently, not worse
         assert keyset._name_rank('updated_at', keyset._MODIFIED_NAME_HINTS) is not None
         assert keyset._name_rank('created_at', keyset._CREATED_NAME_HINTS) is not None
+
+
+class TestMaxPkValuesSql:
+    """The probe reads N index entries either way; only the wording differs."""
+
+    def test_merge_scan_form_is_one_statement(self):
+        sql = keyset.max_pk_values_sql('s.t', ['id'], 3, merge_scan=True)
+        assert 'UNION ALL' not in sql
+        assert '(yb_hash_code("id") % 3) IN (0, 1, 2)' in sql
+        assert sql.endswith('ORDER BY "id" DESC LIMIT 1')
+
+    def test_fallback_form_carries_a_limit_per_bucket(self):
+        sql = keyset.max_pk_values_sql('s.t', ['id'], 3, merge_scan=False)
+        # the per-branch LIMIT is what makes each branch read a single entry;
+        # the IN-list form without merge scan reads the whole index instead
+        assert sql.count('UNION ALL') == 2
+        assert sql.count('ORDER BY "id" DESC LIMIT 1') == 4   # 3 branches + the outer
+
+    def test_fallback_form_names_every_bucket_exactly_once(self):
+        sql = keyset.max_pk_values_sql('s.t', ['id'], 4, merge_scan=False)
+        for bucket in range(4):
+            assert f'% 4) = {bucket}' in sql
+
+    def test_composite_key_orders_columns_individually_in_both_forms(self):
+        for merge_scan in (True, False):
+            sql = keyset.max_pk_values_sql('s.t', ['tenant', 'id'], 2, merge_scan)
+            assert '"tenant" DESC, "id" DESC' in sql
+            assert 'ROW(' not in sql
+
+
+class TestMergeScanAvailability:
+    def test_present_when_pg_settings_has_the_parameter(self):
+        assert keyset.merge_scan_available(FakeCursor([(1,)])) is True
+
+    def test_absent_on_a_build_without_it(self):
+        assert keyset.merge_scan_available(FakeCursor([(0,)])) is False
+
+
+class TestUnknownGucIsPermanent:
+    def test_unrecognised_parameter_is_not_retried(self):
+        # a GUC this build lacks can never appear; retrying it just delays the failure
+        assert is_permanent(SqlStateError('42704'))

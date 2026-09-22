@@ -110,6 +110,42 @@ def bucket_in_sql(pk_columns, buckets, escape_percent=False):
     return f'{bucket_expr(pk_columns, buckets, escape_percent)} IN ({values})'
 
 
+def merge_scan_available(cur):
+    """Whether this server build has the merge-scan setting at all.
+
+    Checked rather than assumed: older YugabyteDB has no such parameter, and SET
+    on one that does not exist raises rather than being ignored. The scan has a
+    correct form either way, so this picks between them instead of failing.
+    """
+    cur.execute("SELECT count(*) FROM pg_settings WHERE name = 'yb_max_merge_scan_streams'")
+    return cur.fetchone()[0] > 0
+
+
+def max_pk_values_sql(fq_table_name, pk_columns, buckets, merge_scan):
+    """Largest key tuple in the table, in whichever form this server can serve.
+
+    With merge scan, one index condition over every bucket and the streams merged
+    into order. Without it, a branch per bucket: each carries its own LIMIT, so
+    each reads exactly one index entry and the outer sort orders N rows. The
+    branching form is wordier but needs nothing set -- and the IN-list form
+    without the setting reads the whole index, which is the failure worth
+    avoiding since nothing about the plan says it happened.
+    """
+    cols = ', '.join(quoted(pk_columns))
+    desc = order_by_sql(pk_columns, 'DESC')
+    if merge_scan:
+        return (f'SELECT {cols} FROM {fq_table_name} '
+                f'WHERE {bucket_in_sql(pk_columns, buckets)} '
+                f'ORDER BY {desc} LIMIT 1')
+    branches = '\nUNION ALL\n'.join(
+        f'  (SELECT {cols} FROM {fq_table_name} '
+        f'WHERE {bucket_expr(pk_columns, buckets)} = {bucket} '
+        f'ORDER BY {desc} LIMIT 1)'
+        for bucket in range(buckets)
+    )
+    return f'SELECT {cols} FROM (\n{branches}\n) bucket_maxima ORDER BY {desc} LIMIT 1'
+
+
 def merge_scan_guc_sql(buckets):
     """Session setting that lets an index scan merge the per-bucket streams.
 
