@@ -33,6 +33,10 @@ PERMANENT_SQLSTATES = frozenset({
     '3F000',  # invalid_schema_name
     '25001',  # active_sql_transaction -- yb_read_time inside BEGIN/COMMIT
     '22023',  # invalid_parameter_value
+    '42601',  # syntax_error -- deterministic, retrying only delays the failure
+    '42P02',  # undefined_parameter
+    '42804',  # datatype_mismatch
+    '42846',  # cannot_coerce
 })
 
 

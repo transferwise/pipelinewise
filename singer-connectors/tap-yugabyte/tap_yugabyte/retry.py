@@ -45,6 +45,10 @@ PERMANENT_SQLSTATES = frozenset({
     '25001',  # active_sql_transaction -- yb_read_time inside BEGIN/COMMIT
     '22023',  # invalid_parameter_value
     '42704',  # undefined_object -- e.g. a GUC this server build does not have
+    '42601',  # syntax_error -- deterministic, retrying only delays the failure
+    '42P02',  # undefined_parameter
+    '42804',  # datatype_mismatch
+    '42846',  # cannot_coerce
 })
 
 # Named only so operators can recognise them in logs; the policy retries anything

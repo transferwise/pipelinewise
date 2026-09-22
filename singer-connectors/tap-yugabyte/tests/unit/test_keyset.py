@@ -529,3 +529,47 @@ class TestReplicationKeyThatIsThePrimaryKey:
         ddl = keyset.replication_key_index_ddl('s.t', 't', 'created_at', ['id'], 3)
         assert '"created_at" ASC, "id" ASC' in ddl
         assert 't_created_at_pw_keyset' in ddl
+
+
+class TestIndexValidityAndShape:
+    """Checks added after a live cluster produced each of these silently.
+
+    An index whose backfill never completed exists, is named correctly, and has
+    exactly the right definition -- and the planner refuses it. A failed
+    CREATE INDEX leaves one behind permanently, so this is not a transient
+    window: the tap reported the requirement satisfied forever while every scan
+    read the whole table."""
+
+    def test_key_columns_survive_a_composite_bucket_expression(self):
+        # the comma inside yb_hash_code(tenant, id) is not a key separator
+        assert keyset._index_key_columns(
+            'CREATE UNIQUE INDEX i ON s.t USING lsm '
+            '(((yb_hash_code(tenant, id) % 3)) ASC, created_at ASC, tenant ASC, id ASC)'
+        ) == ['((yb_hash_code(tenant, id) % 3))', 'created_at', 'tenant', 'id']
+
+    def test_key_columns_survive_a_quoted_column_name(self):
+        # pg_get_indexdef quotes any name that needs it
+        assert keyset._index_key_columns(
+            'CREATE UNIQUE INDEX i ON s.t USING lsm '
+            '(((yb_hash_code(id) % 3)) ASC, "pct%done" ASC, id ASC)'
+        ) == ['((yb_hash_code(id) % 3))', 'pct%done', 'id']
+
+    def test_a_single_column_key_still_parses(self):
+        assert keyset._index_key_columns(
+            'CREATE UNIQUE INDEX i ON s.t USING lsm (((yb_hash_code(id) % 3)) ASC, id ASC)'
+        ) == ['((yb_hash_code(id) % 3))', 'id']
+
+
+class TestDeterministicErrorsAreNotRetried:
+    """A syntax error does not become correct on the eighth attempt; retrying
+    one just delays the failure by the whole backoff schedule."""
+
+    @pytest.mark.parametrize('sqlstate', ['42601', '42P02', '42804', '42846'])
+    def test_never_transient_states_are_permanent(self, sqlstate):
+        from tap_yugabyte import retry
+        assert sqlstate in retry.PERMANENT_SQLSTATES
+
+    def test_a_tablet_move_is_still_retried(self):
+        from tap_yugabyte import retry
+        assert '40001' not in retry.PERMANENT_SQLSTATES
+        assert '40P01' not in retry.PERMANENT_SQLSTATES

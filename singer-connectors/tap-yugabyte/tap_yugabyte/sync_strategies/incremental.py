@@ -79,6 +79,19 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
             else:
                 LOGGER.info("hstore is UNavailable")
 
+            # the same settings full_table's scans need, for the same reason: the
+            # merge plan is a cost decision and the cost model prefers a
+            # sequential scan and an external merge sort. Without these the
+            # bucket predicate and the index are emitted and then ignored --
+            # measured, a 30,000-row drain sorts to disk (2,432 kB) instead of
+            # merging 3 streams. They must run on a plain cursor: the extraction
+            # below uses a named server-side cursor, which cannot carry SET.
+            buckets = conn_info.get('keyset_buckets', keyset.BUCKETS_DEFAULT)
+            with conn.cursor() as setup:
+                if keyset.merge_scan_available(setup):
+                    for setting in keyset.scan_settings_sql(buckets):
+                        setup.execute(setting)
+
             with conn.cursor(cursor_factory=psycopg2.extras.DictCursor, name='pipelinewise') as cur:
                 cur.itersize = yb_db.CURSOR_ITER_SIZE
                 LOGGER.info("Beginning new incremental replication sync %s", stream_version)
@@ -89,7 +102,10 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
                                               "schema_name": schema_name,
                                               "table_name": stream['table_name'],
                                               "limit": conn_info['limit'],
-                                              "keyset_buckets": conn_info.get('keyset_buckets'),
+                                              # same default as full_table: absent from
+                                              # config this used to be None, which emits
+                                              # no bucket predicate and no hint at all
+                                              "keyset_buckets": buckets,
                                               "pk_columns": md_map.get((), {}).get(
                                                   'table-key-properties', []),
                                               })

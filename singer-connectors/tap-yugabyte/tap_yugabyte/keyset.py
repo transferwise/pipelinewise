@@ -265,7 +265,8 @@ def index_ddl(fq_table_name, table_name, pk_columns, buckets, tablets=None):
 
 
 _INDEX_SHAPE_SQL = """
-SELECT pg_get_indexdef(i.oid), x.indisunique, p.num_tablets
+SELECT pg_get_indexdef(i.oid), x.indisunique, p.num_tablets,
+       x.indisvalid, x.indisready, x.indoption[0]
 FROM pg_class c
 JOIN pg_namespace n ON n.oid = c.relnamespace
 JOIN pg_index x ON x.indrelid = c.oid
@@ -273,6 +274,30 @@ JOIN pg_class i ON i.oid = x.indexrelid
 CROSS JOIN LATERAL yb_table_properties(i.oid) p
 WHERE n.nspname = %s AND c.relname = %s AND i.relname = %s
 """
+
+
+def _index_key_columns(indexdef):
+    """Key column names from a rendered index definition, in order.
+
+    Splits the key list at top-level commas only, so a composite bucket
+    expression -- `yb_hash_code(tenant, id)` -- stays one key, and strips the
+    quoting `pg_get_indexdef` applies to any name that needs it.
+    """
+    body = indexdef[indexdef.index('USING lsm (') + len('USING lsm ('):]
+    body = body[:body.rindex(')')]
+    depth, current, parts = 0, [], []
+    for char in body:
+        if char == ',' and depth == 0:
+            parts.append(''.join(current).strip())
+            current = []
+            continue
+        if char == '(':
+            depth += 1
+        elif char == ')':
+            depth -= 1
+        current.append(char)
+    parts.append(''.join(current).strip())
+    return [part.rsplit(' ', 1)[0].strip().strip('"') for part in parts]
 
 
 def describe_index(cur, schema_name, table_name, wanted_name):
@@ -287,7 +312,7 @@ def describe_index(cur, schema_name, table_name, wanted_name):
     row = cur.fetchone()
     if row is None:
         return None
-    indexdef, is_unique, num_tablets = row
+    indexdef, is_unique, num_tablets, is_valid, is_ready, leading_indoption = row
     # the key list is the parenthesised group following `USING lsm `
     body = indexdef[indexdef.index('USING lsm (') + len('USING lsm ('):]
     body = body[:body.rindex(')')]
@@ -312,6 +337,9 @@ def describe_index(cur, schema_name, table_name, wanted_name):
         'bucket_columns': _bucket_columns(parts[0]),
         'trailing': trailing,
         'tablets': num_tablets,
+        'valid': is_valid,
+        'ready': is_ready,
+        'bucket_is_ordered': _column_is_ordered(leading_indoption),
     }
 
 
@@ -346,7 +374,27 @@ def check_index(cur, schema_name, table_name, wanted_name, pk_columns,
         return None, [f'{wanted_name} does not exist.']
 
     problems = []
-    if found['buckets'] != buckets:
+    # An index whose backfill never finished exists, is named correctly, and has
+    # exactly the right definition -- and the planner will not use it. Nothing
+    # about the table or the definition says so; the scan just silently becomes a
+    # sequential scan and an external sort. Measured: a 30,000-row drain sorting
+    # 2,432 kB to disk behind an index that reads as perfect.
+    if not found['valid'] or not found['ready']:
+        problems.append(
+            f'{wanted_name} exists but is not valid ('
+            f"indisvalid={found['valid']}, indisready={found['ready']}): its "
+            f'backfill did not complete, so the planner ignores it and every '
+            f'scan is a full table scan. Drop and recreate it.')
+    if not found['bucket_is_ordered']:
+        problems.append(
+            f'{wanted_name} declares the bucket HASH, not ASC. A hashed '
+            f'discriminator cannot be split one bucket per tablet, so the '
+            f'bucket-to-tablet mapping is whatever the hash space gives.')
+    if found['buckets'] is None:
+        problems.append(
+            f'{wanted_name} is not a bucket index -- its leading key is not '
+            f'yb_hash_code(...) % N, so no scan of ours can use it.')
+    elif found['buckets'] != buckets:
         problems.append(
             f"{wanted_name} is built with {found['buckets']} buckets but the tap "
             f'is configured for {buckets}. Every scan names {buckets} bucket '
@@ -363,10 +411,13 @@ def check_index(cur, schema_name, table_name, wanted_name, pk_columns,
     if not found['unique']:
         problems.append(f'{wanted_name} is not UNIQUE.')
     if found['tablets'] is not None and found['tablets'] < buckets:
+        cause = ('Without SPLIT AT VALUES the whole index is one tablet and the '
+                 'buckets share it.' if found['bucket_is_ordered'] else
+                 'SPLIT AT VALUES is not legal on a hashed bucket, which is the '
+                 'real fault here.')
         problems.append(
-            f"{wanted_name} has {found['tablets']} tablet(s) for {buckets} buckets. "
-            f'Without SPLIT AT VALUES the whole index is one tablet and the '
-            f'buckets share it.')
+            f"{wanted_name} has {found['tablets']} tablet(s) for {buckets} "
+            f'buckets. {cause}')
     return found, problems
 
 
@@ -594,6 +645,10 @@ JOIN pg_class c ON c.oid = x.indrelid
 JOIN pg_namespace n ON n.oid = c.relnamespace
 JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum = x.indkey[0]
 WHERE n.nspname = %s AND c.relname = %s AND a.attname = %s
+  -- an index whose backfill has not finished exists with a perfect definition
+  -- and the planner ignores it. On YugabyteDB that window is minutes, not
+  -- milliseconds, because index backfills serialise within a database
+  AND x.indisvalid AND x.indisready
 """
 
 
@@ -606,6 +661,7 @@ JOIN pg_namespace n ON n.oid = c.relnamespace
 WHERE n.nspname = %s AND c.relname = %s
   AND x.indkey[0] = 0
   AND pg_get_indexdef(i.oid) LIKE '%%yb_hash_code%%'
+  AND x.indisvalid AND x.indisready
 """
 
 
@@ -738,28 +794,47 @@ def plan_partial_sync(cur, schema_name, table_name, boundary_column, start_value
     # change to the PartialSync predicate, not something an index alone provides.
     cur.execute(_KEYSET_INDEX_SQL, (schema_name, table_name))
     for name, indexdef in cur.fetchall():
-        keys = indexdef[indexdef.index('(') + 1:].split(',')
-        if len(keys) > 1 and keys[1].strip().startswith(f'{boundary_column} '):
+        # splitting the key list on commas does not survive contact with real
+        # definitions: a composite bucket renders as `yb_hash_code(tenant, id)`,
+        # whose own comma lands mid-expression, and a column needing quotes
+        # renders as `"pct%done" ASC`, which no unquoted comparison matches
+        trailing = _index_key_columns(indexdef)[1:]
+        if trailing and trailing[0] == boundary_column:
             return {
                 'indexed': False, 'index': None, 'partial_indexes': partial,
                 'suggestion': None,
                 'via_bucket_index': name,
                 'note': (
-                    f'{name} can bound this range if the PartialSync predicate also '
-                    f'names every bucket, as the full-table scan does. Without that '
-                    f'the boundary is a full scan.'
+                    f'{name} bounds this range already -- YugabyteDB bounds a '
+                    f'trailing column under an unbounded leading one, measured '
+                    f'identical with and without a bucket predicate. Naming every '
+                    f'bucket is required for ORDER BY, which PartialSync does not '
+                    f'use, so no predicate change is needed here.'
                 ),
             }
 
     fq_table_name = f'"{schema_name}"."{table_name}"'
+    # A partial index is the cheaper answer when the boundary has a fixed lower
+    # bound -- but `usable` above counts only non-partial indexes, so suggesting
+    # one produced an operator-visible loop: run the DDL, re-run the check, get
+    # the identical suggestion back, forever. It is offered as a note instead,
+    # and the suggestion is the index that actually changes the verdict.
     suggestion = (
         f'CREATE INDEX {table_name}_pw_partial ON {fq_table_name} '
         f'("{boundary_column}" ASC)'
     )
+    note = None
     if start_value is not None:
-        suggestion += f" WHERE \"{boundary_column}\" >= '{start_value}'"
+        note = (
+            f'If this boundary never moves below {start_value!r}, a partial index '
+            f'covers the synced rows for less write cost:\n  CREATE INDEX '
+            f'{table_name}_pw_partial ON {fq_table_name} ("{boundary_column}" ASC) '
+            f"WHERE \"{boundary_column}\" >= '{start_value}';\n"
+            f'It stops being used the moment a query reaches below that bound, '
+            f'which is why it is not the default suggestion.'
+        )
     return {'indexed': False, 'index': None, 'partial_indexes': partial,
-            'suggestion': suggestion, 'via_bucket_index': None, 'note': None}
+            'suggestion': suggestion, 'via_bucket_index': None, 'note': note}
 
 
 # ------------------------------------------------- monotonic key eligibility
