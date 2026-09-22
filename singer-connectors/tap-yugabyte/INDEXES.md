@@ -280,10 +280,46 @@ YugabyteDB 2026.1.1.1).
 | Primary key omitted from the trailing columns | Resume re-reads the whole group of rows sharing the last timestamp seen, every run |
 | `ORDER BY` written as a row constructor — `ORDER BY (a, b)` | Opaque to the planner: a blocking sort where the index could have supplied the order. 48 MB spill against 81 kB streaming |
 | Capturing a plan on a table that has never been `ANALYZE`d | Not a mistake in the index — but see the note below before reading a `Sort` as one |
-| Keyset resume written as a row constructor — `WHERE (a, b) > (%s, %s)` | Reads `Index Cond`, so the plan looks correct, but every remaining index entry in the bucket is read and dropped. 9,221 index rows to return 5, against 22 for the expanded form. The tap emits the expanded form; this matters if you hand-write a probe |
+| Keyset resume written as a row constructor — `WHERE (a, b) > (%s, %s)` | Reads `Index Cond`, so the plan looks correct, but every remaining index entry in the bucket is read and dropped. The tap emits an expanded form instead — but see the composite-key limitation below, which is not yet fixed |
 | `N` in the config ≠ `N` in the index | Full table scan, silently. The tap validates this against the live index and refuses |
 
 ---
+
+## Known limitation: resuming a COMPOSITE primary key
+
+**Single-column primary keys are unaffected.** `(id) > (%s)` collapses to
+`id > %s`, which becomes a real `Index Cond` and seeks straight to the cursor.
+
+For a composite key the tap emits an expanded comparison rather than a row
+constructor, because a row constructor gets no pushdown at all under a bucketed
+index. But the expansion only gets the *leading* column into the `Index Cond`;
+the rest becomes a storage filter:
+
+```
+Index Cond: (((yb_hash_code(tenant, id) % 3) = 0) AND (tenant >= 1))
+Storage Index Filter: ((tenant > 1) OR (id > 5994))
+Storage Index Rows Scanned: 1991        -- to return 5
+```
+
+So a resume costs **the size of the cursor's leading-value group**, not the
+number of rows returned. How bad that is depends entirely on the cardinality of
+the first key column:
+
+| leading column | rows sharing the cursor's value, per bucket | index rows scanned to return 5 |
+|---|---|---|
+| high cardinality | 33 | 22 |
+| low cardinality (worst case: constant) | 1,991 — the whole bucket | 1,991 |
+
+An earlier version of this document quoted the high-cardinality number as though
+it were the general case. It is not: it was an artifact of the test data. With a
+low-cardinality leading column — `tenant_id`, `region`, a status or type code,
+anything with few distinct values — every resume re-reads the whole bucket, which
+is the behaviour the expansion was meant to avoid.
+
+**What to do about it for now:** prefer a composite key whose *first* column is
+selective. If your leading column has few distinct values, expect resumes to cost
+a full bucket scan, and prefer fewer, larger buckets so that fewer resumes happen.
+A fix that seeks properly is under investigation.
 
 ## `ANALYZE` before you read a plan
 

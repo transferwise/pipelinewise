@@ -99,9 +99,19 @@ def keyset_predicate(columns, after=True):
 
     The expansion states the leading column as a plain range first, which is
     what gives the scan a start position, and leaves the rest as a filter the
-    storage layer evaluates over the few rows that remain:
+    storage layer evaluates over the rows that remain:
 
         a >= %s AND (a > %s OR b >= %s) AND (a > %s OR b > %s OR c > %s)
+
+    KNOWN LIMITATION, composite keys only. Only the leading column reaches the
+    Index Cond; the rest is a storage filter over the whole leading-value group.
+    A resume therefore costs the size of that group, not the rows returned, and
+    the numbers above hold only because the test data had a high-cardinality
+    leading column (33 rows per value). With a low-cardinality leading column --
+    a tenant, a region, a status code -- the group is the whole bucket and the
+    expansion buys nothing: measured 1,991 index rows to return 5 on a table
+    whose leading column is constant. A form that seeks properly is under
+    investigation; see INDEXES.md. Single-column keys are unaffected.
 
     A single-column key needs none of this -- `(a) > (%s)` already collapses to
     `a > %s` -- and it is emitted as the plain comparison.
