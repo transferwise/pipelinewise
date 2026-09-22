@@ -438,6 +438,30 @@ class FastSyncTapYugabyte:
                     LOGGER.warning('Could not remove partial export file %s', stale)
 
         def _export():
+            # A failed attempt may have lost the connection, not just the
+            # statement: a terminated backend or a tablet leader election leaves
+            # self.conn closed, and psycopg2 then raises InterfaceError
+            # ('connection already closed') on the first use of self.curr. That
+            # error carries no SQLSTATE, so the policy reads it as transient and
+            # re-runs an operation that cannot ever succeed -- measured against a
+            # real pg_terminate_backend mid-COPY: attempt 1 failed with the real
+            # COPY error, attempts 2-8 failed instantly on the dead cursor, and
+            # the export burned all 8 attempts and ~46s of backoff before giving
+            # up. Reconnecting here rather than in before_retry keeps a failure
+            # to reconnect inside the retry loop, where it is itself retried;
+            # raising out of before_retry would escape the loop entirely.
+            #
+            # Only a connection psycopg2 has actually marked closed is replaced,
+            # so an error that leaves the session usable -- a catalog-version
+            # bump, say -- still retries on the same connection. The yb_read_time
+            # pin below is re-issued on every attempt, so a fresh session is
+            # correctly pinned.
+            if getattr(self.conn, 'closed', 0):
+                LOGGER.info('Source connection is closed; reopening it for this '
+                            'export attempt')
+                self.close_connection(silent=True)
+                self.open_connection()
+
             if self._snapshot_ht is not None:
                 # Session-level GUC; must be its own statement, not inside a transaction
                 # block (YugabyteDB rejects `SET LOCAL yb_read_time` inside BEGIN/COMMIT).

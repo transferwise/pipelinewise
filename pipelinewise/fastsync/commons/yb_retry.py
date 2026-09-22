@@ -33,6 +33,13 @@ PERMANENT_SQLSTATES = frozenset({
     '3F000',  # invalid_schema_name
     '25001',  # active_sql_transaction -- yb_read_time inside BEGIN/COMMIT
     '22023',  # invalid_parameter_value
+    '42704',  # undefined_object -- e.g. a GUC this server build does not have.
+              # copy_table pins the export snapshot with `SET yb_read_time`, so
+              # this is a statement FastSync actually issues: on a build without
+              # that GUC the server answers `unrecognized configuration
+              # parameter` with 42704 (measured), which cannot change on a
+              # re-run. It was in the tap's list and not this one, and the two
+              # policies are otherwise identical.
     '42601',  # syntax_error -- deterministic, retrying only delays the failure
     '42P02',  # undefined_parameter
     '42804',  # datatype_mismatch
