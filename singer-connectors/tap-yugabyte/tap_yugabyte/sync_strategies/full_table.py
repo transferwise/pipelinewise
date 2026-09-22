@@ -199,13 +199,16 @@ def _scan_bucket(conn_info, stream, state, desired_columns, md_map, pk_columns,
         params = []
         last_pk_values = read_bookmark(bucket)
         if last_pk_values:
-            predicates.append(f'{keyset.tuple_sql(pk_columns)} > '
-                              f'{keyset.placeholders(pk_columns)}')
-            params.extend(last_pk_values)
+            # not a row constructor: see keyset.keyset_predicate. With the bucket
+            # leading the index, `(a, b) > (%s, %s)` is accepted as an Index Cond
+            # and then rechecked against every remaining entry in the bucket.
+            sql, order = keyset.keyset_predicate(pk_columns, after=True)
+            predicates.append(sql)
+            params.extend(keyset.keyset_params(last_pk_values, order))
         if max_pk_values:
-            predicates.append(f'{keyset.tuple_sql(pk_columns)} <= '
-                              f'{keyset.placeholders(pk_columns)}')
-            params.extend(max_pk_values)
+            sql, order = keyset.keyset_predicate(pk_columns, after=False)
+            predicates.append(sql)
+            params.extend(keyset.keyset_params(max_pk_values, order))
         select_sql = (f"{keyset.index_hint(table_name)} "
                       f"SELECT {','.join(escaped)} FROM {fq_table_name} "
                       f'WHERE {" AND ".join(predicates)} '

@@ -90,6 +90,8 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
                                               "table_name": stream['table_name'],
                                               "limit": conn_info['limit'],
                                               "keyset_buckets": conn_info.get('keyset_buckets'),
+                                              "pk_columns": md_map.get((), {}).get(
+                                                  'table-key-properties', []),
                                               })
                 LOGGER.info('select statement: %s with itersize %s', select_sql, cur.itersize)
                 cur.execute(select_sql)
@@ -142,13 +144,15 @@ def _get_select_sql(params):
     replication_key_value = params['replication_key_value']
     schema_name = params['schema_name']
     table_name = params['table_name']
-    buckets = params.get('keyset_buckets')
+    pk_columns = params.get('pk_columns') or []
+    # the index is only bucketed when there is a primary key to hash
+    buckets = params.get('keyset_buckets') if pk_columns else None
 
     limit_statement = f'LIMIT {params["limit"]}' if params['limit'] else ''
 
     predicates = []
     if buckets:
-        predicates.append(keyset.bucket_in_sql([params['replication_key']], buckets))
+        predicates.append(keyset.bucket_in_sql(pk_columns, buckets))
     if replication_key_value:
         # cast to the column's own discovered type: a timestamptz value compared
         # against a timestamp column is accepted as an index condition and then
@@ -158,8 +162,16 @@ def _get_select_sql(params):
             f'::{replication_key_sql_datatype}'
         )
     where_statement = f'WHERE {" AND ".join(predicates)}' if predicates else ''
-    hint = (keyset.replication_key_hint(table_name, params['replication_key'])
+    hint = (keyset.replication_key_hint(table_name, params['replication_key'],
+                                        pk_columns)
             if buckets else '')
+
+    # the primary key trails the replication key in the index and in the order, so
+    # rows sharing a replication-key value come back in the same sequence on every
+    # run. The bookmark is still the replication key alone and the predicate is
+    # still >=, so a resume re-reads that group -- deterministically, rather than
+    # in whatever order the storage layer happened to return.
+    order_by = keyset.order_by_sql([params['replication_key']] + list(pk_columns))
 
     select_sql = f"""
     SELECT {','.join(escaped_columns)}
@@ -167,7 +179,7 @@ def _get_select_sql(params):
         {hint} SELECT *
         FROM {yb_db.fully_qualified_table_name(schema_name, table_name)}
         {where_statement}
-        ORDER BY {replication_key} ASC {limit_statement}
+        ORDER BY {order_by} {limit_statement}
     ) yb_speedup_trick;"""
 
     return select_sql

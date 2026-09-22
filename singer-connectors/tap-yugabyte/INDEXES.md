@@ -1,0 +1,247 @@
+# Required indexes for tap-yugabyte
+
+**These indexes are a prerequisite, not a tuning suggestion.** Create them before
+a table is added to a tap config. Without them the tap still returns correct
+rows — it just reads the whole table to do it, on every run and every resume, and
+neither the query plan nor the tap log says that happened.
+
+The reason is that YugabyteDB shards a primary key by hash unless it was declared
+`ASC`/`DESC`, and a hash-sharded key has no order to scan along. Every ordered,
+resumable read the tap performs therefore needs an index to supply an order the
+table itself does not have.
+
+---
+
+## One shape, four uses
+
+Every index below is the same shape. Learn it once:
+
+```sql
+CREATE UNIQUE INDEX <name> ON <schema>.<table>
+  (((yb_hash_code(<primary key columns>) % N)) ASC,   -- the bucket
+   <ordering column>,                                 -- omitted for shapes 1 and 2
+   <primary key columns> ASC)                         -- always last
+  SPLIT AT VALUES ((1), (2), ... (N-1));
+```
+
+Six rules. None of them are stylistic; each one fails in its own way if you
+deviate, and the failures are quiet.
+
+| Rule | If you deviate |
+|---|---|
+| The bucket hashes the **primary key**, always — never the ordering column | The scan's bucket predicate does not match the index expression, so the index is unusable. Bucketing on `updated_at` additionally moves the index entry to a different tablet on every update, which is the write this index exists to make cheap |
+| `ASC` on the bucket, never `HASH` | `SPLIT AT VALUES` is rejected, so bucket→tablet placement is whatever the hash space gives you, and workers contend |
+| The primary key is the **last** thing in the index | The order is not total. A resume re-reads every row sharing the last value it saw, and the index cannot answer without a trip to the table |
+| `UNIQUE` | Free, because the primary key trails. It is what lets the index answer alone |
+| `SPLIT AT VALUES` with N−1 boundaries | A range-sharded index gets **one** tablet. All N buckets land on it, the parallelism buys nothing, and the workers contend on a single tablet |
+| One N everywhere — index, tap config, every table | The scan names bucket values the index does not have. Full table scan |
+
+`N` is `keyset_buckets` in the tap config. **Default 3.** It fixes the index
+expression, the tablet count, and the maximum useful parallelism, because a
+worker owns exactly one bucket. Changing it means rebuilding every index.
+
+---
+
+## The four indexes
+
+### 1 · `bucket, PK` — the primary key, whatever it is
+
+```sql
+CREATE UNIQUE INDEX <table>_pw_keyset ON <schema>.<table>
+  (((yb_hash_code(<pk>) % 3)) ASC, <pk> ASC)
+  SPLIT AT VALUES ((1), (2));
+```
+
+The primary key does **not** need to be monotonic, sequential, or numeric. A
+`uuid`, a `text`, a composite `(tenant_id, id)` — all page identically. Keyset
+paging wants a total order, which every primary key has by definition.
+
+**Required for every table synced by `FULL_TABLE` or `LOG_BASED`.**
+
+Enables:
+- `FULL_TABLE` — the whole table, in key order
+- **Parallel export** — N workers, one per bucket, each on its own connection
+- **Resume** — each bucket bookmarks its own position; a kill mid-table restarts
+  from the last row that reached the target, not from the beginning
+- `LOG_BASED` **initial snapshot** — the bootstrap stage runs the same code path,
+  and resumes the same way after an interruption
+
+### 2 · `bucket, PK` — where the primary key is also monotonic
+
+```sql
+-- identical DDL to shape 1. The same index. Nothing extra to create.
+CREATE UNIQUE INDEX <table>_pw_keyset ON <schema>.<table>
+  (((yb_hash_code(<pk>) % 3)) ASC, <pk> ASC)
+  SPLIT AT VALUES ((1), (2));
+```
+
+Shape 2 is shape 1 plus a property of your **data**, not of the index. It unlocks
+one extra feature: `INCREMENTAL` with `replication_key` set to the primary key
+itself.
+
+The tap will not take your word for it. It checks, and blocks on:
+- the column is **nullable** — a NULL is never written to the bookmark, so those
+  rows re-sync on every run, forever
+- the column is **not unique and there is no primary key** to break ties
+
+and warns on:
+- a **sequence with `CACHE > 1`** (YugabyteDB's default is `100`). Values are
+  handed out in per-connection blocks, so one session commits ids 1–100 while
+  another commits 101–200. A run that bookmarks 150 will never see id 40
+  committed a moment later. Lower the cache, carry a lag window at least that
+  wide, or use `LOG_BASED`
+- a sequence attached by `DEFAULT nextval(...)` rather than owned — it can be
+  dropped, repointed or reset with no change to the column
+
+### 3 · `bucket, created_at, PK` — a creation timestamp
+
+```sql
+CREATE UNIQUE INDEX <table>_created_at_pw_keyset ON <schema>.<table>
+  (((yb_hash_code(<pk>) % 3)) ASC, created_at ASC, <pk> ASC)
+  SPLIT AT VALUES ((1), (2));
+```
+
+Any column name works — `created_at`, `createdat`, `created`, `inserted_at`,
+`ts_insert`, `event_time`. The tap does not gate on the name; it reads what the
+column actually is. The index name follows the column: `<table>_<column>_pw_keyset`.
+
+Enables:
+- `INCREMENTAL` on that column — **new rows only**
+- **PartialSync** — a bounded export, `WHERE created_at BETWEEN ... AND ...`
+
+Does **not** see updates. A creation timestamp never moves after insert, so every
+change to an existing row is invisible. That is not a defect in the index; it is
+what the column means.
+
+### 4 · `bucket, updated_at, PK` — a modification timestamp
+
+```sql
+CREATE UNIQUE INDEX <table>_updated_at_pw_keyset ON <schema>.<table>
+  (((yb_hash_code(<pk>) % 3)) ASC, updated_at ASC, <pk> ASC)
+  SPLIT AT VALUES ((1), (2));
+```
+
+Identical DDL to shape 3. The difference is what the column records.
+
+Enables:
+- `INCREMENTAL` on that column — **inserts and updates**
+- **PartialSync**
+
+**A column named for modification time is a claim, not a mechanism.** An
+`updated_at` carrying only `DEFAULT now()` is set on insert and never moves
+again — it is shape 3 wearing shape 4's name, and every update after the first is
+silently missed. Only a row-level `UPDATE` trigger actually maintains one:
+
+```sql
+CREATE OR REPLACE FUNCTION touch_updated_at() RETURNS trigger AS $$
+BEGIN NEW.updated_at = now(); RETURN NEW; END $$ LANGUAGE plpgsql;
+
+CREATE TRIGGER <table>_touch BEFORE UPDATE ON <schema>.<table>
+  FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
+```
+
+The tap reports whether such a trigger exists. It cannot confirm which column the
+trigger touches — that is inside the function body — so the owner still has to
+confirm it fires on every write path.
+
+Neither shape 3 nor shape 4 sees **deletes**. Only `LOG_BASED` does.
+
+---
+
+## Feature matrix
+
+| | **1** `bucket, PK` | **2** `bucket, PK` monotonic | **3** `bucket, created_at, PK` | **4** `bucket, updated_at, PK` |
+|---|:---:|:---:|:---:|:---:|
+| Index to create | `<t>_pw_keyset` | *same index as 1* | `<t>_<col>_pw_keyset` | `<t>_<col>_pw_keyset` |
+| `FULL_TABLE` | ✅ | ✅ | — | — |
+| ⮑ parallel, N workers | ✅ | ✅ | — | — |
+| ⮑ resume mid-table | ✅ | ✅ | — | — |
+| `LOG_BASED` initial snapshot | ✅ | ✅ | — | — |
+| `LOG_BASED` change stream | *no index needed* | | | |
+| `INCREMENTAL` | ❌ | ✅ key = PK | ✅ key = that column | ✅ key = that column |
+| ⮑ sees inserts | — | ✅ | ✅ | ✅ |
+| ⮑ sees updates | — | ❌ | ❌ | ✅ *trigger required* |
+| ⮑ sees deletes | — | ❌ | ❌ | ❌ |
+| ⮑ resumes inside a tie | — | ✅ *(key is unique)* | ✅ | ✅ |
+| PartialSync bounded export | ❌ | ✅ on the PK | ✅ | ✅ |
+
+### Which do I need?
+
+- Table is `FULL_TABLE` or `LOG_BASED` → **shape 1**.
+- Table is `INCREMENTAL` on the primary key → **shape 2**, which *is* shape 1.
+  Do not create a second index.
+- Table is `INCREMENTAL` on a timestamp → **shape 3 or 4** for that column.
+  Shape 1 is not required unless the table is also `FULL_TABLE`/`LOG_BASED`.
+- Table is `LOG_BASED` *and* PartialSync'd on a timestamp → **1 + (3 or 4)**.
+- Table has **no primary key** → nothing here applies. It cannot be paged,
+  parallelised or resumed; it gets one unresumable sequential pass. The
+  preflight reports this as `BLOCK`.
+
+---
+
+## Session settings the tap sets for itself
+
+You do not need to set these; they are listed so a plan you capture by hand
+matches the one the tap gets.
+
+```sql
+SET yb_max_merge_scan_streams = <max(N, 8)>;  -- merge the N per-bucket streams
+SET enable_seqscan = off;                     -- on the scan connections only
+```
+
+`yb_max_merge_scan_streams` must be at least N or the streams are not merged and
+the result is sorted instead. `enable_seqscan = off` is what actually gets the
+streaming plan: the index hint alone does not, because the cost model prefers a
+sequential scan and an external merge sort — cheaper in wall clock at moderate
+sizes, and it spills to disk instead of streaming. It is set on connections that
+run nothing but these scans, and it does not forbid a sequential scan where no
+index can serve.
+
+Every scan also names every bucket explicitly:
+
+```sql
+WHERE (yb_hash_code(<pk>) % N) IN (0, 1, ... N-1)
+```
+
+This is required for **ordering**, not for bounding. YugabyteDB will bound a
+range on a trailing column under an unbounded leading one — so PartialSync's
+`WHERE created_at >= ...` works without it — but `ORDER BY` will not stream:
+without the predicate a full ordered drain of 50,000 rows plans as a sequential
+scan and a 1,672 kB external merge sort instead of a 3-stream merge.
+
+---
+
+## What it costs to get wrong
+
+Measured on the review test bed (50,000 rows, 3 tablets, 3 buckets,
+YugabyteDB 2026.1.1.1).
+
+| Mistake | Effect |
+|---|---|
+| No index, hash PK, resume at the halfway point | Sequential scan of all 50,000 rows and a blocking 3,112 kB quicksort, to return 25,000. Nothing is emitted until the whole table has been read and sorted. With the index: 8,391 index rows, 81 kB, streaming |
+| `SPLIT AT VALUES` omitted | 1 tablet instead of 3. Reported by the preflight |
+| Bucket declared `HASH` instead of `ASC` | `SPLIT AT VALUES` rejected outright |
+| Primary key omitted from the trailing columns | Resume re-reads the whole group of rows sharing the last timestamp seen, every run |
+| `ORDER BY` written as a row constructor — `ORDER BY (a, b)` | Opaque to the planner: a blocking sort where the index could have supplied the order. 48 MB spill against 81 kB streaming |
+| Keyset resume written as a row constructor — `WHERE (a, b) > (%s, %s)` | Reads `Index Cond`, so the plan looks correct, but every remaining index entry in the bucket is read and dropped. 9,221 index rows to return 5, against 22 for the expanded form. The tap emits the expanded form; this matters if you hand-write a probe |
+| `N` in the config ≠ `N` in the index | Full table scan, silently. The tap validates this against the live index and refuses |
+
+---
+
+## Checking a config before you run it
+
+```bash
+singer-connectors/tap-yugabyte/tools/yb_index_check.py tap_yugabyte.yml \
+  --host <host> --port 5433 --user <user> --dbname <db> [--buckets N]
+```
+
+It reads the tap YAML the service owner already maintains, checks every table
+against the live source, and prints one of:
+
+- `OK` — the index exists and its shape, bucket count, uniqueness and tablet
+  count all match
+- `ACTION` — with the exact `CREATE UNIQUE INDEX` to run. The DDL it prints is
+  what turns that line into `OK`
+- `BLOCK` — the configuration cannot work, with the reason
+
+Exit status is 0 only when every table is `OK`.

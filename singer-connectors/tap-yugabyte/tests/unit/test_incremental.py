@@ -96,3 +96,58 @@ class TestIncremental(TestCase):
                          )
         incremental.UPDATE_BOOKMARK_PERIOD = original_update_bookmark_period
         mocked_singer_write.assert_called_with(singer.StateMessage(value=self.state))
+
+
+class TestIncrementalSelectSql(TestCase):
+    """The statement INCREMENTAL emits, against the shape-3/4 index.
+
+    The bucket predicate is what makes it stream: bounding a range does not need
+    it, but ORDER BY does -- without it a full ordered drain plans as a sequential
+    scan and an external merge sort.
+    """
+
+    BASE = {
+        'escaped_columns': ['"id"', '"created_at"'],
+        'replication_key': 'created_at',
+        'replication_key_sql_datatype': 'timestamp with time zone',
+        'replication_key_value': '2026-09-22 09:00:00+00',
+        'schema_name': 'svc',
+        'table_name': 'event',
+        'limit': None,
+        'keyset_buckets': 3,
+        'pk_columns': ['id'],
+    }
+
+    def _sql(self, **overrides):
+        return incremental._get_select_sql({**self.BASE, **overrides})
+
+    def test_buckets_on_the_primary_key_not_the_replication_key(self):
+        sql = self._sql()
+        self.assertIn('(yb_hash_code("id") % 3) IN (0, 1, 2)', sql)
+        self.assertNotIn('yb_hash_code("created_at")', sql)
+
+    def test_orders_by_the_key_then_the_primary_key(self):
+        # the index ends in the primary key, so the tie order is free and stable
+        self.assertIn('ORDER BY "created_at" ASC, "id" ASC', self._sql())
+
+    def test_hints_the_replication_key_index(self):
+        self.assertIn('IndexScan(event event_created_at_pw_keyset)', self._sql())
+
+    def test_hints_the_primary_key_index_when_the_key_is_the_primary_key(self):
+        sql = self._sql(replication_key='id', escaped_columns=['"id"'],
+                        replication_key_sql_datatype='bigint',
+                        replication_key_value=25000)
+        self.assertIn('IndexScan(event event_pw_keyset)', sql)
+        self.assertNotIn('event_id_pw_keyset', sql)
+
+    def test_bookmark_is_cast_to_the_discovered_column_type(self):
+        # a timestamptz literal against a timestamp column is accepted as an index
+        # condition and then rechecked against every row, which the plan does not
+        # distinguish from a real bound
+        self.assertIn("::timestamp with time zone", self._sql())
+
+    def test_no_bucket_predicate_without_a_primary_key(self):
+        sql = self._sql(pk_columns=[])
+        self.assertNotIn('yb_hash_code', sql)
+        self.assertNotIn('IndexScan', sql)
+        self.assertIn('ORDER BY "created_at" ASC', sql)

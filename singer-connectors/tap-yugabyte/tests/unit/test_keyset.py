@@ -30,9 +30,39 @@ class TestOrdering:
         # even when the index could have supplied the order
         assert keyset.order_by_sql(['tenant', 'id']) == '"tenant" ASC, "id" ASC'
 
-    def test_tuple_sql_is_a_row_constructor(self):
-        # correct and index-usable in WHERE, unlike in ORDER BY
-        assert keyset.tuple_sql(['tenant', 'id']) == '("tenant", "id")'
+
+class TestKeysetPredicate:
+    """The resume comparison. A row constructor reads as `Index Cond` and then
+    rechecks every remaining entry in the bucket -- measured, 9,221 index rows to
+    return 5 against 22 for the expanded form -- because the bucket leads the
+    index, not the key."""
+
+    def test_single_column_needs_no_expansion(self):
+        sql, order = keyset.keyset_predicate(['id'])
+        assert sql == '"id" > %s'
+        assert keyset.keyset_params([7], order) == [7]
+
+    def test_two_columns_bound_the_leading_one_then_filter(self):
+        sql, order = keyset.keyset_predicate(['tenant', 'id'])
+        assert sql == '"tenant" >= %s AND ("tenant" > %s OR "id" > %s)'
+        assert keyset.keyset_params(['t', 9], order) == ['t', 't', 9]
+
+    def test_three_columns_chain_the_equalities(self):
+        sql, order = keyset.keyset_predicate(['a', 'b', 'c'])
+        assert sql == ('"a" >= %s AND ("a" > %s OR "b" >= %s) '
+                       'AND ("a" > %s OR "b" > %s OR "c" > %s)')
+        assert keyset.keyset_params([1, 2, 3], order) == [1, 1, 2, 1, 2, 3]
+
+    def test_upper_bound_mirrors_the_lower_one(self):
+        sql, order = keyset.keyset_predicate(['tenant', 'id'], after=False)
+        assert sql == '"tenant" <= %s AND ("tenant" < %s OR "id" <= %s)'
+        assert keyset.keyset_params(['t', 9], order) == ['t', 't', 9]
+
+    def test_no_row_constructor_anywhere(self):
+        for columns in (['id'], ['a', 'b'], ['a', 'b', 'c']):
+            sql, _ = keyset.keyset_predicate(columns)
+            assert 'ROW(' not in sql
+            assert ') >' not in sql
 
 
 class TestIndexDefinition:
@@ -54,6 +84,65 @@ class TestIndexDefinition:
     ])
     def test_bucket_count_round_trips_from_a_live_definition(self, indexdef, expected):
         assert keyset.parse_index_buckets(indexdef) == expected
+
+
+class TestTheFourIndexShapes:
+    """INDEXES.md defines four indexes. They are one shape: the primary key
+    hashed into N buckets ASC, the ordering column, then the primary key, UNIQUE,
+    split one bucket per tablet."""
+
+    def test_shape_1_and_2_are_the_same_index(self):
+        # shape 2 is shape 1 plus a property of the data, not a second index
+        assert (keyset.index_ddl('s.t', 't', ['id'], 3)
+                == keyset.index_ddl('s.t', 't', ['id'], 3))
+        ddl = keyset.index_ddl('s.t', 't', ['id'], 3)
+        assert ddl == ('CREATE UNIQUE INDEX t_pw_keyset ON s.t '
+                       '(((yb_hash_code("id") % 3)) ASC, "id" ASC) '
+                       'SPLIT AT VALUES ((1), (2))')
+
+    def test_shape_3_hashes_the_primary_key_not_the_timestamp(self):
+        # bucketing on the replication key would move the index entry to another
+        # tablet whenever the key changes -- the write this index exists to
+        # make cheap -- and it would not be the same expression as every other
+        # index on the table
+        ddl = keyset.replication_key_index_ddl('s.t', 't', 'created_at', ['id'], 3)
+        assert 'yb_hash_code("id")' in ddl
+        assert 'yb_hash_code("created_at")' not in ddl
+
+    def test_shape_3_ends_in_the_primary_key_and_is_unique(self):
+        ddl = keyset.replication_key_index_ddl('s.t', 't', 'created_at', ['id'], 3)
+        assert ddl == ('CREATE UNIQUE INDEX t_created_at_pw_keyset ON s.t '
+                       '(((yb_hash_code("id") % 3)) ASC, "created_at" ASC, "id" ASC) '
+                       'SPLIT AT VALUES ((1), (2))')
+
+    def test_shape_4_is_shape_3_with_a_different_column(self):
+        created = keyset.replication_key_index_ddl('s.t', 't', 'created_at', ['id'], 3)
+        updated = keyset.replication_key_index_ddl('s.t', 't', 'updated_at', ['id'], 3)
+        assert created.replace('created_at', 'X') == updated.replace('updated_at', 'X')
+
+    def test_a_composite_primary_key_trails_in_key_order(self):
+        ddl = keyset.replication_key_index_ddl('s.t', 't', 'updated_at',
+                                               ['tenant', 'id'], 3)
+        assert '"updated_at" ASC, "tenant" ASC, "id" ASC' in ddl
+
+    def test_every_shape_splits_one_bucket_per_tablet(self):
+        for ddl in (keyset.index_ddl('s.t', 't', ['id'], 4),
+                    keyset.replication_key_index_ddl('s.t', 't', 'created_at',
+                                                     ['id'], 4)):
+            assert ddl.endswith('SPLIT AT VALUES ((1), (2), (3))')
+
+    def test_replication_key_that_is_the_primary_key_reuses_shape_1(self):
+        # a hint naming an index nobody created is silently dropped, and the scan
+        # falls back to a sequential scan and an external sort
+        assert keyset.index_for_replication_key('t', 'id', ['id']) == 't_pw_keyset'
+        assert keyset.replication_key_hint('t', 'id', ['id']) \
+            == '/*+ IndexScan(t t_pw_keyset) */'
+
+    def test_replication_key_that_is_not_the_primary_key_gets_its_own(self):
+        assert (keyset.index_for_replication_key('t', 'created_at', ['id'])
+                == 't_created_at_pw_keyset')
+        assert (keyset.index_for_replication_key('t', 'updated_at', ['tenant', 'id'])
+                == 't_updated_at_pw_keyset')
 
 
 class TestReplicationKeyWarnings:

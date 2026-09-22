@@ -158,10 +158,10 @@ class TestSyncTableResumeQuery(unittest.TestCase):
         def cursor(self, *_args, **_kwargs):
             return self._cursor
 
-    def test_resume_builds_tuple_comparison_with_bound_params(self):
+    def test_resume_builds_keyset_comparison_with_bound_params(self):
         """A bucket resuming from its own last_pk_fetched builds a parameterized
-        `(pk) > (%s) AND (pk) <= (%s)` clause, with the bookmarked values bound
-        rather than interpolated into the SQL text."""
+        `pk > %s AND pk <= %s` clause, with the bookmarked values bound rather
+        than interpolated into the SQL text."""
         recording_cursor = self._RecordingCursor()
         recording_connect = self._RecordingConnect(recording_cursor)
 
@@ -192,8 +192,12 @@ class TestSyncTableResumeQuery(unittest.TestCase):
                         if call[1] and 'yb_hash_code' in call[0] and 'bucket_maxima' not in call[0]]
         self.assertEqual(1, len(bucket_scans))
         sql, params = bucket_scans[0]
-        self.assertIn('> (%s)', sql)
-        self.assertIn('<= (%s)', sql)
+        # a single-column key needs no expansion: `(code) > (%s)` already
+        # collapses to `code > %s`, and a row constructor would only cost the
+        # pushdown (see keyset.keyset_predicate)
+        self.assertIn('"code" > %s', sql)
+        self.assertIn('"code" <= %s', sql)
+        self.assertNotIn('("code") >', sql)
         # doubled so psycopg2's placeholder interpolation leaves a single operator
         self.assertIn('%%', sql)
         # the key columns are ordered individually; a ROW() here would force a sort

@@ -146,6 +146,53 @@ available on YugabyteDB and is exported as-is; it is not mapped to
 Snowflake ``VARIANT``, unlike tap-postgres's explicit Iceberg v3 route.
 
 
+Required indexes
+-----------------
+
+**Every table this tap reads needs a prerequisite index, and the tap will not
+create it.** YugabyteDB shards a primary key by hash unless it was declared
+``ASC``/``DESC``, and a hash-sharded key has no order to scan along, so every
+ordered, resumable read needs an index to supply one. Without it the tap still
+returns correct rows -- it reads the whole table to do it, on every run and
+every resume, and neither the query plan nor the tap log says so.
+
+There are four, and they are one shape: the **primary key** hashed into ``N``
+buckets ``ASC``, then the ordering column, then the **primary key** again,
+``UNIQUE``, split one bucket per tablet.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 26 30 44
+
+   * - Shape
+     - Index
+     - Enables
+   * - ``bucket, PK``
+     - ``<table>_pw_keyset``
+     - ``FULL_TABLE``, parallel export, resume, ``LOG_BASED`` initial snapshot
+   * - ``bucket, PK`` monotonic
+     - *the same index*
+     - the above, plus ``INCREMENTAL`` where the replication key is the primary key
+   * - ``bucket, created_at, PK``
+     - ``<table>_<column>_pw_keyset``
+     - ``INCREMENTAL`` (new rows only), PartialSync
+   * - ``bucket, updated_at, PK``
+     - ``<table>_<column>_pw_keyset``
+     - ``INCREMENTAL`` (inserts and updates), PartialSync
+
+The full contract -- exact DDL, the rules that must not be varied, what each
+mistake costs, and the feature matrix -- is in
+``singer-connectors/tap-yugabyte/INDEXES.md``.
+
+Check a tap config against a live source before running it::
+
+    singer-connectors/tap-yugabyte/tools/yb_index_check.py tap_yugabyte.yml \
+      --host <host> --port 5433 --user <user> --dbname <db>
+
+It prints ``OK``, ``ACTION`` (with the exact ``CREATE UNIQUE INDEX`` to run) or
+``BLOCK`` per table, and exits non-zero unless every table is ``OK``.
+
+
 Replication behaviour
 ----------------------
 

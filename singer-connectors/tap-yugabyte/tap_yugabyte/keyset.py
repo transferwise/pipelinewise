@@ -84,14 +84,54 @@ def order_by_sql(pk_columns, direction='ASC'):
     return ', '.join(f'{c} {direction}' for c in quoted(pk_columns))
 
 
-def tuple_sql(pk_columns):
-    """Row constructor for keyset comparison. Correct and index-usable in a
-    WHERE clause -- unlike in ORDER BY, where it defeats the index."""
-    return f"({', '.join(quoted(pk_columns))})"
+def keyset_predicate(columns, after=True):
+    """Lexicographic comparison of `columns` against a bound, expanded into the
+    conjunctive form the index can actually bound.
+
+    The natural way to write this is a row constructor -- `(a, b) > (%s, %s)`.
+    PostgreSQL optimises that into a range when the columns lead the index;
+    YugabyteDB does not when something else leads it, and the bucket
+    discriminator always does. The plan still reads `Index Cond`, so nothing
+    about it says the scan degraded -- but every remaining index entry in the
+    bucket is read and dropped. Measured on 50k rows with a two-column key:
+    9,221 index rows scanned to return 5, against 22 for the form below. Three
+    columns: 9,221 against 177.
+
+    The expansion states the leading column as a plain range first, which is
+    what gives the scan a start position, and leaves the rest as a filter the
+    storage layer evaluates over the few rows that remain:
+
+        a >= %s AND (a > %s OR b >= %s) AND (a > %s OR b > %s OR c > %s)
+
+    A single-column key needs none of this -- `(a) > (%s)` already collapses to
+    `a > %s` -- and it is emitted as the plain comparison.
+
+    Returns (sql, parameter_order), where parameter_order lists the index into
+    the caller's value sequence for each placeholder, since values repeat.
+    """
+    strict, last = ('>', '>') if after else ('<', '<=')
+    loose = '>=' if after else '<='
+    cols = quoted(columns)
+    if len(cols) == 1:
+        return f'{cols[0]} {last} %s', [0]
+
+    clauses, order = [], []
+    for i in range(len(cols)):
+        terms = []
+        for j in range(i):
+            terms.append(f'{cols[j]} {strict} %s')
+            order.append(j)
+        final = last if i == len(cols) - 1 else loose
+        terms.append(f'{cols[i]} {final} %s')
+        order.append(i)
+        clauses.append(terms[0] if len(terms) == 1 else f'({" OR ".join(terms)})')
+    return ' AND '.join(clauses), order
 
 
-def placeholders(pk_columns):
-    return f"({', '.join(['%s'] * len(pk_columns))})"
+def keyset_params(values, order):
+    """Lay the caller's values out in the order keyset_predicate's placeholders
+    consume them."""
+    return [values[i] for i in order]
 
 
 def bucket_in_sql(pk_columns, buckets, escape_percent=False):
@@ -212,6 +252,112 @@ def index_ddl(fq_table_name, table_name, pk_columns, buckets, tablets=None):
         f'(({bucket_expr(pk_columns, buckets)}) ASC, {order_by_sql(pk_columns)}) '
         f'SPLIT AT VALUES ({split_at_values(buckets)})'
     )
+
+
+_INDEX_SHAPE_SQL = """
+SELECT pg_get_indexdef(i.oid), x.indisunique, p.num_tablets
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+JOIN pg_index x ON x.indrelid = c.oid
+JOIN pg_class i ON i.oid = x.indexrelid
+CROSS JOIN LATERAL yb_table_properties(i.oid) p
+WHERE n.nspname = %s AND c.relname = %s AND i.relname = %s
+"""
+
+
+def describe_index(cur, schema_name, table_name, wanted_name):
+    """What a keyset index on this table actually is, read from the catalog.
+
+    Returns None when it does not exist. The key list comes from the index
+    definition text because the leading column is an expression, which pg_index
+    stores as a parse tree and reports as attnum 0; the rest of the shape --
+    uniqueness, tablet count -- is read properly.
+    """
+    cur.execute(_INDEX_SHAPE_SQL, (schema_name, table_name, wanted_name))
+    row = cur.fetchone()
+    if row is None:
+        return None
+    indexdef, is_unique, num_tablets = row
+    # the key list is the parenthesised group following `USING lsm `
+    body = indexdef[indexdef.index('USING lsm (') + len('USING lsm ('):]
+    body = body[:body.rindex(')')]
+    depth, current, parts = 0, [], []
+    for char in body:
+        if char == ',' and depth == 0:
+            parts.append(''.join(current).strip())
+            current = []
+            continue
+        if char == '(':
+            depth += 1
+        elif char == ')':
+            depth -= 1
+        current.append(char)
+    parts.append(''.join(current).strip())
+    trailing = [part.rsplit(' ', 1)[0].strip('"') for part in parts[1:]]
+    return {
+        'name': wanted_name,
+        'definition': indexdef,
+        'unique': is_unique,
+        'buckets': parse_index_buckets(indexdef),
+        'bucket_columns': _bucket_columns(parts[0]),
+        'trailing': trailing,
+        'tablets': num_tablets,
+    }
+
+
+def _bucket_columns(leading):
+    """Column names inside the leading yb_hash_code(...) expression."""
+    match = re.search(r'yb_hash_code\(([^)]*)\)', leading or '')
+    if not match:
+        return []
+    return [c.strip().strip('"') for c in match.group(1).split(',') if c.strip()]
+
+
+def check_index(cur, schema_name, table_name, wanted_name, pk_columns,
+                trailing, buckets):
+    """Confirm one index matches the shape the tap requires, or say what is wrong.
+
+    Every index the tap needs is the same shape -- the primary key hashed into N
+    buckets, ASC, then the ordering columns, ending in the primary key, UNIQUE,
+    one tablet per bucket. This checks all of it, because each part fails
+    differently and none of them fails loudly:
+
+    wrong bucket count -- the scan predicate names buckets the index does not
+    have, so the index is unusable and the scan is a full table scan;
+    bucketed on the wrong column -- same, and it also moves index entries between
+    tablets when the replication key changes;
+    missing trailing primary key -- the order is not total, so a resume re-reads
+    every row sharing the last value seen, and the index cannot answer alone;
+    not unique -- a duplicate key would be accepted and then emitted twice;
+    one tablet -- the bucketing bought nothing and all N workers contend on it.
+    """
+    found = describe_index(cur, schema_name, table_name, wanted_name)
+    if found is None:
+        return None, [f'{wanted_name} does not exist.']
+
+    problems = []
+    if found['buckets'] != buckets:
+        problems.append(
+            f"{wanted_name} is built with {found['buckets']} buckets but the tap "
+            f'is configured for {buckets}. Every scan names {buckets} bucket '
+            f'values, so the index cannot serve it -- rebuild the index, or set '
+            f'keyset_buckets: {found["buckets"]}.')
+    if found['bucket_columns'] != list(pk_columns):
+        problems.append(
+            f"{wanted_name} hashes {', '.join(found['bucket_columns']) or 'nothing'} "
+            f"but the scan hashes {', '.join(pk_columns)}.")
+    if found['trailing'] != list(trailing):
+        problems.append(
+            f"{wanted_name} orders by {', '.join(found['trailing'])} but the scan "
+            f"orders by {', '.join(trailing)}.")
+    if not found['unique']:
+        problems.append(f'{wanted_name} is not UNIQUE.')
+    if found['tablets'] is not None and found['tablets'] < buckets:
+        problems.append(
+            f"{wanted_name} has {found['tablets']} tablet(s) for {buckets} buckets. "
+            f'Without SPLIT AT VALUES the whole index is one tablet and the '
+            f'buckets share it.')
+    return found, problems
 
 
 def parse_index_buckets(indexdef):
@@ -754,7 +900,23 @@ def replication_key_index_name(table_name, replication_key):
     return f'{table_name}_{replication_key}{INDEX_SUFFIX}'
 
 
-def replication_key_index_ddl(fq_table_name, table_name, replication_key, buckets):
+def index_for_replication_key(table_name, replication_key, pk_columns):
+    """Name of the index an INCREMENTAL scan should use.
+
+    When the replication key IS the primary key -- a bigserial id used as the
+    watermark -- the primary-key keyset index is already `(bucket, id)`, which is
+    exactly what a replication-key index would be. Naming a separate one asks for
+    an index nobody created; a hint that names a missing index is not an error,
+    it is silently dropped, and the scan falls back to whatever the cost model
+    prefers. Which, on a full drain, is a sequential scan and an external sort.
+    """
+    if list(pk_columns) == [replication_key]:
+        return index_name(table_name)
+    return replication_key_index_name(table_name, replication_key)
+
+
+def replication_key_index_ddl(fq_table_name, table_name, replication_key,
+                              pk_columns, buckets):
     """Bucketed index for an INCREMENTAL replication key.
 
     A plain (key ASC) index serves the watermark query, but a replication key is
@@ -763,18 +925,36 @@ def replication_key_index_ddl(fq_table_name, table_name, replication_key, bucket
     takes the whole write load. Bucketing spreads the tail across N tablets while
     keeping each bucket ordered, exactly as it does for the primary key.
 
-    The cost is that the scan must now name every bucket: without that predicate
-    the planner cannot use an index led by the discriminator, and the watermark
-    query reads the whole table. incremental.py emits it.
+    Three details make this the same shape as the primary-key index rather than a
+    second idea:
+
+    The discriminator hashes the PRIMARY KEY, not the replication key. One
+    expression and one bucket count then cover every index on the table. It also
+    keeps an index entry in the tablet it was written to when the replication key
+    changes: bucketing on `updated_at` moves the entry to another tablet on every
+    update, which is the write this index exists to make cheap.
+
+    The primary key trails the replication key. That makes the order total, so a
+    cursor can resume inside a group of rows sharing a timestamp instead of
+    re-reading the whole group, and it makes the index UNIQUE -- which lets it
+    answer from the index alone.
+
+    The scan must name every bucket. Bounding a range does not need it
+    (YugabyteDB bounds a trailing column under an unbounded leading one), but
+    ORDER BY does: without the predicate the plan is a sort, and on a full drain
+    a sequential scan and an external merge. incremental.py emits it.
     """
+    trailing = ', '.join(f'{c} ASC' for c in quoted(pk_columns))
     return (
-        f'CREATE INDEX {replication_key_index_name(table_name, replication_key)} '
+        f'CREATE UNIQUE INDEX '
+        f'{replication_key_index_name(table_name, replication_key)} '
         f'ON {fq_table_name} '
-        f'(({bucket_expr([replication_key], buckets)}) ASC, "{replication_key}" ASC) '
+        f'(({bucket_expr(pk_columns, buckets)}) ASC, "{replication_key}" ASC, '
+        f'{trailing}) '
         f'SPLIT AT VALUES ({split_at_values(buckets)})'
     )
 
 
-def replication_key_hint(table_name, replication_key):
-    return (f'/*+ IndexScan({table_name} '
-            f'{replication_key_index_name(table_name, replication_key)}) */')
+def replication_key_hint(table_name, replication_key, pk_columns=()):
+    index = index_for_replication_key(table_name, replication_key, pk_columns)
+    return f'/*+ IndexScan({table_name} {index}) */'

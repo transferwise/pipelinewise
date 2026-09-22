@@ -42,27 +42,50 @@ def _primary_key(cur, schema_name, table_name):
     return [r[0] for r in rows], [r[1] for r in rows]
 
 
-def check_full_table(cur, schema_name, table_name, buckets):
-    """FULL_TABLE pages by primary key, so it needs the key to be scannable in order."""
-    pk_columns, pk_types = _primary_key(cur, schema_name, table_name)
+def _pk_index(cur, schema_name, table_name, pk_columns, pk_types, buckets):
+    """Shape 1/2: ((yb_hash_code(pk) % N) ASC, pk ASC) UNIQUE.
+
+    Required by FULL_TABLE and by the full-table bootstrap stage of LOG_BASED,
+    which runs the same code.
+    """
     plan = keyset.plan_keyset_strategy(cur, schema_name, table_name,
                                        pk_columns, pk_types, buckets)
     if plan['strategy'] == keyset.STRATEGY_PK_RANGE:
         return OK, ['Primary key is range-sharded, so it already pages in key '
                     'order. Adding an index here would only cost writes.'], []
-    if plan['strategy'] == keyset.STRATEGY_BUCKET_INDEX:
-        present, reason = keyset.validate_index(cur, schema_name, table_name,
-                                                pk_columns, buckets)
-        if present:
-            return OK, [f'Primary key is hash-sharded, and '
-                        f'{keyset.index_name(table_name)} already supplies the '
-                        f'order it lacks.'], []
-        return ACTION, [
-            'Primary key is hash-sharded, so it has no order to page along. '
-            'Without this index every resume re-reads the whole table.',
-            reason.splitlines()[0] if reason else '',
-        ], [plan['index_ddl'] + ';']
-    return BLOCK, plan['blockers'], []
+    if plan['strategy'] != keyset.STRATEGY_BUCKET_INDEX:
+        return BLOCK, plan['blockers'], []
+
+    name = keyset.index_name(table_name)
+    found, problems = keyset.check_index(cur, schema_name, table_name, name,
+                                         pk_columns, pk_columns, buckets)
+    if found is not None and not problems:
+        return OK, [f'{name} supplies the order the hash-sharded primary key '
+                    f'lacks, {buckets} buckets over {found["tablets"]} tablets.'], []
+    notes = ['Primary key is hash-sharded, so it has no order to page along. '
+             'Without this index every resume re-reads the whole table.']
+    notes.extend(problems)
+    return ACTION, notes, [plan['index_ddl'] + ';']
+
+
+def check_full_table(cur, schema_name, table_name, buckets):
+    """FULL_TABLE pages by primary key, so it needs the key to be scannable in
+    order."""
+    pk_columns, pk_types = _primary_key(cur, schema_name, table_name)
+    return _pk_index(cur, schema_name, table_name, pk_columns, pk_types, buckets)
+
+
+def check_log_based(cur, schema_name, table_name, buckets):
+    """LOG_BASED reads the change stream -- but its first stage is a full-table
+    bootstrap that runs full_table.sync_table, so it needs the same index."""
+    pk_columns, pk_types = _primary_key(cur, schema_name, table_name)
+    status, notes, ddl = _pk_index(cur, schema_name, table_name,
+                                   pk_columns, pk_types, buckets)
+    notes.append('The change stream itself needs no index. The initial snapshot '
+                 'does: LOG_BASED bootstraps through the same full-table scan, '
+                 'and resumes it after an interruption.')
+    notes.append('It does need a replica identity that can name a deleted row.')
+    return status, notes, ddl
 
 
 def check_incremental(cur, schema_name, table_name, replication_key, buckets):
@@ -72,9 +95,13 @@ def check_incremental(cur, schema_name, table_name, replication_key, buckets):
         return BLOCK, ['replication_method is INCREMENTAL but no replication_key '
                        'is set.'], []
 
-    pk_columns, _ = _primary_key(cur, schema_name, table_name)
-    notes, ddl, status = [], [], OK
+    pk_columns, pk_types = _primary_key(cur, schema_name, table_name)
+    if not pk_columns:
+        return BLOCK, ['Table has no primary key, so there is nothing to bucket '
+                       'on and no tiebreaker for rows sharing a replication-key '
+                       'value.'], []
 
+    notes, ddl, status = [], [], OK
     key = keyset.require_monotonic_key(cur, schema_name, table_name,
                                        replication_key, pk_columns)
     if key['hard_failures']:
@@ -82,42 +109,39 @@ def check_incremental(cur, schema_name, table_name, replication_key, buckets):
         notes.extend(key['hard_failures'])
     notes.extend(key['risks'])
 
-    # the bucketed index is what INCREMENTAL wants, and it does not lead with the
-    # key -- the discriminator does -- so no column-name lookup will find it
-    cur.execute(
-        "SELECT pg_get_indexdef(i.oid) FROM pg_index x "
-        'JOIN pg_class i ON i.oid = x.indexrelid '
-        'JOIN pg_class c ON c.oid = x.indrelid '
-        'JOIN pg_namespace n ON n.oid = c.relnamespace '
-        'WHERE n.nspname = %s AND c.relname = %s AND i.relname = %s',
-        (schema_name, table_name,
-         keyset.replication_key_index_name(table_name, replication_key)))
-    bucketed = cur.fetchone()
+    # when the replication key IS the primary key the shape-1 index already is
+    # the shape-2 index; asking for a second one would ask for a duplicate
+    if list(pk_columns) == [replication_key]:
+        pk_status, pk_notes, pk_ddl = _pk_index(cur, schema_name, table_name,
+                                                pk_columns, pk_types, buckets)
+        notes.append('The replication key is the primary key, so the primary-key '
+                     'keyset index serves both. No second index.')
+        notes.extend(pk_notes)
+        ddl.extend(pk_ddl)
+        if pk_status == BLOCK or (pk_status == ACTION and status == OK):
+            status = pk_status
+        return status, notes, ddl
 
-    if bucketed:
-        found = keyset.parse_index_buckets(bucketed[0])
-        notes.append(f'{replication_key} is bucketed by '
-                     f'{keyset.replication_key_index_name(table_name, replication_key)} '
-                     f'({found} buckets), so the watermark query bounds itself and the '
-                     f'write tail is spread across {found} tablets.')
+    trailing = [replication_key] + list(pk_columns)
+    name = keyset.replication_key_index_name(table_name, replication_key)
+    found, problems = keyset.check_index(cur, schema_name, table_name, name,
+                                         pk_columns, trailing, buckets)
+    if found is not None and not problems:
+        notes.append(f'{name} orders {replication_key} within each of {buckets} '
+                     f'buckets and ends in the primary key, so the watermark scan '
+                     f'streams in order and resumes inside a tie.')
     else:
-        served = keyset.plan_partial_sync(cur, schema_name, table_name, replication_key)
-        if served['indexed']:
-            notes.append(f"{replication_key} is ordered by {served['index']}, which bounds "
-                         f'the watermark query but puts every insert on one tablet: a '
-                         f'replication key only ever increases, so it lands at the tail.')
-        else:
-            notes.append(f'No index bounds {replication_key}, so every run scans the whole '
-                         f'table to find its rows.')
-        if status != BLOCK:
-            status = ACTION
+        notes.extend(problems)
         fq_table_name = f'"{schema_name}"."{table_name}"'
         ddl.append(keyset.replication_key_index_ddl(
-            fq_table_name, table_name, replication_key, buckets) + ';')
+            fq_table_name, table_name, replication_key, pk_columns, buckets) + ';')
+        if status != BLOCK:
+            status = ACTION
 
     if key.get('tiebreaker'):
-        notes.append(f"{replication_key} is not unique; rows sharing a value need "
-                     f"{', '.join(key['tiebreaker'])} to break the tie deterministically.")
+        notes.append(f"{replication_key} is not unique; the index ends in "
+                     f"{', '.join(key['tiebreaker'])} so rows sharing a value keep "
+                     f"a stable order across runs.")
     return status, notes, ddl
 
 
@@ -130,9 +154,7 @@ def check_table(cur, schema_name, table, buckets):
         return check_incremental(cur, schema_name, table_name,
                                  table.get('replication_key'), buckets)
     if method == 'LOG_BASED':
-        return OK, ['LOG_BASED reads the change stream, so it needs no index. '
-                    'It does need the table to have a replica identity that can '
-                    'name a deleted row.'], []
+        return check_log_based(cur, schema_name, table_name, buckets)
     return BLOCK, [f'Unknown replication_method {method!r}.'], []
 
 
