@@ -224,11 +224,20 @@ class TestTheFourIndexShapes:
             assert ddl.endswith('SPLIT AT VALUES ((1), (2), (3))')
 
     def test_replication_key_that_is_the_primary_key_reuses_shape_1(self):
-        # a hint naming an index nobody created is silently dropped, and the scan
-        # falls back to a sequential scan and an external sort
+        # naming an index nobody created means the DDL the preflight prints
+        # builds a second copy of an index the table already has
         assert keyset.index_for_replication_key('t', 'id', ['id']) == 't_pw_keyset'
-        assert keyset.replication_key_hint('t', 'id', ['id']) \
-            == '/*+ IndexScan(t t_pw_keyset) */'
+
+    def test_the_incremental_scan_no_longer_renders_a_hint(self):
+        # replication_key_hint is gone. It put the hint inside the
+        # yb_speedup_trick subquery, a position pg_hint_plan never reads --
+        # hints_anywhere is off, so only the comment leading the whole statement
+        # is parsed. Probed with a deliberately bogus index name, which the
+        # extension reports whenever it parses a hint it cannot apply:
+        #   leading comment   WARNING: bad index hint name "no_such_index"
+        #   inside a subquery WARNING: error trying to get hints from comment
+        # See keyset.bucket_branches_sql for what a hint does when it IS read.
+        assert not hasattr(keyset, 'replication_key_hint')
 
     def test_replication_key_that_is_not_the_primary_key_gets_its_own(self):
         assert (keyset.index_for_replication_key('t', 'created_at', ['id'])
@@ -347,6 +356,94 @@ class TestMergeScan:
     def test_in_list_escapes_the_modulo_for_parameterised_statements(self):
         assert keyset.bucket_in_sql(['id'], 3, escape_percent=True) == \
             '(yb_hash_code("id") %% 3) IN (0, 1, 2)'
+
+
+class TestBucketBranches:
+    """The branch form, which is what a NAMED cursor needs.
+
+    The storage-level merge behind bucket_in_sql is not performed under
+    `DECLARE CURSOR`: the per-bucket streams come back concatenated, and both
+    plans read `Merge Streams: 3`. Measured on rt.healthy, 40,000 rows, only the
+    cursor varying -- plain: 0 ORDER BY violations, 26,712 bucket changes along
+    the stream; named: 2 violations, 2 bucket changes. `Merge Append` is a plan
+    node, so the cursor honours it: 0 violations named and plain.
+    """
+
+    ORDER = '"updated_at" ASC, "id" ASC'
+
+    def _sql(self, buckets=3, **kwargs):
+        return keyset.bucket_branches_sql('"s"."t"', ['id'], buckets,
+                                          self.ORDER, **kwargs)
+
+    def test_one_branch_per_bucket(self):
+        sql = self._sql()
+        assert sql.count('UNION ALL') == 2
+        assert sql.count('SELECT * FROM "s"."t"') == 3
+
+    def test_each_branch_states_its_bucket_as_an_equality(self):
+        # an equality is the one access pattern a hash-sharded discriminator
+        # serves; the IN-list reaches the index too, but only the equality
+        # survives into a per-branch Index Cond
+        sql = self._sql()
+        for bucket in range(3):
+            assert f'(yb_hash_code("id") % 3) = {bucket}' in sql
+        assert 'IN (0, 1, 2)' not in sql
+
+    def test_every_branch_carries_its_own_ordering(self):
+        # without it the branches feed a blocking Sort rather than a Merge
+        # Append -- measured, peak memory 5,624 kB against 161 kB
+        assert self._sql().count(f'ORDER BY {self.ORDER}') == 3
+
+    def test_the_bookmark_rides_inside_every_branch(self):
+        # so bucket equality and bookmark reach the SAME Index Cond, which is
+        # what terminates early under a LIMIT: 4,096 index rows per branch for
+        # LIMIT 10000 over three buckets, not a third of the table
+        sql = self._sql(extra_predicate='"updated_at" >= \'X\'::timestamptz')
+        assert sql.count('"updated_at" >= \'X\'::timestamptz') == 3
+        for bucket in range(3):
+            assert (f'WHERE (yb_hash_code("id") % 3) = {bucket} '
+                    f'AND "updated_at" >= \'X\'::timestamptz') in sql
+
+    def test_no_bookmark_leaves_the_bucket_predicate_alone(self):
+        sql = self._sql()
+        assert 'WHERE (yb_hash_code("id") % 3) = 0 ORDER BY' in sql
+        assert 'AND' not in sql
+
+    def test_no_index_hint_is_emitted(self):
+        # a hint inside a branch is never read (pg_hint_plan: hints_anywhere is
+        # off), one leading hint on the bare table name reaches exactly ONE
+        # branch, and N leading hints on per-branch aliases reach all of them and
+        # make it worse -- IndexScan replaces the Index Only Scan the planner
+        # picks unaided, 80,000 storage rows scanned against 40,000
+        assert 'IndexScan' not in self._sql()
+        assert '/*+' not in self._sql()
+
+    def test_the_modulo_is_escaped_only_for_parameterised_statements(self):
+        # this statement interpolates its bookmark and passes no parameters, so
+        # the default is the undoubled form. The doubled one here is not a slow
+        # query, it is a malformed statement
+        assert '% 3' in self._sql()
+        assert '%%' not in self._sql()
+        assert '%% 3' in self._sql(escape_percent=True)
+
+    def test_the_shape_holds_at_larger_bucket_counts(self):
+        # confirmed against the server at N = 3, 8, 16, 32, 64 and 128: Merge
+        # Append every time, 0 ORDER BY violations through the named cursor, no
+        # point at which it degrades to a Sort
+        sql = self._sql(buckets=16)
+        assert sql.count('UNION ALL') == 15
+        assert '(yb_hash_code("id") % 16) = 15' in sql
+
+    def test_a_single_bucket_is_one_branch_and_no_union(self):
+        sql = self._sql(buckets=1)
+        assert 'UNION ALL' not in sql
+        assert '(yb_hash_code("id") % 1) = 0' in sql
+
+    def test_composite_primary_key_hashes_the_whole_tuple(self):
+        sql = keyset.bucket_branches_sql('"s"."t"', ['tenant', 'id'], 2,
+                                         '"tenant" ASC, "id" ASC')
+        assert '(yb_hash_code("tenant", "id") % 2) = 0' in sql
+        assert '(yb_hash_code("tenant", "id") % 2) = 1' in sql
 
     def test_settings_cover_the_bucket_count(self):
         # below the bucket count the planner cannot merge every stream and falls

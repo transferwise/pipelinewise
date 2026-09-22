@@ -45,9 +45,10 @@ deviate, and the failures are quiet.
 
 ### Why the bucket hashes the primary key even in shapes 3 and 4
 
-`INCREMENTAL` names every bucket (`IN (0, 1, ... N-1)`) rather than targeting
-one, so the bucket never has to be derivable from the cursor and either column
-would work. The read plans are identical. What differs is where a batch lands:
+`INCREMENTAL` reads every bucket — one `UNION ALL` branch each — rather than
+targeting one, so the bucket never has to be derivable from the cursor and either
+column would work. The read plans are identical. What differs is where a batch
+lands:
 
 ```sql
 -- 9,000 rows inserted in ONE transaction, counted per bucket
@@ -309,7 +310,8 @@ index can serve.
 Every scan also names every bucket explicitly:
 
 ```sql
-WHERE (yb_hash_code(<pk>) % N) IN (0, 1, ... N-1)
+WHERE (yb_hash_code(<pk>) % N) IN (0, 1, ... N-1)     -- FULL_TABLE's max-key probe
+WHERE (yb_hash_code(<pk>) % N) = <b>                  -- one branch per bucket
 ```
 
 This is required for **ordering**, not for bounding. YugabyteDB will bound a
@@ -317,6 +319,112 @@ range on a trailing column under an unbounded leading one — so PartialSync's
 `WHERE created_at >= ...` works without it — but `ORDER BY` will not stream:
 without the predicate a full ordered drain of 50,000 rows plans as a sequential
 scan and a 1,672 kB external merge sort instead of a 3-stream merge.
+
+The `IN`-list form is only safe on a **plain** cursor, which is why `INCREMENTAL`
+uses the branch form — see the next section.
+
+---
+
+## The merge scan does not survive a server-side cursor
+
+**`ORDER BY` over a multi-bucket `IN` list is not ordered when the statement is
+read through a named cursor.** The merge is performed by the storage layer, and
+`DECLARE CURSOR` does not perform it: the N per-bucket streams arrive
+**concatenated** — each ascending internally, the whole not ascending.
+
+`EXPLAIN` reports `Merge Streams: 3` in **both** cases. The plans are
+byte-identical. Nothing about any plan distinguishes them; only comparing the
+rows that come back does. Measured on `rt.healthy`, 40,000 rows, one session,
+identical settings, only the cursor varying:
+
+| cursor | rows | `ORDER BY` violations | bucket changes along the stream |
+|---|---|---|---|
+| plain | 40,000 | 0 | 26,712 — interleaved, so merged |
+| named | 40,000 | **2** | **2** — concatenated, N−1 for N buckets |
+
+Two violations sounds trivial. It is not: with a `LIMIT` the run takes the first
+*n* rows of the concatenation — essentially one bucket — bookmarks that bucket's
+high-water mark, and **permanently skips every row in the other buckets below
+it**, while reporting success and emitting a full batch on schedule. Driving the
+real `incremental.sync_table` against `rt.healthy` with `limit: 10000` until it
+reported caught up:
+
+| statement | runs | rows emitted | distinct rows | missing forever |
+|---|---|---|---|---|
+| `IN`-list + storage merge | 3 | 19,634 | 19,631 | **20,369** |
+| `UNION ALL` + outer `ORDER BY` | 6 | 40,005 | 40,000 | **0** |
+
+### What `INCREMENTAL` emits instead
+
+```sql
+SELECT <columns> FROM (
+  (SELECT * FROM <table> WHERE (yb_hash_code(<pk>) % N) = 0 [AND <key> >= <bookmark>]
+     ORDER BY <key> ASC, <pk> ASC)
+  UNION ALL
+  ... one branch per bucket ...
+) yb_speedup_trick ORDER BY <key> ASC, <pk> ASC [LIMIT n];
+```
+
+**The outer `ORDER BY` is load-bearing and must never be omitted.** It is what
+makes the shape correct rather than lucky: the planner is *obliged* to satisfy
+it, so it emits `Merge Append` where the branches already supply the order and a
+`Sort` where they cannot. Correctness never rests on `Append` emitting its
+children in branch order, which neither SQL nor PostgreSQL guarantees. Drop it
+and you get a bare `Append` and the same 2 violations.
+
+`Merge Append` is a plan node rather than a storage-layer behaviour, so a named
+cursor honours it. Measured through the tap's own named cursor: 0 violations,
+40,000 rows.
+
+| shape | plan | peak memory | violations, named cursor |
+|---|---|---|---|
+| `UNION ALL`, ordered branches, outer `ORDER BY` | `Merge Append` | **161 kB** | **0** |
+| `UNION ALL`, unordered branches, outer `ORDER BY` | `Sort` | 5,624 kB | 0 |
+| `UNION ALL`, ordered branches, **no** outer `ORDER BY` | `Append` | 185 kB | **2** |
+| `IN`-list + storage merge | `Merge Streams: 3` | 263 kB | **2** |
+
+Each branch states its bucket as an equality and carries the bookmark, so both
+reach the same `Index Cond` — which is what terminates early under a `LIMIT`:
+
+```
+Limit
+  -> Merge Append
+     -> Index Only Scan using healthy_updated_at_pw_keyset
+          Index Cond: (((yb_hash_code(id) % 3)) = 0
+                       AND (updated_at >= '...'::timestamp with time zone))
+          Storage Index Rows Scanned: 4096      -- per branch, for LIMIT 10000
+```
+
+12,288 index rows read to return 10,000, against 40,000 for a full drain.
+
+**No index hint is emitted on this path, and one must not be added.** Measured:
+
+- a hint nested inside the subquery **is** read — verified by A/B on the exact
+  `yb_speedup_trick` shape: unhinted plans an `Index Only Scan`, and adding
+  `/*+ SeqScan(healthy) */` inside the subquery turns it into a `Seq Scan`. So
+  the hint this statement used to carry was doing something; it just was not
+  doing anything useful. `full_table` puts its hint first in the statement, where
+  it *is* read
+- one leading hint naming the bare table reaches exactly **one** branch, because
+  every branch writes the same relation name. Probed with `SeqScan(healthy)`: one
+  branch sequentially scanned, two still on the index
+- N leading hints against per-branch aliases do reach every branch, and make the
+  plan **worse** — `IndexScan` forces a plain `Index Scan` in place of the `Index
+  Only Scan` the planner picks unaided, adding a heap fetch per row: 80,000
+  storage rows scanned against 40,000 on a full drain, 24,576 against 12,288
+  under `LIMIT 10000`
+- unhinted is already the right plan everywhere it was measured — `Merge Append`
+  over N `Index Only Scan`s with `Heap Fetches: 0` — on an `ANALYZE`d table and
+  on one that has never been `ANALYZE`d, with the session settings above and with
+  none at all
+
+The session settings stay, but this statement no longer depends on them: the
+ordering is in the plan now, not in the storage layer.
+
+**Tables with no primary key, or no bucket count, are untouched.** Nothing to
+hash means no discriminator and no branches, so the statement is the plain single
+ordered `SELECT` it has always been — and one stream is in order under any
+cursor, because nothing is being merged.
 
 ---
 
@@ -335,6 +443,9 @@ YugabyteDB 2026.1.1.1).
 | Capturing a plan on a table that has never been `ANALYZE`d | Not a mistake in the index — but see the note below before reading a `Sort` as one |
 | Keyset resume written as a row constructor — `WHERE (a, b) > (%s, %s)` | Reads `Index Cond`, so the plan looks correct, but every remaining index entry in the bucket is read and dropped. The tap emits an expanded form instead — but see the composite-key limitation below, which is not yet fixed |
 | `N` in the config ≠ `N` in the index | Full table scan, silently. The tap validates this against the live index and refuses |
+| An ordered multi-bucket `IN`-list scan read through a **named** cursor | The storage-level merge is not performed and the buckets arrive concatenated. Both plans read `Merge Streams: 3`, so no plan shows it. With a `LIMIT`, 20,369 of 40,000 rows were skipped permanently while every run reported success — see "The merge scan does not survive a server-side cursor" |
+| The outer `ORDER BY` dropped from the `UNION ALL` | A bare `Append`, whose child order nothing guarantees — the same 2 violations and the same silent loss. It is the `ORDER BY` that obliges the planner, not the branch order |
+| A `LIMIT` moved *inside* the `UNION ALL` branches | Caps each bucket separately instead of terminating the merge early, so rows past a bucket's cap are dropped from the run and the bookmark advances past them |
 
 ---
 
@@ -397,6 +508,21 @@ at N:
 
 187× and a blocking sort, on the wrong side of a single integer. The tap sets
 `max(N, 8)`, which is always ≥ N.
+
+**`INCREMENTAL`'s `Merge Append` holds one open branch per bucket, so its own
+memory scales with N.** Confirmed on `rt.healthy`, 40,000 rows, full ordered
+drain through the tap's named cursor — `Merge Append` at every N, no point at
+which it degraded to a `Sort`, and 0 `ORDER BY` violations every time:
+
+| N | 3 | 8 | 16 | 32 | 64 | 128 |
+|---|---|---|---|---|---|---|
+| plan | `Merge Append` | `Merge Append` | `Merge Append` | `Merge Append` | `Merge Append` | `Merge Append` |
+| peak memory | 161 kB | 361 kB | 745 kB | 1,521 kB | 3,065 kB | 6,145 kB |
+
+Roughly 47 kB per bucket on a three-column table, on top of a fixed ~20 kB. It
+pulls the opposite way from the per-worker figure below, which *falls* as N
+rises: `FULL_TABLE` gives one bucket to each of N workers, while `INCREMENTAL`
+reads all N through one cursor. 128 was the largest confirmed here.
 
 **For wide tables, choose N against row width, not just parallelism.** Peak
 memory per worker scales with *rows in the bucket × row width*, and narrow tables

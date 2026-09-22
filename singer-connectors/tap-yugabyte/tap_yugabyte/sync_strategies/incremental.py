@@ -79,13 +79,22 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
             else:
                 LOGGER.info("hstore is UNavailable")
 
-            # the same settings full_table's scans need, for the same reason: the
-            # merge plan is a cost decision and the cost model prefers a
-            # sequential scan and an external merge sort. Without these the
-            # bucket predicate and the index are emitted and then ignored --
-            # measured, a 30,000-row drain sorts to disk (2,432 kB) instead of
-            # merging 3 streams. They must run on a plain cursor: the extraction
-            # below uses a named server-side cursor, which cannot carry SET.
+            # the same settings full_table's scans need. They must run on a plain
+            # cursor: the extraction below uses a named server-side cursor, which
+            # cannot carry SET.
+            #
+            # The extraction no longer DEPENDS on them. It used to lean on the
+            # storage-level merge scan, which yb_max_merge_scan_streams enables
+            # and which a named cursor silently does not perform -- see
+            # _get_select_sql. The statement is a UNION ALL under an outer ORDER
+            # BY now, so the ordering is a plan node (`Merge Append`) that the
+            # cursor honours, and the plan was measured identical with these
+            # settings and with none at all: Merge Append over N Index Only Scans,
+            # Heap Fetches 0, on an ANALYZEd table and on one never ANALYZEd.
+            # They stay because they are cheap, because this connection runs
+            # nothing else, and because enable_seqscan = off is still the thing
+            # that keeps a cost estimate from preferring a sequential scan on a
+            # table shape nobody has measured yet.
             buckets = conn_info.get('keyset_buckets', keyset.BUCKETS_DEFAULT)
             with conn.cursor() as setup:
                 if keyset.merge_scan_available(setup):
@@ -210,12 +219,48 @@ def _warn_if_bookmark_stalled(stream, state, replication_key, started_at,
 def _get_select_sql(params):
     """Build the extraction query.
 
-    The bucket predicate names every bucket so the planner can use an index led
-    by the discriminator; without it that index is unusable and the query reads
-    the whole table. The hint and the session settings are there because the
-    merge plan is otherwise a cost decision, and the cost model prefers a
-    sequential scan and an external merge sort -- faster in wall clock, and it
-    spills instead of streaming.
+    Bucketed, this is a `UNION ALL` of one ordered branch per bucket under an
+    OUTER `ORDER BY`. THAT OUTER `ORDER BY` IS LOAD-BEARING AND MUST NEVER BE
+    OMITTED. It is what makes this correct rather than lucky: the planner is
+    obliged to satisfy it, so it emits `Merge Append` where the branches already
+    supply the order and a `Sort` where they cannot -- correctness never depends
+    on `Append` happening to emit its children in branch order. Drop it and the
+    shape is a bare `Append`, which measures exactly as badly as what it
+    replaced.
+
+    WHAT IT REPLACED, AND WHY. This used to be one statement naming every bucket,
+    `WHERE (yb_hash_code(id) % N) IN (0 ... N-1) ORDER BY key, pk`, relying on
+    YugabyteDB's storage-level merge scan to supply the order. sync_table reads
+    that through a NAMED server-side cursor, and UNDER A CURSOR YUGABYTEDB DOES
+    NOT PERFORM THE MERGE: the N per-bucket streams come back concatenated, each
+    ascending internally and the whole not ascending. Measured on rt.healthy,
+    40,000 rows, same session, same settings, only the cursor varying:
+
+        cursor  rows    ORDER BY violations  bucket changes along the stream
+        plain   40,000  0                    26,712   (interleaved -- merged)
+        named   40,000  2                    2        (concatenated -- N-1)
+
+    `EXPLAIN` reports `Merge Streams: 3` in BOTH cases; the plans are
+    byte-identical. The defect is invisible from any plan, and only comparing
+    returned rows shows it.
+
+    It lost data silently. With a `LIMIT` the run takes the first n rows of the
+    concatenation -- essentially one bucket -- bookmarks that bucket's high-water
+    mark, and permanently skips every row in the other buckets below it while
+    reporting success. Measured against rt.healthy by driving sync_table to
+    "caught up" and collecting every id it emitted: 19,631 of 40,000 rows with
+    limit 10,000, 15,572 with limit 3,000. With `Merge Append`, both: 40,000 of
+    40,000, nothing missing.
+
+    The bucket predicate is still per-bucket rather than absent, because the
+    index is led by the discriminator and an equality against it is the access
+    pattern hash sharding serves. The bookmark rides inside each branch so both
+    reach the same `Index Cond`, which is what terminates early under the
+    `LIMIT`: with `LIMIT 10000` over three buckets each branch reads 4,096 index
+    rows rather than its share of the table.
+
+    No index hint is emitted; see keyset.bucket_branches_sql, which measured
+    every place one could go.
 
     The subquery, labelled yb_speedup_trick as in tap-postgres, keeps the
     column-expression projection from defeating the index scan.
@@ -232,21 +277,15 @@ def _get_select_sql(params):
 
     limit_statement = f'LIMIT {params["limit"]}' if params['limit'] else ''
 
-    predicates = []
-    if buckets:
-        predicates.append(keyset.bucket_in_sql(pk_columns, buckets))
+    bookmark_predicate = None
     if replication_key_value:
         # cast to the column's own discovered type: a timestamptz value compared
         # against a timestamp column is accepted as an index condition and then
         # rechecked against every row, which looks identical in the plan
-        predicates.append(
+        bookmark_predicate = (
             f"{replication_key} >= '{replication_key_value}'"
             f'::{replication_key_sql_datatype}'
         )
-    where_statement = f'WHERE {" AND ".join(predicates)}' if predicates else ''
-    hint = (keyset.replication_key_hint(table_name, params['replication_key'],
-                                        pk_columns)
-            if buckets else '')
 
     # the primary key trails the replication key in the index and in the order, so
     # rows sharing a replication-key value come back in the same sequence on every
@@ -258,13 +297,38 @@ def _get_select_sql(params):
     ordering = list(dict.fromkeys([params['replication_key']] + list(pk_columns)))
     order_by = keyset.order_by_sql(ordering)
 
-    select_sql = f"""
+    fq_table_name = yb_db.fully_qualified_table_name(schema_name, table_name)
+
+    # No primary key, or no bucket count: there is nothing to hash, so there are
+    # no branches and no discriminator to name. One plain ordered statement, the
+    # same one this has always emitted -- a single stream is in order under any
+    # cursor, because nothing is being merged. The stray leading space before
+    # SELECT is deliberate: it is where the (now removed) hint used to be
+    # interpolated, and keeping it makes this path byte-identical to the previous
+    # statement rather than merely equivalent to it.
+    if not buckets:
+        where_statement = (f'WHERE {bookmark_predicate}'
+                           if bookmark_predicate else '')
+        return f"""
     SELECT {','.join(escaped_columns)}
     FROM (
-        {hint} SELECT *
-        FROM {yb_db.fully_qualified_table_name(schema_name, table_name)}
+         SELECT *
+        FROM {fq_table_name}
         {where_statement}
         ORDER BY {order_by} {limit_statement}
     ) yb_speedup_trick;"""
 
-    return select_sql
+    # the branches interpolate the bookmark as a literal and the statement is
+    # executed with no parameters, so the modulo is NOT doubled. Handing psycopg2
+    # a doubled `%%` here does not produce a slow query, it produces a malformed
+    # statement; handing it a single `%` in a statement that DOES carry
+    # parameters raises IndexError. See keyset.bucket_expr.
+    branches = keyset.bucket_branches_sql(fq_table_name, pk_columns, buckets,
+                                          order_by, bookmark_predicate)
+
+    # the outer ORDER BY is the whole point -- see the docstring
+    return f"""
+    SELECT {','.join(escaped_columns)}
+    FROM (
+{branches}
+    ) yb_speedup_trick ORDER BY {order_by} {limit_statement};"""

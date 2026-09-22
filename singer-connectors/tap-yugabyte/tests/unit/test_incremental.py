@@ -101,9 +101,20 @@ class TestIncremental(TestCase):
 class TestIncrementalSelectSql(TestCase):
     """The statement INCREMENTAL emits, against the shape-3/4 index.
 
-    The bucket predicate is what makes it stream: bounding a range does not need
-    it, but ORDER BY does -- without it a full ordered drain plans as a sequential
-    scan and an external merge sort.
+    It is a UNION ALL of one ordered branch per bucket under an OUTER ORDER BY,
+    and the outer ORDER BY is the load-bearing part.
+
+    It used to be one statement naming every bucket, leaning on YugabyteDB's
+    storage-level merge scan for the order. sync_table reads through a NAMED
+    server-side cursor, and under a cursor that merge is not performed: the
+    per-bucket streams come back concatenated. EXPLAIN says `Merge Streams: 3`
+    either way -- the plans are byte-identical -- so no plan shows it. Measured
+    on 40,000 rows, only the cursor varying: plain 0 ORDER BY violations and
+    26,712 bucket changes along the stream; named 2 violations and 2 bucket
+    changes. With a LIMIT the run then took the first n rows of the
+    concatenation, bookmarked one bucket's high-water mark and skipped the rest
+    permanently: 19,634 of 40,000 rows emitted before it reported caught up,
+    against 40,000 of 40,000 after.
     """
 
     BASE = {
@@ -123,25 +134,61 @@ class TestIncrementalSelectSql(TestCase):
 
     def test_buckets_on_the_primary_key_not_the_replication_key(self):
         sql = self._sql()
-        self.assertIn('(yb_hash_code("id") % 3) IN (0, 1, 2)', sql)
+        for bucket in range(3):
+            self.assertIn(f'(yb_hash_code("id") % 3) = {bucket}', sql)
         self.assertNotIn('yb_hash_code("created_at")', sql)
 
+    def test_one_branch_per_bucket_instead_of_one_merged_scan(self):
+        sql = self._sql()
+        self.assertEqual(2, sql.count('UNION ALL'))
+        self.assertNotIn('IN (0, 1, 2)', sql)
+
+    def test_the_outer_order_by_is_present(self):
+        # THE point. Without it the shape is a bare Append, whose child order
+        # neither SQL nor PostgreSQL guarantees, and it measures exactly as badly
+        # as the merge scan did under a cursor -- the same 2 violations. With it
+        # the planner is obliged: Merge Append where the branches supply the
+        # order, Sort where they cannot.
+        sql = self._sql()
+        self.assertIn(') yb_speedup_trick ORDER BY "created_at" ASC, "id" ASC',
+                      sql)
+
     def test_orders_by_the_key_then_the_primary_key(self):
-        # the index ends in the primary key, so the tie order is free and stable
-        self.assertIn('ORDER BY "created_at" ASC, "id" ASC', self._sql())
+        # the index ends in the primary key, so the tie order is free and stable.
+        # Every branch carries it as well as the outer statement: that is what
+        # makes the Merge Append possible rather than a 5,624 kB blocking Sort
+        self.assertEqual(4, self._sql().count('ORDER BY "created_at" ASC, "id" ASC'))
 
-    def test_hints_the_replication_key_index(self):
-        self.assertIn('IndexScan(event event_created_at_pw_keyset)', self._sql())
+    def test_the_limit_sits_outside_the_branches(self):
+        # inside a branch it would cap each bucket separately and drop rows; the
+        # outer Limit terminates the Merge Append early instead -- 4,096 index
+        # rows per branch for LIMIT 10000 over three buckets
+        sql = self._sql(limit=10000)
+        self.assertIn('yb_speedup_trick ORDER BY "created_at" ASC, "id" ASC '
+                      'LIMIT 10000', sql)
+        self.assertEqual(1, sql.count('LIMIT'))
 
-    def test_hints_the_primary_key_index_when_the_key_is_the_primary_key(self):
+    def test_the_bookmark_rides_inside_every_branch(self):
+        # both predicates have to reach the same Index Cond, or the bookmark
+        # becomes a filter over rows the scan has already read
+        sql = self._sql()
+        self.assertEqual(3, sql.count("'2026-09-22 09:00:00+00'"))
+        self.assertIn('(yb_hash_code("id") % 3) = 0 AND  "created_at"  >= ', sql)
+
+    def test_no_index_hint_is_emitted(self):
+        # a hint inside the subquery was never read by pg_hint_plan at all, and a
+        # hint that IS read costs the Index Only Scan -- see
+        # keyset.bucket_branches_sql
+        self.assertNotIn('IndexScan', self._sql())
+        self.assertNotIn('/*+', self._sql())
+
+    def test_the_key_that_is_the_primary_key_dedupes_the_ordering(self):
         sql = self._sql(replication_key='id', escaped_columns=['"id"'],
                         replication_key_sql_datatype='bigint',
                         replication_key_value=25000)
-        self.assertIn('IndexScan(event event_pw_keyset)', sql)
-        self.assertNotIn('event_id_pw_keyset', sql)
-        # and the ordering columns are deduped, not `ORDER BY "id" ASC, "id" ASC`
         self.assertIn('ORDER BY "id" ASC', sql)
         self.assertNotIn('"id" ASC, "id" ASC', sql)
+        self.assertIn('(yb_hash_code("id") % 3) = 2 AND  "id"  >= ', sql)
 
     def test_bookmark_is_cast_to_the_discovered_column_type(self):
         # a timestamptz literal against a timestamp column is accepted as an index
@@ -149,11 +196,41 @@ class TestIncrementalSelectSql(TestCase):
         # distinguish from a real bound
         self.assertIn("::timestamp with time zone", self._sql())
 
-    def test_no_bucket_predicate_without_a_primary_key(self):
+    def test_the_resume_predicate_stays_inclusive(self):
+        # >= not >: the bookmark is one scalar and the key is not unique, so a
+        # resume has to re-read the group it stopped inside. At-least-once by
+        # design; the target deduplicates on the primary key
+        self.assertIn('>= ', self._sql())
+        self.assertNotIn('> \'2026', self._sql().replace('>= ', ''))
+
+    def test_the_modulo_is_not_doubled(self):
+        # the statement is executed with no parameter sequence, so psycopg2 never
+        # interpolates. A doubled %% here is a malformed statement, not a slow one
+        self.assertNotIn('%%', self._sql())
+
+    def test_no_branches_without_a_primary_key(self):
+        # nothing to hash, so no discriminator and no branches: the plain single
+        # statement, byte for byte what this emitted before the branches existed.
+        # One stream is in order under any cursor, because nothing is merged.
         sql = self._sql(pk_columns=[])
         self.assertNotIn('yb_hash_code', sql)
+        self.assertNotIn('UNION ALL', sql)
         self.assertNotIn('IndexScan', sql)
         self.assertIn('ORDER BY "created_at" ASC', sql)
+
+    def test_no_branches_without_a_bucket_count(self):
+        sql = self._sql(keyset_buckets=None)
+        self.assertNotIn('yb_hash_code', sql)
+        self.assertNotIn('UNION ALL', sql)
+        # the primary key still trails the key in the order
+        self.assertIn('ORDER BY "created_at" ASC, "id" ASC', sql)
+
+    def test_the_unbucketed_statement_keeps_its_limit_inside(self):
+        # unchanged from before the branches: there is one stream, so capping it
+        # inside the subquery and capping it outside are the same thing
+        sql = self._sql(pk_columns=[], limit=5000)
+        self.assertIn('ORDER BY "created_at" ASC LIMIT 5000\n    ) '
+                      'yb_speedup_trick;', sql)
 
 
 class TestBookmarkStalledWarning(TestCase):

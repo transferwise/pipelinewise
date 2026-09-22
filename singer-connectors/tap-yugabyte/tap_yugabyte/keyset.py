@@ -217,15 +217,99 @@ def bucket_in_sql(pk_columns, buckets, escape_percent=False):
 
     YugabyteDB turns this into a single index condition over all N values and,
     with yb_max_merge_scan_streams >= N, merges the N per-bucket sorted streams
-    into one ordered result. That replaces the UNION ALL the scan used to need,
-    and it works against the expression index directly -- the source table needs
-    no generated column and no schema change, only the index.
+    into one ordered result. It works against the expression index directly --
+    the source table needs no generated column and no schema change, only the
+    index.
 
     It has to be a literal IN list: the planner does not derive one from a CHECK
     constraint, and BETWEEN degrades to a storage filter over the whole index.
+
+    ONLY SAFE ON A PLAIN CURSOR. The merge is performed by the storage layer, and
+    under a NAMED server-side cursor (`DECLARE CURSOR`) YugabyteDB does not
+    perform it: the N per-bucket streams come back CONCATENATED, each ascending
+    internally and the whole not ascending. `EXPLAIN` reports `Merge Streams: N`
+    either way -- the plans are byte-identical -- so nothing about the plan says
+    which of the two happened. Measured on rt.healthy, 40,000 rows, same session,
+    same settings, only the cursor varying:
+
+        cursor  rows    ORDER BY violations  bucket changes along the stream
+        plain   40,000  0                    26,712   (interleaved -- merged)
+        named   40,000  2                    2        (concatenated -- N-1)
+
+    So this is for statements read through a plain cursor, and for those the
+    ordering only has to hold within one fetch of everything -- max_pk_values_sql
+    reads a single row. Anything streamed through a named cursor must use
+    bucket_branches_sql instead, which puts the ordering in the plan rather than
+    in the storage layer.
     """
     values = ', '.join(str(b) for b in range(buckets))
     return f'{bucket_expr(pk_columns, buckets, escape_percent)} IN ({values})'
+
+
+# pylint: disable=too-many-arguments,too-many-positional-arguments
+def bucket_branches_sql(fq_table_name, pk_columns, buckets, order_by,
+                        extra_predicate=None, escape_percent=False):
+    """One ordered branch per bucket, `UNION ALL`ed -- the body of the subquery.
+
+    THE CALLER MUST PUT AN OUTER `ORDER BY` OVER THE RESULT. This returns the
+    branches only; on their own they are a bare `Append`, whose child order
+    neither SQL nor PostgreSQL guarantees and which measures exactly as badly as
+    the merge scan does under a cursor (2 ORDER BY violations on rt.healthy,
+    identical to the IN-list form). The outer `ORDER BY` is what makes the shape
+    correct rather than lucky: the planner is OBLIGED to satisfy it, so it emits
+    `Merge Append` where the branches already supply the order and `Sort` where
+    they do not. Correctness then rests on the planner honouring an `ORDER BY`
+    rather than on `Append` emitting children in branch order.
+
+    Unlike the merge scan, `Merge Append` is a plan node, so a named server-side
+    cursor honours it. Measured on rt.healthy through the tap's own named cursor:
+    0 violations, 40,000 rows.
+
+    Each branch states its bucket as an EQUALITY, which is the access pattern a
+    hash-sharded discriminator serves, and carries `extra_predicate` -- the
+    INCREMENTAL bookmark -- so both reach the same `Index Cond`:
+
+        Index Cond: (((yb_hash_code(id) % 3)) = 0
+                     AND (updated_at >= '...'::timestamp with time zone))
+
+    which is what gives early termination under a `LIMIT`: with `LIMIT 10000`
+    over three buckets each branch reads 4,096 index rows, not its share of the
+    table.
+
+    NO INDEX HINT IS EMITTED, and one must not be added:
+
+    - a hint nested inside the subquery IS read -- A/B on the exact
+      yb_speedup_trick shape: unhinted plans an Index Only Scan, and the same
+      statement with `/*+ SeqScan(healthy) */` inside the subquery plans a Seq
+      Scan. The hint this statement used to carry was therefore doing something;
+      it just was not doing anything useful.
+    - one leading hint naming the bare table reaches exactly ONE branch, because
+      every branch writes the same relation name. Probed with `SeqScan(healthy)`:
+      one branch sequentially scanned, the other two still on the index.
+    - N leading hints against per-branch aliases do reach every branch, and make
+      the plan WORSE: `IndexScan` forces a plain `Index Scan` in place of the
+      `Index Only Scan` the planner picks unaided, adding a heap fetch per row --
+      80,000 storage rows scanned against 40,000 on a full drain, 24,576 against
+      12,288 under `LIMIT 10000`.
+    - unhinted is already the right plan everywhere it was measured: `Merge
+      Append` over N `Index Only Scan`s with `Heap Fetches: 0`, on an ANALYZEd
+      table and on one that has never been ANALYZEd, with the tap's session
+      settings and with none at all.
+
+    `escape_percent` doubles the modulo for a statement psycopg2 is given
+    parameters for. The INCREMENTAL scan interpolates its bookmark as a literal
+    and passes none, so it wants the default -- see bucket_expr.
+    """
+    expr = bucket_expr(pk_columns, buckets, escape_percent)
+    branches = []
+    for bucket in range(buckets):
+        predicates = [f'{expr} = {bucket}']
+        if extra_predicate:
+            predicates.append(extra_predicate)
+        branches.append(f'        (SELECT * FROM {fq_table_name} '
+                        f'WHERE {" AND ".join(predicates)} '
+                        f'ORDER BY {order_by})')
+    return '\n        UNION ALL\n'.join(branches)
 
 
 def index_hint(table_name):
@@ -1332,6 +1416,20 @@ def replication_key_index_ddl(fq_table_name, table_name, replication_key,
     )
 
 
-def replication_key_hint(table_name, replication_key, pk_columns=()):
-    index = index_for_replication_key(table_name, replication_key, pk_columns)
-    return f'/*+ IndexScan({table_name} {index}) */'
+# replication_key_hint() used to live here. It rendered
+# `/*+ IndexScan(<table> <index>) */` for incremental._get_select_sql, which
+# placed it INSIDE the yb_speedup_trick subquery -- a position pg_hint_plan never
+# reads. Probed with a deliberately bogus index name, which the extension reports
+# when it parses a hint it cannot apply:
+#
+#   leading comment, plain statement   WARNING: bad index hint name "no_such_index"
+#   inside the subquery                WARNING: error trying to get hints from comment
+#
+# So it was never doing anything: `hints_anywhere` is off and only the comment
+# leading the whole statement is parsed. The INCREMENTAL scan emits no hint now
+# and needs none -- see bucket_branches_sql for what a hint does to the UNION ALL
+# shape when it IS read, which is to lose the Index Only Scan. full_table still
+# hints, and its hint is the leading token of its statement, where it is read.
+#
+# index_for_replication_key stays: it names the index the scan reads and the DDL
+# creates, which is a separate question from hinting it.
