@@ -429,37 +429,31 @@ def parse_index_buckets(indexdef):
 
 
 def validate_index(cur, schema_name, table_name, pk_columns, buckets):
-    """Confirm the prerequisite index exists and agrees with the configured
-    bucket count.
+    """The runtime gate before a bucketed parallel sync, as (usable, reason).
 
-    A mismatch is reported rather than tolerated: the scans would still return
-    correct rows, but each would silently become a full table scan, which is the
-    failure mode hardest to notice from the outside.
+    This used to carry its own, weaker copy of the checks -- existence and bucket
+    count, nothing else -- while the preflight tool called check_index and
+    verified the whole shape. The preflight was therefore strictly stricter than
+    the thing it was meant to predict, and the gap was exactly the failures that
+    do not announce themselves: an index whose backfill never completed passed
+    here and the planner refused it, so every one of the N workers sequentially
+    scanned the whole table with `enable_seqscan = off` set and the hint ignored.
+
+    It delegates now, so there is one implementation and the gate cannot drift
+    behind the tool again.
     """
-    cur.execute(
-        'SELECT pg_get_indexdef(i.oid) '
-        'FROM pg_class c '
-        'JOIN pg_namespace n ON n.oid = c.relnamespace '
-        'JOIN pg_index x ON x.indrelid = c.oid '
-        'JOIN pg_class i ON i.oid = x.indexrelid '
-        'WHERE n.nspname = %s AND c.relname = %s AND i.relname = %s',
-        (schema_name, table_name, index_name(table_name)),
-    )
-    row = cur.fetchone()
-    fq_table_name = f'"{schema_name}"."{table_name}"'
-    if row is None:
+    found, problems = check_index(cur, schema_name, table_name,
+                                  index_name(table_name), pk_columns,
+                                  pk_columns, buckets)
+    if found is None:
+        fq_table_name = f'"{schema_name}"."{table_name}"'
         return False, (
             f'Parallel keyset sync of {schema_name}.{table_name} requires a bucket '
             f'index. Create it with:\n  '
-            f'{index_ddl(fq_table_name, table_name, pk_columns, buckets, buckets)};'
+            f'{index_ddl(fq_table_name, table_name, pk_columns, buckets)};'
         )
-    found = parse_index_buckets(row[0])
-    if found != buckets:
-        return False, (
-            f'{index_name(table_name)} is built with {found} buckets but the tap is '
-            f'configured for {buckets}. Rebuild the index, or set '
-            f'keyset_buckets: {found}.'
-        )
+    if problems:
+        return False, '\n  '.join(problems)
     return True, None
 
 

@@ -321,6 +321,56 @@ selective. If your leading column has few distinct values, expect resumes to cos
 a full bucket scan, and prefer fewer, larger buckets so that fewer resumes happen.
 A fix that seeks properly is under investigation.
 
+## Choosing N
+
+`N` is `keyset_buckets`, default 3. Three things bound it, measured on a
+single-TServer cluster:
+
+**Merging holds to at least 512.** Verified at N = 3, 8, 16, 32, 64, 128, 256 and
+512: `Merge Streams` equals N every time, tablets equal N, and `SPLIT AT VALUES`
+emits N−1 boundaries. N = 1024 was not reached — not a merge limit
+(`yb_max_merge_scan_streams` maxes at 1024) but an index-build one: creating 1024
+tablets did not finish in 20 minutes.
+
+**The session setting is load-bearing and the server default is wrong for it.**
+`yb_max_merge_scan_streams` boots at `0`. On a 16-bucket index it flips exactly
+at N:
+
+| setting | plan | index rows to return 1 |
+|---|---|---|
+| 0 (server default) | `Sort` | 3,000 |
+| 15 (N−1) | `Sort` | 3,000 |
+| **16 (= N)** | **merge, 16 streams** | **16** |
+
+187× and a blocking sort, on the wrong side of a single integer. The tap sets
+`max(N, 8)`, which is always ≥ N.
+
+**For wide tables, choose N against row width, not just parallelism.** Peak
+memory per worker scales with *rows in the bucket × row width*, and narrow tables
+hide this completely:
+
+| table | rows in bucket | peak memory | per row |
+|---|---|---|---|
+| 3 columns, 500k rows | 166,477 | **65 kB** | 0.0004 kB |
+| 50 columns, ~4.8 kB/row | 9,863 | **50,675 kB** | 5.14 kB |
+| same, N raised 3 → 12 | 2,449 | **12,886 kB** | 5.26 kB |
+
+It is not a fetch-batch effect — varying `yb_fetch_row_limit` across 1024/256/64
+moved peak memory by under 1%. A wide table with 500k rows in one bucket would
+report around 2.5 GB. Raising N cuts it proportionally, because it cuts rows per
+bucket.
+
+**Skew erases parallelism without breaking anything.** Because the bucket hashes
+the primary key, ordinary keys spread evenly — but a pathological key set can
+land 99% of rows in one bucket, and then the sync is the slowest worker:
+measured, a 20,000/100/100 split caps speedup at 1.01× where an even 500k table
+reaches 2.32×. Correctness is unaffected and nothing reports the distribution.
+To check a table yourself:
+
+```sql
+SELECT (yb_hash_code(<pk>) % <N>) AS bucket, count(*) FROM <table> GROUP BY 1 ORDER BY 1;
+```
+
 ## `ANALYZE` before you read a plan
 
 A `Sort` in the plan usually means the bucket predicate or the index is wrong.

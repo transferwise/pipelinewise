@@ -573,3 +573,59 @@ class TestDeterministicErrorsAreNotRetried:
         from tap_yugabyte import retry
         assert '40001' not in retry.PERMANENT_SQLSTATES
         assert '40P01' not in retry.PERMANENT_SQLSTATES
+
+
+class TestRuntimeGateMatchesThePreflight:
+    """validate_index is the gate full_table.sync_table calls before taking the
+    bucketed parallel path; check_index is what the preflight tool calls. They
+    used to be separate implementations, and the runtime one was weaker -- it
+    checked existence and bucket count only. An index whose backfill never
+    completed passed it, and all N workers then sequentially scanned the whole
+    table with enable_seqscan off and the hint ignored."""
+
+    def _cursor(self, row):
+        class Cur:
+            def execute(self_inner, *_a, **_k):
+                pass
+
+            def fetchone(self_inner):
+                return row
+        return Cur()
+
+    def _row(self, **over):
+        shape = dict(
+            indexdef='CREATE UNIQUE INDEX t_pw_keyset ON s.t USING lsm '
+                     '(((yb_hash_code(id) % 3)) ASC, id ASC)',
+            unique=True, tablets=3, valid=True, ready=True, indoption=0)
+        shape.update(over)
+        return (shape['indexdef'], shape['unique'], shape['tablets'],
+                shape['valid'], shape['ready'], shape['indoption'])
+
+    def test_a_correct_index_passes(self):
+        usable, reason = keyset.validate_index(
+            self._cursor(self._row()), 's', 't', ['id'], 3)
+        assert usable is True and reason is None
+
+    def test_an_invalid_index_is_refused(self):
+        usable, reason = keyset.validate_index(
+            self._cursor(self._row(valid=False, ready=False)), 's', 't', ['id'], 3)
+        assert usable is False
+        assert 'not valid' in reason
+
+    def test_a_hashed_bucket_is_refused(self):
+        usable, reason = keyset.validate_index(
+            self._cursor(self._row(indoption=keyset.INDOPTION_HASH)), 's', 't', ['id'], 3)
+        assert usable is False
+        assert 'HASH' in reason
+
+    def test_a_single_tablet_is_refused(self):
+        usable, reason = keyset.validate_index(
+            self._cursor(self._row(tablets=1)), 's', 't', ['id'], 3)
+        assert usable is False
+        assert 'tablet' in reason
+
+    def test_a_missing_index_still_reports_the_ddl_to_run(self):
+        usable, reason = keyset.validate_index(
+            self._cursor(None), 's', 't', ['id'], 3)
+        assert usable is False
+        assert 'CREATE UNIQUE INDEX t_pw_keyset' in reason
