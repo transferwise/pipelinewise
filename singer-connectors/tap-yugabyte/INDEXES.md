@@ -31,8 +31,8 @@ deviate, and the failures are quiet.
 |---|---|
 | The bucket hashes the **primary key**, always — never the ordering column | For shapes 1 and 2 this is a hard requirement: a parallel worker owns one bucket and resumes on its primary-key cursor, so the bucket must be computable from that cursor. For shapes 3 and 4 it is a choice, and the reason is below |
 | `ASC` on the bucket, never `HASH` | `SPLIT AT VALUES` is rejected, so bucket→tablet placement is whatever the hash space gives you, and workers contend |
-| The primary key is the **last** thing in the index | The order is not total. A resume re-reads every row sharing the last value it saw, and the index cannot answer without a trip to the table |
-| `UNIQUE` | Free, because the primary key trails. It is what lets the index answer alone |
+| The primary key is the **last** thing in the index | The order stops being total, so the sequence of rows sharing one replication-key value is unspecified between runs. Combined with `UNIQUE` below, omitting it makes the `CREATE` fail outright rather than degrade quietly |
+| `UNIQUE` | Free, because the primary key trails — and that is the point: it turns a missing trailing primary key into a failed `CREATE INDEX` instead of a silently non-total order. (It is *not* what lets the index answer without touching the table; that is coverage, and a non-unique copy gives the same `Index Only Scan` with `Heap Fetches: 0`) |
 | `SPLIT AT VALUES` with N−1 boundaries | A range-sharded index gets **one** tablet. All N buckets land on it, the parallelism buys nothing, and the workers contend on a single tablet |
 | One N everywhere — index, tap config, every table | The scan names bucket values the index does not have. Full table scan |
 
@@ -277,7 +277,7 @@ YugabyteDB 2026.1.1.1).
 | No index, hash PK, resume at the halfway point | Sequential scan of all 50,000 rows and a blocking 3,112 kB quicksort, to return 25,000. Nothing is emitted until the whole table has been read and sorted. With the index: 8,391 index rows, 81 kB, streaming |
 | `SPLIT AT VALUES` omitted | 1 tablet instead of 3. Reported by the preflight |
 | Bucket declared `HASH` instead of `ASC` | `SPLIT AT VALUES` rejected outright |
-| Primary key omitted from the trailing columns | Resume re-reads the whole group of rows sharing the last timestamp seen, every run |
+| Primary key omitted from the trailing columns | `CREATE UNIQUE INDEX` fails with a duplicate-key error, which is the intended outcome. Drop `UNIQUE` as well and it succeeds, leaving a non-total order — the drain then plans as a blocking external merge sort (2,432 kB measured) instead of a 3-stream merge. It does **not** change tie re-reading: that comes from the bookmark, not the index, and was measured identical with and without the trailing key |
 | `ORDER BY` written as a row constructor — `ORDER BY (a, b)` | Opaque to the planner: a blocking sort where the index could have supplied the order. 48 MB spill against 81 kB streaming |
 | Capturing a plan on a table that has never been `ANALYZE`d | Not a mistake in the index — but see the note below before reading a `Sort` as one |
 | Keyset resume written as a row constructor — `WHERE (a, b) > (%s, %s)` | Reads `Index Cond`, so the plan looks correct, but every remaining index entry in the bucket is read and dropped. The tap emits an expanded form instead — but see the composite-key limitation below, which is not yet fixed |
