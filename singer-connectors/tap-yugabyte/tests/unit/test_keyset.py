@@ -174,3 +174,33 @@ class TestMergeScan:
 
     def test_guc_has_a_floor_for_small_bucket_counts(self):
         assert keyset.merge_scan_guc_sql(3) == 'SET yb_max_merge_scan_streams = 8'
+
+
+class TestLeadingColumnOrdering:
+    """Whether a column leads an index in sorted order decides if it can bound a range."""
+
+    @pytest.mark.parametrize('indexdef,column,expected', [
+        # range-sharded primary key: the column leads it, sorted
+        ('CREATE UNIQUE INDEX t_pkey ON s.t USING lsm (id ASC)', 'id', True),
+        ('CREATE UNIQUE INDEX t_pkey ON s.t USING lsm (id DESC)', 'id', True),
+        ('CREATE UNIQUE INDEX i ON s.t USING lsm (created_at ASC, id ASC)',
+         'created_at', True),
+        # hash-sharded: ordered by hash, which says nothing about the column's order
+        ('CREATE UNIQUE INDEX t_pkey ON s.t USING lsm (id HASH)', 'id', False),
+        ('CREATE UNIQUE INDEX t_pkey ON s.t USING lsm (tenant HASH, id ASC)',
+         'tenant', False),
+        # the column is present but does not lead
+        ('CREATE UNIQUE INDEX i ON s.t USING lsm (tenant ASC, id ASC)', 'id', False),
+        # a bucket index leads with the discriminator, never with the key
+        ('CREATE UNIQUE INDEX t_pw_keyset ON s.t USING lsm '
+         '(((yb_hash_code(id) % 3)) HASH, id ASC)', 'id', False),
+    ])
+    def test_leading_column_detection(self, indexdef, column, expected):
+        assert keyset._leading_column_is_ordered(indexdef, column) is expected
+
+
+class TestStrategyNames:
+    def test_strategies_are_distinct(self):
+        names = {keyset.STRATEGY_PK_RANGE, keyset.STRATEGY_BUCKET_INDEX,
+                 keyset.STRATEGY_PLAIN_SCAN}
+        assert len(names) == 3

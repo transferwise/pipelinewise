@@ -19,6 +19,8 @@ against the live index rather than trusted from config.
 
 import re
 
+import psycopg2
+
 BUCKETS_DEFAULT = 3
 INDEX_SUFFIX = '_pw_keyset'
 
@@ -293,3 +295,180 @@ def replication_key_warnings(candidate, pk_columns, sequence_cache_minval=None):
             f'transaction, or use LOG_BASED.'
         )
     return warnings
+
+
+# --------------------------------------------------------------- eligibility
+
+STRATEGY_PK_RANGE = 'pk_range'
+STRATEGY_BUCKET_INDEX = 'bucket_index'
+STRATEGY_PLAIN_SCAN = 'plain_scan'
+
+_SHARDING_SQL = """
+SELECT c.relkind, p.num_hash_key_columns, p.num_tablets
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+CROSS JOIN LATERAL yb_table_properties(c.oid) p
+WHERE n.nspname = %s AND c.relname = %s
+"""
+
+# An index can serve ordered range access on `column` when that column leads it
+# and is stored in sorted order. A HASH leading column cannot: it is ordered by
+# hash, which has nothing to do with the column's own ordering.
+_RANGE_INDEX_SQL = """
+SELECT i.relname,
+       pg_get_indexdef(i.oid)                       AS indexdef,
+       x.indpred IS NOT NULL                        AS is_partial,
+       pg_get_expr(x.indpred, x.indrelid)           AS predicate
+FROM pg_index x
+JOIN pg_class i ON i.oid = x.indexrelid
+JOIN pg_class c ON c.oid = x.indrelid
+JOIN pg_namespace n ON n.oid = c.relnamespace
+JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum = x.indkey[0]
+WHERE n.nspname = %s AND c.relname = %s AND a.attname = %s
+"""
+
+
+_KEYSET_INDEX_SQL = """
+SELECT i.relname, pg_get_indexdef(i.oid)
+FROM pg_index x
+JOIN pg_class i ON i.oid = x.indexrelid
+JOIN pg_class c ON c.oid = x.indrelid
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname = %s AND c.relname = %s
+  AND x.indkey[0] = 0
+  AND pg_get_indexdef(i.oid) LIKE '%%yb_hash_code%%'
+"""
+
+
+def _hashable(cur, type_name):
+    """Whether yb_hash_code accepts this type.
+
+    Probed against a NULL literal rather than a type allow-list: it costs no
+    storage read, it is authoritative for the server actually being talked to,
+    and the set of accepted types is not something the tap should be tracking.
+    Runs inside a savepoint because the rejection is an error, which would
+    otherwise poison the surrounding transaction.
+    """
+    cur.execute('SAVEPOINT yb_hash_probe')
+    try:
+        cur.execute(f'SELECT yb_hash_code(NULL::{type_name})')
+        cur.fetchone()
+        cur.execute('RELEASE SAVEPOINT yb_hash_probe')
+        return True
+    except psycopg2.Error:
+        cur.execute('ROLLBACK TO SAVEPOINT yb_hash_probe')
+        return False
+
+
+def _leading_column_is_ordered(indexdef, column):
+    """True when `column` leads the index in sorted, not hashed, order."""
+    inside = indexdef[indexdef.index('(') + 1:]
+    leading = inside.split(',')[0].strip()
+    return leading.startswith(f'{column} ') and 'HASH' not in leading
+
+
+# pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-return-statements
+def plan_keyset_strategy(cur, schema_name, table_name, pk_columns, pk_types, buckets):
+    """Decide how this table can be scanned, and what creating the index would need.
+
+    Three outcomes, in descending order of preference:
+
+    `pk_range`    the primary key is already range-sharded, so it is directly
+                  scannable in key order and no extra index is wanted -- adding
+                  one would cost writes for nothing.
+    `bucket_index` the key is hash-sharded, so ordered access needs the bucket
+                  index; `index_ddl` is the statement that would create it.
+    `plain_scan`  nothing can give ordered access, so the sync is a single
+                  non-resumable pass. `blockers` says why.
+    """
+    cur.execute(_SHARDING_SQL, (schema_name, table_name))
+    row = cur.fetchone()
+    if row is None:
+        return {'strategy': STRATEGY_PLAIN_SCAN, 'index_ddl': None,
+                'blockers': [f'{schema_name}.{table_name} was not found']}
+    relkind, num_hash_key_columns, num_tablets = row[0], row[1], row[2]
+
+    if relkind in ('v', 'm'):
+        return {'strategy': STRATEGY_PLAIN_SCAN, 'index_ddl': None,
+                'blockers': ['a view has no primary key and cannot be indexed']}
+
+    if not pk_columns:
+        return {'strategy': STRATEGY_PLAIN_SCAN, 'index_ddl': None,
+                'blockers': ['the table has no primary key to page on']}
+
+    if num_hash_key_columns == 0:
+        # already ordered by the key itself; the bucket index would be pure overhead
+        return {'strategy': STRATEGY_PK_RANGE, 'index_ddl': None, 'blockers': []}
+
+    unhashable = [c for c, t in zip(pk_columns, pk_types) if not _hashable(cur, t)]
+    if unhashable:
+        return {
+            'strategy': STRATEGY_PLAIN_SCAN, 'index_ddl': None,
+            'blockers': [
+                f'yb_hash_code does not accept {", ".join(unhashable)}, so the '
+                f'bucket discriminator cannot be computed'
+            ],
+        }
+
+    fq_table_name = f'"{schema_name}"."{table_name}"'
+    return {
+        'strategy': STRATEGY_BUCKET_INDEX,
+        'index_ddl': index_ddl(fq_table_name, table_name, pk_columns, buckets,
+                               tablets=num_tablets or buckets),
+        'blockers': [],
+    }
+
+
+def plan_partial_sync(cur, schema_name, table_name, boundary_column, start_value=None):
+    """Decide whether a PartialSync boundary can be served by an index.
+
+    PartialSync bounds an arbitrary configured column, not the primary key, so
+    the keyset index built for full-table sync does nothing for it. What it needs
+    is an index that column leads in sorted order.
+
+    When the boundary has a fixed lower bound, a partial index over just that
+    range is the cheaper answer: it indexes the rows being synced instead of the
+    whole table. It only applies while queries stay inside its predicate -- a
+    boundary that later moves below `start_value` silently stops using it -- so
+    it is offered, never created implicitly.
+    """
+    cur.execute(_RANGE_INDEX_SQL, (schema_name, table_name, boundary_column))
+    usable, partial = [], []
+    for name, indexdef, is_partial, predicate in cur.fetchall():
+        if not _leading_column_is_ordered(indexdef, boundary_column):
+            continue
+        (partial if is_partial else usable).append((name, predicate))
+
+    if usable:
+        return {'indexed': True, 'index': usable[0][0], 'partial_indexes': partial,
+                'suggestion': None, 'via_bucket_index': None, 'note': None}
+
+    # A bucket index does not lead with the boundary column -- the discriminator
+    # does -- so no column-name lookup finds it. It can still serve the range,
+    # but only if the query names every bucket, which lets the index bound the
+    # trailing key and the merge scan put the streams back in order. That is a
+    # change to the PartialSync predicate, not something an index alone provides.
+    cur.execute(_KEYSET_INDEX_SQL, (schema_name, table_name))
+    for name, indexdef in cur.fetchall():
+        keys = indexdef[indexdef.index('(') + 1:].split(',')
+        if len(keys) > 1 and keys[1].strip().startswith(f'{boundary_column} '):
+            return {
+                'indexed': False, 'index': None, 'partial_indexes': partial,
+                'suggestion': None,
+                'via_bucket_index': name,
+                'note': (
+                    f'{name} can bound this range if the PartialSync predicate also '
+                    f'names every bucket, as the full-table scan does. Without that '
+                    f'the boundary is a full scan.'
+                ),
+            }
+
+    fq_table_name = f'"{schema_name}"."{table_name}"'
+    suggestion = (
+        f'CREATE INDEX {table_name}_pw_partial ON {fq_table_name} '
+        f'("{boundary_column}" ASC)'
+    )
+    if start_value is not None:
+        suggestion += f" WHERE \"{boundary_column}\" >= '{start_value}'"
+    return {'indexed': False, 'index': None, 'partial_indexes': partial,
+            'suggestion': suggestion, 'via_bucket_index': None, 'note': None}
