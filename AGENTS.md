@@ -56,8 +56,9 @@ An unavoidable host run must activate `.virtualenvs/pipelinewise/`. Keep paths
 and flags exact: Ruff checks all repository Python except connector tests outside
 existing GitHub connector CI, including integration suites, legacy tests, and
 spikes. This includes data-diff, root E2E, vendored connector source, and the
-tap-mysql, tap-postgres, and target-snowflake unit suites run by connector CI.
-Never run bare `pytest tests/` because it collects credentialed E2E. Collect
+tap-mysql, tap-postgres, tap-yugabyte, and target-snowflake unit suites run by
+connector CI. Never run bare `pytest tests/` because it collects credentialed
+E2E. Collect
 nested data-diff/backend-db tests from `tests/units`, narrowing with `-k` to
 avoid import failures.
 

@@ -1,0 +1,19 @@
+services:
+  yugabyte:
+    image: yugabytedb/yugabyte:2026.1.1.1-b2
+    container_name: "yugabyte"
+    command: >
+      bin/yugabyted start --background=false
+    ports:
+      - "5433:5433"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "bash",
+          "-c",
+          "bin/yugabyted status | grep -q 'Status.*Running'",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 15

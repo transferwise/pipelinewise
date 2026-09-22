@@ -39,6 +39,7 @@ from .errors import (
 )
 
 from pipelinewise.fastsync.commons.tap_postgres import FastSyncTapPostgres
+from pipelinewise.fastsync.commons.tap_yugabyte import FastSyncTapYugabyte
 from pipelinewise.fastsync.commons import utils as fastsync_utils
 from pipelinewise.cli.multiprocess import Process
 from pipelinewise.data_diff.repository import DataDiffRepository
@@ -2760,17 +2761,26 @@ TAP RUN SUMMARY
         """
         self.logger.info('Deleting tap "%s" config', tap_id)
 
-        if tap_type == 'tap-postgres':
+        if tap_type in ('tap-postgres', 'tap-yugabyte'):
             # drop the slot if it exists
             self.logger.info('Dropping tap "%s" slot on the DB', tap_id)
             tap_config = utils.load_json(Config.get_connector_config_file(
                 self.get_tap_dir(target_id, tap_id)
             ))
             if tap_config:
-                FastSyncTapPostgres.drop_slot(
-                    tap_config,
-                    allow_unsupported_version_for_config_removal=True,
-                )
+                if tap_type == 'tap-postgres':
+                    FastSyncTapPostgres.drop_slot(
+                        tap_config,
+                        allow_unsupported_version_for_config_removal=True,
+                    )
+                else:
+                    # Slot cleanup runs in-process from the main pipelinewise venv, whose stock
+                    # psycopg2-binary rejects the YugabyteDB driver's load balancing options.
+                    FastSyncTapYugabyte.drop_slot({
+                        key: value
+                        for key, value in tap_config.items()
+                        if key not in ('load_balance', 'topology_keys')
+                    })
 
         utils.silentremove(self.get_tap_dir(target_id, tap_id))
 

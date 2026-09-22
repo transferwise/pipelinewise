@@ -124,7 +124,7 @@ def test_root_ci_dependencies_and_policy_use_ruff():
 
     connector_workflow = (REPOSITORY_ROOT / '.github/workflows/connectors.yml').read_text()
     ci_tested_connectors = set(re.findall(r'^\s+- connector: ([\w-]+)$', connector_workflow, re.MULTILINE))
-    assert ci_tested_connectors == {'tap-mysql', 'tap-postgres', 'target-snowflake'}
+    assert ci_tested_connectors == {'tap-mysql', 'tap-postgres', 'tap-yugabyte', 'target-snowflake'}
 
     connector_test_dirs = {
         str(path.relative_to(REPOSITORY_ROOT))

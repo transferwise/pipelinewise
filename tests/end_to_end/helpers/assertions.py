@@ -648,6 +648,14 @@ def _map_tap_to_target_functions(
             'source_sql_get_cols_fn': db.sql_get_columns_postgres,
             'source_sql_dynamic_row_count_fn': db.sql_dynamic_row_count_postgres,
         },
+        # tap-yugabyte specific attributes and functions
+        'run_query_tap_yugabyte': {
+            'source_schemas': ['public', 'public2'],
+            'target_schemas': [f'ppw_e2e_tap_yugabyte{schema_postfix}',
+                                f'ppw_e2e_tap_yugabyte_public2{schema_postfix}'],
+            'source_sql_get_cols_fn': db.sql_get_columns_postgres,
+            'source_sql_dynamic_row_count_fn': db.sql_dynamic_row_count_postgres,
+        },
         # target-postgres specific attributes and functions
         'run_query_target_postgres': {
             'target_sql_get_cols_fn': db.sql_get_columns_postgres,
