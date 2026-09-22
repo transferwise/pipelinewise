@@ -65,7 +65,7 @@ def check_full_table(cur, schema_name, table_name, buckets):
     return BLOCK, plan['blockers'], []
 
 
-def check_incremental(cur, schema_name, table_name, replication_key):
+def check_incremental(cur, schema_name, table_name, replication_key, buckets):
     """INCREMENTAL pages by the replication key, so the key -- not the primary
     key -- is what has to be indexed, non-null and actually increasing."""
     if not replication_key:
@@ -82,17 +82,38 @@ def check_incremental(cur, schema_name, table_name, replication_key):
         notes.extend(key['hard_failures'])
     notes.extend(key['risks'])
 
-    served = keyset.plan_partial_sync(cur, schema_name, table_name, replication_key)
-    if served['indexed']:
-        notes.append(f"{replication_key} is ordered by {served['index']}, so the "
-                     f"watermark query can bound itself.")
+    # the bucketed index is what INCREMENTAL wants, and it does not lead with the
+    # key -- the discriminator does -- so no column-name lookup will find it
+    cur.execute(
+        "SELECT pg_get_indexdef(i.oid) FROM pg_index x "
+        'JOIN pg_class i ON i.oid = x.indexrelid '
+        'JOIN pg_class c ON c.oid = x.indrelid '
+        'JOIN pg_namespace n ON n.oid = c.relnamespace '
+        'WHERE n.nspname = %s AND c.relname = %s AND i.relname = %s',
+        (schema_name, table_name,
+         keyset.replication_key_index_name(table_name, replication_key)))
+    bucketed = cur.fetchone()
+
+    if bucketed:
+        found = keyset.parse_index_buckets(bucketed[0])
+        notes.append(f'{replication_key} is bucketed by '
+                     f'{keyset.replication_key_index_name(table_name, replication_key)} '
+                     f'({found} buckets), so the watermark query bounds itself and the '
+                     f'write tail is spread across {found} tablets.')
     else:
+        served = keyset.plan_partial_sync(cur, schema_name, table_name, replication_key)
+        if served['indexed']:
+            notes.append(f"{replication_key} is ordered by {served['index']}, which bounds "
+                         f'the watermark query but puts every insert on one tablet: a '
+                         f'replication key only ever increases, so it lands at the tail.')
+        else:
+            notes.append(f'No index bounds {replication_key}, so every run scans the whole '
+                         f'table to find its rows.')
         if status != BLOCK:
             status = ACTION
-        notes.append(f'No index leads with {replication_key} in sorted order, so '
-                     f'every run scans the whole table to find its rows.')
-        ddl.append(f'CREATE INDEX {table_name}_{replication_key}_idx ON '
-                   f'"{schema_name}"."{table_name}" ("{replication_key}" ASC);')
+        fq_table_name = f'"{schema_name}"."{table_name}"'
+        ddl.append(keyset.replication_key_index_ddl(
+            fq_table_name, table_name, replication_key, buckets) + ';')
 
     if key.get('tiebreaker'):
         notes.append(f"{replication_key} is not unique; rows sharing a value need "
@@ -107,7 +128,7 @@ def check_table(cur, schema_name, table, buckets):
         return check_full_table(cur, schema_name, table_name, buckets)
     if method == 'INCREMENTAL':
         return check_incremental(cur, schema_name, table_name,
-                                 table.get('replication_key'))
+                                 table.get('replication_key'), buckets)
     if method == 'LOG_BASED':
         return OK, ['LOG_BASED reads the change stream, so it needs no index. '
                     'It does need the table to have a replica identity that can '

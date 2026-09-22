@@ -1,3 +1,4 @@
+# The config a service owner maintains. tools/yb_index_check.py reads this.
 id: "tap_yugabyte"
 type: "tap-yugabyte"
 schemas:
@@ -10,8 +11,13 @@ schemas:
       - table_name: "event"
         replication_method: "INCREMENTAL"
         replication_key: "created_at"
+      - table_name: "invoice"
+        replication_method: "INCREMENTAL"
+        replication_key: "createdat"
       - table_name: "ledger"
         replication_method: "INCREMENTAL"
         replication_key: "id"
       - table_name: "batch"
+        replication_method: "FULL_TABLE"
+      - table_name: "audit_log"
         replication_method: "FULL_TABLE"
