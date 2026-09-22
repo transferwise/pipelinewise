@@ -397,6 +397,27 @@ small delta will plan with a sort. Run `ANALYZE` on the table before capturing a
 plan to check it against this document, or you will be reading a statistics
 problem as an index problem.
 
+## Create these indexes outside a transaction block
+
+YugabyteDB cannot build an index concurrently inside a transaction, and says so:
+
+```
+NOTICE:  making create index for table "t" nonconcurrent
+DETAIL:  Create index in transaction block cannot be concurrent.
+HINT:   Consider running it outside of a transaction block.
+```
+
+Observed on this cluster when the rule is ignored: `pg_index` reports
+`indisvalid = true, indisready = true`, the session that ran the transaction sees
+its rows, and **a fresh session sees none** — neither through the index nor
+through the table. The preflight reports `OK`, because as far as the catalog is
+concerned the index is perfect.
+
+Run each `CREATE UNIQUE INDEX` as its own statement, not wrapped in
+`BEGIN`/`COMMIT`, and not inside a migration that batches DDL into one
+transaction. If you have to serialise a batch of these, note that YugabyteDB
+serialises index backfills within a database anyway, so batching buys nothing.
+
 ## Checking a config before you run it
 
 ```bash

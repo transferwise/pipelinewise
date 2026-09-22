@@ -103,15 +103,16 @@ def keyset_predicate(columns, after=True):
 
         a >= %s AND (a > %s OR b >= %s) AND (a > %s OR b > %s OR c > %s)
 
-    KNOWN LIMITATION, composite keys only. Only the leading column reaches the
-    Index Cond; the rest is a storage filter over the whole leading-value group.
-    A resume therefore costs the size of that group, not the rows returned, and
-    the numbers above hold only because the test data had a high-cardinality
-    leading column (33 rows per value). With a low-cardinality leading column --
-    a tenant, a region, a status code -- the group is the whole bucket and the
-    expansion buys nothing: measured 1,991 index rows to return 5 on a table
-    whose leading column is constant. A form that seeks properly is under
-    investigation; see INDEXES.md. Single-column keys are unaffected.
+    On a composite key only the leading column reaches the Index Cond; the rest
+    is a storage filter over the whole leading-value group, so the cost is the
+    size of that group rather than the rows returned. That is fine for the
+    UPPER bound (`after=False`), which is a stop condition on a scan that is
+    going to read to the end of the bucket anyway -- the last leading-value
+    group is the most it can over-read, and max_pk_values is the table's actual
+    maximum, so in practice nothing lies beyond it.
+
+    It is NOT fine for the resume bound, which is a seek: see `keyset_branches`,
+    which is what `_scan_bucket` uses to restart a composite-key scan.
 
     A single-column key needs none of this -- `(a) > (%s)` already collapses to
     `a > %s` -- and it is emitted as the plain comparison.
@@ -142,6 +143,73 @@ def keyset_params(values, order):
     """Lay the caller's values out in the order keyset_predicate's placeholders
     consume them."""
     return [values[i] for i in order]
+
+
+def keyset_branches(columns):
+    """The resume comparison as a LADDER OF STATEMENTS rather than one predicate.
+
+    `key > (X, Y, Z)` is the union of one range per equality prefix, and each of
+    those ranges is something the index can seek to exactly:
+
+        a = X AND b = Y AND c > Z      -- the rest of the (X, Y) group
+        a = X AND b > Y                -- the rest of the X group
+        a > X                          -- everything after X
+
+    They are disjoint, they are consecutive, and listed in this order they are
+    in ascending key order. The caller issues them as separate statements, in
+    order, on one connection: see full_table._scan_bucket.
+
+    WHY NOT ONE STATEMENT. Every single-statement form is worse:
+
+    A row constructor, `(a, b, c) > (X, Y, Z)`, reads as an Index Cond and then
+    rechecks every remaining entry in the bucket -- see keyset_predicate.
+
+    The conjunctive expansion keyset_predicate returns gets the leading column
+    into the Index Cond and nothing else, so the scan starts at the head of the
+    leading-value GROUP and storage-filters its way forward. Measured, full
+    drain, no LIMIT, cursor five rows from the end, keyset index used every
+    time: 250 distinct leading values -> 135 index rows scanned to return 5;
+    a three-column key -> 662 to return 5; a constant leading column -> 33,220
+    to return 5, the entire bucket. Composite keys with a low-cardinality
+    leading column -- (tenant_id, id), (region, id) -- are the common case in
+    the services this ships to, so the last row is the realistic one.
+
+    `UNION ALL` of these same branches in one statement gets the same optimal
+    seek, and was rejected anyway. Its ordering rests on `Append` emitting
+    children in branch order, which neither SQL nor PostgreSQL guarantees. It
+    held in testing only because `DECLARE CURSOR` suppresses parallelism
+    (measured: 0 parallel workers through the named cursor, 6 for the identical
+    statement under plain EXPLAIN). Let costing ever put a Gather above the
+    Append and `Parallel Append` reorders children deliberately -- and
+    _scan_bucket bookmarks the last row it emitted, so a reorder walks the
+    bookmark BACKWARDS and rows are dropped silently on the next resume.
+
+    Adding an outer `ORDER BY` over the UNION ALL to force the order is worse
+    still: it puts a blocking Sort on the equality-prefix branch -- 1,807 kB
+    resuming from the midpoint, 3,194 kB from the start of the degenerate
+    fixture -- a full blocking sort of the bucket, in exactly the case this
+    exists to fix.
+
+    Splitting into statements moves the ordering guarantee somewhere it is
+    actually guaranteed. Within a statement it is the ORDER BY; between
+    statements it is the caller's own loop. The bookmark therefore advances
+    monotonically by construction, and the silent-loss risk is gone rather than
+    merely unobserved.
+
+    A SINGLE-COLUMN KEY YIELDS EXACTLY ONE BRANCH, `a > %s` -- byte for byte
+    the statement this path has always issued. That is not a coincidence to be
+    preserved by hand; it falls out of the ladder having one rung.
+
+    Returns [(sql, parameter_order), ...] most-specific first, with
+    parameter_order in the shape keyset_params consumes.
+    """
+    cols = quoted(columns)
+    branches = []
+    for i in range(len(cols) - 1, -1, -1):
+        terms = [f'{cols[j]} = %s' for j in range(i)]
+        terms.append(f'{cols[i]} > %s')
+        branches.append((' AND '.join(terms), list(range(i + 1))))
+    return branches
 
 
 def bucket_in_sql(pk_columns, buckets, escape_percent=False):

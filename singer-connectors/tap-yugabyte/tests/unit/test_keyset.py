@@ -65,6 +65,97 @@ class TestKeysetPredicate:
             assert ') >' not in sql
 
 
+class TestKeysetBranches:
+    """The resume, laddered into one statement per equality prefix.
+
+    The conjunctive expansion above bounds only the leading column, so a resume
+    costs the size of the leading-value group: measured 135 index rows to
+    return 5 with 250 distinct leading values, 662 with a three-column key, and
+    33,220 -- the whole bucket -- with a constant leading column. Stating the
+    prefix as an equality is what gets the whole prefix into the Index Cond.
+    """
+
+    def test_single_column_is_one_branch_and_unchanged(self):
+        # the single-column path must not regress: one statement, and the same
+        # statement keyset_predicate has always produced
+        branches = keyset.keyset_branches(['id'])
+        assert branches == [('"id" > %s', [0])]
+        assert branches[0][0] == keyset.keyset_predicate(['id'])[0]
+        assert keyset.keyset_params([7], branches[0][1]) == [7]
+
+    def test_two_columns_ladder_most_specific_first(self):
+        branches = keyset.keyset_branches(['tenant', 'id'])
+        assert [sql for sql, _ in branches] == [
+            '"tenant" = %s AND "id" > %s',
+            '"tenant" > %s',
+        ]
+        assert [keyset.keyset_params(['t', 9], order) for _, order in branches] == [
+            ['t', 9], ['t'],
+        ]
+
+    def test_three_columns_ladder_most_specific_first(self):
+        branches = keyset.keyset_branches(['a', 'b', 'c'])
+        assert [sql for sql, _ in branches] == [
+            '"a" = %s AND "b" = %s AND "c" > %s',
+            '"a" = %s AND "b" > %s',
+            '"a" > %s',
+        ]
+        assert [keyset.keyset_params([1, 2, 3], order) for _, order in branches] == [
+            [1, 2, 3], [1, 2], [1],
+        ]
+
+    @pytest.mark.parametrize('columns', [['id'], ['a', 'b'], ['a', 'b', 'c'],
+                                         ['a', 'b', 'c', 'd']])
+    def test_one_branch_per_key_column(self, columns):
+        assert len(keyset.keyset_branches(columns)) == len(columns)
+
+    @pytest.mark.parametrize('columns', [['id'], ['a', 'b'], ['a', 'b', 'c']])
+    def test_every_branch_ends_in_the_only_inequality(self, columns):
+        # exactly one open end per branch is what makes it a seek: everything
+        # before it is pinned, so the Index Cond can position on the prefix
+        for sql, _ in keyset.keyset_branches(columns):
+            assert sql.count('>') == 1
+            assert sql.endswith('> %s')
+            assert '<' not in sql
+            assert 'OR' not in sql
+            assert 'ROW(' not in sql
+
+    @pytest.mark.parametrize('columns', [['id'], ['a', 'b'], ['a', 'b', 'c']])
+    def test_branches_partition_every_key_above_the_bound(self, columns):
+        """Disjoint, exhaustive, and in ascending order -- the three properties
+        the sequential loop and the bookmark both rest on."""
+        width = len(columns)
+        bound = tuple([2] * width)
+        universe = [tuple(t) for t in _tuples(width, range(1, 5))]
+
+        def matched(order, values):
+            prefix = len(order) - 1
+            return [key for key in universe
+                    if key[:prefix] == values[:prefix] and key[prefix] > values[prefix]]
+
+        selections = [matched(order, bound) for _, order in keyset.keyset_branches(columns)]
+
+        # exhaustive: together they are exactly the keys above the bound
+        assert sorted(k for sel in selections for k in sel) == \
+            sorted(k for k in universe if k > bound)
+        # disjoint: no key is selected twice
+        flat = [k for sel in selections for k in sel]
+        assert len(flat) == len(set(flat))
+        # ascending: concatenating the branches in order, each sorted within
+        # itself, is already globally sorted -- which is what lets the tap's own
+        # loop supply the ordering that a UNION ALL's Append would not
+        assert [k for sel in selections for k in sorted(sel)] == sorted(flat)
+
+
+def _tuples(width, values):
+    if width == 0:
+        yield []
+        return
+    for head in values:
+        for tail in _tuples(width - 1, values):
+            yield [head] + tail
+
+
 class TestIndexDefinition:
     def test_ddl_hash_shards_the_bucket_and_range_orders_the_key(self):
         ddl = keyset.index_ddl('s.orders', 'orders', ['tenant', 'id'], 8, tablets=8)

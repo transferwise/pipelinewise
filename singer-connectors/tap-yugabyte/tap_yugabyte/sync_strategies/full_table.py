@@ -8,8 +8,23 @@ concurrently, one connection per bucket, rather than serialised behind a single
 cursor.
 
 Every statement here is a SELECT and every bucket bookmarks its own position, so
-a failed scan is restarted rather than repaired: the replacement query is rebuilt
-from the bucket's current bookmark and picks up where the stream stopped.
+a failed scan is restarted rather than repaired: the replacement statements are
+rebuilt from the bucket's current bookmark and pick up where the stream stopped.
+
+A resumed bucket is more than one statement. A composite key only seeks when the
+equality prefix of the bookmark is stated as an equality, so the resume is issued
+as one statement per prefix, in ascending order, sequentially -- see
+keyset.keyset_branches and _scan_bucket.
+
+One consequence is worth stating plainly. The rungs share a connection and a
+transaction but not a snapshot: READ COMMITTED gives each statement its own, and
+that is live here rather than mapped away (measured on this cluster -- a value
+committed by another session between two statements of one transaction was
+visible to the second). So a resumed bucket reads at several instants where it
+used to read at one. It is the same inconsistency the sync already carries
+between buckets and across retries, not a new kind, and `snapshot_hybrid_time`
+removes it here exactly as it does there by pinning every statement on the
+connection to one hybrid time.
 """
 
 import copy
@@ -182,7 +197,13 @@ def _scan_bucket(conn_info, stream, state, desired_columns, md_map, pk_columns,
                  stream_version, time_extracted, emit, read_bookmark, counter):
     """Read one bucket to completion on its own connection.
 
-    The statement is rebuilt from the bucket's bookmark on every attempt, so a
+    A fresh bucket is one statement. A RESUMED bucket is a short ordered
+    sequence of them -- one per equality prefix of the bookmarked key, most
+    specific first -- because that is the only shape that makes a composite key
+    seek. See keyset.keyset_branches for why every single-statement form was
+    rejected; a single-column key still yields exactly one statement.
+
+    The sequence is rebuilt from the bucket's bookmark on every attempt, so a
     retry after a read restart or a lost connection resumes from the last row
     that reached the target instead of replaying the bucket.
     """
@@ -194,47 +215,97 @@ def _scan_bucket(conn_info, stream, state, desired_columns, md_map, pk_columns,
     hybrid_time = conn_info.get('snapshot_hybrid_time')
     proc = conn_info.get('yb_read_time_proc')
 
-    def scan():
-        predicates = [f'{bucket_sql} = {bucket}']
-        params = []
-        last_pk_values = read_bookmark(bucket)
-        if last_pk_values:
-            # not a row constructor: see keyset.keyset_predicate. With the bucket
-            # leading the index, `(a, b) > (%s, %s)` is accepted as an Index Cond
-            # and then rechecked against every remaining entry in the bucket.
-            sql, order = keyset.keyset_predicate(pk_columns, after=True)
-            predicates.append(sql)
-            params.extend(keyset.keyset_params(last_pk_values, order))
+    def statements(last_pk_values):
+        """The statements this attempt has to run, in the order it must run them.
+
+        Every one of them carries the bucket equality and, when the scan is
+        bounded, the upper bound -- which stays the conjunctive expansion,
+        because it is a stop condition rather than a seek (see
+        keyset.keyset_predicate).
+
+        Only the lower bound is laddered, and only when there is one: with no
+        bookmark there is nothing to resume past, so the list is the single
+        unbounded-below statement this path has always issued.
+        """
+        upper_sql, upper_params = None, []
         if max_pk_values:
             sql, order = keyset.keyset_predicate(pk_columns, after=False)
-            predicates.append(sql)
-            params.extend(keyset.keyset_params(max_pk_values, order))
-        select_sql = (f"{keyset.index_hint(table_name)} "
-                      f"SELECT {','.join(escaped)} FROM {fq_table_name} "
-                      f'WHERE {" AND ".join(predicates)} '
-                      f'ORDER BY {keyset.order_by_sql(pk_columns)}')
+            upper_sql = sql
+            upper_params = keyset.keyset_params(max_pk_values, order)
+
+        if last_pk_values:
+            lower_bounds = [(sql, keyset.keyset_params(last_pk_values, order))
+                            for sql, order in keyset.keyset_branches(pk_columns)]
+        else:
+            lower_bounds = [(None, [])]
+
+        built = []
+        for lower_sql, lower_params in lower_bounds:
+            predicates = [f'{bucket_sql} = {bucket}']
+            params = []
+            if lower_sql is not None:
+                predicates.append(lower_sql)
+                params.extend(lower_params)
+            if upper_sql is not None:
+                predicates.append(upper_sql)
+                params.extend(upper_params)
+            built.append((
+                f'{keyset.index_hint(table_name)} '
+                f"SELECT {','.join(escaped)} FROM {fq_table_name} "
+                f'WHERE {" AND ".join(predicates)} '
+                f'ORDER BY {keyset.order_by_sql(pk_columns)}',
+                params))
+        return built
+
+    def scan():
+        # rebuilt here, not once outside: on a retry the bookmark has advanced
+        # past everything this attempt already emitted, and the ladder built
+        # from it covers exactly the remainder. Hoisting this out of the retry
+        # would replay from the position the scan started at.
+        branches = statements(read_bookmark(bucket))
 
         with _open_reader(conn_info, hybrid_time, proc) as conn:
             with conn.cursor() as setup:
                 if keyset.merge_scan_available(setup):
                     for setting in keyset.scan_settings_sql(buckets):
                         setup.execute(setting)
-            with conn.cursor(cursor_factory=psycopg2.extras.DictCursor,
-                             name=f'stitch_cursor_bucket_{bucket}') as cur:
-                cur.itersize = yb_db.CURSOR_ITER_SIZE
-                LOGGER.info('bucket %s: select %s with itersize %s, params %s',
-                            bucket, select_sql, cur.itersize, params)
-                cur.execute(select_sql, params)
-                rows_saved = 0
-                for rec in cur:
-                    message = yb_db.selected_row_to_singer_message(
-                        stream, rec, stream_version, desired_columns,
-                        time_extracted, md_map)
-                    rows_saved += 1
-                    emit(message, bucket, [rec[i] for i in pk_indices],
-                         flush=rows_saved % UPDATE_BOOKMARK_PERIOD == 0)
-                    counter.increment()
+            # one counter across the whole sequence: the flush period is a
+            # property of the bucket's stream, not of an individual statement
+            rows_saved = 0
+            for branch, (select_sql, params) in enumerate(branches):
+                with conn.cursor(cursor_factory=psycopg2.extras.DictCursor,
+                                 name=f'stitch_cursor_bucket_{bucket}_{branch}') as cur:
+                    cur.itersize = yb_db.CURSOR_ITER_SIZE
+                    LOGGER.info(
+                        'bucket %s branch %s/%s: select %s with itersize %s, params %s',
+                        bucket, branch + 1, len(branches), select_sql,
+                        cur.itersize, params)
+                    cur.execute(select_sql, params)
+                    for rec in cur:
+                        message = yb_db.selected_row_to_singer_message(
+                            stream, rec, stream_version, desired_columns,
+                            time_extracted, md_map)
+                        rows_saved += 1
+                        emit(message, bucket, [rec[i] for i in pk_indices],
+                             flush=rows_saved % UPDATE_BOOKMARK_PERIOD == 0)
+                        counter.increment()
 
+    # ONE retry_read around the whole sequence, never one per statement.
+    #
+    # Why this is safe. The rungs are disjoint, consecutive and ascending, so
+    # the rows this attempt emitted are exactly the keys in (old bookmark,
+    # current bookmark] -- whichever rung it died on, and whether or not it
+    # died mid-rung. `emit` advances the bookmark on every row, so rebuilding
+    # the ladder from it covers exactly the complement: nothing replayed,
+    # nothing skipped. Rungs the attempt already drained rebuild as empty
+    # probes rather than being skipped, which costs an index seek each and
+    # keeps the structure from having to remember how far it got.
+    #
+    # Why per-statement retry is not. It would rebuild a full ladder from a
+    # bookmark that has already passed the earlier rungs, so a failure inside
+    # `a = X AND b > Y` would come back with `a > X` attached -- and the outer
+    # loop would then run `a > X` again. Every row after the current leading
+    # value, twice.
     retry_read(scan, f"bucket {bucket} of {stream['tap_stream_id']}")
     return bucket
 
