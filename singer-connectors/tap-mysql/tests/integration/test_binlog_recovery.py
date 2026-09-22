@@ -1,7 +1,6 @@
 """Exercise interrupted binlog replication against a real MySQL-family server."""
 
 import copy
-import os
 
 import pytest
 import singer
@@ -24,7 +23,7 @@ def legacy_gtid_context():
             cursor.execute("INSERT INTO recovery_rows VALUES (0, 'seed')")
         source.commit()
 
-    engine = os.getenv('TAP_MYSQL_ENGINE', 'mariadb')
+    engine = test_utils.get_source_engine(connection)
     config = dict(
         test_utils.get_db_config(), engine=engine, use_gtid=True,
         filter_dbs=test_utils.DB_NAME,
@@ -99,7 +98,9 @@ def test_legacy_gtid_migration_does_not_promote_an_open_transaction_endpoint(mon
     messages = []
     monkeypatch.setattr(singer, 'write_message', messages.append)
 
-    with pytest.raises(RuntimeError, match='did not reach the sampled binlog endpoint'):
+    with pytest.raises(
+            RuntimeError,
+            match='Durable state was retained; the next scheduled run will retry automatically'):
         binlog.sync_binlog_stream(connection, config, streams, state)
 
     assert state == original
@@ -118,7 +119,8 @@ def test_large_transaction_survives_interruption(use_gtid, monkeypatch):
             cursor.execute("INSERT INTO recovery_rows VALUES (0, 'seed')")
         source.commit()
 
-    config = dict(test_utils.get_db_config(), engine=os.getenv('TAP_MYSQL_ENGINE', 'mariadb'),
+    engine = test_utils.get_source_engine(connection)
+    config = dict(test_utils.get_db_config(), engine=engine,
                   use_gtid=use_gtid, filter_dbs=test_utils.DB_NAME)
     catalog = test_utils.discover_catalog(connection, config)
     stream = next(entry for entry in catalog.streams if entry.table == 'recovery_rows')

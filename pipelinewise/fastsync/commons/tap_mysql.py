@@ -32,8 +32,8 @@ MARIADB_MAX_STATEMENT_TIME_SQL = 'SET @@session.max_statement_time=0'
 _REPORTED_SESSION_ENGINE_SELECTIONS = set()
 
 
-def default_session_sqls(connection, configured_engine=None):
-    """Return defaults compatible with the connected source server."""
+def resolve_source_engine(connection, configured_engine=None):
+    """Return the configured engine or detect it from the server handshake."""
     if configured_engine is None:
         engine = MARIADB_ENGINE if 'mariadb' in connection.get_server_info().lower() else MYSQL_ENGINE
         engine_source = 'detected'
@@ -43,10 +43,15 @@ def default_session_sqls(connection, configured_engine=None):
 
     selection = (engine, engine_source)
     if selection not in _REPORTED_SESSION_ENGINE_SELECTIONS:
-        LOGGER.info('Using %s source engine for default session settings (%s)', engine, engine_source)
+        LOGGER.info('Using %s source engine (%s)', engine, engine_source)
         _REPORTED_SESSION_ENGINE_SELECTIONS.add(selection)
     else:
-        LOGGER.debug('Using %s source engine for default session settings (%s)', engine, engine_source)
+        LOGGER.debug('Using %s source engine (%s)', engine, engine_source)
+    return engine
+
+
+def default_session_sqls(engine):
+    """Return default session SQL compatible with the resolved source engine."""
     session_sqls = list(DEFAULT_SESSION_SQLS)
     if engine == MARIADB_ENGINE:
         session_sqls.append(MARIADB_MAX_STATEMENT_TIME_SQL)
@@ -70,7 +75,8 @@ class FastSyncTapMySql:
 
     def __init__(self, connection_config: dict, tap_type_to_target_type: Callable, target_quote=None):
         self._configured_engine = connection_config.get('engine')
-        self.connection_config = connection_config
+        self._resolved_engine = None
+        self.connection_config = connection_config.copy()
         self.connection_config['charset'] = connection_config.get(
             'charset', DEFAULT_CHARSET
         )
@@ -82,9 +88,6 @@ class FastSyncTapMySql:
         )
         self.connection_config['use_gtid'] = connection_config.get(
             'use_gtid', DEFAULT_USE_GTID
-        )
-        self.connection_config['engine'] = connection_config.get(
-            'engine', MYSQL_ENGINE
         )
         self.tap_type_to_target_type = tap_type_to_target_type
         self.target_quote = target_quote
@@ -99,14 +102,23 @@ class FastSyncTapMySql:
         Property method, to find if the engine is mariadb or not
         Returns: bool
         """
-        return self.connection_config['engine'] == MARIADB_ENGINE
+        return self.source_engine == MARIADB_ENGINE
+
+    @property
+    def source_engine(self) -> str:
+        """Return the resolved engine, with the legacy fallback before opening."""
+        if self._resolved_engine is not None:
+            return self._resolved_engine
+        if self._configured_engine is not None:
+            return str(self._configured_engine).lower()
+        return MYSQL_ENGINE
 
     @property
     def uses_mariadb_json_aliases(self) -> bool:
         """Return whether MariaDB JSON aliases should map to Iceberg VARIANT."""
         iceberg_version = self.connection_config.get('iceberg_version')
         return (
-            self.connection_config['engine'].lower() == MARIADB_ENGINE
+            self.is_mariadb
             and (
                 self._mariadb_json_aliases_enabled
                 or (
@@ -180,6 +192,11 @@ class FastSyncTapMySql:
             cursorclass=pymysql.cursors.DictCursor,
             ssl={'': True}
         )
+        if self._resolved_engine is None:
+            self._resolved_engine = resolve_source_engine(
+                self.conn, self._configured_engine
+            )
+            self.connection_config['engine'] = self._resolved_engine
         self.conn_unbuffered: Connection = pymysql.connect(
             **conn_params,
             cursorclass=pymysql.cursors.SSCursor,
@@ -196,7 +213,7 @@ class FastSyncTapMySql:
         """
         configured_session_sqls = self.connection_config.get('session_sqls')
         session_sqls = [
-            *default_session_sqls(self.conn, self._configured_engine),
+            *default_session_sqls(self.source_engine),
             *(configured_session_sqls if isinstance(configured_session_sqls, list) else []),
         ]
 

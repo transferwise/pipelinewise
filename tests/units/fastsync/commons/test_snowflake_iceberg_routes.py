@@ -245,7 +245,6 @@ def _recovery_args(tap_override=None, target_override=None, transform=None):
         'port': 3306,
         'dbname': 'source_db',
         'user': 'source_user',
-        'engine': 'mariadb',
         **(tap_override or {}),
     }
     target = {
@@ -271,7 +270,7 @@ def _recovery_identity(args, table='source.table', partial_boundary=None):
         args,
         table,
         source_route='mysql_to_snowflake',
-        source_engine=args.tap['engine'],
+        source_engine=args.tap.get('engine', 'auto'),
         staging_config={'s3_bucket': 'staging'},
         iceberg_version=args.target['iceberg_version'],
         partial_boundary=partial_boundary,
@@ -318,6 +317,10 @@ def test_fastsync_recovery_identity_keeps_server_detected_timeout_non_semantic()
     detected_sqls = identities[0]['source']['session_sqls']
     mysql_sqls = identities[1]['source']['session_sqls']
     custom_sqls = identities[2]['source']['session_sqls']
+    assert identities[0]['source']['engine'] == 'auto'
+    assert identities[1]['source']['engine'] == 'mysql'
+    assert identities[0]['source']['charset'] == routes.DEFAULT_CHARSET
+    assert identities[0]['source']['use_gtid'] is routes.DEFAULT_USE_GTID
     assert detected_sqls == routes.DEFAULT_SESSION_SQLS
     assert mysql_sqls == routes.DEFAULT_SESSION_SQLS
     assert custom_sqls == [

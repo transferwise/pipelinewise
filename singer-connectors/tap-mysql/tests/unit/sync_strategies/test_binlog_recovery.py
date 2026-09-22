@@ -723,7 +723,9 @@ def test_legacy_gtid_migration_promotes_no_gtid_before_reaching_sampled_endpoint
             patch.object(binlog, 'create_binlog_stream_reader', return_value=reader), \
             patch.object(binlog, '_run_binlog_sync', return_value=('mysql-bin.000001', 199)), \
             patch.object(binlog.singer, 'write_message') as output:
-        with pytest.raises(RuntimeError, match='did not reach the sampled binlog endpoint'):
+        with pytest.raises(
+                RuntimeError,
+                match='Durable state was retained; the next scheduled run will retry automatically'):
             binlog.sync_binlog_stream(None, config, streams, state)
 
     output.assert_not_called()
@@ -907,6 +909,42 @@ def test_schema_ignores_are_scoped_to_the_source_stream(stream):
     assert records[1].record['added'] == 42
 
 
+def test_binlog_rediscovery_uses_resolved_mariadb_json_alias_setting(stream):
+    row_event = write_event()
+    row_event.columns.append(SimpleNamespace(name='added', type=FIELD_TYPE.VARCHAR))
+    row_event.rows[0]['values']['added'] = '{"key":"value"}'
+    discovered = copy.deepcopy(stream)
+    discovered.schema.properties['added'] = Schema(type=['null', 'object'])
+    for column in discovered.schema.properties.values():
+        column.inclusion = 'available'
+    streams = {
+        stream.tap_stream_id: {
+            'catalog_entry': stream,
+            'desired_columns': set(stream.schema.properties),
+        },
+    }
+    reader = Reader([(100, row_event)])
+    config = {
+        'use_gtid': False,
+        'engine': 'mariadb',
+        'target_table_format': 'iceberg',
+        'iceberg_version': 3,
+    }
+
+    with patch.object(binlog, 'should_run_discovery', return_value=True), \
+            patch.object(binlog, 'discover_catalog', return_value=Catalog([discovered])) as discovery, \
+            patch.object(binlog.singer, 'write_message'):
+        binlog._run_binlog_sync(
+            None, reader, streams, {}, config, reader.log_file, 1000)
+
+    discovery.assert_called_once_with(
+        None,
+        'db',
+        'items',
+        detect_json_aliases=True,
+    )
+
+
 @pytest.mark.parametrize('event_types', [['Gtid'], ['Anonymous_Gtid'], ['Table_map'], ['Xid'],
                                       ['Annotate_rows', 'Table_map'], ['Rows_query', 'Query']])
 def test_safe_binlog_checkpoint_requires_one_bounded_query(event_types):
@@ -916,12 +954,12 @@ def test_safe_binlog_checkpoint_requires_one_bounded_query(event_types):
         binlog.verify_binlog_checkpoint(None, 'mysql-bin.000001', 100)
     assert cursor.execute.call_count == 2
     cursor.execute.assert_called_with(
-        'SHOW BINLOG EVENTS IN %s FROM %s LIMIT 16', ('mysql-bin.000001', 100))
+        'SHOW BINLOG EVENTS IN %s FROM %s LIMIT 17', ('mysql-bin.000001', 100))
 
 
 @pytest.mark.parametrize('event_types', [['Write_rows'], ['Update_rows_v1'], ['Delete_rows_v2'],
                                       ['Transaction_payload'], ['Partial_update_rows'],
-                                      ['Rows_query', 'Write_rows_v1'], ['Unknown'], ['Rows_query'] * 16])
+                                      ['Rows_query', 'Write_rows_v1'], ['Unknown']])
 def test_unsafe_legacy_checkpoint_stops_before_rows_can_be_skipped(event_types):
     with patch.object(binlog, 'connect_with_backoff') as connect:
         cursor = connect.return_value.__enter__.return_value.cursor.return_value.__enter__.return_value

@@ -76,7 +76,7 @@ List of config parameters:
 | server_id         | int                           | False    | Randomly generated int                                                                                                                                            | Used as the slave id when this tap is connecting to the server                                                            |
 | filter_dbs        | string                        | False    | -                                                                                                                                                                 | Comma separated list of schemas to extract tables only from particular schemas and to improve data extraction performance |
 | use_gtid          | bool                          | False    | False                                                    <br/>                                                                                                         | Flag to enable log based replication using GTID               |
-| engine            | string ('mysql' or 'mariadb') | False    | 'mysql'                                                                                                                                                           | Indicate which flavor the server is, used for LOG_BASED with GTID                                                         |
+| engine            | string ('mysql' or 'mariadb') | False    | Detected from the server                                                                                                                                          | Override automatic source-flavor detection for all source-specific behaviour                                             |
 | ssl               | string ("true")               | No       | False                                                                                                                                                             | Enable SSL connection                                                                                                     |
 | ssl_ca            | string                        | No       | -                                                                                                                                                                 | for self-signed SSL                                                                                                       |
 | ssl_cert          | string                        | No       | -                                                                                                                                                                 | for self-signed SSL                                                                                                       |
@@ -299,9 +299,9 @@ pertaining to row changes (inserts, updates, deletes), binlog file rotate and gt
 Log_based method always requires an initial sync to get a snapshot of the table and current binlog coordinates/gtid 
 position.
 
-The tap support two ways of consuming log events: using binlog coordinates or GTID, the default behavior is using 
-binlog coordinates, when turning the `use_gtid` flag, you have to specify the engine flavor (mariadb/mysql) due to 
-how different are the GTID implementations in these two engines.
+The tap supports two ways of consuming log events: using binlog coordinates or GTID. Binlog coordinates are the
+default. When `use_gtid` is enabled, the tap detects the MySQL or MariaDB engine from the connected server and uses
+the corresponding GTID implementation. An explicit `engine` setting overrides detection.
 
 When enabling `use_gtid`, older MySQL and MariaDB GTID bookmarks are upgraded
 automatically when retained file/position coordinates remain available. The tap
@@ -503,8 +503,9 @@ GRANT ALL PRIVILEGES ON tap_mysql_test.* TO <mysql-user>;
   export TAP_MYSQL_PORT=<mysql-port>
   export TAP_MYSQL_USER=<mysql-user>
   export TAP_MYSQL_PASSWORD=<mysql-password>
-  export TAP_MYSQL_ENGINE=<engine>
 ```
+
+The integration suite detects the connected MySQL or MariaDB engine.
 
 3. Install the test dependencies:
 

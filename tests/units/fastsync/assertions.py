@@ -439,7 +439,11 @@ def assert_snowflake_sync_table_iceberg_workflow(
         args,
         table,
         source_route=f'{source_type}_to_snowflake',
-        source_engine=source_type,
+        source_engine=(
+            args.tap.get('engine', 'auto')
+            if source_type == 'mysql'
+            else source_type
+        ),
         staging_config=staging_config,
         iceberg_version=3,
     )
@@ -448,6 +452,7 @@ def assert_snowflake_sync_table_iceberg_workflow(
         source_bookmark=bookmark,
         s3_keys=s3_keys,
         context={},
+        manifest_payload=SimpleNamespace(resolved_source_engine='mysql'),
         table_spec=persisted_spec,
     )
 
@@ -518,6 +523,7 @@ def assert_snowflake_sync_table_iceberg_workflow(
                 side_effect=record('validate', 3),
             ) as validate_mock:
         tap = tap_class_mock.return_value
+        tap.source_engine = 'mysql'
         target = target_class_mock.return_value
         publisher = create_publisher_mock.return_value
 
@@ -685,6 +691,7 @@ def assert_snowflake_sync_table_iceberg_workflow(
                 bookmark,
                 recovery_identity=recovery_identity,
                 staging_config=staging_config,
+                resolved_source_engine='mysql' if source_type == 'mysql' else None,
             )
         exists_mock.assert_called_once_with(export_path)
         glob_mock.assert_called_once_with(f'{export_path}*')

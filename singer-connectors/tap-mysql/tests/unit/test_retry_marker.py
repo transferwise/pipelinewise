@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 from pymysql.err import OperationalError
 
-from tap_mysql import main
+from tap_mysql import MYSQL_BINLOG_DISCONNECT_CONTROL_PREFIX, main
 from tap_mysql.connection import (
     BinlogStreamDisconnectedError,
     MYSQL_BINLOG_DISCONNECT_MARKER,
@@ -21,7 +21,10 @@ def test_tap_writes_control_marker_directly_to_stderr(capsys):
         with pytest.raises(BinlogStreamDisconnectedError) as raised:
             main()
     captured = capsys.readouterr()
-    assert json.loads(captured.err) == MYSQL_BINLOG_DISCONNECT_MARKER
+    assert captured.err.startswith(MYSQL_BINLOG_DISCONNECT_CONTROL_PREFIX)
+    assert json.loads(captured.err.removeprefix(MYSQL_BINLOG_DISCONNECT_CONTROL_PREFIX)) == (
+        MYSQL_BINLOG_DISCONNECT_MARKER
+    )
     assert captured.out == ''
     assert raised.value is failure
     log.assert_called_once_with(failure)

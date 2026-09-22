@@ -82,9 +82,10 @@ Configuration
      - Default
      - Effect
    * - ``engine``
-     - For MariaDB GTID
-     - ``mysql``
-     - Selects MariaDB or MySQL source-specific semantics.
+     - No
+     - Detected from the connected server
+     - Overrides automatic MariaDB or MySQL detection for source-specific
+       behaviour.
    * - ``use_gtid``
      - No
      - ``false``
@@ -126,9 +127,11 @@ Operational notes
 
 - ``binlog_row_image`` must remain ``FULL``; sparse row images can omit values
   required to reconstruct a target row.
-- PipelineWise uses an explicit ``engine`` value when present and otherwise
-  detects the connected server. MariaDB sessions set ``max_statement_time=0``
-  for Singer, FullSync, and PartialSync; MySQL sessions do not.
+- Singer, FullSync, and PartialSync use an explicit ``engine`` value when
+  present and otherwise detect the connected server. The resolved engine is
+  used consistently for session defaults, GTID handling, binlog status, and
+  managed Iceberg v3 JSON aliases. MariaDB sessions set
+  ``max_statement_time=0``; MySQL sessions do not.
 - MySQL partial-JSON events and MySQL/MariaDB compressed binlog events are not
   supported by the bundled decoder. Keep ``binlog_row_value_options`` empty,
   ``binlog_transaction_compression`` disabled, and MariaDB ``log_bin_compress``
@@ -182,15 +185,20 @@ Operational notes
   ``utf8mb4`` connections and uses an ``utf8mb4`` text projection; an explicitly
   narrower FastSync connection charset can still limit representable characters.
   FastSync removes NUL characters.
-- Finish pending managed-Iceberg FastSync recovery before upgrading from the
-  previous default charset, or retain explicit ``charset: utf8`` while finishing
-  recovery. Recovery rejects a changed source encoding; use ``utf8mb4`` for
-  subsequent runs after clearing the pending attempt.
+- Finish pending managed-Iceberg attempts with the PipelineWise version and
+  configuration that created them before upgrading. Matching the previous
+  charset alone is insufficient: recovery identity also includes engine and
+  session settings, and older manifests lack the saved engine needed for
+  re-export. See :ref:`snowflake_iceberg_recovery` for recovery guidance.
+- Managed-Iceberg recovery that re-exports source data requires the same resolved
+  MySQL or MariaDB engine recorded in the manifest. Recovery from completed
+  staging does not reconnect to the source or recheck its engine. Resolve
+  pending recovery before replacing or repointing the source server.
 - Snowflake Singer, FullSync, and PartialSync can target managed Iceberg v3 with
   explicit tap-level configuration. See :ref:`snowflake_iceberg`.
-- On an explicit v3 route with ``engine: mariadb``, MariaDB's generated
-  ``JSON_VALID`` constraint identifies its ``JSON``-alias ``LONGTEXT`` columns
-  for ``VARIANT`` loading. Plain ``LONGTEXT`` and native routes remain strings.
+- On a v3 route, MariaDB's generated ``JSON_VALID`` constraint identifies its
+  ``JSON``-alias ``LONGTEXT`` columns for ``VARIANT`` loading. Plain
+  ``LONGTEXT`` and native routes remain strings.
   Object, array, string, number, Boolean, and null JSON roots are carried as
   validated JSON text and restored as ``VARIANT``. JSON null remains distinct
   from SQL ``NULL``.

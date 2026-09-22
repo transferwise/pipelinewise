@@ -44,6 +44,7 @@ SDC_DELETED_AT = "_sdc_deleted_at"
 UPDATE_BOOKMARK_PERIOD = 1000
 BOOKMARK_KEYS = {'log_file', 'log_pos', 'version', 'gtid', 'gtid_complete'}
 CHECKPOINT_PROBE_LIMIT = 16
+CHECKPOINT_PROBE_MAX_EVENTS = 256
 BINLOG_START_POSITION = 4
 CHECKPOINT_SCAN_PAGE_SIZE = 10000
 CHECKPOINT_SCAN_LOG_INTERVAL = 100000
@@ -492,38 +493,56 @@ def verify_binlog_checkpoint(mysql_conn, log_file, log_pos, require_transaction_
     if not require_transaction_boundary:
         safe_events.update({'table_map', 'anonymous_gtid', 'query', 'xid'})
         neutral_events.update({'annotate_rows', 'rows_query'})
+    probe_pos = log_pos
+    probed_events = 0
+    unsafe_event = None
     with connect_with_backoff(mysql_conn) as open_conn:
         with open_conn.cursor() as cursor:
-            try:
-                # Event Info contains original statement bytes and is not guaranteed to match the connection charset.
-                cursor.execute('SET character_set_results = binary')
-                cursor.execute(
-                    f'SHOW BINLOG EVENTS IN %s FROM %s LIMIT {CHECKPOINT_PROBE_LIMIT}', (log_file, log_pos))
-            except (pymysql.err.InternalError, pymysql.err.OperationalError) as exc:
-                if exc.args[0] != 1220:
-                    raise
-                raise ValueError(
-                    f'Cannot validate binlog bookmark {log_file}:{log_pos}: the server could not decode the event. '
-                    'Check the bookmark and source binlog integrity; perform a full resync if the checkpoint '
-                    f'cannot be recovered safely. Server error: {exc}') from exc
-            events = cursor.fetchall()
-            unsafe_event = None
-            for event in events:
-                # MariaDB 11.4 leaves End_log_pos zero by default. Pos and event order remain authoritative.
-                event_type = _binlog_text(event[2]).lower()
-                if event_type in safe_events:
-                    return
-                if event_type not in neutral_events:
-                    unsafe_event = event_type
+            # Event Info contains original statement bytes and is not guaranteed to match the connection charset.
+            cursor.execute('SET character_set_results = binary')
+            while probed_events < CHECKPOINT_PROBE_MAX_EVENTS:
+                page_size = min(CHECKPOINT_PROBE_LIMIT, CHECKPOINT_PROBE_MAX_EVENTS - probed_events)
+                try:
+                    cursor.execute(
+                        f'SHOW BINLOG EVENTS IN %s FROM %s LIMIT {page_size + 1}', (log_file, probe_pos))
+                except (pymysql.err.InternalError, pymysql.err.OperationalError) as exc:
+                    if exc.args[0] != 1220:
+                        raise
+                    raise ValueError(
+                        f'Cannot validate binlog bookmark {log_file}:{log_pos}: the server could not decode the event. '
+                        'Check the bookmark and source binlog integrity; perform a full resync if the checkpoint '
+                        f'cannot be recovered safely. Server error: {exc}') from exc
+                events = cursor.fetchall()
+                for event in events[:page_size]:
+                    probed_events += 1
+                    # MariaDB 11.4 leaves End_log_pos zero by default. Pos and event order remain authoritative.
+                    event_type = _binlog_text(event[2]).lower()
+                    if event_type in safe_events:
+                        return
+                    if event_type not in neutral_events:
+                        unsafe_event = event_type
+                        break
+                if unsafe_event:
                     break
+                if events and len(events) <= page_size:
+                    return
+                if not events:
+                    # An empty result is safe only at the exact current end of that file.
+                    cursor.execute('SHOW BINARY LOGS')
+                    if any(_binlog_name_matches(row[0], log_file) and row[1] == probe_pos
+                           for row in cursor.fetchall()):
+                        return
+                    break
+                next_probe_pos = events[page_size][1]
+                if next_probe_pos <= probe_pos:
+                    raise InconclusiveBinlogCheckpointError(
+                        f'Binlog bookmark validation is inconclusive for {log_file}:{log_pos}: '
+                        f'the bounded probe did not advance beyond position {probe_pos}.')
+                probe_pos = next_probe_pos
             else:
-                # Fewer rows than the bounded query prove that neutral rotation headers reached EOF.
-                if events and len(events) < CHECKPOINT_PROBE_LIMIT:
-                    return
-                # An empty result is safe only at the exact current end of that file.
-                cursor.execute('SHOW BINARY LOGS')
-                if any(_binlog_name_matches(row[0], log_file) and row[1] == log_pos for row in cursor.fetchall()):
-                    return
+                raise InconclusiveBinlogCheckpointError(
+                    f'Binlog bookmark validation is inconclusive for {log_file}:{log_pos} after inspecting '
+                    f'{probed_events} neutral events; no safe or unsafe boundary was observed.')
     message = ('The binlog bookmark is not a safe transaction boundary and may omit its TABLE_MAP; '
                'perform a full resync before resuming replication.')
     if unsafe_event and re.fullmatch(r'(?:write|update|delete)_rows(?:_v\d+)?', unsafe_event):
@@ -533,6 +552,10 @@ def verify_binlog_checkpoint(mysql_conn, log_file, log_pos, require_transaction_
 
 class UnsafeBinlogCheckpointError(ValueError):
     """A legacy file checkpoint resumes at a row event without its table map."""
+
+
+class InconclusiveBinlogCheckpointError(ValueError):
+    """A bounded checkpoint probe found neither a safe nor an unsafe event."""
 
 
 def _binlog_info(event):
@@ -1350,7 +1373,8 @@ def sync_binlog_stream(
             started_at_endpoint = (log_file, log_pos) == (end_log_file, end_log_pos)
             if not started_at_endpoint and (final_log_file, final_log_pos) != (end_log_file, end_log_pos):
                 raise RuntimeError(
-                    'Legacy GTID migration did not reach the sampled binlog endpoint; retry from durable state.')
+                    'Legacy GTID migration did not reach the sampled binlog endpoint. Durable state was retained; '
+                    'the next scheduled run will retry automatically.')
             update_bookmarks(
                 state, binlog_streams_map, end_log_file, end_log_pos, complete_endpoint_gtid)
 

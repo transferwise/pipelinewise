@@ -1,4 +1,3 @@
-import os
 import re
 import unittest
 from unittest.mock import patch
@@ -1031,8 +1030,8 @@ class TestBinlogReplication(unittest.TestCase):
     def test_binlog_stream_with_gtid(self):
         global SINGER_MESSAGES
 
-        engine = os.getenv('TAP_MYSQL_ENGINE', MYSQL_ENGINE)
-        gtid = binlog.fetch_current_gtid_pos(self.conn, os.environ['TAP_MYSQL_ENGINE'])
+        engine = test_utils.get_source_engine(self.conn)
+        gtid = binlog.fetch_current_gtid_pos(self.conn, engine)
 
         config = test_utils.get_db_config()
         config['use_gtid'] = True
@@ -1095,7 +1094,7 @@ class TestBinlogReplication(unittest.TestCase):
     def test_binlog_stream_switching_from_binlog_to_gtid_with_mysql_succeeds(self):
         global SINGER_MESSAGES
 
-        engine = os.getenv('TAP_MYSQL_ENGINE', MYSQL_ENGINE)
+        engine = test_utils.get_source_engine(self.conn)
 
         if engine != MYSQL_ENGINE:
             self.skipTest('This test is only meant for Mysql flavor')
@@ -1133,7 +1132,7 @@ class TestBinlogReplication(unittest.TestCase):
     def test_binlog_stream_switching_from_binlog_to_gtid_with_mariadb_success(self):
         global SINGER_MESSAGES
 
-        engine = os.getenv('TAP_MYSQL_ENGINE', MYSQL_ENGINE)
+        engine = test_utils.get_source_engine(self.conn)
 
         if engine != MARIADB_ENGINE:
             self.skipTest('This test is only meant for Mariadb flavor')

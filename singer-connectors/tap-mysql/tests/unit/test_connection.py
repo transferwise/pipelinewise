@@ -59,12 +59,12 @@ class TestConnection(unittest.TestCase):
             run_session_sqls(conn)
 
         logger.info.assert_called_once_with(
-            'Using %s source engine for default session settings (%s)',
+            'Using %s source engine (%s)',
             'mariadb',
             'detected',
         )
         logger.debug.assert_called_once_with(
-            'Using %s source engine for default session settings (%s)',
+            'Using %s source engine (%s)',
             'mariadb',
             'detected',
         )
@@ -93,21 +93,30 @@ class TestConnection(unittest.TestCase):
                 )
                 conn.get_server_info.assert_not_called()
 
-    def test_omitted_engine_remains_detectable_after_runtime_defaulting(self):
+    def test_connection_does_not_mutate_config_or_materialize_an_engine(self):
         config = {'host': 'localhost', 'port': 3306, 'user': 'test', 'password': 'test'}
-        MySQLConnection(config)
-        config['engine'] = 'mysql'
-        conn = MySQLConnection(config)
-        conn.get_server_info = MagicMock(return_value='11.4.10-MariaDB-log')
+        original = dict(config)
+        first = MySQLConnection(config)
+        second = MySQLConnection(config)
+        first.get_server_info = MagicMock(return_value='11.4.10-MariaDB-log')
+        second.get_server_info = MagicMock(return_value='11.4.10-MariaDB-log')
 
         with patch('tap_mysql.connection.run_sql') as run_sql:
-            run_session_sqls(conn)
+            run_session_sqls(first)
+            run_session_sqls(second)
 
+        self.assertEqual(config, original)
         self.assertEqual(
             [args.args[1] for args in run_sql.call_args_list],
-            [*DEFAULT_SESSION_SQLS, MARIADB_MAX_STATEMENT_TIME_SQL],
+            [
+                *DEFAULT_SESSION_SQLS,
+                MARIADB_MAX_STATEMENT_TIME_SQL,
+                *DEFAULT_SESSION_SQLS,
+                MARIADB_MAX_STATEMENT_TIME_SQL,
+            ],
         )
-        conn.get_server_info.assert_called_once_with()
+        first.get_server_info.assert_called_once_with()
+        second.get_server_info.assert_called_once_with()
 
     def test_custom_session_sqls_extend_and_override_mariadb_defaults(self):
         custom_session_sqls = ['SET @@session.time_zone="+1:00"']

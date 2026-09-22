@@ -57,6 +57,7 @@ MYSQL_BINLOG_DISCONNECT_MARKER = {
     'event': 'binlog_stream_disconnected',
     'version': 1,
 }
+MYSQL_BINLOG_DISCONNECT_CONTROL_PREFIX = 'PIPELINEWISE_CONTROL:'
 MYSQL_BINLOG_DISCONNECT_MAX_ATTEMPTS = 3
 MYSQL_BINLOG_DISCONNECT_RETRY_DELAY_SECONDS = 1
 
@@ -68,10 +69,14 @@ def _persist_singer_state(path: str, state: str) -> None:
 def _is_retryable_mysql_disconnect(
         tap_type: str,
         line: str) -> bool:
-    if tap_type != ConnectorType.TAP_MYSQL.value:
+    if (
+        tap_type != ConnectorType.TAP_MYSQL.value
+        or MYSQL_BINLOG_DISCONNECT_CONTROL_PREFIX not in line
+    ):
         return False
+    marker_text = line.rpartition(MYSQL_BINLOG_DISCONNECT_CONTROL_PREFIX)[2]
     try:
-        marker = json.loads(line)
+        marker = json.loads(marker_text)
         return marker == MYSQL_BINLOG_DISCONNECT_MARKER and type(marker['version']) is int
     except (ValueError, TypeError):
         return False

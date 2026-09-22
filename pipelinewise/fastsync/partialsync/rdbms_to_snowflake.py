@@ -229,6 +229,9 @@ def _export_partial_source(run: _PartialSyncRun) -> bool:
 
 
 def _prepare_iceberg_partial_export(run: _PartialSyncRun) -> bool:
+    resolved_engine = run.source_adapter.resolved_source_engine(run.source)
+    if run.attempt is not None:
+        iceberg_routes.validate_recovery_source_engine(run.attempt, resolved_engine)
     snowflake_types = run.source.map_column_types_to_target(run.table_name)
     run.source_columns = snowflake_types.get('columns', [])
     run.primary_keys = snowflake_types.get('primary_key')
@@ -279,6 +282,7 @@ def _prepare_iceberg_partial_export(run: _PartialSyncRun) -> bool:
         run.boundary,
         recovery_identity=run.recovery_identity,
         staging_config=run.staging_config,
+        resolved_source_engine=resolved_engine,
     )
     run.publisher.plan_partial_sync(run.attempt, run.spec)
     return True

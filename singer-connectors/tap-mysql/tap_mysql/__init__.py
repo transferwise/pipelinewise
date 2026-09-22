@@ -12,10 +12,12 @@ from singer.catalog import Catalog
 from tap_mysql.connection import (
     BinlogStreamDisconnectedError,
     connect_with_backoff,
+    MYSQL_BINLOG_DISCONNECT_CONTROL_PREFIX,
     MYSQL_BINLOG_DISCONNECT_MARKER,
     MySQLConnection,
     fetch_server_id as fetch_server_id,
     MYSQL_ENGINE,
+    resolve_source_engine,
 )
 from tap_mysql.discover_utils import (
     discover_catalog,
@@ -393,21 +395,37 @@ def sync_binlog_streams(mysql_conn, binlog_catalog, config, state):
             binlog.sync_binlog_stream(mysql_conn, config, binlog_streams_map, state)
 
 
+def _resolve_runtime_engine(mysql_conn, config):
+    """Resolve the source engine, opening a short-lived connection if needed."""
+    configured_engine = config.get('engine') if 'engine' in config else mysql_conn.configured_engine
+    if configured_engine is not None or mysql_conn.resolved_engine is not None or mysql_conn.open:
+        return resolve_source_engine(mysql_conn, configured_engine)
+
+    with connect_with_backoff(mysql_conn) as open_conn:
+        return resolve_source_engine(open_conn)
+
+
+def _runtime_config(mysql_conn, config):
+    """Return a sync config with one source-engine decision for this run."""
+    runtime_config = {**config, 'use_gtid': config.get('use_gtid', False)}
+
+    runtime_config['engine'] = _resolve_runtime_engine(mysql_conn, config)
+    return runtime_config
+
+
 def do_sync(mysql_conn, config, catalog, state):
+    runtime_config = _runtime_config(mysql_conn, config)
 
-    config['use_gtid'] = config.get('use_gtid', False)
-    config['engine'] = config.get('engine', MYSQL_ENGINE).lower()
-
-    non_binlog_catalog = get_non_binlog_streams(mysql_conn, catalog, config, state)
-    binlog_catalog = get_binlog_streams(mysql_conn, catalog, config, state)
+    non_binlog_catalog = get_non_binlog_streams(mysql_conn, catalog, runtime_config, state)
+    binlog_catalog = get_binlog_streams(mysql_conn, catalog, runtime_config, state)
 
     sync_non_binlog_streams(mysql_conn,
                             non_binlog_catalog,
                             state,
-                            config['use_gtid'],
-                            config['engine']
+                            runtime_config['use_gtid'],
+                            runtime_config['engine']
                             )
-    sync_binlog_streams(mysql_conn, binlog_catalog, config, state)
+    sync_binlog_streams(mysql_conn, binlog_catalog, runtime_config, state)
 
 
 def log_server_params(mysql_conn):
@@ -448,7 +466,7 @@ def main_impl():
     log_server_params(mysql_conn)
 
     if args.discover:
-        do_discover(mysql_conn, args.config)
+        do_discover(mysql_conn, _runtime_config(mysql_conn, args.config))
     elif args.catalog:
         state = args.state or {}
         do_sync(mysql_conn, args.config, args.catalog, state)
@@ -465,7 +483,8 @@ def main():
         main_impl()
     except Exception as exc:
         if isinstance(exc, BinlogStreamDisconnectedError):
-            sys.stderr.write(json.dumps(MYSQL_BINLOG_DISCONNECT_MARKER) + '\n')
+            marker = json.dumps(MYSQL_BINLOG_DISCONNECT_MARKER, separators=(',', ':'))
+            sys.stderr.write(f'{MYSQL_BINLOG_DISCONNECT_CONTROL_PREFIX}{marker}\n')
             sys.stderr.flush()
         LOGGER.critical(exc)
         raise exc

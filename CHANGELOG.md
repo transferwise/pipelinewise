@@ -1,22 +1,4 @@
-0.91.0 (2026-09-21)
--------------------
-
-**MySQL and MariaDB**
-
-- Support MariaDB 11.4 binlog events with a zero ``End_log_pos``
-- Handle non-UTF8 text in binlog metadata during bookmark validation
-- Resume legacy file-position and GTID bookmarks from retained binlogs without
-  requiring FastSync; bookmarks without usable file coordinates still fail safely
-- Reduce source round trips and report progress while recovering unsafe legacy
-  bookmarks from retained binlogs
-- Retry lost binlog connections twice from target-acknowledged state and retain
-  all attempts in one terminal log
-- Persist Singer state atomically and drain final process output before deciding
-  whether the run succeeded
-- Apply MySQL or MariaDB session defaults from the explicit engine or connected
-  server; configured ``session_sqls`` run afterward and can override them
-
-0.90.0 (2026-09-21)
+0.91.0 (2026-09-22)
 -------------------
 
 **MySQL and MariaDB replication**
@@ -25,12 +7,18 @@
   boundaries
 - Keep MariaDB savepoints inside their transaction until commit
 - Advance filtered standalone transactions only at verified boundaries
-- Preserve complete GTID history and per-stream replay positions across restarts
+- Preserve complete multi-server and multi-domain GTID history and per-stream
+  replay positions across restarts; older versions cannot safely resume these
+  checkpoints
 - Process row events at the sampled endpoint and support MariaDB file/position
   bookmarks without GTID
+- Support MariaDB 11.4 binlog events with a zero ``End_log_pos``
+- Handle non-UTF8 text in binlog metadata during bookmark validation
 - Remove the old target row when a primary key changes
 - Preserve composite and empty-string primary keys in Snowflake buffers
 - Emit Snowflake state only after the matching stream data is durable
+- Persist Singer state atomically and drain final process output before deciding
+  whether the run succeeded
 - Resume Singer after replica FastSync from the replica's applied primary
   coordinates
 - Preserve supplementary Unicode in Singer, FullSync, and PartialSync with
@@ -38,38 +26,52 @@
 - Limit column rediscovery to the affected schema and stream
 - Replicate MySQL ``geomcollection`` columns through Singer and FastSync
 - Preserve signs and microseconds in MySQL and MariaDB ``TIME`` values
+- Use an explicit MySQL or MariaDB engine, or detect it when omitted,
+  consistently across Singer, FullSync, and PartialSync for session defaults,
+  GTID handling, status queries, and managed Iceberg v3 JSON aliases
+- Disable MariaDB statement timeouts by default
+- Run configured ``session_sqls`` after connector defaults so they can override
+  the defaults
+- Support current MySQL binary-log status statements with legacy syntax fallback
 
-**Safety and compatibility**
+**Recovery and compatibility**
 
-- Test dev-project and GitHub E2E sources with ``binlog_row_metadata=FULL``
-  while retaining mysql-replication 0.46
+- Resume legacy file-position and GTID bookmarks from retained binlogs without
+  requiring FastSync; stop if usable file coordinates or binlogs are unavailable
+- Reduce source round trips and report progress while recovering unsafe legacy
+  bookmarks from retained binlogs
+- Inspect up to 256 neutral binlog events when validating a checkpoint; stop
+  without advancing state if the result remains inconclusive
+- Retry lost file-position binlog connections twice from target-acknowledged
+  state and retain all attempts in one terminal log; keep existing reconnects
+  for GTID and metadata connections
 - Recheck ROW/FULL binlog settings on resumed runs and stop when table metadata
   is unavailable
-- Require one FullSync for legacy GTID checkpoints without the complete-history
-  marker and list every affected stream in the startup error
-- Reject unsafe row-event bookmarks, multi-channel replica coordinates, XA,
-  selected-table ``TRUNCATE``, partial-JSON, and compressed binlog events before
-  state advances
+- Reject multi-channel replica coordinates, XA, selected-table ``TRUNCATE``,
+  partial-JSON, and compressed binlog events before state advances
 - Infer MariaDB GTIDs from file/position bookmarks only at verified transaction
   boundaries
 - Accept MariaDB rotated-binlog headers and header-only files at verified EOF
-- Report invalid bookmarks and missing or anonymous GTIDs with recovery guidance
-- Stop file/position reads after connection loss so retries resume from durable
-  state; metadata connections retain their own retries
-- Store complete multi-server and multi-domain GTID sets in state; older versions
-  cannot safely resume these checkpoints
-- Finish pending managed-Iceberg recovery with its original charset before using
-  the new ``utf8mb4`` default
-- Support current MySQL binary-log status statements with legacy syntax fallback
-- Resync target data that was already missing or corrupted before this release
+- Report invalid bookmarks and missing or anonymous transaction GTID markers
+  with recovery guidance
+- Stop managed-Iceberg restaging before re-export if the resolved MySQL or
+  MariaDB source engine differs from the persisted attempt
+- Explain how to recover older Iceberg attempts with no saved source engine
+  without deleting recovery evidence
+- Finish pending managed-Iceberg MySQL/MariaDB attempts with the previous version
+  before upgrading; the ``utf8mb4`` default, omitted ``engine``, and configured
+  ``session_sqls`` change recovery identity, and re-export requires a saved engine
+- Resync target data already missing or corrupted before this release; these
+  fixes prevent new omissions but do not repair existing data
 
-**Dependencies**
+**Dependencies and testing**
 
 - Update the Snowflake connector to 4.7.3, PyMySQL to 1.1.3, and Boto3 to
   1.43.94
 - Update sqlparse to 0.6.0 for PartialSync denial-of-service fixes
 - Retain mysql-replication 0.46 until newer releases are validated with full
   source-binlog metadata
+- Test dev-project and GitHub E2E sources with ``binlog_row_metadata=FULL``
 
 0.89.0 (2026-09-18)
 -------------------

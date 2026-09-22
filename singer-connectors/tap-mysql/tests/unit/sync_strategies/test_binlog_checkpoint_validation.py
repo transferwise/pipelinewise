@@ -31,7 +31,7 @@ def test_rotated_mariadb_headers_preserve_the_next_transaction(cursor, require_t
 
     assert cursor.execute.call_args_list == [
         call('SET character_set_results = binary'),
-        call('SHOW BINLOG EVENTS IN %s FROM %s LIMIT 16', (LOG_FILE, 4)),
+        call('SHOW BINLOG EVENTS IN %s FROM %s LIMIT 17', (LOG_FILE, 4)),
     ]
 
 
@@ -145,16 +145,49 @@ def test_unknown_events_are_not_neutral(cursor, require_transaction_boundary):
 
 
 @pytest.mark.parametrize('require_transaction_boundary', [False, True])
-def test_checkpoint_probe_does_not_scan_past_its_bounded_window(cursor, require_transaction_boundary):
+def test_checkpoint_probe_continues_past_a_neutral_page(cursor, require_transaction_boundary):
+    neutral_page = [(LOG_FILE, pos, 'Binlog_checkpoint', 1, pos + 1, '') for pos in range(4, 20)]
+    safe_event = (LOG_FILE, 20, 'Gtid', 1, 21, '')
     cursor.fetchall.side_effect = [
-        [(LOG_FILE, pos, 'Binlog_checkpoint', 1, pos + 1, '') for pos in range(4, 20)],
-        [(LOG_FILE, 300)],
+        [*neutral_page, safe_event],
+        [safe_event],
     ]
 
-    with pytest.raises(ValueError, match='safe transaction boundary'):
-        binlog.verify_binlog_checkpoint(None, LOG_FILE, 4, require_transaction_boundary)
+    binlog.verify_binlog_checkpoint(None, LOG_FILE, 4, require_transaction_boundary)
 
     assert cursor.execute.call_count == 3
+    assert cursor.execute.call_args_list[1:] == [
+        call('SHOW BINLOG EVENTS IN %s FROM %s LIMIT 17', (LOG_FILE, 4)),
+        call('SHOW BINLOG EVENTS IN %s FROM %s LIMIT 17', (LOG_FILE, 20)),
+    ]
+
+
+@pytest.mark.parametrize('require_transaction_boundary', [False, True])
+def test_checkpoint_probe_reports_a_neutral_safety_ceiling_as_inconclusive(
+        cursor, monkeypatch, require_transaction_boundary):
+    monkeypatch.setattr(binlog, 'CHECKPOINT_PROBE_LIMIT', 2)
+    monkeypatch.setattr(binlog, 'CHECKPOINT_PROBE_MAX_EVENTS', 4)
+    cursor.fetchall.side_effect = [
+        [
+            (LOG_FILE, 4, 'Binlog_checkpoint', 1, 5, ''),
+            (LOG_FILE, 5, 'Binlog_checkpoint', 1, 6, ''),
+            (LOG_FILE, 6, 'Binlog_checkpoint', 1, 7, ''),
+        ],
+        [
+            (LOG_FILE, 6, 'Binlog_checkpoint', 1, 7, ''),
+            (LOG_FILE, 7, 'Binlog_checkpoint', 1, 8, ''),
+            (LOG_FILE, 8, 'Binlog_checkpoint', 1, 9, ''),
+        ],
+    ]
+
+    with pytest.raises(binlog.InconclusiveBinlogCheckpointError,
+                       match='inconclusive.*4 neutral events.*no safe or unsafe boundary'):
+        binlog.verify_binlog_checkpoint(None, LOG_FILE, 4, require_transaction_boundary)
+
+    assert cursor.execute.call_args_list[1:] == [
+        call('SHOW BINLOG EVENTS IN %s FROM %s LIMIT 3', (LOG_FILE, 4)),
+        call('SHOW BINLOG EVENTS IN %s FROM %s LIMIT 3', (LOG_FILE, 6)),
+    ]
 
 
 @pytest.mark.parametrize('error_type', [InternalError, OperationalError])

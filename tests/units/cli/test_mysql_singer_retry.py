@@ -12,6 +12,7 @@ import pytest
 
 from pipelinewise.cli import commands
 from pipelinewise.cli.pipelinewise import (
+    MYSQL_BINLOG_DISCONNECT_CONTROL_PREFIX,
     MYSQL_BINLOG_DISCONNECT_MARKER,
     MYSQL_BINLOG_DISCONNECT_MAX_ATTEMPTS,
     MYSQL_BINLOG_DISCONNECT_RETRY_DELAY_SECONDS,
@@ -25,8 +26,13 @@ from pipelinewise.fastsync.commons import utils as fastsync_utils
 DISCONNECT_MESSAGE = 'Binlog connection lost; restart replication from the durable checkpoint.'
 
 
-def marker_line():
-    return json.dumps(MYSQL_BINLOG_DISCONNECT_MARKER, separators=(',', ':')) + '\n'
+def marker_line(overrides=None):
+    marker = {**MYSQL_BINLOG_DISCONNECT_MARKER, **(overrides or {})}
+    return (
+        MYSQL_BINLOG_DISCONNECT_CONTROL_PREFIX
+        + json.dumps(marker, separators=(',', ':'))
+        + '\n'
+    )
 
 
 def runner(tmp_path):
@@ -195,16 +201,37 @@ def test_human_messages_exception_text_and_other_taps_cannot_trigger_retry(tmp_p
     {'version': True}, {'version': 1.0}, {'version': 2}, {'component': 'target-snowflake'}, {'event': 'other'},
 ])
 def test_only_the_exact_versioned_control_marker_is_retryable(overrides):
-    assert not _is_retryable_mysql_disconnect('tap-mysql', json.dumps({**MYSQL_BINLOG_DISCONNECT_MARKER, **overrides}))
+    assert not _is_retryable_mysql_disconnect('tap-mysql', marker_line(overrides))
+
+
+def test_control_marker_can_follow_an_unterminated_output_fragment():
+    assert _is_retryable_mysql_disconnect(
+        'tap-mysql',
+        'unterminated upstream output' + marker_line(),
+    )
+
+
+def test_lines_without_the_control_prefix_are_not_json_parsed():
+    with patch('pipelinewise.cli.pipelinewise.json.loads') as loads:
+        assert not _is_retryable_mysql_disconnect(
+            'tap-mysql',
+            '{"bookmarks":{"db-items":{"log_pos":123}}}',
+        )
+    loads.assert_not_called()
 
 
 def test_tap_and_orchestrator_share_the_control_protocol():
-    source_path = Path(__file__).resolve().parents[3] / 'singer-connectors/tap-mysql/tap_mysql/connection.py'
-    module = ast.parse(source_path.read_text())
+    tap_root = Path(__file__).resolve().parents[3] / 'singer-connectors/tap-mysql/tap_mysql'
+    module = ast.parse((tap_root / 'connection.py').read_text())
     marker = next(node.value for node in module.body if isinstance(node, ast.Assign)
                   and any(isinstance(target, ast.Name) and target.id == 'MYSQL_BINLOG_DISCONNECT_MARKER'
                           for target in node.targets))
     assert ast.literal_eval(marker) == MYSQL_BINLOG_DISCONNECT_MARKER
+    prefix = next(node.value for node in module.body if isinstance(node, ast.Assign)
+                  and any(isinstance(target, ast.Name)
+                          and target.id == 'MYSQL_BINLOG_DISCONNECT_CONTROL_PREFIX'
+                          for target in node.targets))
+    assert ast.literal_eval(prefix) == MYSQL_BINLOG_DISCONNECT_CONTROL_PREFIX
 
 
 def test_frequent_singer_state_saves_use_debug_but_other_atomic_saves_keep_info(tmp_path):
