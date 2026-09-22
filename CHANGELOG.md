@@ -27,11 +27,12 @@
   position
 - Add FastSync FullSync support (`yugabyte-to-postgres`,
   `yugabyte-to-snowflake`) for bulk full-table copies
-- Create and drop replication slots from FastSync, retrying a "slot is
-  active" error on drop for up to 5 minutes to tolerate YugabyteDB's
-  post-disconnect active-slot window
+- Create a tap's replication slot from FastSync when a LOG_BASED stream needs
+  a HybridTime boundary
 - Drop a tap's replication slot when its configuration is removed, matching
-  existing tap-postgres cleanup behavior
+  existing tap-postgres cleanup behavior, and retry a "slot is active" error
+  for up to 5 minutes to tolerate YugabyteDB's post-disconnect active-slot
+  window
 - Add native PartialSync support (`partial-yugabyte-to-snowflake`) for
   bounded-range resyncs to Snowflake, reusing PostgreSQL's dialect-safe
   boundary predicate since YSQL follows PostgreSQL identifier-quoting rules

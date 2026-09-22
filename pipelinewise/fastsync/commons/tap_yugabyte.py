@@ -9,7 +9,7 @@ import psycopg2
 import psycopg2.extras
 
 from argparse import Namespace
-from typing import Dict
+from typing import Callable, Dict, Optional, Tuple
 
 from . import utils, split_gzip
 from .partial_sync_boundary import PartialSyncBoundary
@@ -20,15 +20,19 @@ LOGGER = logging.getLogger(__name__)
 # YugabyteDB keeps a slot's `active` flag set for up to
 # ysql_cdc_active_replication_slot_window_ms (default 5 minutes) after the last consumer
 # disconnects; pg_drop_replication_slot fails with "slot is active" during that window,
-# so drop_slot retries instead of failing the resync outright. Dropping a slot shortly
-# after heavy CDC activity can also transiently surface as InFailedSqlTransaction or
-# SerializationFailure while the catalog-version bump from that activity settles.
+# so slot administration retries instead of failing the resync outright. Dropping a slot
+# shortly after heavy CDC activity can also transiently surface as InFailedSqlTransaction
+# or SerializationFailure while the catalog-version bump from that activity settles.
 _DROP_SLOT_RETRY_ATTEMPTS = 10
 _DROP_SLOT_RETRY_INTERVAL_SECONDS = 30
 _RETRYABLE_DROP_SLOT_ERRORS = (
     psycopg2.errors.InFailedSqlTransaction,
     psycopg2.errors.SerializationFailure,
 )
+
+# Slot administration runs in-process from the main pipelinewise virtualenv, whose stock
+# psycopg2-binary rejects the YugabyteDB driver's load balancing connection options.
+_DRIVER_SPECIFIC_CONNECTION_OPTIONS = ('load_balance', 'topology_keys')
 
 # A `yb_read_time`-pinned read validates its session's cached catalog snapshot against
 # the cluster's current catalog version. A concurrent DDL elsewhere in the cluster can
@@ -78,6 +82,46 @@ class FastSyncTapYugabyte:
         return re.sub('[^a-z0-9_]', '_', slot_name)
 
     @classmethod
+    def admin_connection(cls, connection_config: Dict):
+        """
+        Open a slot-administration connection without driver-specific options.
+
+        Args:
+            connection_config: Dictionary with db credentials
+        Returns:
+            psycopg2 Connection instance
+        """
+        return cls.get_connection({
+            key: value
+            for key, value in connection_config.items()
+            if key not in _DRIVER_SPECIFIC_CONNECTION_OPTIONS
+        })
+
+    @classmethod
+    def _run_slot_statement(cls, connection, slot_name: str, phase: str, statement: Callable) -> None:
+        """Run one slot statement, retrying YugabyteDB's transient active-slot errors."""
+        for attempt in range(1, _DROP_SLOT_RETRY_ATTEMPTS + 1):
+            try:
+                with connection.cursor() as cur:
+                    statement(cur)
+                return
+            except psycopg2.Error as exc:
+                retryable = 'is active' in str(exc) or isinstance(exc, _RETRYABLE_DROP_SLOT_ERRORS)
+                if not retryable or attempt == _DROP_SLOT_RETRY_ATTEMPTS:
+                    raise
+                LOGGER.info(
+                    'Slot "%s" %s failed (%s), retrying in %s seconds (attempt %s/%s)',
+                    slot_name,
+                    phase,
+                    exc.__class__.__name__,
+                    _DROP_SLOT_RETRY_INTERVAL_SECONDS,
+                    attempt,
+                    _DROP_SLOT_RETRY_ATTEMPTS,
+                )
+                connection.rollback()
+                time.sleep(_DROP_SLOT_RETRY_INTERVAL_SECONDS)
+
+    @classmethod
     def drop_slot(cls, connection_config: Dict) -> None:
         """
         Drop the logical replication slot used by this tap, tolerating YugabyteDB's
@@ -87,37 +131,121 @@ class FastSyncTapYugabyte:
             connection_config: Dictionary with db credentials
         """
         LOGGER.info('Attempting to drop slot ...')
-        connection = cls.get_connection(connection_config)
+        connection = cls.admin_connection(connection_config)
         slot_name = cls.generate_replication_slot_name(
             connection_config['dbname'], connection_config['tap_id']
         )
 
+        def drop(cur):
+            cur.execute(
+                f'SELECT pg_drop_replication_slot(slot_name) '
+                f"FROM pg_replication_slots WHERE slot_name = '{slot_name}';"
+            )
+            LOGGER.info('Number of dropped slots: %s', cur.rowcount)
+
         try:
-            for attempt in range(1, _DROP_SLOT_RETRY_ATTEMPTS + 1):
-                try:
-                    with connection.cursor() as cur:
-                        cur.execute(
-                            f'SELECT pg_drop_replication_slot(slot_name) '
-                            f"FROM pg_replication_slots WHERE slot_name = '{slot_name}';"
-                        )
-                        LOGGER.info('Number of dropped slots: %s', cur.rowcount)
-                    return
-                except psycopg2.Error as exc:
-                    retryable = 'is active' in str(exc) or isinstance(exc, _RETRYABLE_DROP_SLOT_ERRORS)
-                    if not retryable or attempt == _DROP_SLOT_RETRY_ATTEMPTS:
-                        raise
-                    LOGGER.info(
-                        'Slot "%s" drop failed (%s), retrying in %s seconds (attempt %s/%s)',
-                        slot_name,
-                        exc.__class__.__name__,
-                        _DROP_SLOT_RETRY_INTERVAL_SECONDS,
-                        attempt,
-                        _DROP_SLOT_RETRY_ATTEMPTS,
-                    )
-                    connection.rollback()
-                    time.sleep(_DROP_SLOT_RETRY_INTERVAL_SECONDS)
+            cls._run_slot_statement(connection, slot_name, 'drop', drop)
         finally:
             connection.close()
+
+    @classmethod
+    def reset_slot(cls, connection_config: Dict, *, before_reset: Callable[[], Optional[str]]) -> None:
+        """Validate one tap-specific slot, invalidate state, then replace the slot."""
+        LOGGER.info('Attempting to reset slot ...')
+
+        connection = cls.admin_connection(connection_config)
+        try:
+            slot_name, slot_exists = cls._preflight_slot_reset(connection, connection_config)
+            # State must be durable before DROP: losing its response cannot restore the old
+            # HybridTime boundary.
+            backup_path = before_reset()
+            phase = 'drop' if slot_exists else 'create'
+            try:
+                if slot_exists:
+                    LOGGER.info('Dropping the slot "%s"', slot_name)
+                    cls._run_slot_statement(
+                        connection,
+                        slot_name,
+                        'drop',
+                        lambda cur: cur.execute('SELECT pg_drop_replication_slot(%s)', (slot_name,)),
+                    )
+                phase = 'create'
+                LOGGER.info('Creating the slot "%s"', slot_name)
+                cls._run_slot_statement(
+                    connection,
+                    slot_name,
+                    'create',
+                    lambda cur: cur.execute(
+                        'SELECT * FROM pg_create_logical_replication_slot(%s, %s, %s, %s, %s)',
+                        (slot_name, 'wal2json', False, False, 'HYBRID_TIME'),
+                    ),
+                )
+            except psycopg2.Error as exc:
+                raise RuntimeError(
+                    f'YugabyteDB slot reset failed during {phase} for "{slot_name}"; '
+                    'the source-side outcome may be uncertain. Tap bookmarks remain invalidated. '
+                    f'Pre-reset state backup: {backup_path or "no previous state file"}. '
+                    'Keep scheduled replication stopped, resolve the source error, and rerun '
+                    'the unfiltered fast_sync (adding --force only to bypass the size limit). '
+                    'Do not restore old LOG_BASED bookmarks '
+                    'after a completed or uncertain slot drop.'
+                ) from exc
+        finally:
+            connection.close()
+
+    @classmethod
+    def _preflight_slot_reset(cls, connection, connection_config: Dict) -> Tuple[str, bool]:
+        """Reject shared or incompatible slots and wait out the lingering active window."""
+        database = connection_config['dbname']
+        legacy_name = cls.generate_replication_slot_name(database)
+        slot_name = cls.generate_replication_slot_name(database, connection_config['tap_id'])
+        if slot_name == legacy_name or len(slot_name) > 63:
+            raise RuntimeError('Slot reset requires a distinct tap-specific slot name of at most 63 characters.')
+
+        for attempt in range(1, _DROP_SLOT_RETRY_ATTEMPTS + 1):
+            with connection.cursor() as cur:
+                cur.execute(
+                    'SELECT slot_name, database, plugin, active FROM pg_replication_slots '
+                    'WHERE slot_name IN (%s, %s)',
+                    (legacy_name, slot_name),
+                )
+                slots = {row[0]: row[1:] for row in cur.fetchall()}
+
+            if legacy_name in slots:
+                raise RuntimeError(
+                    f'Cannot reset legacy YugabyteDB slot "{legacy_name}": it may be shared by other taps. '
+                    'Coordinate migration to tap-specific slots with your DBA before retrying. '
+                    'No source or state changes were made.'
+                )
+            if slot_name not in slots:
+                return slot_name, False
+
+            slot_database, plugin, active = slots[slot_name]
+            if slot_database != database or plugin != 'wal2json':
+                raise RuntimeError(
+                    f'Cannot reset YugabyteDB slot "{slot_name}": it must use wal2json and belong to the '
+                    'configured database. No source or state changes were made.'
+                )
+            if not active:
+                return slot_name, True
+            # `active` stays set for the whole post-disconnect window, so it only proves a live
+            # consumer once the window has elapsed; waiting here keeps state intact meanwhile.
+            if attempt == _DROP_SLOT_RETRY_ATTEMPTS:
+                raise RuntimeError(
+                    f'Cannot reset YugabyteDB slot "{slot_name}": it is still active after '
+                    f'{_DROP_SLOT_RETRY_ATTEMPTS * _DROP_SLOT_RETRY_INTERVAL_SECONDS} seconds, longer than '
+                    'ysql_cdc_active_replication_slot_window_ms, so a consumer is likely still streaming it. '
+                    'Stop every consumer of this slot and retry. No source or state changes were made.'
+                )
+            LOGGER.info(
+                'Slot "%s" is still active, waiting %s seconds for YugabyteDB\'s active-slot '
+                'window to elapse (attempt %s/%s)',
+                slot_name,
+                _DROP_SLOT_RETRY_INTERVAL_SECONDS,
+                attempt,
+                _DROP_SLOT_RETRY_ATTEMPTS,
+            )
+            time.sleep(_DROP_SLOT_RETRY_INTERVAL_SECONDS)
 
     @classmethod
     def get_connection(cls, connection_config: Dict):
