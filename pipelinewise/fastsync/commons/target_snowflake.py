@@ -20,13 +20,11 @@ LOGGER = logging.getLogger(__name__)
 logging.getLogger('snowflake.connector').setLevel(logging.WARNING)
 
 
-# pylint: disable=missing-function-docstring,too-many-arguments
-class FastSyncTargetSnowflake(SnowflakeSqlClient):  # pylint: disable=too-many-public-methods
+class FastSyncTargetSnowflake(SnowflakeSqlClient):
     """
     Common functions for fastsync to Snowflake
     """
 
-    # pylint: disable=invalid-name
     def __init__(self, connection_config, transformation_config=None):
         super().__init__(connection_config)
         self.transformation_config = transformation_config
@@ -240,7 +238,6 @@ class FastSyncTargetSnowflake(SnowflakeSqlClient):  # pylint: disable=too-many-p
                     exc,
                 )
 
-    # pylint: disable=too-many-positional-arguments
     def create_table(
         self,
         target_schema: str,
@@ -362,7 +359,6 @@ class FastSyncTargetSnowflake(SnowflakeSqlClient):  # pylint: disable=too-many-p
         """
         return f'"{schema.upper()}"."{table.upper()}"'
 
-    # pylint: disable=too-many-locals
     def copy_to_table(
         self,
         s3_key,
@@ -383,12 +379,12 @@ class FastSyncTargetSnowflake(SnowflakeSqlClient):  # pylint: disable=too-many-p
         inserts = 0
 
         stage = self.connection_config['stage']
-        # Keep Snowflake's default explicit: unquoted empty fields are NULL, while
-        # quoted empty fields remain empty strings.
+        # Empty unquoted fields are the only SQL NULL representation. An empty
+        # NULL_IF keeps literal source values such as ``\N`` intact.
         sql = (
             f'COPY INTO {target_schema}."{target_table.upper()}" FROM \'@{stage}/{s3_key}\''
             f' FILE_FORMAT = (type=CSV escape=NONE escape_unenclosed_field=\'\\x1e\''
-            f' field_optionally_enclosed_by=\'\"\' empty_field_as_null=TRUE'
+            f' field_optionally_enclosed_by=\'\"\' null_if=() empty_field_as_null=TRUE'
             f' skip_header={int(skip_csv_header)}'
             f' compression=GZIP binary_format=HEX)'
         )
@@ -417,7 +413,7 @@ class FastSyncTargetSnowflake(SnowflakeSqlClient):  # pylint: disable=too-many-p
 
     # grant_... functions are common functions called by utils.py: grant_privilege function
     # "to_group" is not used here but exists for compatibility reasons with other database types
-    # pylint: disable=unused-argument
+
     def grant_select_on_table(
         self, target_schema, table_name, role, is_temporary, to_group=False
     ):
@@ -436,14 +432,12 @@ class FastSyncTargetSnowflake(SnowflakeSqlClient):  # pylint: disable=too-many-p
                 sql, query_tag_props={'schema': target_schema, 'table': table_name}
             )
 
-    # pylint: disable=unused-argument
     def grant_usage_on_schema(self, target_schema, role, to_group=False):
         # Grant role is not mandatory parameter, do nothing if not specified
         if role:
             sql = 'GRANT USAGE ON SCHEMA {} TO ROLE {}'.format(target_schema, role)
             self.query(sql, query_tag_props={'schema': target_schema})
 
-    # pylint: disable=unused-argument
     def grant_select_on_schema(self, target_schema, role, to_group=False):
         # Grant role is not mandatory parameter, do nothing if not specified
         if role:
@@ -515,9 +509,6 @@ class FastSyncTargetSnowflake(SnowflakeSqlClient):  # pylint: disable=too-many-p
     def _partial_hard_delete_query(schema, table, where_clause_sql):
         return f'DELETE FROM {schema}."{table.upper()}"{where_clause_sql} AND _SDC_DELETED_AT IS NOT NULL'
 
-    def partial_hard_delete(self, schema, table, where_clause_sql):
-        self.query(self._partial_hard_delete_query(schema, table, where_clause_sql))
-
     def publish_partial_sync(
         self,
         schema,
@@ -526,16 +517,14 @@ class FastSyncTargetSnowflake(SnowflakeSqlClient):  # pylint: disable=too-many-p
         columns,
         primary_keys,
         where_clause_sql,
-        hard_delete,
     ):
-        """Atomically mark, merge, and optionally delete one partial range."""
+        """Atomically mark, merge, and delete missing rows in one partial range."""
         queries = [
             f'UPDATE {schema}."{target_table.upper()}" SET _SDC_DELETED_AT = CURRENT_TIMESTAMP()'
             f'{where_clause_sql} AND _SDC_DELETED_AT IS NULL',
             self._merge_tables_query(schema, source_table, target_table, columns, primary_keys),
+            self._partial_hard_delete_query(schema, target_table, where_clause_sql),
         ]
-        if hard_delete:
-            queries.append(self._partial_hard_delete_query(schema, target_table, where_clause_sql))
 
         self.execute_transaction(queries, query_tag_props={'schema': schema, 'table': target_table})
 

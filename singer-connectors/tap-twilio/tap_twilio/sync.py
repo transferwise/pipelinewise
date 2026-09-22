@@ -51,12 +51,12 @@ def write_bookmark(state, stream, value):
 
 def transform_datetime(this_dttm):
     with Transformer() as transformer:
-        # pylint: disable=protected-access
+
         new_dttm = transformer._transform_datetime(this_dttm)
     return new_dttm
 
 
-def process_records(catalog,  # pylint: disable=too-many-branches
+def process_records(catalog,
                     stream_name,
                     records,
                     time_extracted,
@@ -153,8 +153,8 @@ def get_dates(state, stream_name, start_date, bookmark_field, bookmark_query_fie
 
 
 # Sync a specific parent or child endpoint.
-# pylint: disable=too-many-statements,too-many-branches
-def sync_endpoint(
+
+def sync_endpoint(  # noqa: C901
         client,
         config,
         catalog,
@@ -190,10 +190,12 @@ def sync_endpoint(
 
     endpoint_total = 0
 
-    # pylint: disable=too-many-nested-blocks
     while start_window < now_datetime:
-        LOGGER.info('START Sync for Stream: %s%s', stream_name,
-                    ', Date window from: {} to {}'.format(start_window, end_window) if bookmark_query_field_from else '')
+        LOGGER.info(
+            'START Sync for Stream: %s%s',
+            stream_name,
+            ', Date window from: {} to {}'.format(start_window, end_window) if bookmark_query_field_from else '',
+        )
 
         params = static_params  # adds in endpoint specific, sort, filter params
 

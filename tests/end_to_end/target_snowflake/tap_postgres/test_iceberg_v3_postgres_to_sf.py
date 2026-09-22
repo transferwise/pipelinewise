@@ -11,6 +11,10 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 
 from tests.end_to_end.helpers import assertions, tasks
+from tests.end_to_end.target_snowflake.multiline_values import (
+    exercise_multiline_fastsync,
+    prepare_postgres_multiline_table,
+)
 from tests.end_to_end.target_snowflake.tap_postgres import TapPostgres
 
 
@@ -84,7 +88,6 @@ def _horizon_credentials(identity):
 class TestIcebergV3PostgresToSnowflake(TapPostgres):
     """Exercise PostgreSQL Singer, FullSync, and PartialSync into Iceberg."""
 
-    # pylint: disable=arguments-differ
     def setUp(self):
         super().setUp(tap_id=TAP_ID, target_id=TARGET_ID)
         self.target_schema = (f"PPW_E2E_TAP_POSTGRES{self.e2e_env.sf_schema_postfix}").upper()
@@ -94,6 +97,13 @@ class TestIcebergV3PostgresToSnowflake(TapPostgres):
         """Create Iceberg-only source tables before catalog discovery."""
         super().prepare_source()
         self.addCleanup(self._drop_iceberg_source_tables)
+        self.addCleanup(
+            self.e2e_env.run_query_tap_postgres,
+            "DROP TABLE IF EXISTS public.multiline_values CASCADE",
+        )
+        prepare_postgres_multiline_table(
+            self.e2e_env.run_query_tap_postgres
+        )
         self.e2e_env.run_query_tap_postgres(
             "ALTER TABLE public.edgydata ADD COLUMN large_text text"
         )
@@ -359,6 +369,7 @@ class TestIcebergV3PostgresToSnowflake(TapPostgres):
                     "public-country": False,
                     "public-no_pk_table": False,
                     "public-iceberg_composite_key": False,
+                    "public-multiline_values": True,
                 }
             },
         )
@@ -370,6 +381,7 @@ class TestIcebergV3PostgresToSnowflake(TapPostgres):
             "no_pk_table",
             "iceberg_hstore",
             "iceberg_composite_key",
+            "multiline_values",
         ):
             self._assert_managed_v3(table_name)
         self._assert_country_approximate_numbers_are_double()
@@ -381,6 +393,21 @@ class TestIcebergV3PostgresToSnowflake(TapPostgres):
             self.initial_s3_keys,
         )
         self._exercise_singer_handoff(fastsync_id)
+
+    def test_full_and_bounded_partial_sync_preserve_multiline_bytes(self):
+        """PostgreSQL FastSync retains controls, escapes, Unicode, empty, and NULL."""
+        exercise_multiline_fastsync(
+            self,
+            self.e2e_env.run_query_tap_postgres,
+            "public",
+            "postgres",
+            self.target_schema,
+            lambda: self._assert_managed_v3("multiline_values"),
+        )
+        self.assert_iceberg_fastsync_cleanup(
+            self.target_schema,
+            self.initial_s3_keys,
+        )
 
     def test_partial_sync_merges_a_bounded_range_into_managed_iceberg_v3(self):
         """PartialSync preserves VARIANT values in a PostgreSQL key range."""

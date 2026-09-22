@@ -2,6 +2,7 @@ import os
 import subprocess
 from pathlib import Path
 
+import pytest
 import yaml
 
 
@@ -56,6 +57,9 @@ case "${FAKE_CURL_SCENARIO}:${page}" in
     ;;
   detector_only:1)
     printf '[{"filename":"scripts/ci_check_no_file_changes.sh"}]'
+    ;;
+  lint_policy_only:1)
+    printf '[{"filename":"%s"}]' "${LINT_POLICY_FILE}"
     ;;
   e2e_workflow:1)
     printf '[{"filename":".github/workflows/e2e_tests.yml"}]'
@@ -175,6 +179,33 @@ def test_detector_change_triggers_checks(tmp_path):
     assert 'Detected changes in following file: scripts/ci_check_no_file_changes.sh' in result.stdout
 
 
+@pytest.mark.parametrize(
+    'filename',
+    (
+        '.flake8',
+        '.github/workflows/connectors.yml',
+        '.github/workflows/e2e_tests.yml',
+        '.github/workflows/lint_unit_tests.yml',
+        '.github/workflows/publish_doc.yml',
+        '.pre-commit-config.yaml',
+        '.style.yapf',
+        'docs/conf.py',
+        'pylintrc',
+        'pyproject.toml',
+        'scripts/check_any_file_changed.py',
+    ),
+)
+def test_root_lint_input_change_triggers_checks(tmp_path, monkeypatch, filename):
+    """Changes to Ruff policy or files unique to its scope must run the workflow."""
+    monkeypatch.setenv('LINT_POLICY_FILE', filename)
+
+    result, pages = run_detector(tmp_path, 'lint_policy_only', 'python')
+
+    assert result.returncode == 1
+    assert pages == ['1']
+    assert f'Detected changes in following file: {filename}' in result.stdout
+
+
 def test_e2e_workflow_triggers_checks(tmp_path):
     """An E2E workflow-only change must run the E2E jobs it defines."""
     result, pages = run_detector(tmp_path, 'e2e_workflow', 'python', 'config', 'e2e')
@@ -203,30 +234,31 @@ def test_snowflake_e2e_matrix_contract():
 
     expected_shards = {
         'conversion': (
-            'e2e_tests_sf_conversion',
+            'e2e_tests_02',
             (
                 'tests/end_to_end/target_snowflake/test_native_to_iceberg_converter.py',
                 'tests/end_to_end/data_diff/test_mysql_to_snowflake.py',
             ),
         ),
         'publication': (
-            'e2e_tests_sf_publication',
+            'e2e_tests_03',
             (
                 'tests/end_to_end/target_snowflake/tap_postgres/test_snowflake_iceberg_publisher.py',
                 'tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_replica_to_sf.py',
             ),
         ),
         'pg-partial': (
-            'e2e_tests_sf_pg_partial',
+            'e2e_tests_04',
             (
                 'tests/end_to_end/target_snowflake/tap_postgres/test_partial_sync_pg_to_sf.py',
+                'tests/end_to_end/target_snowflake/tap_postgres/test_multiline_native_pg_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_with_custom_buffer_size.py',
                 'tests/end_to_end/data_diff/test_postgres_to_snowflake.py',
                 'tests/end_to_end/target_snowflake/tap_yugabyte/test_partial_sync_yugabyte_to_sf.py',
             ),
         ),
         'mariadb-partial': (
-            'e2e_tests_sf_mariadb_partial',
+            'e2e_tests_05',
             (
                 'tests/end_to_end/target_snowflake/tap_mariadb/test_partial_sync_mariadb_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_postgres/test_defined_partial_sync_pg_to_sf.py',
@@ -235,7 +267,7 @@ def test_snowflake_e2e_matrix_contract():
             ),
         ),
         'pg-iceberg': (
-            'e2e_tests_sf_pg_iceberg',
+            'e2e_tests_06',
             (
                 'tests/end_to_end/target_snowflake/tap_postgres/test_iceberg_v3_postgres_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf.py',
@@ -243,27 +275,28 @@ def test_snowflake_e2e_matrix_contract():
             ),
         ),
         'mariadb-iceberg': (
-            'e2e_tests_sf_mariadb_iceberg',
+            'e2e_tests_07',
             (
                 'tests/end_to_end/target_snowflake/tap_mariadb/test_iceberg_v3_mariadb_to_sf.py',
-                'tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_soft_delete.py',
                 'tests/end_to_end/target_snowflake/tap_mongodb/test_replicate_mongodb_to_sf.py',
             ),
         ),
         'mysql-iceberg': (
-            'e2e_tests_sf_mysql_iceberg',
+            'e2e_tests_08',
             (
                 'tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py',
+                'tests/end_to_end/target_snowflake/tap_mysql/test_multiline_native_mysql_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_table_size_check.py',
                 'tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf_with_archive_load_files.py',
             ),
         ),
         'mariadb-native': (
-            'e2e_tests_sf_mariadb_native',
+            'e2e_tests_09',
             (
                 'tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_table_size_check.py',
                 'tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf.py',
+                'tests/end_to_end/target_snowflake/tap_mariadb/test_multiline_native_mariadb_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_mariadb/test_defined_partial_sync_mariadb_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_with_split_large_files.py',
             ),
@@ -304,6 +337,7 @@ def test_snowflake_e2e_matrix_contract():
     assert '${{ matrix.shard }}' in job['env']['PIPELINEWISE_E2E_NAMESPACE']
 
     retired_jobs = {
+        'e2e_tests_target_pg',
         'e2e_tests_mariadb_to_sf',
         'e2e_tests_mysql_to_sf',
         'e2e_tests_pg_to_sf',
@@ -312,7 +346,7 @@ def test_snowflake_e2e_matrix_contract():
     }
     assert retired_jobs.isdisjoint(jobs)
 
-    target_pg_job = jobs['e2e_tests_target_pg']
+    target_pg_job = jobs['e2e_tests_01']
     target_pg_commands = '\n'.join(
         step.get('run', '') for step in target_pg_job['steps']
     )
@@ -342,18 +376,23 @@ def test_snowflake_e2e_matrix_contract():
 
 
 def test_required_e2e_status_contract():
-    """Repository rules require every current Snowflake shard exactly once."""
+    """Repository rules require every numbered E2E shard exactly once."""
     workflow = yaml.safe_load(E2E_WORKFLOW.read_text(encoding='utf-8'))
     rules = yaml.safe_load(TW_RULES.read_text(encoding='utf-8'))
     shards = workflow['jobs']['e2e_tests_snowflake']['strategy']['matrix']['include']
-    expected_statuses = {shard['check_name'] for shard in shards}
+    expected_statuses = {'e2e_tests_01'} | {
+        shard['check_name'] for shard in shards
+    }
     configured_checks = rules['actions']['branch-protection-settings']['branches'][0]['checks']
     configured_names = [check['name'] for check in configured_checks]
     required_statuses = {
-        name for name in configured_names if name.startswith('e2e_tests_sf_')
+        name for name in configured_names if name.startswith('e2e_tests_')
     }
 
     assert len(configured_names) == len(set(configured_names))
+    assert expected_statuses == {
+        f'e2e_tests_{shard_number:02d}' for shard_number in range(1, 10)
+    }
     assert required_statuses == expected_statuses
     assert not {
         'e2e_tests_mariadb_to_sf',

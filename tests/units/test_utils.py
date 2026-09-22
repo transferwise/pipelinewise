@@ -12,7 +12,7 @@ from pipelinewise.fastsync.commons.tap_postgres import FastSyncTapPostgres
 class MockCursor:
     """Mock Cursor class"""
 
-    def __init__(self, *args, **kwargs):  # pylint: disable=unused-argument
+    def __init__(self, *args, **kwargs):
         self.rowcount = None
 
     def __enter__(self):
@@ -21,7 +21,7 @@ class MockCursor:
     def __exit__(self, exc_type, exc_val, exc_tb):
         pass
 
-    def execute(self, sql, params=None):  # pylint: disable=unused-argument
+    def execute(self, sql, params=None):
         """Mock execute method"""
         self.rowcount = 2
 
@@ -40,6 +40,7 @@ class MockCursor:
             ]
         return None
 
+
 class ConnMock:
     """Mock Connection class"""
 
@@ -55,7 +56,7 @@ class ConnMock:
 
     def close(self):
         """Mock close method"""
-        pass  # pylint: disable=unnecessary-pass
+        pass
 
 
 class FastSyncTapMySqlMock(FastSyncTapMySql):

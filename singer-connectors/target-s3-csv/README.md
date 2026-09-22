@@ -108,11 +108,11 @@ Full list of options in `config.json`:
   make integration_test
 ```
 
-### To run pylint:
+### To run Ruff:
 
 1. Install python dependencies and run python linter
 ```bash
-    make venv pylint
+    make venv lint
 ```
 
 ## License

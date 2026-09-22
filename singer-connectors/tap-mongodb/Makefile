@@ -26,8 +26,8 @@ check_dep:
 setup: create_venv setup_local_db upgrade_pip install_dep check_dep
 	echo "Setup is finished"
 
-pylint:
-	pylint tap_mongodb tap_mongodb/sync_strategies --rcfile=pylintrc
+lint:
+	cd ../.. && singer-connectors/tap-mongodb/venv/bin/ruff check singer-connectors/tap-mongodb/tap_mongodb/
 
 test:
 	pytest tests -v

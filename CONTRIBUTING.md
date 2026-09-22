@@ -43,19 +43,20 @@ Run applicable checks in the ready `pipelinewise` container. The root
 implementation gates are:
 
 ```bash
-ruff check pipelinewise tests
-pylint pipelinewise tests
-flake8 pipelinewise --count --select=E9,F63,F7,F82 --show-source --statistics
-flake8 pipelinewise --count --max-complexity=15 --max-line-length=120 --statistics
+ruff check .
 pytest --cov=pipelinewise --cov-fail-under=77 -v tests/units
 ```
 
 Never run bare `pytest tests/`; it also collects credentialed end-to-end tests.
 
 Changes under `singer-connectors/` require the owning connector's install, lint,
-unit, coverage, and applicable integration targets. Root checks do not inspect
-vendored connector source. Run relevant database and end-to-end routes serially
-using the [`dev-project`](dev-project/README.md) environment.
+unit, coverage, and applicable integration targets. The root Ruff gate inspects
+all repository Python except connector suites outside GitHub connector CI,
+including integration suites, legacy tests, and spikes. This includes vendored
+connector source and the tap-mysql, tap-postgres, and target-snowflake unit suites
+run by connector CI. Run relevant
+database and end-to-end routes serially using the
+[`dev-project`](dev-project/README.md) environment.
 
 After configuration schema or sample changes, run:
 

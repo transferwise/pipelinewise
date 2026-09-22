@@ -151,7 +151,7 @@ def test_core_emits_create_and_add_cases(tmp_path):
         assert source_column.definition == case['expected_definition']
 
         publisher = SnowflakeIcebergPublisher(FakeSnowflake(), str(tmp_path))
-        create_sql = publisher.publication_service._ctas_sql(  # pylint: disable=protected-access
+        create_sql = publisher.publication_service._ctas_sql(
             desired,
             desired.name.staging_name('fixture-load'),
             iceberg_version=3,

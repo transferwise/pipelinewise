@@ -1,4 +1,4 @@
-0.86.0 (2026-09-10)
+0.90.1 (2026-09-2)
 -------------------
 
 **tap-yugabyte**
@@ -51,14 +51,247 @@
   already has files at the shared install path from a prior `psycopg2-binary`
   install
 
-Documentation only
-------------------
+0.90.0 (2026-09-21)
+-------------------
+
+**Replication correctness**
+
+- Keep MySQL and MariaDB file/position and GTID checkpoints behind incomplete
+  transactions so restarts retain table mappings and all rows; preserve
+  complete server/domain history for GTID restart and reconnect
+- Keep MariaDB savepoints inside their transaction until commit, and advance
+  past schema-filtered standalone transactions only at proven boundaries
+- Skip already acknowledged events per stream when restarting from a shared
+  binlog position, preventing replay from overwriting newer target rows
+- Process binlog row events at the sampled end position instead of skipping
+  the final event, and honour MariaDB file/position bookmarks without GTID
+- Delete the previous target identity when a MySQL or MariaDB primary-key value
+  changes during binlog replication
+- Preserve distinct composite and empty-string primary keys in Snowflake target
+  buffers, avoiding silent row loss and duplicate merge inputs
+- Withhold Snowflake target state until the corresponding streams are durable,
+  including the first checkpoint when per-stream flushing is enabled
+- Start Singer from the replica's applied primary-binlog coordinates after
+  FastSync, replaying changes missing from a lagging replica snapshot
+- Preserve supplementary Unicode through MySQL and MariaDB Singer, FullSync,
+  and PartialSync with an `utf8mb4` connection default and FastSync projection
+- Scope binlog column rediscovery to the affected schema and stream so another
+  table's ignored columns cannot suppress schema updates
+- Recognize MySQL's `geomcollection` type in Singer discovery and FastSync
+  mappings instead of silently omitting geometry-collection columns
+- Preserve MySQL and MariaDB TIME microseconds and signs in Singer records
+
+**Compatibility and operations**
+
+- Run the dev-project and GitHub E2E MySQL and MariaDB sources with
+  `binlog_row_metadata=FULL` while retaining mysql-replication 0.46, proving
+  current replication remains compatible ahead of a future decoder upgrade
+- Recheck ROW/FULL binlog settings on resumed replication and fail instead of
+  silently skipping events whose table metadata is unavailable
+- Require a one-time FullSync for existing MySQL/MariaDB GTID checkpoints that
+  lack the new complete-history marker; older checkpoints can omit source history
+- List every selected stream with missing or legacy GTIDs in startup errors
+  so operators can identify the required resync scope
+- Reject unsafe legacy row-event bookmarks with a resync requirement; reject
+  multi-channel replica coordinates, XA transactions, selected-table TRUNCATE,
+  and unsupported partial-JSON or compressed binlog events instead of
+  acknowledging lost data
+- Infer MariaDB GTIDs from file/position bookmarks only at verified transaction
+  boundaries, avoiding acknowledgements of partially consumed transactions
+- Accept MariaDB rotated-binlog headers, including header-only files at verified
+  EOF, without unnecessary resync demands
+- Report undecodable bookmarks and missing or anonymous GTID markers with
+  actionable recovery errors
+- Stop file/position binlog reads on connection loss so retries use durable
+  checkpoints rather than the decoder's potentially mid-transaction position;
+  retain retries for separate table-metadata connections
+- Retain complete GTID sets in state; older versions cannot reliably resume
+  multi-server or multi-domain checkpoints. Resolve pending managed-Iceberg
+  recovery with its original charset before adopting the new default
+- Support current MySQL binary-log status statements with legacy syntax
+  fallback; existing missing or corrupted target data still requires resync
+
+**Dependencies**
+
+- Update the Snowflake Python connector to 4.7.3 in core and target-snowflake,
+  PyMySQL to 1.1.3 in core and tap-mysql, and the target's Boto3 pin to 1.43.94
+- Update sqlparse to 0.6.0 to include denial-of-service fixes in PartialSync SQL
+  parsing and validation
+- Retain mysql-replication 0.46: newer releases require additional source-binlog
+  metadata for reliable type decoding, so that upgrade needs separate validation
+
+0.89.0 (2026-09-18)
+-------------------
+
+**Breaking compatibility**
+
+- Remove experimental Parquet staging from the bundled Snowflake target;
+  require its configured named file format to be CSV and reject unsupported
+  types before consuming Singer input
+
+**Fixes**
+
+- Validate the Snowflake target's named file format even when table caching is
+  disabled, avoiding a startup crash
+- Report missing or incompatible Snowflake target file formats with a concise
+  error and exit code 1 before consuming Singer input
+
+**Dependencies**
+
+- Remove NumPy and pandas/PyArrow staging dependencies from PipelineWise core
+  and the bundled Snowflake target without changing CSV, FastSync, or
+  Snowflake-managed Iceberg loads
+
+0.88.0 (2026-09-17)
+-------------------
+
+**Breaking compatibility**
+
+- Make physical deletion of source-deleted rows mandatory in PipelineWise and
+  the bundled PostgreSQL and Snowflake targets: process source-delete markers
+  before acknowledging Singer state and remove missing rows from PartialSync
+  ranges
+- Include historical target rows with a non-null `_SDC_DELETED_AT` in deletion
+  cleanup; Snowflake performs this cleanup after a non-empty stream load, and
+  streams receiving only SCHEMA/STATE messages are not cleaned. Retired
+  deletion-mode settings are ignored, and existing generated configs remain
+  usable without reimport
+- Retain `_SDC_DELETED_AT` for internal delete processing and automatically
+  enable target metadata columns, even when `add_metadata_columns` is false
+
+**Fixes**
+
+- Preserve FastSync bookmarks when target runtime configuration cannot be
+  loaded or combined for execution
+- Retry Snowflake table discovery once when another FastSync worker creates
+  the schema during discovery; restrict recovery to the missing-object error
+  and surface unrelated errors and retry failures
+- Count PostgreSQL target deletions without fetching the deleted rows into
+  memory
+
+**Tests**
+
+- Verify native PostgreSQL and MariaDB PartialSync remove existing target rows
+  deleted at source while preserving rows outside the selected range
+
+0.87.0 (2026-09-17)
+-------------------
+
+**Test infrastructure**
+
+- Use stable numbered E2E shard checks `e2e_tests_01` through `e2e_tests_09`
+  across branch protection, workflow outputs, and contract tests, allowing
+  future test rebalancing without further required-check renames
+
+**Docker image**
+
+- Configure mbuffer status reporting every 30 seconds in the main Docker image,
+  reducing progress log volume without changing stream-buffer behaviour
+
+**Developer tooling**
+
+- Consolidate Python linting on Ruff for PipelineWise, data-diff, all root tests
+  including E2E, vendored connector source, and the tap-mysql, tap-postgres, and
+  target-snowflake suites run by connector CI, replacing Pylint, Flake8, YAPF,
+  and Unify
+- Retain 120-character line, warning, docstring-quote, and complexity checks
+  plus Ruff's Pylint-category error rules without enabling Pylint convention,
+  refactor, and warning families wholesale over legacy code
+- Enforce line length, docstring quoting, lambda assignment, and complexity
+  across all vendored connector source, replacing connector-wide Ruff
+  exemptions with fixes or narrowly scoped inline exceptions
+- Enforce blank-line spacing with explicitly selected Ruff preview rules and
+  remove spacing left by retired directives; verify line-length and spacing
+  enforcement with executable lint probes
+- Remove broad unused-import, unused-variable, undefined-name, and test
+  type-comparison exemptions while preserving connector exports and initialization
+- Exclude connector suites outside existing GitHub connector CI, including
+  integration suites, legacy tests, and spikes, from the root Ruff gate
+- Run the lint and unit workflow for changes to Ruff policy, its pre-commit
+  hook, or the workflow itself, even when no application Python changed
+- Remove obsolete inline directives for retired linters, replace avoidable
+  invalid-escape exceptions with equivalent valid string literals, and guard
+  against reintroducing non-Ruff directives
+- Set tap-kafka's unit, integration, and combined coverage threshold to 59%,
+  with measured unit coverage of 59.18%; integration and combined coverage
+  baselines remain unverified
+
+0.86.0 (2026-09-16)
+-------------------
+
+**Breaking compatibility**
+
+- Require target-snowflake named CSV formats to use the required multiline-safe
+  options, including `NULL_IF = ()`, and reject incompatible formats before
+  loading
+- Default `flush_all_streams` to `true` in PipelineWise-generated Singer
+  configuration to load sparse streams sooner and advance cross-stream
+  checkpoints more frequently, potentially increasing loading cost; retain
+  explicit `false` overrides and re-run `import_config` to adopt the default
+  for existing taps
+
+**Fixes**
+
+- Preserve LF, CR, CRLF, tabs, CSV punctuation, three-byte Unicode, and literal
+  backslash sequences in MariaDB/MySQL FastSync exports while
+  continuing to remove NUL characters
+- Preserve actual control characters and literal backslash sequences in
+  target-snowflake Singer CSV string fields
+- Validate the exact configured Snowflake file format, respecting database and
+  schema qualifiers and quoted identifiers instead of checking a same-named
+  object in another schema
+- Preserve quoted Snowflake file-format names in COPY and MERGE SQL so loading
+  uses the same object as validation
+
+**Tests**
+
+- Verify PostgreSQL Snowflake FastSync and target-snowflake retain multiline
+  strings and literal escape sequences
+- Include native MariaDB, MySQL, and PostgreSQL multiline regression tests in
+  the Snowflake E2E shards, with exact-once coverage enforced by the CI contract
+- Verify exact C0 control-character bytes through native and managed-v3 Singer
+  loads and reject incompatible CSV formats before consuming Singer input
+
+0.85.1 (2026-09-12)
+-------------------
+
+**PostgreSQL FastSync**
+
+- Restore PostgreSQL source-slot reset for explicit unfiltered ``fast_sync`` on
+  taps containing LOG_BASED tables, with or without ``--force``: preflight the
+  resync and source slot, back up and clear every tap bookmark, then drop and
+  recreate the tap-specific slot once before workers start
+- Reject legacy database-wide, active, and incompatible slots before changing
+  state, preventing a resync from dropping a slot shared by other taps
+- Preserve unique pre-reset state backups across retries and report the failed
+  reset phase without restoring stale bookmarks after a failed or ambiguous drop
+- Retain the slot when ``--tables`` or a non-default ``--replication_method_only``
+  is specified, even if every table is listed; also retain it for automatic
+  initial loads, standalone PartialSync, and taps without LOG_BASED tables
+- Preflight the PostgreSQL-to-Snowflake FullSync size limit before resetting the
+  slot or bookmarks; keep ``--force`` as the size-limit override and honour
+  configured ``sync_start_from`` ranges with or without it
+- Refuse a managed-Iceberg slot reset while publication or conversion recovery
+  is pending, without changing source or state, so the corresponding filtered
+  FastSync or conversion command can finish recovery before the whole-tap resync
+  is retried
 
 **PostgreSQL logical replication**
 
 - Document recovery from wal2json ``stream_abort_cb`` failures by increasing
   ``logical_decoding_work_mem`` and retrying without discarding replication-slot
   state
+
+**Tests**
+
+- Verify that only an explicit unfiltered PostgreSQL ``fast_sync`` resets the
+  tap-specific logical replication slot, including source preflight, legacy-slot
+  isolation, durable backups, drop/create failures and lost responses,
+  managed-Iceberg recovery guards, retained-slot paths, pre-reset size checks,
+  and unchanged PartialSync selection with or without ``--force``
+- Keep the PostgreSQL split-file E2E tap within the source-slot name limit and
+  verify acceptance at 63 characters and rejection at 64 before mutation
+- Expose FastSync preflight failures in E2E output before checking worker logs
 
 0.85.0 (2026-09-08)
 -------------------

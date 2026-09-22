@@ -1,4 +1,4 @@
-# pylint: disable=missing-docstring,too-many-locals
+
 
 import collections
 import itertools
@@ -58,7 +58,7 @@ BINARY_TYPES = {'binary', 'varbinary'}
 
 SPATIAL_TYPES = {'geometry', 'point', 'linestring',
                  'polygon', 'multipoint', 'multilinestring',
-                 'multipolygon', 'geometrycollection'}
+                 'multipolygon', 'geometrycollection', 'geomcollection'}
 
 # A set of all supported column types listed above
 SUPPORTED_COLUMN_TYPES_AGGREGATED = \
@@ -251,8 +251,11 @@ def discover_catalog(
                                             'is-view',
                                             is_view)
 
-                column_is_key_prop = lambda c, s: (c.column_key == 'PRI' and
-                                                   s.properties[c.column_name].inclusion != 'unsupported')
+                def column_is_key_prop(column, column_schema):
+                    return (
+                        column.column_key == 'PRI'
+                        and column_schema.properties[column.column_name].inclusion != 'unsupported'
+                    )
 
                 key_properties = [c.column_name for c in cols if column_is_key_prop(c, schema)]
 
@@ -274,7 +277,7 @@ def discover_catalog(
     return Catalog(entries)
 
 
-def schema_for_column(column):  # pylint: disable=too-many-branches
+def schema_for_column(column):
     """Returns the Schema object for the given Column."""
 
     data_type = column.data_type.lower()
@@ -352,7 +355,6 @@ def create_column_metadata(cols: List[Column]):
         mdata = metadata.write(mdata,
                                ('properties', col.column_name),
                                'sql-datatype', col.column_type.lower())
-
 
         data_type = 'json' if col.is_json_alias else col.data_type.lower()
         mdata = metadata.write(mdata,

@@ -3,7 +3,8 @@
 # ------------------------------------------------------------------------------
 # General Properties
 # ------------------------------------------------------------------------------
-id: "postgres_to_sf_split_large_files"
+# The database and tap IDs share PostgreSQL's 63-character slot-name limit.
+id: "pg_to_sf_split_large_files"
 name: "PostgreSQL source test database"
 type: "tap-postgres"
 owner: "test-runner"

@@ -26,9 +26,6 @@ from pipelinewise.data_diff.engine import (
     run_check,
 )
 
-# pylint: disable=missing-class-docstring,missing-function-docstring,invalid-name
-# pylint: disable=abstract-method,super-init-not-called,arguments-renamed
-
 
 def _usable_index(columns, name="idx", **overrides):
     """Index metadata as a healthy btree index reports it."""

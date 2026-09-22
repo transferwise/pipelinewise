@@ -17,8 +17,6 @@ from pipelinewise.fastsync.commons.snowflake_iceberg import (
     TableFormatDiscoveryError,
 )
 
-# pylint: disable=missing-function-docstring,invalid-name
-
 
 @pytest.mark.parametrize(
     ('target_config', 'expected'),
@@ -28,7 +26,6 @@ from pipelinewise.fastsync.commons.snowflake_iceberg import (
         ({
             'target_table_format': 'iceberg',
             'iceberg_version': 3,
-            'hard_delete': True,
             'data_flattening_max_level': 0,
         }, 3),
     ],
@@ -45,7 +42,6 @@ def test_validate_route_config(target_config, expected):
         ({'iceberg_version': '3'}, 'iceberg_version'),
         ({'iceberg_version': 2}, 'iceberg_version'),
         ({'iceberg_version': 4}, 'iceberg_version'),
-        ({'hard_delete': False}, 'hard_delete'),
         ({'data_flattening_max_level': False}, 'data_flattening_max_level'),
         ({'data_flattening_max_level': 1}, 'data_flattening_max_level'),
         ({'iceberg_query_history_poll_timeout_seconds': False}, 'query_history'),
@@ -61,7 +57,6 @@ def test_validate_route_config_rejects_unsupported_iceberg_settings(
     target_config = {
         'target_table_format': 'iceberg',
         'iceberg_version': 3,
-        'hard_delete': True,
         'data_flattening_max_level': 0,
         **override,
     }
@@ -87,6 +82,18 @@ def test_validate_route_config_rejects_stray_direct_format_settings(
 ):
     with pytest.raises(ValueError, match=message):
         routes.validate_route_config(target_config)
+
+
+@pytest.mark.parametrize('value', [True, False, None, 'false'])
+@pytest.mark.parametrize('table_format', [None, 'native', 'iceberg'])
+def test_direct_fastsync_ignores_legacy_delete_setting(value, table_format):
+    """Old runtime JSON is accepted for native and Iceberg publication."""
+    config = {'hard_delete': value}
+    if table_format is not None:
+        config['target_table_format'] = table_format
+    if table_format == 'iceberg':
+        config.update(iceberg_version=3, data_flattening_max_level=0)
+    assert routes.validate_route_config(config) == (3 if table_format == 'iceberg' else None)
 
 
 def test_staging_config_identity_contains_no_credentials():
@@ -277,7 +284,7 @@ def _recovery_identity(args, table='source.table', partial_boundary=None):
         _recovery_args(tap_override={'host': 'other-source.example'}),
         _recovery_args(tap_override={'dbname': 'other_source'}),
         _recovery_args(tap_override={'user': 'other_user'}),
-        _recovery_args(tap_override={'charset': 'utf8mb4'}),
+        _recovery_args(tap_override={'charset': 'utf8'}),
         _recovery_args(tap_override={'session_sqls': ['SET time_zone="+01:00"']}),
         _recovery_args(tap_override={'use_gtid': True}),
         _recovery_args(target_override={'account': 'other_account'}),
@@ -459,7 +466,6 @@ def test_create_publisher_requires_state_for_iceberg(tmp_path):
         target={
             'target_table_format': 'iceberg',
             'iceberg_version': 3,
-            'hard_delete': True,
             'data_flattening_max_level': 0,
         },
     )

@@ -50,10 +50,19 @@ LOG_BASED reads inserts, updates, and deletes from a database change log.
 PipelineWise supports it for MariaDB/MySQL, PostgreSQL, and MongoDB connectors.
 Experimental connector status still applies.
 
+PostgreSQL and Snowflake targets physically remove source-deleted rows before
+acknowledging Singer state. See :ref:`metadata_columns` for deletion markers
+and processing.
+
 An initial table without a bookmark uses FullSync when the route supports it.
 The same ``run_tap`` invocation then starts Singer for ongoing log consumption.
 The source must retain change-log data until the target-acknowledged bookmark has
 advanced beyond it.
+
+MySQL/MariaDB checkpoints wait for complete transactions and preserve each
+stream's acknowledged history. Unsupported binlog encodings and selected-table
+``TRUNCATE`` stop replication; see :ref:`tap-mysql` for source settings and
+legacy-checkpoint recovery requirements.
 
 .. warning::
 

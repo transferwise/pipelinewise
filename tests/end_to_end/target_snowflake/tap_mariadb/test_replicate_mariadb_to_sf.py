@@ -21,7 +21,6 @@ class TestReplicateMariaDBToSF(TapMariaDB):
     Replicate data from MariaDB to Snowflake
     """
 
-    # pylint: disable=arguments-differ
     def setUp(self):
         super().setUp(tap_id=TAP_ID, target_id=TARGET_ID)
 
@@ -142,6 +141,13 @@ class TestReplicateMariaDBToSF(TapMariaDB):
         )
         self.assertEqual(len(result), 1)
         self.assertIn('\u00ef', result[0][0])
+
+        # Retain invalid-date normalization coverage on a live row before testing its deletion.
+        result = self.e2e_env.run_query_target_snowflake(
+            f'SELECT "DATE_CREATED" FROM ppw_e2e_tap_mysql{self.e2e_env.sf_schema_postfix}.weight_unit '
+            'WHERE "WEIGHT_UNIT_ID" = 25'
+        )
+        self.assertEqual(result, [(None,)])
 
         # 2. Make changes in MariaDB source database
         #  LOG_BASED

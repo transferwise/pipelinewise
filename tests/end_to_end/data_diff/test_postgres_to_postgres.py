@@ -68,7 +68,6 @@ def _repository_definition(tap_id, source_table, *, frequency='0 * * * *'):
     )
 
 
-# pylint: disable=attribute-defined-outside-init
 class TestPostgresToPostgresDataDiff:
     """Exercise persisted checks, failures, remediation, and coverage."""
 
@@ -116,7 +115,6 @@ class TestPostgresToPostgresDataDiff:
                 return json.loads(stdout[index:])
         raise ValueError(f'No JSON found in command output: {stdout[:200]}')
 
-    # pylint: disable=too-many-locals,too-many-statements
     def test_dd_pass_failure_and_remediation_lifecycle(self):
         """Prove source-target comparison and immutable remediation evidence."""
         self.e2e.setup_tap_postgres()

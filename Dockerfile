@@ -33,6 +33,7 @@ RUN echo "setup connectors" \
     && if [ "$connectors" = "all" ]; then make all_connectors -e pw_acceptlicenses=y; fi\
     && if [ "$connectors" != "all" ] && [ "$connectors" != "none" ] && [ -n "$connectors" ]; then make connectors -e "pw_connector=$connectors" -e pw_acceptlicenses=y; fi
 
+COPY mbuffer.rc /etc/mbuffer.rc
 COPY . /app
 
 RUN echo "setup pipelinewise" \

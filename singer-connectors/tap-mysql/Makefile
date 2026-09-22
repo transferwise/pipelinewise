@@ -4,9 +4,9 @@ venv:
 	pip install --upgrade pip setuptools wheel ;\
 	pip install -e .[test]
 
-pylint:
-	. ./venv/bin/activate ;\
-	pylint --rcfile .pylintrc tap_mysql/
+lint:
+	cd ../.. && singer-connectors/tap-mysql/venv/bin/ruff check \
+		singer-connectors/tap-mysql/tap_mysql/ singer-connectors/tap-mysql/tests/unit/
 
 unit_test:
 	. ./venv/bin/activate ;\

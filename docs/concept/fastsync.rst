@@ -101,16 +101,15 @@ added first. Other FullSync mismatches require guarded replacement. PartialSync
 uses transactional range DML and requires a primary key.
 
 The route requires explicit ``target_table_format: iceberg``,
-``iceberg_version: 3``, ``data_flattening_max_level: 0``, and
-``hard_delete: true``. Native remains the default. See
-:ref:`snowflake_iceberg` for metadata limits, writer exclusion, and recovery.
+``iceberg_version: 3``, and ``data_flattening_max_level: 0``. Native remains the
+default. See :ref:`snowflake_iceberg` for metadata limits, writer exclusion, and
+recovery.
 After an eligible initial load, Singer continues LOG_BASED or INCREMENTAL
 replication against the same managed-v3 table in the same run.
 FastSync availability and its zero-flattening requirement are specific to these
 routes. A compatible Singer-only source such as Salesforce can load managed v3
 through ``target-snowflake`` without gaining a FastSync component; it retains
-its normal flattening setting, still requires ``hard_delete: true``, and sends
-``FULL_TABLE`` streams through Singer.
+its normal flattening setting and sends ``FULL_TABLE`` streams through Singer.
 
 
 Snowflake string widths
@@ -138,6 +137,17 @@ Singer schema evolution has a different existing-native policy:
 widen or version a compatible existing native string column solely because of
 its declared width. See :ref:`target-snowflake`.
 
+MariaDB/MySQL and PostgreSQL Snowflake FullSync and PartialSync preserve LF, CR,
+CRLF, tab, CSV punctuation, and literal backslash sequences in string values.
+PostgreSQL preserves Unicode; MariaDB/MySQL uses an ``utf8mb4`` projection and
+default connection encoding, including supplementary Unicode, while continuing
+to remove NUL characters. This preservation applies to native and
+managed Iceberg v3 publication; the table format does not change the staged
+string representation. SQL ``NULL`` and a literal ``\N`` string remain distinct.
+
+This behavior does not repair values normalized by an earlier run. Resync each
+affected table from its source after upgrading.
+
 
 Explicit FullSync
 -----------------
@@ -153,6 +163,13 @@ Explicit FullSync
 
 This operation can replace target data and reset replication bookmarks. Review
 :ref:`resync` before running it against a large or actively written table.
+
+An unfiltered PostgreSQL ``fast_sync`` containing LOG_BASED tables resets the
+tap-specific slot once before workers start, with or without ``--force``.
+Filtered FastSync, automatic initial loads, and standalone PartialSync retain
+it. ``--force`` only bypasses the resync size limit; configured
+``sync_start_from`` ranges remain in effect. See :ref:`resync_postgres_slot_reset`
+for exact commands, safety checks, pending-Iceberg guards, and failure recovery.
 
 
 .. _defined_partial_sync:

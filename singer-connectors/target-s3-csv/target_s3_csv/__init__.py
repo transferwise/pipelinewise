@@ -2,11 +2,9 @@
 
 import argparse
 import csv
-import gzip
 import io
 import json
 import os
-import shutil
 import sys
 import tempfile
 import singer
@@ -28,8 +26,7 @@ def emit_state(state):
         sys.stdout.flush()
 
 
-# pylint: disable=too-many-locals,too-many-branches,too-many-statements
-def persist_messages(messages, config, s3_client):
+def persist_messages(messages, config, s3_client):  # noqa: C901
     state = None
     schemas = {}
     key_properties = {}

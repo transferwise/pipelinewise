@@ -30,7 +30,7 @@ def _snowflake_column(name, data_type, length=None):
     }
 
 
-class PartialSyncUtilsTestCase(TestCase):  # pylint: disable=too-many-public-methods
+class PartialSyncUtilsTestCase(TestCase):
     """Test case for partial sync utils"""
 
     def test_upload_to_s3(self):
@@ -45,7 +45,6 @@ class PartialSyncUtilsTestCase(TestCase):  # pylint: disable=too-many-public-met
             mocked_upload_to_s3 = mocked_snowflake.upload_to_s3
             mocked_upload_to_s3.return_value = test_s3_key
 
-            # pylint: disable=protected-access
             actual_return = upload_to_s3(mocked_snowflake, [test_file_part], temp_test_dir)
             self.assertTupleEqual(([test_s3_key], test_s3_key), actual_return)
             mocked_upload_to_s3.assert_called_with(test_file_part, tmp_dir=temp_test_dir)
@@ -273,71 +272,7 @@ class PartialSyncUtilsTestCase(TestCase):  # pylint: disable=too-many-public-met
             mock.call.publish_partial_sync(
                 target['schema'], target['temp'], target['table'],
                 ['"FOO_SOURCE_COLUMN"', '_SDC_EXTRACTED_AT', '_SDC_BATCHED_AT', '_SDC_DELETED_AT'],
-                primary_keys, where_clause_sql, hard_delete=True,
-            ),
-            mock.call.drop_table(
-                target['schema'],
-                target['table'],
-                is_temporary=True,
-                max_attempts=3,
-            )
-        ])
-
-    def test_load_into_snowflake_soft_delete(self):
-        """Test load_into_snowflake method with soft delete"""
-        snowflake = mock.MagicMock()
-        snowflake.query.return_value = []
-        target = {
-            'sf_object': snowflake,
-            'schema': 'FOO_SCHEMA',
-            'table': 'FOO_TABLE',
-            'temp': 'FOO_TEMP',
-            'publication_status': {'attempted': False},
-        }
-        args = PartialSync2SFArgs(
-            temp_test_dir='temp_test_dir', start_value='20', end_value='30', hard_delete=False
-        )
-        source_columns = ['"FOO_SOURCE_COLUMN" FOO_TYPE']
-        primary_keys = ['FOO_PRIMARY']
-        s3_key_pattern = 'FOO_PATTERN'
-        size_bytes = 3
-        where_clause_sql = 'test'
-        with mock.patch(
-            'pipelinewise.fastsync.partialsync.utils.iceberg_routes.'
-            'require_native_target_format'
-        ) as native_format_guard:
-            load_into_snowflake(
-                target,
-                args,
-                source_columns,
-                primary_keys,
-                s3_key_pattern,
-                size_bytes,
-                where_clause_sql,
-            )
-
-        native_format_guard.assert_called_once_with(
-            snowflake,
-            args,
-            target['schema'],
-            args.table,
-            allow_missing=False,
-        )
-
-        self.assertEqual(snowflake.method_calls, [
-            mock.call.copy_to_table(s3_key_pattern, target['schema'], args.table, size_bytes, is_temporary=True),
-            mock.call.obfuscate_columns(target['schema'], args.table),
-            mock.call.create_table(
-                target_schema=target['schema'], table_name=target['table'], columns=source_columns,
-                primary_key=primary_keys, is_temporary=False, sort_columns=False, allow_replace_table=False,
-                normalize_primary_keys='if_created',
-            ),
-            mock.call.query('SHOW COLUMNS IN TABLE FOO_SCHEMA."FOO_TABLE"'),
-            mock.call.add_columns(target['schema'], target['table'], {'"FOO_SOURCE_COLUMN"': 'FOO_TYPE'}),
-            mock.call.publish_partial_sync(
-                target['schema'], target['temp'], target['table'],
-                ['"FOO_SOURCE_COLUMN"', '_SDC_EXTRACTED_AT', '_SDC_BATCHED_AT', '_SDC_DELETED_AT'],
-                primary_keys, where_clause_sql, hard_delete=False,
+                primary_keys, where_clause_sql,
             ),
             mock.call.drop_table(
                 target['schema'],
@@ -357,7 +292,7 @@ class PartialSyncUtilsTestCase(TestCase):  # pylint: disable=too-many-public-met
             'temp': 'FOO_TEMP'
         }
         args = PartialSync2SFArgs(
-            temp_test_dir='temp_test_dir', start_value='20', end_value='30', hard_delete=False, drop_target_table=True
+            temp_test_dir='temp_test_dir', start_value='20', end_value='30', drop_target_table=True
         )
         source_columns = ['"FOO_SOURCE_COLUMN" FOO_TYPE']
         primary_keys = ['FOO_PRIMARY']
@@ -565,7 +500,7 @@ class PartialSyncUtilsTestCase(TestCase):  # pylint: disable=too-many-public-met
             mock.call.query('SHOW COLUMNS IN TABLE FOO_SCHEMA."FOO_TABLE"'),
             mock.call.add_columns('FOO_SCHEMA', 'FOO_TABLE', {'"FOO_SOURCE_COLUMN"': 'FOO_TYPE'}),
             mock.call.publish_partial_sync(
-                'FOO_SCHEMA', 'FOO_TEMP', 'FOO_TABLE', merge_columns, ['FOO_PRIMARY'], 'test', hard_delete=True,
+                'FOO_SCHEMA', 'FOO_TEMP', 'FOO_TABLE', merge_columns, ['FOO_PRIMARY'], 'test',
             ),
         ])
 

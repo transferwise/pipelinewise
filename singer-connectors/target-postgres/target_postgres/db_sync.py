@@ -11,7 +11,6 @@ from collections.abc import MutableMapping
 from singer import get_logger
 
 
-# pylint: disable=missing-function-docstring,missing-class-docstring
 def validate_config(config):
     errors = []
     required_config_keys = [
@@ -36,7 +35,6 @@ def validate_config(config):
     return errors
 
 
-# pylint: disable=fixme
 def column_type(schema_property):
     property_type = schema_property['type']
     property_format = schema_property['format'] if 'format' in schema_property else None
@@ -97,7 +95,6 @@ def flatten_key(k, parent_key, sep):
     return sep.join(inflected_key)
 
 
-# pylint: disable=dangerous-default-value,invalid-name
 def flatten_schema(d, parent_key=[], sep='__', level=0, max_level=0):
     items = []
 
@@ -123,7 +120,9 @@ def flatten_schema(d, parent_key=[], sep='__', level=0, max_level=0):
                     list(v.values())[0][0]['type'] = ['null', 'object']
                     items.append((new_key, list(v.values())[0][0]))
 
-    key_func = lambda item: item[0]
+    def key_func(item):
+        return item[0]
+
     sorted_items = sorted(items, key=key_func)
     for k, g in itertools.groupby(sorted_items, key=key_func):
         if len(list(g)) > 1:
@@ -132,7 +131,6 @@ def flatten_schema(d, parent_key=[], sep='__', level=0, max_level=0):
     return dict(sorted_items)
 
 
-# pylint: disable=redefined-outer-name
 def _should_json_dump_value(key, value, flatten_schema=None):
     if isinstance(value, (dict, list)):
         return True
@@ -144,7 +142,6 @@ def _should_json_dump_value(key, value, flatten_schema=None):
     return False
 
 
-# pylint: disable-msg=too-many-arguments
 def flatten_record(d, flatten_schema=None, parent_key=[], sep='__', level=0, max_level=0):
     items = []
     for k, v in d.items():
@@ -183,7 +180,6 @@ def stream_name_to_dict(stream_name, separator='-'):
     }
 
 
-# pylint: disable=too-many-public-methods,too-many-instance-attributes
 class DbSync:
     def __init__(self, connection_config, stream_schema_message=None):
         """
@@ -224,11 +220,7 @@ class DbSync:
         # Init stream schema
         if stream_schema_message is not None:
             # Define initial list of indices to created
-            self.hard_delete = self.connection_config.get('hard_delete')
-            if self.hard_delete:
-                self.indices = ['_sdc_deleted_at']
-            else:
-                self.indices = []
+            self.indices = ['_sdc_deleted_at']
 
             #  Define target schema name.
             #  --------------------------
@@ -386,7 +378,6 @@ class DbSync:
                                  self.table_name(stream, False),
                                  json.dumps({'inserts': inserts, 'updates': updates, 'size_bytes': size_bytes}))
 
-    # pylint: disable=duplicate-string-formatting-argument
     def insert_from_temp_table(self, temp_table):
         stream_schema_message = self.stream_schema_message
         columns = self.column_names()
@@ -492,9 +483,14 @@ class DbSync:
 
     def delete_rows(self, stream):
         table = self.table_name(stream)
-        query = "DELETE FROM {} WHERE _sdc_deleted_at IS NOT NULL RETURNING _sdc_deleted_at".format(table)
+        query = "DELETE FROM {} WHERE _sdc_deleted_at IS NOT NULL".format(table)
         self.logger.info("Deleting rows from '%s' table... %s", table, query)
-        self.logger.info("DELETE %s", len(self.query(query)))
+        self.logger.debug("Running query: %s", query)
+        with self.open_connection() as connection:
+            with connection.cursor() as cur:
+                cur.execute(query)
+                deleted_rows = cur.rowcount
+        self.logger.info("DELETE %s", deleted_rows)
 
     def create_schema_if_not_exists(self, table_columns_cache=None):
         schema_name = self.schema_name

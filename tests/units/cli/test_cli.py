@@ -4,11 +4,12 @@ import re
 import time
 import psutil
 import pidfile
+import psycopg2
 import pytest
 import shutil
 
 from pathlib import Path
-from unittest.mock import patch, call
+from unittest.mock import MagicMock, Mock, patch, call
 from typing import Callable, Optional
 from slack import WebClient
 
@@ -18,6 +19,8 @@ from pipelinewise.cli.constants import ConnectorType
 from pipelinewise.cli.config import Config
 from pipelinewise.cli.fastsync_capabilities import FastSyncCapabilities
 from pipelinewise.cli.pipelinewise import FASTSYNC_PAIRS, PipelineWise
+from pipelinewise.fastsync.commons import utils as fastsync_utils
+from pipelinewise.fastsync import postgres_to_snowflake
 from pipelinewise.cli.errors import (
     DuplicateConfigException,
     InvalidConfigException,
@@ -37,7 +40,7 @@ PROFILING_DIR = './profiling'
 # Can't inherit from unittest.TestCase because it breaks pytest fixture
 # https://github.com/pytest-dev/pytest/issues/2504#issuecomment-308828149
 
-# pylint: disable=too-many-public-methods,attribute-defined-outside-init,too-many-lines,fixme
+
 class TestCli:
     """
     Unit Tests for PipelineWise CLI executable
@@ -148,7 +151,7 @@ class TestCli:
             with pytest.raises(SystemExit) as pytest_wrapped_e:
                 ppw_command = getattr(pipelinewise, command)
                 ppw_command()
-            assert pytest_wrapped_e.type == SystemExit
+            assert pytest_wrapped_e.type is SystemExit
             assert pytest_wrapped_e.value.code == 1
 
     def test_target_dir(self):
@@ -308,7 +311,7 @@ class TestCli:
         ) = self.pipelinewise.create_filtered_tap_properties(
             ConnectorType.TARGET_SNOWFLAKE,
             ConnectorType.TAP_MYSQL,
-            f'{os.path.dirname(__file__)}/resources/sample_json_config/target_one/tap_one/properties.json',  # pylint: disable=line-too-long
+            f'{os.path.dirname(__file__)}/resources/sample_json_config/target_one/tap_one/properties.json',
             f'{os.path.dirname(__file__)}/resources/sample_json_config/target_one/tap_one/state.json',
             {
                 'selected': True,
@@ -346,7 +349,7 @@ class TestCli:
         ) = self.pipelinewise.create_filtered_tap_properties(
             target_type=ConnectorType.TARGET_SNOWFLAKE,
             tap_type=ConnectorType.TAP_MYSQL,
-            tap_properties=f'{os.path.dirname(__file__)}/resources/sample_json_config/target_one/tap_one/properties.json', # pylint: disable=line-too-long
+            tap_properties=f'{os.path.dirname(__file__)}/resources/sample_json_config/target_one/tap_one/properties.json',
             tap_state=f'{os.path.dirname(__file__)}/resources/sample_json_config/target_one/tap_one/state.json',
             filters={
                 'selected': True,
@@ -527,7 +530,6 @@ class TestCli:
             'data_flattening_max_level': 0,
             'default_target_schema': 'jira_clear',
             'default_target_schema_select_permissions': ['grp_power'],
-            'hard_delete': True,
             'primary_key_required': True,
             'schema_mapping': {
                 'jira': {
@@ -539,6 +541,23 @@ class TestCli:
 
         # Remove temp file with merged JSON
         os.remove(temp_file)
+
+    @pytest.mark.parametrize('value', [True, False, None, 'false'])
+    @pytest.mark.parametrize('location', ['target', 'inheritable'])
+    def test_runtime_config_accepts_legacy_hard_delete(self, tmp_path, value, location):
+        """Old imported configurations continue to produce consumable target JSON."""
+        configs = {'target': {}, 'inheritable': {}}
+        configs[location]['hard_delete'] = value
+        paths = []
+        for name, settings in configs.items():
+            path = tmp_path / f'{name}.json'
+            path.write_text(json.dumps(settings), encoding='utf-8')
+            paths.append(str(path))
+
+        merged_path = tmp_path / 'merged.json'
+        with patch('pipelinewise.cli.utils.create_temp_file', return_value=(None, str(merged_path))):
+            self.pipelinewise.create_consumable_target_config(*paths)
+        assert json.loads(merged_path.read_text(encoding='utf-8'))['hard_delete'] == value
 
     def test_invalid_target_config(self):
         """Test merging invalid target config.json and inheritable_config.json"""
@@ -622,7 +641,7 @@ class TestCli:
         # Re-creating project should raise exception of directory not empty
         with pytest.raises(SystemExit) as pytest_wrapped_e:
             pipelinewise.init()
-        assert pytest_wrapped_e.type == SystemExit
+        assert pytest_wrapped_e.type is SystemExit
         assert pytest_wrapped_e.value.code == 1
 
     def test_command_import_all_taps(self):
@@ -659,7 +678,7 @@ class TestCli:
         assert target_runtime['target_table_format'] == 'iceberg'
         assert target_runtime['iceberg_version'] == 3
         assert target_runtime['data_flattening_max_level'] == 10
-        assert target_runtime['hard_delete'] is True
+        assert 'hard_delete' not in target_runtime
         assert imported_tap['target_table_format'] == 'iceberg'
         assert imported_tap['iceberg_version'] == 3
 
@@ -693,7 +712,7 @@ class TestCli:
         assert not stderr.strip()
 
         # Exact output match
-        # pylint: disable=line-too-long
+
         assert (
             stdout
             == """Tap ID     Tap Type      Target ID    Target Type       Enabled    Status          Last Sync    Last Sync Result
@@ -752,7 +771,7 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         # Since the executable is not available in this test then it should fail
         with pytest.raises(SystemExit) as pytest_wrapped_e:
             pipelinewise.run_tap()
-        assert pytest_wrapped_e.type == SystemExit
+        assert pytest_wrapped_e.type is SystemExit
         assert pytest_wrapped_e.value.code == 1
 
     def test_run_tap_routes_full_table_salesforce_iceberg_to_singer(self, tmp_path):
@@ -825,7 +844,7 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         # Tap is not running, pid file not exist, should exit with error
         with pytest.raises(SystemExit) as pytest_wrapped_e:
             pipelinewise.stop_tap()
-        assert pytest_wrapped_e.type == SystemExit
+        assert pytest_wrapped_e.type is SystemExit
         assert pytest_wrapped_e.value.code == 1
 
         Path(f'{pipelinewise.tap_run_log_file}.running').touch()
@@ -891,7 +910,7 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         for sync_method in all_sync_methods:
             with pytest.raises(SystemExit) as pytest_wrapped_e:
                 sync_method(['foo'])
-            assert pytest_wrapped_e.type == SystemExit
+            assert pytest_wrapped_e.type is SystemExit
             assert pytest_wrapped_e.value.code == 1
 
     def test_command_sync_tables_cleanup_state_if_file_not_exists_and_no_tables_argument(self):
@@ -904,6 +923,375 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         pipelinewise = self._init_for_sync_tables_states_cleanup(
             tables_arg='db_test_mysql.table_one,db_test_mysql.table_two')
         self._assert_calling_sync_tables(pipelinewise)
+
+    @pytest.mark.parametrize(
+        'force, tables, replication_method_only, tap_type, replication_method, expected_reset',
+        [
+            pytest.param(True, None, '*', 'tap-postgres', 'LOG_BASED', True, id='forced-whole-postgres-tap'),
+            pytest.param(True, 'public.one,public.two', '*', 'tap-postgres', 'LOG_BASED', False,
+                         id='forced-explicit-tables'),
+            pytest.param(False, None, '*', 'tap-postgres', 'LOG_BASED', True, id='ordinary-whole-postgres-tap'),
+            pytest.param(True, None, 'LOG_BASED', 'tap-postgres', 'LOG_BASED', False,
+                         id='forced-replication-method-filter'),
+            pytest.param(True, None, '*', 'tap-mysql', 'LOG_BASED', False, id='forced-whole-mysql-tap'),
+            pytest.param(True, None, '*', 'tap-postgres', 'FULL_TABLE', False,
+                         id='postgres-tap-without-log-based-tables'),
+        ],
+    )
+    def test_fast_sync_requests_postgres_slot_reset_only_for_unfiltered_whole_tap(
+        self, force, tables, replication_method_only, tap_type, replication_method, expected_reset,
+    ):
+        """An unfiltered PostgreSQL resync resets its LOG_BASED slot with or without force."""
+        args = CliArgs(
+            target='target_one',
+            tap='tap_one',
+            force=force,
+            tables=tables,
+            replication_method_only=replication_method_only,
+        )
+        pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
+        pipelinewise.tap['type'] = tap_type
+
+        with patch('pipelinewise.cli.pipelinewise.pidfile.PIDFile'), patch(
+            'pipelinewise.cli.pipelinewise.utils.load_json',
+            return_value={'selection': [{'replication_method': replication_method}]},
+        ), patch.object(pipelinewise, 'do_sync_tables') as do_sync_tables:
+            pipelinewise.fast_sync()
+
+        do_sync_tables.assert_called_once_with(reset_postgres_slot=expected_reset)
+
+    @pytest.mark.parametrize('force', [False, True])
+    def test_fast_sync_resets_slot_once_before_mixed_workers_with_or_without_force(self, force):
+        """Reset once before workers, preserving sync_start_from regardless of force."""
+        pipelinewise = self._init_for_sync_tables_states_cleanup()
+        pipelinewise.tap['type'] = ConnectorType.TAP_POSTGRES.value
+        pipelinewise.args.force = force
+        calls = Mock()
+        with patch('pipelinewise.cli.pipelinewise.pidfile.PIDFile'), patch.object(
+            pipelinewise, '_preflight_postgres_slot_reset', return_value=({'tap': 'config'}, {}),
+        ), patch.object(
+            pipelinewise, '_clear_tap_bookmarks_before_postgres_slot_reset',
+        ) as clear_bookmarks, patch(
+            'pipelinewise.cli.pipelinewise.FastSyncTapPostgres.reset_slot',
+        ) as reset_slot, patch(
+            'pipelinewise.cli.pipelinewise.Process',
+        ) as process:
+            calls.attach_mock(clear_bookmarks, 'clear_bookmarks')
+            calls.attach_mock(reset_slot, 'reset_slot')
+            calls.attach_mock(process, 'process')
+            reset_slot.side_effect = lambda _config, *, before_reset: before_reset()
+            process.return_value.exception = None
+            process.return_value.exitcode = 0
+            pipelinewise.fast_sync()
+
+        reset_slot.assert_called_once_with({'tap': 'config'}, before_reset=clear_bookmarks)
+        assert calls.mock_calls[:2] == [
+            call.reset_slot({'tap': 'config'}, before_reset=clear_bookmarks),
+            call.clear_bookmarks(),
+        ]
+        assert process.call_args_list == [
+            call(target=pipelinewise.sync_tables_partial_sync, args=(
+                {'db_test_mysql.table_one': {'column': 'id', 'value': '5'}},
+            )),
+            call(target=pipelinewise.sync_tables_fast_sync, args=(['db_test_mysql.table_two'],)),
+        ]
+
+    @pytest.mark.parametrize('force', [False, True])
+    def test_slot_reset_preflight_checks_size_limit_before_state_or_source_changes(self, force):
+        """An oversized FullSync blocks the whole resync unless the size guard is overridden."""
+        pipelinewise = self._init_for_sync_tables_states_cleanup()
+        pipelinewise.tap['type'] = ConnectorType.TAP_POSTGRES.value
+        pipelinewise.force_fast_sync = force
+        pipelinewise.config['allowed_resync_max_size'] = {'table_mb': 10}
+        tap_config = dict.fromkeys(postgres_to_snowflake.REQUIRED_CONFIG_KEYS['tap'], 'test')
+        target_config = dict.fromkeys(postgres_to_snowflake.REQUIRED_CONFIG_KEYS['target'], 'test')
+        selected = {'full_sync': ['public.full'], 'partial_sync': {'public.partial': {'column': 'id', 'value': '5'}}}
+        state_path = pipelinewise.tap['files']['state']
+        self._make_sample_state_file(state_path)
+        original_state = fastsync_utils.load_json(state_path)
+        with patch.object(pipelinewise, '_check_if_complete_tap_configuration') as check_executable, patch.object(
+            pipelinewise, '_get_sync_tables_setting_from_selection_file', return_value=selected,
+        ), patch.object(
+            pipelinewise, '_load_required_json_object',
+            side_effect=[tap_config, target_config, {}, {'streams': []}],
+        ), patch.object(
+            fastsync_utils, 'get_tables_from_properties', return_value=['public.full', 'public.partial'],
+        ), patch(
+            'pipelinewise.fastsync.postgres_to_snowflake.get_tables_size',
+            return_value=[{'table_name': 'public.full', 'table_size': 11},
+                          {'table_name': 'public.partial', 'table_size': 100}],
+        ) as sizes, patch('pipelinewise.cli.pipelinewise.FastSyncTapPostgres.reset_slot') as reset_slot, patch(
+            'pipelinewise.cli.pipelinewise.Process',
+        ) as process:
+            process.return_value.exception = None
+            process.return_value.exitcode = 0
+            if force:
+                pipelinewise.do_sync_tables(reset_postgres_slot=True)
+                reset_slot.assert_called_once()
+                sizes.assert_not_called()
+                assert process.call_count == 2
+            else:
+                with pytest.raises(PreRunChecksException, match='No source or state changes were made'):
+                    pipelinewise.do_sync_tables(reset_postgres_slot=True)
+                sizes.assert_called_once()
+                reset_slot.assert_not_called()
+                process.assert_not_called()
+                assert fastsync_utils.load_json(state_path) == original_state
+
+        assert check_executable.call_args_list == [
+            call(f'{pipelinewise.venv_dir}pipelinewise/bin/{binary}', 'tap-postgres', 'target-snowflake')
+            for binary in ('partial-postgres-to-snowflake', 'postgres-to-snowflake')
+        ]
+
+    @pytest.mark.parametrize(
+        'failure, invalidated, statement_count',
+        [
+            ('connect', False, 0), ('inspect', False, 1), ('legacy', False, 1),
+            ('active', False, 1), ('backup', False, 1), ('save_state', False, 1),
+            ('drop', True, 2), ('drop_response', True, 2), ('create', True, 3), ('create_response', True, 3),
+        ],
+    )
+    def test_postgres_slot_reset_failures_preserve_safe_state(
+        self, tmp_path, failure, invalidated, statement_count,
+    ):
+        """Run the real reset and state helpers; inject only source/filesystem failures."""
+        pipelinewise = self._init_for_sync_tables_states_cleanup()
+        pipelinewise.tap['type'] = ConnectorType.TAP_POSTGRES.value
+        state_path = tmp_path / 'state.json'
+        pipelinewise.tap['files']['state'] = str(state_path)
+        original = {'bookmarks': {'public-table': {'lsn': 123}}, 'currently_syncing': 'public-table'}
+        fastsync_utils.save_dict_to_json(state_path, original)
+        connection = MagicMock()
+        cursor = connection.cursor.return_value.__enter__.return_value
+        cursor.fetchall.return_value = [('pipelinewise_my_db_my_tap', 'my_db', 'wal2json', failure == 'active')]
+        if failure == 'legacy':
+            cursor.fetchall.return_value.append(('pipelinewise_my_db', 'my_db', 'wal2json', False))
+
+        def execute(sql, _params):
+            state = fastsync_utils.load_json(state_path)
+            if 'FROM pg_replication_slots' in sql:
+                assert state == original
+                if failure == 'inspect':
+                    raise psycopg2.OperationalError('source inspection failed')
+            else:
+                assert state == {'bookmarks': {}, 'currently_syncing': None}
+                backups = list(tmp_path.glob('state.json.before-slot-reset-*.bak'))
+                assert len(backups) == 1
+                assert fastsync_utils.load_json(backups[0]) == original
+                if failure == 'drop' and 'pg_drop_' in sql:
+                    raise psycopg2.errors.ObjectInUse('slot became active after preflight')
+                if failure == 'create' and 'pg_create_' in sql:
+                    raise psycopg2.errors.InsufficientPrivilege('creation denied')
+                if failure.removesuffix('_response') in sql and failure.endswith('_response'):
+                    raise psycopg2.OperationalError('server response lost')
+
+        def save_state(path, state):
+            if failure == 'backup' or failure == 'save_state' and path == str(state_path):
+                raise OSError('state persistence failed')
+            save_json(path, state)
+
+        cursor.execute.side_effect = execute
+        save_json = fastsync_utils.save_dict_to_json
+        with patch.object(
+            pipelinewise, '_preflight_postgres_slot_reset',
+            return_value=({'dbname': 'my_db', 'tap_id': 'my_tap'}, {}),
+        ), patch(
+            'pipelinewise.cli.pipelinewise.FastSyncTapPostgres.get_connection', return_value=connection,
+        ) as connect, patch(
+            'pipelinewise.cli.pipelinewise.Process',
+        ) as process, patch.object(fastsync_utils, 'save_dict_to_json', side_effect=save_state):
+            if failure == 'connect':
+                connect.side_effect = psycopg2.OperationalError('connection failed')
+            with pytest.raises((RuntimeError, psycopg2.Error, OSError)) as error:
+                pipelinewise.do_sync_tables(reset_postgres_slot=True)
+
+        process.assert_not_called()
+        assert cursor.execute.call_count == statement_count
+        state = fastsync_utils.load_json(state_path)
+        assert state == ({'bookmarks': {}, 'currently_syncing': None} if invalidated else original)
+        backups = list(tmp_path.glob('state.json.before-slot-reset-*.bak'))
+        assert len(backups) == int(invalidated or failure == 'save_state')
+        if invalidated:
+            assert f'failed during {failure.split("_")[0]}' in str(error.value)
+            assert 'Do not restore old LOG_BASED bookmarks' in str(error.value)
+            assert str(backups[0]) in str(error.value)
+        if failure != 'connect':
+            connection.close.assert_called_once_with()
+
+    def test_do_sync_tables_does_not_reset_slot_when_preflight_fails(self):
+        """A disabled tap fails before Singer state or its source slot changes."""
+        pipelinewise = self._init_for_sync_tables_states_cleanup()
+        pipelinewise.tap['type'] = ConnectorType.TAP_POSTGRES.value
+        pipelinewise.tap['enabled'] = False
+
+        with patch.object(
+            pipelinewise, '_clear_tap_bookmarks_before_postgres_slot_reset'
+        ) as clear_bookmarks, patch(
+            'pipelinewise.cli.pipelinewise.FastSyncTapPostgres.reset_slot'
+        ) as reset_slot, patch(
+            'pipelinewise.cli.pipelinewise.Process'
+        ) as process:
+            with pytest.raises(PreRunChecksException):
+                pipelinewise.do_sync_tables(reset_postgres_slot=True)
+
+        clear_bookmarks.assert_not_called()
+        reset_slot.assert_not_called()
+        process.assert_not_called()
+
+    @pytest.mark.parametrize('tap_type', ['tap-mysql', 'tap-postgres'])
+    def test_fastsync_invalid_target_config_does_not_clear_bookmarks(self, tmp_path, tap_type):
+        """The worker loads target JSON before clearing replication bookmarks."""
+        pipelinewise = self._init_for_sync_tables_states_cleanup(tables_arg='db_test_mysql.table_one')
+        pipelinewise.tap['type'] = tap_type
+        path = tmp_path / 'inheritable.json'
+        path.write_text('invalid JSON', encoding='utf-8')
+        pipelinewise.tap['files']['inheritable_config'] = str(path)
+        self._make_sample_state_file(pipelinewise.tap['files']['state'])
+        original_state = Path(pipelinewise.tap['files']['state']).read_bytes()
+        with patch.object(pipelinewise, '_check_if_complete_tap_configuration'), patch.object(
+            pipelinewise, 'send_alert',
+        ), patch('pipelinewise.cli.pipelinewise.Process') as process:
+            with pytest.raises(Exception, match='Cannot merge JSON files'):
+                pipelinewise.sync_tables_fast_sync(['db_test_mysql.table_one'])
+        assert Path(pipelinewise.tap['files']['state']).read_bytes() == original_state
+        process.assert_not_called()
+
+    def test_postgres_slot_reset_preflight_rejects_stale_catalog(self):
+        """Every requested table must still be selected in the Singer catalog."""
+        pipelinewise = self._init_for_sync_tables_states_cleanup()
+        pipelinewise.tap['type'] = ConnectorType.TAP_POSTGRES.value
+        pipelinewise.target['type'] = ConnectorType.TARGET_POSTGRES.value
+        properties = {'streams': [{
+            'stream': 'other_table',
+            'metadata': [{'breadcrumb': [], 'metadata': {'selected': True, 'schema-name': 'public'}}],
+        }]}
+
+        with patch.object(
+            pipelinewise, '_check_if_complete_tap_configuration'
+        ), patch.object(
+            pipelinewise,
+            '_load_required_json_object',
+            side_effect=[{}, {}, {}, properties],
+        ):
+            with pytest.raises(
+                fastsync_utils.NotSelectedTableException,
+                match='public.table_one',
+            ):
+                pipelinewise._preflight_postgres_slot_reset(
+                    {'full_sync': ['public.table_one'], 'partial_sync': {}}
+                )
+
+    @pytest.mark.parametrize('pending, manifest_reads, pointer_reads', [
+        ('conversion', 1, 0), ('fastsync', 1, 1), (None, 2, 2),
+    ])
+    def test_do_sync_tables_checks_iceberg_recovery_under_target_locks(self, pending, manifest_reads, pointer_reads):
+        """Lock all targets and check both recovery stores before allowing a reset."""
+        pipelinewise = self._init_for_sync_tables_states_cleanup()
+        pipelinewise.tap['type'] = ConnectorType.TAP_POSTGRES.value
+        target_config = {
+            'target_table_format': Config.TABLE_FORMAT_ICEBERG,
+            'dbname': 'target_db',
+            'default_target_schema': 'target_schema',
+        }
+        coordinator = MagicMock()
+        store = coordinator.recovery_store.return_value
+        store.load_locked.return_value = object() if pending == 'conversion' else None
+        store.load_fastsync_target_pointer.return_value = object() if pending == 'fastsync' else None
+        with patch(
+            'pipelinewise.fastsync.commons.snowflake_iceberg_coordination.RecoveryCoordinator',
+            return_value=coordinator,
+        ), patch.object(
+            pipelinewise, '_preflight_postgres_slot_reset', return_value=({}, target_config),
+        ), patch.object(
+            pipelinewise, '_clear_tap_bookmarks_before_postgres_slot_reset'
+        ) as clear_bookmarks, patch(
+            'pipelinewise.cli.pipelinewise.FastSyncTapPostgres.reset_slot'
+        ) as reset_slot, patch('pipelinewise.cli.pipelinewise.Process') as process:
+            process.return_value.exception = None
+            process.return_value.exitcode = 0
+            if pending:
+                with pytest.raises(PreRunChecksException, match='Iceberg publication or conversion attempt is pending'):
+                    pipelinewise.do_sync_tables(reset_postgres_slot=True)
+                clear_bookmarks.assert_not_called()
+                reset_slot.assert_not_called()
+                process.assert_not_called()
+            else:
+                pipelinewise.do_sync_tables(reset_postgres_slot=True)
+                reset_slot.assert_called_once()
+                assert process.call_count == 2
+
+        targets = [lock_call.args[0] for lock_call in coordinator.table_lock.call_args_list]
+        assert [target.key for target in targets] == [
+            'TARGET_DB.TARGET_SCHEMA.TABLE_ONE', 'TARGET_DB.TARGET_SCHEMA.TABLE_TWO',
+        ]
+        assert [entry[0] for entry in coordinator.mock_calls[:4]] == [
+            'table_lock', 'table_lock().__enter__', 'table_lock', 'table_lock().__enter__',
+        ]
+        assert store.load_locked.call_count == manifest_reads
+        assert store.load_fastsync_target_pointer.call_count == pointer_reads
+        assert coordinator.table_lock.return_value.__exit__.call_count == 2
+
+    def test_clear_tap_bookmarks_before_postgres_slot_reset(self):
+        """A failed worker launch cannot leave state pointing before the new slot."""
+        pipelinewise = self._init_for_sync_tables_states_cleanup()
+        state_path = pipelinewise.tap['files']['state']
+        self._make_sample_state_file(state_path)
+        original = fastsync_utils.load_json(state_path)
+
+        backup_path = pipelinewise._clear_tap_bookmarks_before_postgres_slot_reset()
+
+        with open(state_path, encoding='utf-8') as state_file:
+            state = json.load(state_file)
+        assert state == {'bookmarks': {}, 'currently_syncing': None}
+        assert fastsync_utils.load_json(backup_path) == original
+        retry_backup = pipelinewise._clear_tap_bookmarks_before_postgres_slot_reset()
+        assert retry_backup != backup_path
+        assert fastsync_utils.load_json(backup_path) == original
+        assert fastsync_utils.load_json(retry_backup) == state
+
+    def test_automatic_initial_sync_retains_postgres_slot(self):
+        """Automatic initial FastSync does not request a whole-tap slot reset."""
+        pipelinewise = self._init_for_sync_tables_states_cleanup()
+        pipelinewise.tap['type'] = ConnectorType.TAP_POSTGRES.value
+
+        with patch(
+            'pipelinewise.cli.pipelinewise.FastSyncTapPostgres.reset_slot'
+        ) as reset_slot, patch(
+            'pipelinewise.cli.pipelinewise.Process'
+        ) as process:
+            process.return_value.exception = None
+            process.return_value.exitcode = 0
+            pipelinewise.do_sync_tables(
+                fastsync_stream_ids=[
+                    'db_test_mysql-table_one',
+                    'db_test_mysql-table_two',
+                ]
+            )
+
+        reset_slot.assert_not_called()
+
+    def test_partial_sync_retains_postgres_slot(self):
+        """Standalone PartialSync never resets the logical replication slot."""
+        pipelinewise = self._init_for_sync_tables_states_cleanup()
+        pipelinewise.tap['type'] = ConnectorType.TAP_POSTGRES.value
+
+        with patch.object(
+            pipelinewise, '_check_if_complete_tap_configuration'
+        ), patch.object(
+            pipelinewise, 'run_tap_partialsync'
+        ), patch(
+            'pipelinewise.cli.pipelinewise.FastSyncTapPostgres.reset_slot'
+        ) as reset_slot:
+            pipelinewise.sync_tables_partial_sync(
+                {
+                    'db_test_mysql.table_one': {
+                        'column': 'id',
+                        'static_value': '5',
+                    }
+                }
+            )
+
+        reset_slot.assert_not_called()
 
     def test_do_sync_tables_reset_state_file_for_partial_sync(self):
         """Testing if selected partial sync tables are filtered from state file if sync_tables run"""
@@ -1024,8 +1412,8 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         pipelinewise.tap['target_table_format'] = 'iceberg'
         pipelinewise.tap['iceberg_version'] = 3
 
-        pipelinewise._check_target_table_format_supports_fastsync()  # pylint: disable=protected-access
-        pipelinewise._check_supporting_tap_and_target_for_partial_sync()  # pylint: disable=protected-access
+        pipelinewise._check_target_table_format_supports_fastsync()
+        pipelinewise._check_supporting_tap_and_target_for_partial_sync()
 
     def test_iceberg_format_guard_requires_the_requested_operation(self):
         """An asymmetric future capability cannot enter the wrong lifecycle."""
@@ -1037,11 +1425,11 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
             'pipelinewise.cli.pipelinewise.resolve_fastsync_capabilities',
             return_value=capabilities,
         ):
-            pipelinewise._check_target_table_format_supports_fastsync(  # pylint: disable=protected-access
+            pipelinewise._check_target_table_format_supports_fastsync(
                 'partial_sync'
             )
             with pytest.raises(PreRunChecksException, match='No target changes'):
-                pipelinewise._check_target_table_format_supports_fastsync(  # pylint: disable=protected-access
+                pipelinewise._check_target_table_format_supports_fastsync(
                     'full_sync'
                 )
 
@@ -1053,12 +1441,12 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         pipelinewise.tap['type'] = ConnectorType.TAP_MONGODB.value
 
         with pytest.raises(PartialSyncNotSupportedTypeException):
-            pipelinewise._check_supporting_tap_and_target_for_partial_sync()  # pylint: disable=protected-access
+            pipelinewise._check_supporting_tap_and_target_for_partial_sync()
 
     def test_fast_sync_tables_cleanup_state_for_selected_tables(self):
         """Testing sync_tables cleanup state if file exists and there is no table argument"""
         def _assert_state_file(*args, **kwargs):
-            # pylint: disable=unused-argument
+
             with open(test_state_file, 'r', encoding='utf-8') as state_file:
                 bookmarks = json.load(state_file)
 
@@ -1208,7 +1596,6 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         with pytest.raises(InvalidConfigException, match='iceberg_create'):
             pipelinewise.validate()
 
-    # pylint: disable=protected-access
     def test_post_import_checks(self):
         """Test post import checks"""
         args = CliArgs()

@@ -1,6 +1,5 @@
 import re
 import threading
-import time
 import backoff
 import requests
 from requests.exceptions import RequestException
@@ -125,11 +124,12 @@ QUERY_INCOMPATIBLE_SALESFORCE_OBJECTS = set(['ListViewChartInstance',
                                              'AttachedContentNote',
                                              'QuoteTemplateRichTextData'])
 
+
 def log_backoff_attempt(details):
     LOGGER.info("ConnectionError detected, triggering backoff: %d try", details.get("tries"))
 
 
-def field_to_property_schema(field, mdata): # pylint: disable=too-many-branches
+def field_to_property_schema(field, mdata):
     property_schema = {}
 
     field_name = field['name']
@@ -186,8 +186,9 @@ def field_to_property_schema(field, mdata): # pylint: disable=too-many-branches
 
     return property_schema, mdata
 
+
 class Salesforce():
-    # pylint: disable=too-many-instance-attributes,too-many-arguments
+
     def __init__(self,
                  refresh_token=None,
                  token=None,
@@ -216,7 +217,9 @@ class Salesforce():
         self.quota_percent_total = float(
             quota_percent_total) if quota_percent_total is not None else 80
         self.is_sandbox = is_sandbox is True or (isinstance(is_sandbox, str) and is_sandbox.lower() == 'true')
-        self.select_fields_by_default = select_fields_by_default is True or (isinstance(select_fields_by_default, str) and select_fields_by_default.lower() == 'true')
+        self.select_fields_by_default = select_fields_by_default is True or (
+            isinstance(select_fields_by_default, str) and select_fields_by_default.lower() == 'true'
+        )
         self.default_start_date = default_start_date
         self.rest_requests_attempted = 0
         self.jobs_completed = 0
@@ -230,7 +233,6 @@ class Salesforce():
     def _get_standard_headers(self):
         return {"Authorization": "Bearer {}".format(self.access_token)}
 
-    # pylint: disable=anomalous-backslash-in-string,line-too-long
     def check_rest_quota_usage(self, headers):
         match = re.search(r'^api-usage=(\d+)/(\d+)$', headers.get('Sforce-Limit-Info'))
 
@@ -262,7 +264,6 @@ class Salesforce():
                                                                        self.quota_percent_per_run)
             raise TapSalesforceQuotaExceededException(partial_message)
 
-    # pylint: disable=too-many-arguments
     @backoff.on_exception(backoff.expo,
                           requests.exceptions.ConnectionError,
                           max_tries=10,
@@ -302,7 +303,12 @@ class Salesforce():
 
         resp = None
         try:
-            resp = self._make_request("POST", login_url, body=login_body, headers={"Content-Type": "application/x-www-form-urlencoded"})
+            resp = self._make_request(
+                "POST",
+                login_url,
+                body=login_body,
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
 
             LOGGER.info("OAuth2 login successful")
 
@@ -338,7 +344,6 @@ class Salesforce():
 
         return resp.json()
 
-    # pylint: disable=no-self-use
     def _get_selected_properties(self, catalog_entry):
         mdata = metadata.to_map(catalog_entry['metadata'])
         properties = catalog_entry['schema'].get('properties', {})
@@ -347,7 +352,6 @@ class Salesforce():
                 if singer.should_sync_field(metadata.get(mdata, ('properties', k), 'inclusion'),
                                             metadata.get(mdata, ('properties', k), 'selected'),
                                             self.select_fields_by_default)]
-
 
     def get_start_date(self, state, catalog_entry):
         catalog_metadata = metadata.to_map(catalog_entry['metadata'])
@@ -405,7 +409,6 @@ class Salesforce():
                 "api_type should be REST or BULK was: {}".format(
                     self.api_type))
 
-    # pylint: disable=line-too-long
     def get_blacklisted_fields(self):
         if self.api_type == BULK_API_TYPE:
             return {('EntityDefinition', 'RecordTypesSupported'): "this field is unsupported by the Bulk API."}

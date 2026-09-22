@@ -25,7 +25,7 @@ setup(name='pipelinewise-tap-mixpanel',
       ],
       extras_require={
           'test': [
-              'pylint==4.0.5',
+              'ruff==0.16.1',
               'pytest==9.0.3',
               'requests_mock==1.9.*',
           ]

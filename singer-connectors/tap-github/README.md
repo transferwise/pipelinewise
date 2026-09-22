@@ -127,3 +127,13 @@ Example:
 ```
   pytest tests/unittests
 ```
+
+## To run Ruff
+
+After installing the test dependencies above, return to the repository root
+from the connector directory and run:
+
+```shell
+cd ../..
+singer-connectors/tap-github/venv/bin/ruff check singer-connectors/tap-github/tap_github/
+```

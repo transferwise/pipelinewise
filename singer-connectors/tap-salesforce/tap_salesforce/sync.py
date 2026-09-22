@@ -9,10 +9,11 @@ LOGGER = singer.get_logger('tap_salesforce')
 
 BLACKLISTED_FIELDS = set(['attributes'])
 
+
 def remove_blacklisted_fields(data):
     return {k: v for k, v in data.items() if k not in BLACKLISTED_FIELDS}
 
-# pylint: disable=unused-argument
+
 def transform_bulk_data_hook(data, typ, schema):
     result = data
     if isinstance(data, dict):
@@ -25,6 +26,7 @@ def transform_bulk_data_hook(data, typ, schema):
         result = None
 
     return result
+
 
 def get_stream_version(catalog_entry, state):
     tap_stream_id = catalog_entry['tap_stream_id']
@@ -40,9 +42,13 @@ def get_stream_version(catalog_entry, state):
         return stream_version
     return int(time.time() * 1000)
 
+
 def resume_syncing_bulk_query(sf, catalog_entry, job_id, state, counter):
     bulk = Bulk(sf)
-    current_bookmark = singer.get_bookmark(state, catalog_entry['tap_stream_id'], 'JobHighestBookmarkSeen') or sf.get_start_date(state, catalog_entry)
+    current_bookmark = (
+        singer.get_bookmark(state, catalog_entry['tap_stream_id'], 'JobHighestBookmarkSeen')
+        or sf.get_start_date(state, catalog_entry)
+    )
     current_bookmark = singer_utils.strptime_with_tz(current_bookmark)
     batch_ids = singer.get_bookmark(state, catalog_entry['tap_stream_id'], 'BatchIDs')
 
@@ -75,7 +81,11 @@ def resume_syncing_bulk_query(sf, catalog_entry, job_id, state, counter):
 
                 # Update bookmark if necessary
                 replication_key_value = replication_key and singer_utils.strptime_with_tz(rec[replication_key])
-                if replication_key_value and replication_key_value <= start_time and replication_key_value > current_bookmark:
+                if (
+                    replication_key_value
+                    and replication_key_value <= start_time
+                    and replication_key_value > current_bookmark
+                ):
                     current_bookmark = singer_utils.strptime_with_tz(rec[replication_key])
 
         state = singer.write_bookmark(state,
@@ -88,6 +98,7 @@ def resume_syncing_bulk_query(sf, catalog_entry, job_id, state, counter):
         singer.write_state(state)
 
     return counter
+
 
 def sync_stream(sf, catalog_entry, state):
     stream = catalog_entry['stream']
@@ -104,6 +115,7 @@ def sync_stream(sf, catalog_entry, state):
                 stream, ex)) from ex
 
         return counter
+
 
 def sync_records(sf, catalog_entry, state, counter):
     chunked_bookmark = singer_utils.strptime_with_tz(sf.get_start_date(state, catalog_entry))
@@ -136,7 +148,11 @@ def sync_records(sf, catalog_entry, state, counter):
         replication_key_value = replication_key and singer_utils.strptime_with_tz(rec[replication_key])
 
         if sf.pk_chunking:
-            if replication_key_value and replication_key_value <= start_time and replication_key_value > chunked_bookmark:
+            if (
+                replication_key_value
+                and replication_key_value <= start_time
+                and replication_key_value > chunked_bookmark
+            ):
                 # Replace the highest seen bookmark and save the state in case we need to resume later
                 chunked_bookmark = singer_utils.strptime_with_tz(rec[replication_key])
                 state = singer.write_bookmark(
@@ -170,6 +186,7 @@ def sync_records(sf, catalog_entry, state, counter):
             catalog_entry['tap_stream_id'],
             replication_key,
             singer_utils.strftime(chunked_bookmark))
+
 
 def fix_record_anytype(rec, schema):
     """Modifies a record when the schema has no 'type' element due to a SF type of 'anyType.'

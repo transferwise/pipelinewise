@@ -117,7 +117,7 @@ class ColumnTypeCompatibility:
 
 
 @dataclass(frozen=True)
-class ManagedIcebergContract:  # pylint: disable=too-many-instance-attributes
+class ManagedIcebergContract:
     """One complete target-snowflake implementation of a managed version."""
 
     version: int
@@ -777,9 +777,6 @@ def validate_table_format_config(config):
         errors.append("'iceberg_version' must be integer 3 when 'target_table_format' is 'iceberg'")
     elif target_table_format != 'iceberg' and iceberg_version_is_set:
         errors.append("'iceberg_version' is only valid when 'target_table_format' is 'iceberg'")
-
-    if target_table_format == 'iceberg' and config.get('hard_delete') is not True:
-        errors.append("'hard_delete' must be true when 'target_table_format' is 'iceberg'")
 
     return errors
 

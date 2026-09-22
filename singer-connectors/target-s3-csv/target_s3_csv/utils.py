@@ -46,11 +46,17 @@ def add_metadata_columns_to_schema(schema_message):
     Metadata columns gives information about data injections
     """
     extended_schema_message = schema_message
-    extended_schema_message['schema']['properties']['_sdc_batched_at'] = { 'type': ['null', 'string'], 'format': 'date-time' }
+    extended_schema_message['schema']['properties']['_sdc_batched_at'] = {
+        'type': ['null', 'string'], 'format': 'date-time'
+    }
     extended_schema_message['schema']['properties']['_sdc_deleted_at'] = { 'type': ['null', 'string'] }
-    extended_schema_message['schema']['properties']['_sdc_extracted_at'] = { 'type': ['null', 'string'], 'format': 'date-time' }
+    extended_schema_message['schema']['properties']['_sdc_extracted_at'] = {
+        'type': ['null', 'string'], 'format': 'date-time'
+    }
     extended_schema_message['schema']['properties']['_sdc_primary_key'] = {'type': ['null', 'string'] }
-    extended_schema_message['schema']['properties']['_sdc_received_at'] = { 'type': ['null', 'string'], 'format': 'date-time' }
+    extended_schema_message['schema']['properties']['_sdc_received_at'] = {
+        'type': ['null', 'string'], 'format': 'date-time'
+    }
     extended_schema_message['schema']['properties']['_sdc_sequence'] = {'type': ['integer'] }
     extended_schema_message['schema']['properties']['_sdc_table_version'] = {'type': ['null', 'string'] }
 
@@ -88,7 +94,6 @@ def remove_metadata_values_from_record(record_message):
     return cleaned_record
 
 
-# pylint: disable=unnecessary-comprehension
 def flatten_key(k, parent_key, sep):
     """
     """
@@ -129,7 +134,7 @@ def get_target_key(message, prefix=None, timestamp=None, naming_convention=None)
     if not timestamp:
         timestamp = datetime.now().strftime('%Y%m%dT%H%M%S')
     key = naming_convention
-    
+
     # replace simple tokens
     for k, v in {
         '{stream}': message['stream'],

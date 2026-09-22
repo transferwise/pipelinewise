@@ -190,7 +190,7 @@ class SnowflakeQueryAdapter(SnowflakeSqlClient):
         return time.monotonic()
 
 
-class SnowflakeIcebergPublisher:  # pylint: disable=too-many-public-methods,too-many-instance-attributes
+class SnowflakeIcebergPublisher:
     """Plan, publish, and recover Snowflake-managed Iceberg v3 loads."""
 
     def __init__(
@@ -263,14 +263,14 @@ class SnowflakeIcebergPublisher:  # pylint: disable=too-many-public-methods,too-
         return self.finalization_service.complete_state_handoff(attempt)
 
     def _full_method(self, spec, snapshot, iceberg_version):
-        return self.publication_service._full_method(  # pylint: disable=protected-access
+        return self.publication_service._full_method(
             spec,
             snapshot,
             iceberg_version,
         )
 
     def _partial_method(self, spec, snapshot, drop_target, iceberg_version):
-        return self.publication_service._partial_method(  # pylint: disable=protected-access
+        return self.publication_service._partial_method(
             spec,
             snapshot,
             drop_target,
@@ -278,7 +278,7 @@ class SnowflakeIcebergPublisher:  # pylint: disable=too-many-public-methods,too-
         )
 
     def _preflight_replacement(self, target, destination_spec=None):
-        return self.publication_service._preflight_replacement(  # pylint: disable=protected-access
+        return self.publication_service._preflight_replacement(
             target,
             destination_spec,
         )
@@ -289,7 +289,7 @@ class SnowflakeIcebergPublisher:  # pylint: disable=too-many-public-methods,too-
         spec,
         query_phase,
     ):
-        return self.publication_service._validate_partial_staging_primary_key(  # pylint: disable=protected-access
+        return self.publication_service._validate_partial_staging_primary_key(
             attempt,
             spec,
             query_phase,
@@ -303,7 +303,7 @@ class SnowflakeIcebergPublisher:  # pylint: disable=too-many-public-methods,too-
         where_clause='',
         query_tag=None,
     ):
-        return self.publication_service._content_evidence(  # pylint: disable=protected-access
+        return self.publication_service._content_evidence(
             spec,
             table,
             project,
@@ -312,13 +312,13 @@ class SnowflakeIcebergPublisher:  # pylint: disable=too-many-public-methods,too-
         )
 
     def _verify_published(self, attempt, spec):
-        return self.publication_service._verify_published(  # pylint: disable=protected-access
+        return self.publication_service._verify_published(
             attempt,
             spec,
         )
 
     def _verify_replacement_metadata(self, attempt):
-        return self.publication_service._verify_replacement_metadata(  # pylint: disable=protected-access
+        return self.publication_service._verify_replacement_metadata(
             attempt
         )
 

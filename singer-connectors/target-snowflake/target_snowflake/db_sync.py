@@ -11,7 +11,7 @@ from singer import get_logger
 from target_snowflake import flattening
 from target_snowflake import managed_iceberg
 from target_snowflake import stream_utils
-from target_snowflake.file_format import FileFormat, FileFormatTypes
+from target_snowflake.file_format import FileFormat
 
 from target_snowflake.exceptions import (
     PrimaryKeyNotFoundException,
@@ -115,7 +115,6 @@ def primary_column_names(stream_schema_message):
     return [safe_column_name(p) for p in stream_schema_message['key_properties']]
 
 
-# pylint: disable=invalid-name
 def create_query_tag(query_tag_pattern: str, database: str = None, schema: str = None, table: str = None) -> str:
     """
     Generate a string to tag executed queries in Snowflake.
@@ -150,7 +149,6 @@ def create_query_tag(query_tag_pattern: str, database: str = None, schema: str =
     return query_tag
 
 
-# pylint: disable=too-many-public-methods,too-many-instance-attributes
 class DbSync:
     """DbSync class"""
 
@@ -200,12 +198,7 @@ class DbSync:
         self.grantees = None
         self.file_format = FileFormat(self.connection_config['file_format'], self.query, file_format_type)
 
-        if not self.connection_config.get('stage') and self.file_format.file_format_type == FileFormatTypes.PARQUET:
-            self.logger.error("Table stages with Parquet file format is not supported. "
-                              "Use named stages with Parquet file format or table stages with CSV files format")
-            sys.exit(1)
-
-        # Init stream schema pylint: disable=line-too-long
+        # Init stream schema
         if self.stream_schema_message is not None:
             #  Define target schema name.
             #  --------------------------
@@ -219,7 +212,9 @@ class DbSync:
             #                                           "schema_mapping": {
             #                                               "my_tap_stream_id": {
             #                                                   "target_schema": "my_snowflake_schema",
-            #                                                   "target_schema_select_permissions": [ "role_with_select_privs" ]
+            #                                                   "target_schema_select_permissions": [
+            #                                                       "role_with_select_privs"
+            #                                                   ]
             #                                               }
             #                                           }
             config_default_target_schema = self.connection_config.get('default_target_schema', '').strip()
@@ -242,16 +237,18 @@ class DbSync:
             #  ---------------
             #  Grantees can be defined in multiple ways:
             #
-            #   1: 'default_target_schema_select_permissions' key  : USAGE and SELECT privileges will be granted on every table to a given role
-            #                                                       for every incoming stream if not specified explicitly
-            #                                                       in the `schema_mapping` object
-            #   2: 'target_schema_select_permissions' key          : Roles to grant USAGE and SELECT privileges defined explicitly
+            #   1: 'default_target_schema_select_permissions' key  : Grant USAGE and SELECT on every table to a
+            #                                                       given role for every incoming stream unless
+            #                                                       explicitly set in the `schema_mapping` object.
+            #   2: 'target_schema_select_permissions' key          : Roles granted USAGE and SELECT explicitly
             #                                                       for a given stream.
             #                                                       Example config.json:
             #                                                           "schema_mapping": {
             #                                                               "my_tap_stream_id": {
             #                                                                   "target_schema": "my_snowflake_schema",
-            #                                                                   "target_schema_select_permissions": [ "role_with_select_privs" ]
+            #                                                                   "target_schema_select_permissions": [
+            #                                                                       "role_with_select_privs"
+            #                                                                   ]
             #                                                               }
             #                                                           }
             self.grantees = self.connection_config.get('default_target_schema_select_permissions')
@@ -321,7 +318,6 @@ class DbSync:
 
                 qid = None
 
-                # pylint: disable=invalid-name
                 for q in queries:
 
                     # update the LAST_QID
@@ -377,7 +373,8 @@ class DbSync:
 
             key_props.append(str(flatten[key_prop]))
 
-        return ','.join(key_props)
+        # Delimiters may occur inside key values; encode component boundaries unambiguously.
+        return json.dumps(key_props, ensure_ascii=False, separators=(',', ':'))
 
     def present_column_names(self, record):
         """Return flattened schema columns represented by a PATCH record."""
@@ -617,7 +614,6 @@ class DbSync:
         self.logger.info("Granting USAGE privilege on '%s' schema to '%s'... %s", schema_name, grantee, query)
         self.query(query)
 
-    # pylint: disable=invalid-name
     def grant_select_on_all_tables_in_schema(self, schema_name, grantee):
         """Grant select on all tables in schema"""
         query = f"GRANT SELECT ON ALL TABLES IN SCHEMA {schema_name} TO ROLE {grantee}"

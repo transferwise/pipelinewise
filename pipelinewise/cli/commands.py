@@ -123,7 +123,6 @@ class TransformParams:
     target_id: str
 
 
-# pylint: disable=unnecessary-pass
 class RunCommandException(Exception):
     """
     Custom exception to raise when run command fails
@@ -296,7 +295,6 @@ def build_stream_buffer_command(
     return buffer_command
 
 
-# pylint: disable=too-many-positional-arguments
 def build_singer_command(
     tap: TapParams,
     target: TargetParams,
@@ -355,8 +353,6 @@ def build_singer_command(
     return command
 
 
-# pylint: disable=too-many-positional-arguments
-# pylint: disable=too-many-arguments
 def build_partialsync_command(
         tap: TapParams,
         target: TargetParams,
@@ -402,8 +398,6 @@ def build_partialsync_command(
     return command
 
 
-# pylint: disable=too-many-positional-arguments
-# pylint: disable=too-many-arguments
 def build_fastsync_command(
     tap: TapParams,
     target: TargetParams,
@@ -413,7 +407,6 @@ def build_fastsync_command(
     tables: str = None,
     profiling_mode: bool = False,
     profiling_dir: str = None,
-    drop_pg_slot: bool = False,
     autoresync_size: int = None
 ) -> str:
     """
@@ -421,7 +414,6 @@ def build_fastsync_command(
     given target with optional transformations.
 
     Args:
-        drop_pg_slot: flag for fastsync to indicate whether to drop or not PG replication slot
         profiling_dir: directory where profiling output should be dumped
         profiling_mode: Flag to indicate whether build the command with profiling
         tap: NamedTuple with tap properties
@@ -452,7 +444,6 @@ def build_fastsync_command(
                     if transform.config and os.path.isfile(transform.config)
                     else '',
                     f'--tables {tables}' if tables else '',
-                    '--drop_pg_slot' if drop_pg_slot else '',
                     f'--autoresync_size {autoresync_size}' if autoresync_size else ''
                 ],
             )
@@ -484,7 +475,6 @@ def log_file_with_status(log_file: str, status: str) -> str:
     return f'{log_file}.{status}'
 
 
-# pylint: disable=too-many-locals
 def run_command(command: str, log_file: str = None, line_callback: callable = None):
     """
     Runs a shell command with or without log file with STDOUT and STDERR

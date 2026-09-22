@@ -72,7 +72,7 @@ To sync data, select fields in the `properties.json` output and run the tap.
 ## Linting
 
 ```bash
-    make venv pylint
+    make venv lint
 ```
 
 ## Licence

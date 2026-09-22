@@ -24,7 +24,6 @@ TAP_YUGABYTE_ID = 'yugabyte_to_pg'
 TARGET_ID = 'postgres_dwh'
 
 
-# pylint: disable=attribute-defined-outside-init,too-many-instance-attributes
 class TestTargetPostgres:
     """
     End to end tests for Target Postgres
@@ -213,7 +212,6 @@ class TestTargetPostgres:
             mysql_to_postgres.tap_type_to_target_type,
         )
 
-    # pylint: disable=invalid-name
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_mariadb_to_pg_with_custom_buffer_size(self):
         """Replicate data from MariaDB to Postgres DWH with custom buffer size

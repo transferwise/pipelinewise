@@ -32,7 +32,6 @@ EXPECTED_CHECKS = {
 }
 
 
-# pylint: disable=attribute-defined-outside-init
 class TestMySqlToSnowflakeDataDiff:
     """Prove data-diff reconciles a MySQL source against a Snowflake replica."""
 

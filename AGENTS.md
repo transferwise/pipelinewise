@@ -48,18 +48,18 @@ For implementation changes, run these root gates verbatim, in order, preferably
 in the ready container:
 
 ```bash
-ruff check pipelinewise tests
-pylint pipelinewise tests
-flake8 pipelinewise --count --select=E9,F63,F7,F82 --show-source --statistics
-flake8 pipelinewise --count --max-complexity=15 --max-line-length=120 --statistics
+ruff check .
 pytest --cov=pipelinewise --cov-fail-under=77 -v tests/units
 ```
 
 An unavoidable host run must activate `.virtualenvs/pipelinewise/`. Keep paths
-and flags exact: Ruff/Pylint inspect `pipelinewise tests`; Flake8 inspects
-`pipelinewise`. Never run bare `pytest tests/` because it collects credentialed
-E2E. Collect nested data-diff/backend-db tests from `tests/units`, narrowing
-with `-k` to avoid import failures.
+and flags exact: Ruff checks all repository Python except connector tests outside
+existing GitHub connector CI, including integration suites, legacy tests, and
+spikes. This includes data-diff, root E2E, vendored connector source, and the
+tap-mysql, tap-postgres, and target-snowflake unit suites run by connector CI.
+Never run bare `pytest tests/` because it collects credentialed E2E. Collect
+nested data-diff/backend-db tests from `tests/units`, narrowing with `-k` to
+avoid import failures.
 
 After implementation, schema, example-config, or connector-config changes,
 validate in Docker (Compose loads `dev-project/.env`):
@@ -81,16 +81,26 @@ Also follow these scoped checks:
 
 - Database, migration, FastSync, data-diff, connector-route, or E2E:
   `tests/end_to_end/AGENTS.md`.
-- Connector source: `singer-connectors/AGENTS.md`; root gates exclude it.
+- Connector source: `singer-connectors/AGENTS.md`; the root Ruff gate checks
+  source and GitHub-tested suites, while connector-local targets provide install
+  and test coverage.
 - Docs: `docs/AGENTS.md`; warnings fail.
 
 ## Style and safety
 
 - Python: 120 columns, complexity 15, four spaces, Google docstrings,
   consistent single quotes, `snake_case` names/JSON keys, `PascalCase` classes.
-- Uppercase Snowflake FastSync identifiers. Scope new Pylint disables to a line
-  or function. Preserve existing connector module suppressions when removing
-  them would expose unrelated legacy findings; do not broaden their scope.
+- Ruff retains error, warning, quote, line-length, and complexity gates plus the
+  `PLE` family. Preview rules require explicit selection; `E301`–`E306` enforce
+  blank-line spacing. The Ruff-only migration intentionally did not enable `PLC`,
+  `PLR`, or `PLW` wholesale over legacy code; broaden rules only with a
+  scoped cleanup and regression plan.
+- Every new or modified Python file must remain in scope for `ruff check .` and
+  pass the repository `pyproject.toml` policy. Do not add or invoke another
+  Python linter or formatter.
+- Uppercase Snowflake FastSync identifiers. Scope new Ruff ignores to the
+  narrowest line or function and rule. Do not add connector-wide or
+  directory-wide rule exemptions or broaden unrelated inline suppressions.
 - Comments explain a non-obvious constraint or consequence in at most two
   lines; do not restate code, narrate edits, argue choices, or add walkthroughs.
 - Preserve dirty-worktree changes. Never run `pre-commit run --all-files`,
@@ -99,6 +109,12 @@ Also follow these scoped checks:
   transitive installs.
 - Never commit secrets, `.tfvars`, private keys, or populated environment files.
 - Use `import_config` in docs, examples, tests, and comments; `import` is deprecated.
+
+## Reviews
+
+When reviewing changes between the current state and `master`, present concerns
+as a numbered list, ordered from most to least severe. Label each concern's
+severity; if there are no concerns, say so explicitly.
 
 ## Git and completion
 

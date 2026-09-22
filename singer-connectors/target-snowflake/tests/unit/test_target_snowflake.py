@@ -6,7 +6,7 @@ import itertools
 
 from contextlib import redirect_stdout
 from datetime import datetime, timedelta
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 import target_snowflake
 
@@ -20,6 +20,65 @@ class TestTargetSnowflake(unittest.TestCase):
     def setUp(self):
         self.config = {}
         self.maxDiff = None
+
+    def test_legacy_hard_delete_setting_still_deletes_before_emitting_state(self):
+        state = {'bookmarks': {'public-table': {'lsn': 2}}}
+        lines = [
+            json.dumps({
+                'type': 'SCHEMA', 'stream': 'public-table', 'key_properties': ['id'],
+                'schema': {'properties': {'id': {'type': ['integer']}}},
+            }),
+            json.dumps({
+                'type': 'RECORD', 'stream': 'public-table',
+                'record': {'id': 1, '_sdc_deleted_at': '2026-09-17T12:00:00Z'},
+            }),
+            json.dumps({'type': 'STATE', 'value': state}),
+        ]
+        for value in (True, False, None, 'false'):
+            with self.subTest(value=value), \
+                    patch('target_snowflake.DbSync') as db_sync_mock, \
+                    patch('target_snowflake.flush_records') as flush_records_mock, \
+                    patch('target_snowflake.emit_state') as emit_state_mock:
+                db_sync = db_sync_mock.return_value
+                db_sync.record_primary_key_string.return_value = '1'
+                operations = Mock()
+                operations.attach_mock(flush_records_mock, 'load')
+                operations.attach_mock(db_sync.delete_rows, 'delete')
+                operations.attach_mock(emit_state_mock, 'state')
+
+                target_snowflake.persist_lines({'hard_delete': value, 'parallelism': 1}, lines)
+
+                self.assertEqual([operation[0] for operation in operations.mock_calls], ['load', 'delete', 'state'])
+                db_sync.delete_rows.assert_called_once_with('public-table')
+                emit_state_mock.assert_called_once_with(state)
+                record = flush_records_mock.call_args.args[1]['1']
+                self.assertEqual(record['_sdc_deleted_at'], '2026-09-17T12:00:00Z')
+                self.assertIn('_sdc_deleted_at', db_sync_mock.call_args.args[1]['schema']['properties'])
+
+    @patch('target_snowflake.flush_streams')
+    @patch('target_snowflake.DbSync')
+    def test_delete_metadata_is_added_when_metadata_setting_is_false(self, db_sync_mock, flush_streams_mock):
+        lines = [
+            json.dumps({
+                'type': 'SCHEMA', 'stream': 'public-table', 'key_properties': ['id'],
+                'schema': {'properties': {'id': {'type': ['integer']}}},
+            }),
+            json.dumps({
+                'type': 'RECORD', 'stream': 'public-table',
+                'record': {'id': 1, '_sdc_deleted_at': '2026-09-17T12:00:00Z'},
+            }),
+        ]
+        db_sync_mock.return_value.record_primary_key_string.return_value = '1'
+        flush_streams_mock.return_value = None
+
+        target_snowflake.persist_lines({'add_metadata_columns': False}, lines)
+
+        schema = db_sync_mock.call_args.args[1]['schema']['properties']
+        self.assertIn('_sdc_deleted_at', schema)
+        record = flush_streams_mock.call_args.args[0]['public-table']['1']
+        self.assertEqual(record['_sdc_deleted_at'], '2026-09-17T12:00:00Z')
+        self.assertIn('_sdc_extracted_at', record)
+        self.assertIn('_sdc_batched_at', record)
 
     def test_store_record_coalesces_patch_events_for_same_primary_key(self):
         db_sync = Mock(record_update_mode=target_snowflake.RECORD_UPDATE_MODE_PATCH)
@@ -129,6 +188,9 @@ class TestTargetSnowflake(unittest.TestCase):
     @patch('target_snowflake.flush_records')
     def test_hard_delete_runs_only_after_patch_batch_loads(self, flush_records_mock):
         db_sync = Mock()
+        operations = Mock()
+        operations.attach_mock(flush_records_mock, 'load')
+        operations.attach_mock(db_sync.delete_rows, 'delete')
         row_count = {'public-table': 1}
         records = {'1': {'id': 1, '_sdc_deleted_at': '2026-08-08T12:00:00Z'}}
 
@@ -137,14 +199,36 @@ class TestTargetSnowflake(unittest.TestCase):
             records,
             row_count,
             db_sync,
-            delete_rows=True,
         )
 
         flush_records_mock.assert_called_once_with(
             'public-table', records, db_sync, None, False, None
         )
         db_sync.delete_rows.assert_called_once_with('public-table')
+        self.assertEqual(operations.mock_calls, [
+            call.load('public-table', records, db_sync, None, False, None),
+            call.delete('public-table'),
+        ])
         self.assertEqual(row_count['public-table'], 0)
+
+    @patch('target_snowflake.flush_records')
+    def test_delete_failure_does_not_reset_batch_or_advance_state(self, flush_records_mock):
+        db_sync = Mock()
+        db_sync.delete_rows.side_effect = RuntimeError('delete failed')
+        row_count = {'public-table': 1}
+        records = {'public-table': {'1': {'id': 1, '_sdc_deleted_at': '2026-09-17T12:00:00Z'}}}
+        previous_state = {'bookmarks': {'public-table': {'lsn': 1}}}
+
+        with self.assertRaisesRegex(RuntimeError, 'delete failed'):
+            target_snowflake.flush_streams(
+                records, row_count, {'public-table': db_sync}, {'parallelism': 1},
+                {'bookmarks': {'public-table': {'lsn': 2}}}, previous_state, {},
+            )
+
+        flush_records_mock.assert_called_once()
+        self.assertEqual(row_count['public-table'], 1)
+        self.assertEqual(previous_state, {'bookmarks': {'public-table': {'lsn': 1}}})
+        self.assertIn('1', records['public-table'])
 
     @patch('target_snowflake.flush_streams')
     @patch('target_snowflake.DbSync')

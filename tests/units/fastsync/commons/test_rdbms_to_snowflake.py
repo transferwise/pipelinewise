@@ -19,7 +19,7 @@ def test_cleanup_failure_is_logged():
         'remove',
         side_effect=cleanup_error,
     ):
-        rdbms_to_snowflake._cleanup_full_export(run)  # pylint: disable=protected-access
+        rdbms_to_snowflake._cleanup_full_export(run)
 
     run.logger.warning.assert_called_once_with(
         'Failed to remove local FastSync export %s: %s',

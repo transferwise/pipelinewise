@@ -20,8 +20,7 @@ TAP = 'FastSyncTapMySql'
 TARGET = 'FastSyncTargetSnowflake'
 
 
-# pylint: disable=missing-function-docstring,invalid-name
-class MySqlToSnowflake(unittest.TestCase):  # pylint: disable=too-many-public-methods
+class MySqlToSnowflake(unittest.TestCase):
     """
     Unit tests for fastsync mysql to snowflake
     """
@@ -46,6 +45,7 @@ class MySqlToSnowflake(unittest.TestCase):  # pylint: disable=too-many-public-me
             ('multilinestring', None): 'VARIANT',
             ('multipolygon', None): 'VARIANT',
             ('geometrycollection', None): 'VARIANT',
+            ('geomcollection', None): 'VARIANT',
             ('text', None): 'VARCHAR(134217728)',
             ('tinytext', None): 'VARCHAR(134217728)',
             ('mediumtext', None): 'VARCHAR(134217728)',

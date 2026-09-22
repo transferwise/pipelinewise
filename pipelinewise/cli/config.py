@@ -39,7 +39,6 @@ class Config:
         self.targets = {}
 
     @classmethod
-    # pylint: disable=too-many-locals
     def from_yamls(cls, config_dir, yaml_dir='.', vault_secret=None):
         """
         Class Constructor
@@ -67,7 +66,6 @@ class Config:
             utils.validate(instance=global_config, schema=global_config_schema)
             config.global_config = global_config or {}
 
-        # pylint: disable=E1136,E1137  # False positive when loading vault encrypted YAML
         # Load every target yaml into targets dictionary
         for yaml_file in target_yamls:
             config.logger.info('LOADING TARGET: %s', yaml_file)
@@ -286,7 +284,6 @@ class Config:
         # Save target config.json
         utils.save_json(target.get('db_conn'), target_config_path)
 
-    # pylint: disable=too-many-locals
     def save_tap_jsons(self, target, tap, extra_config_keys=None):
         """
         Generating JSON config files for a singer tap connector:
@@ -475,8 +472,7 @@ class Config:
                 'batch_wait_limit_seconds': tap.get('batch_wait_limit_seconds', None),
                 'parallelism': tap.get('parallelism', 0),
                 'parallelism_max': tap.get('parallelism_max', 4),
-                'hard_delete': tap.get('hard_delete', True),
-                'flush_all_streams': tap.get('flush_all_streams', False),
+                'flush_all_streams': tap.get('flush_all_streams', True),
                 'primary_key_required': tap.get('primary_key_required', True),
                 'default_target_schema': tap.get('default_target_schema'),
                 'default_target_schema_select_permissions': tap.get(
@@ -689,12 +685,6 @@ class Config:
     @classmethod
     def _validate_iceberg_tap_settings(cls, tap: Dict, target: Dict) -> None:
         """Validate tap settings supported by explicit Singer and FastSync Iceberg routes."""
-        if tap.get('hard_delete', True) is not True:
-            raise InvalidConfigException(
-                f'Tap "{tap.get("id")}" must use hard_delete: true with '
-                'target_table_format "iceberg".'
-            )
-
         capabilities = fastsync_capabilities.resolve_fastsync_capabilities(
             tap['type'],
             target['type'],

@@ -1,17 +1,13 @@
 #!/usr/bin/env python3
-# pylint: disable=missing-docstring,not-an-iterable,too-many-locals,too-many-arguments,too-many-branches,invalid-name,duplicate-code,too-many-statements
+
 
 import collections
 import copy
 import itertools
-import re
-import sys
 import logging
 
 import singer
 import singer.metrics as metrics
-import singer.schema
-import snowflake.connector
 from singer import metadata
 from singer import utils
 from singer.catalog import Catalog, CatalogEntry
@@ -60,7 +56,7 @@ BINARY_TYPE = set(['binary', 'varbinary'])
 
 
 def schema_for_column(c):
-    '''Returns the Schema object for the given Column.'''
+    """Returns the Schema object for the given Column."""
     data_type = c.data_type.lower()
 
     inclusion = 'available'
@@ -242,7 +238,6 @@ def do_discover(snowflake_conn, config):
     discover_catalog(snowflake_conn, config).dump()
 
 
-# pylint: disable=fixme
 # TODO: Maybe put in a singer-db-utils library.
 def desired_columns(selected, table_schema):
     """Return the set of column names we need to include in the SELECT.
@@ -347,7 +342,7 @@ def get_streams(snowflake_conn, catalog, config, state):
     discovered = discover_catalog(snowflake_conn, config)
 
     # Filter catalog to include only selected streams
-    # pylint: disable=unnecessary-lambda
+
     selected_streams = list(filter(lambda s: common.stream_is_selected(s), catalog.streams))
     streams_with_state = []
     streams_without_state = []

@@ -4,8 +4,12 @@ Read root `AGENTS.md` and relevant implementation, test, E2E, and docs guides.
 
 ## Environments and CI
 
-These are vendored sources, not submodules, and root lint/unit gates exclude
-them. Prefer the ready `pipelinewise` container; report host fallbacks.
+These are vendored sources, not submodules. The root Ruff gate checks connector
+source packages plus the tap-mysql, tap-postgres, and target-snowflake unit
+suites run by connector CI. Connector tests outside GitHub connector CI,
+including integration suites, legacy tests, and spikes, remain excluded; root
+unit tests exclude connectors. Prefer the ready `pipelinewise` container; report
+host fallbacks.
 
 Connector CI installs all connectors and runs Python 3.12 units for tap-mysql
 (`make unit_test_cov`, 47%), tap-postgres (`make unit_test_cov`, 58%), and
@@ -18,15 +22,22 @@ PipelineWise, runtime-connector, connector-test, host, or container interpreters
 
 ## Validation
 
-The owning Makefile is authoritative. Run available environment, Pylint, unit,
-integration, and coverage targets without lowering thresholds; integration may
-need containers or credentials.
+Ruff is the only supported connector linter. Where present, the owning
+Makefile's `lint` target runs the connector environment's Ruff binary from the
+repository root so the root `pyproject.toml` applies. The tap-mysql,
+tap-postgres, and target-snowflake targets lint source, their GitHub-tested unit
+suites, and shared unit helpers; other connector targets lint source only. Unit
+and integration targets remain the behavioral validation. Do not add
+connector-local lint configuration, another Python linter, or an automatic
+formatter. Line length, docstring quoting, lambda assignment, and complexity
+rules apply to all connector source. Keep unavoidable legacy ignores inline,
+function- or line-scoped, and rule-specific. New or modified connector Python
+must remain within the root Ruff scope.
 
-Legacy connector Pylint configurations may not be green with the installed
-Pylint. Preserve or improve the master score and finding set, and report the
-baseline configuration errors and findings rather than claiming the gate passed.
+Run available environment, lint, unit, integration, and coverage targets
+without lowering thresholds; integration may need containers or credentials.
 
-- Most use `venv`, `pylint`, `unit_test`, and `integration_test`; inspect the
+- Most use `venv`, `lint`, `unit_test`, and `integration_test`; inspect the
   Makefile for variants.
 - PostgreSQL also requires `integration_test_cov` >=63 and `total_cov` >=85;
   MySQL uses Pytest for unit and integration tests.
@@ -36,6 +47,8 @@ baseline configuration errors and findings rather than claiming the gate passed.
   Jira, and Zendesk lack repository E2E.
 
 Report unavailable or skipped integration/E2E coverage as unverified.
+Use distinct ``COVERAGE_FILE`` paths for overlapping coverage runs; otherwise
+unit and integration results can combine and overstate an individual suite's coverage.
 
 ### Target-snowflake integration tests in dev-project
 
@@ -54,22 +67,21 @@ CSV suite needs standard Snowflake/S3 variables,
 `TARGET_SNOWFLAKE_SCHEMA`, and `TARGET_SNOWFLAKE_FILE_FORMAT_CSV` (which may
 reuse `TARGET_SNOWFLAKE_FILE_FORMAT`); ensure the private key is readable.
 
-Run the supported 46-test subset with plaintext upload explicitly selected:
+Run the supported 49-test suite with plaintext upload explicitly selected:
 
 ```bash
 docker exec -t -e CLIENT_SIDE_ENCRYPTION_MASTER_KEY= pipelinewise bash -lc '
   cd /opt/pipelinewise/singer-connectors/target-snowflake
   . ./venv/bin/activate
   pytest tests/integration -vvx \
-    -k "not test_parquet and not test_table_stage and \
-        (not test_loading_tables_with_client_side_encryption or wrong_master_key)"
+    -k "not test_loading_tables_with_client_side_encryption or wrong_master_key"
 '
 ```
 
-This excludes Parquet, mixed CSV/Parquet table-stage, and successful client-side
-encryption while retaining wrong-key rejection. Expect 46 passes, zero skips;
-anything else is non-green. Full `make integration_test` separately requires
-Parquet and a real client-side encryption master key.
+This excludes successful client-side encryption while retaining CSV external
+and table-stage loads plus wrong-key rejection. Expect 49 passes, zero skips;
+anything else is non-green. Full `make integration_test` separately requires a
+real client-side encryption master key and expects 50 passes.
 
 ## Versioning and upstream
 
@@ -84,6 +96,13 @@ Parquet and a real client-side encryption master key.
   method and PipelineWise FullSync/PartialSync. Keep their version checks aligned;
   this source minimum does not constrain target-postgres or the PipelineWise
   backend database.
+- PostgreSQL/Snowflake targets silently ignore retired deletion-mode options,
+  enable metadata automatically, and physically process `_SDC_DELETED_AT` before
+  acknowledging state. Keep this marker in Singer schemas and transport.
+- MySQL binlog checkpoints must retain transaction/table-map boundaries and
+  each stream's acknowledged history. Preserve complete GTID sets and replay
+  fences; only new complete-history captures may set `gtid_complete: true`.
+  Test interrupted large transactions on both MySQL and MariaDB.
 
 ## Snowflake traps
 
@@ -106,6 +125,10 @@ invariants. Connector-specific rules follow:
   Iceberg policy layer. Keep the dependency-free fixture aligned with core.
 - Keep all managed-v3 DDL/type/version settings and the dependency-free fixture
   in exact core parity. CREATE/ADD emits v3 binary as `BINARY(67108864)`.
+- Keep target-snowflake's quote-aware CSV writer and named-format validation in
+  lockstep. Preserve SQL NULL, empty strings, controls, Unicode, punctuation,
+  and literal escapes; require the documented comma/LF, escape, enclosure,
+  whitespace, empty-field, multiline, UTF-8, header, and empty `NULL_IF` options.
 - Conversion stays in the PipelineWise command; do not restore a connector
   executable or duplicate its type, metadata, or recovery policy.
 - Detect MariaDB JSON aliases only from the exact generated `JSON_VALID`

@@ -115,8 +115,6 @@ Tap configuration
    target: "snowflake"
    batch_size_rows: 20000
    stream_buffer_size: 0
-   add_metadata_columns: true
-   hard_delete: true
    schemas:
      - source_schema: "public"
        target_schema: "repl_orders"
@@ -173,10 +171,11 @@ Tap configuration
      - No
      - Global channel
      - Adds a tap-specific Slack destination; must start with ``#``.
-   * - ``add_metadata_columns`` / ``hard_delete``
+   * - ``add_metadata_columns``
      - No
-     - See metadata guide
-     - Controls target metadata and delete handling. See
+     - ``false``
+     - Adds ingestion metadata to :ref:`target-s3-csv` output. PostgreSQL and
+       Snowflake targets always include metadata automatically. See
        :ref:`metadata_columns`.
 
 .. list-table:: Target-loading settings inherited from the tap
@@ -196,8 +195,10 @@ Tap configuration
      - Currently ineffective: PipelineWise emits this name, but the PostgreSQL
        and Snowflake targets read ``max_parallelism`` instead.
    * - ``flush_all_streams``
-     - ``false``
+     - ``true``
      - Flushes every buffered stream when one stream reaches its batch boundary.
+       Set ``false`` to flush only that stream. Flushing all streams can create
+       smaller, more frequent loads and increase loading cost.
    * - ``primary_key_required``
      - ``true``
      - Rejects streams without a target merge key when enabled.
@@ -243,14 +244,25 @@ Tap configuration
      - None
      - Selects the archive destination when load-file archiving is enabled.
 
+``flush_all_streams`` controls Singer loading into PostgreSQL and Snowflake;
+it does not affect FastSync or PartialSync. Run ``import_config`` after upgrading
+to apply the new default to existing generated configs. Explicit YAML
+``flush_all_streams: false`` remains an opt-out. Standalone target connectors
+retain their ``false`` default.
+
+Flushing all buffered streams loads sparse streams sooner and allows fresher
+cross-stream checkpoints, but smaller, more frequent loads can increase loading
+cost. With ``false``, only the flushed stream's bookmark advances; both modes
+wait for the corresponding loads to finish before acknowledging their state.
+
 .. important::
 
    Any tap whose Singer output is compatible with ``target-snowflake`` can
    select managed Iceberg v3. FastSync FullSync and PartialSync for managed v3
-   remain limited to ``tap-mysql`` (MariaDB/MySQL) and ``tap-postgres``. Every
-   explicit v3 route requires ``hard_delete: true``; those two FastSync-capable
-   taps also require ``data_flattening_max_level: 0``. Singer-only sources retain
-   their normal flattening setting, including Salesforce's default level ``10``.
+   remain limited to ``tap-mysql`` (MariaDB/MySQL) and ``tap-postgres``. Those two
+   FastSync-capable taps require ``data_flattening_max_level: 0``. Singer-only
+   sources retain their normal flattening setting, including Salesforce's
+   default level ``10``.
    Native remains the default, and PipelineWise does not convert an existing
    table when the requested format conflicts. Every managed Iceberg version
    other than v3 is rejected before mutation. See :ref:`snowflake_iceberg`.

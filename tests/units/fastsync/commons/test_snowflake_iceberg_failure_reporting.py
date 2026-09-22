@@ -81,7 +81,7 @@ def test_mismatch_reports_aggregate_evidence(tmp_path, spec):
     attempt.expected_row_fingerprint = 'expected-hash'
 
     with pytest.raises(RecoveryManifestError) as exc_info:
-        publisher._verify_published(attempt, spec)  # pylint: disable=protected-access
+        publisher._verify_published(attempt, spec)
 
     assert str(exc_info.value) == (
         'Published Iceberg target contents do not match staging: '

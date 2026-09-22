@@ -161,8 +161,10 @@ services:
       --server-id=1
       --log-bin=mysql-bin
       --binlog-format=ROW
+      --binlog-row-metadata=FULL
       --binlog-do-db=${TAP_MYSQL_DB}
       --binlog-do-db=${TAP_MYSQL_REPLICA_DB}
+      --binlog-do-db=tap_mysql_test
       --max-allowed-packet=64M
       --tls_version=TLSv1.2
       --require_secure_transport=ON
@@ -191,7 +193,13 @@ services:
     container_name: pipelinewise-mysql-source-replica
     ports:
       - ${TAP_MYSQL_REPLICA_PORT_ON_HOST}:${TAP_MYSQL_REPLICA_PORT}
-    command: --default-authentication-plugin=mysql_native_password --server-id=2 --log-bin=mysql-bin --relay-log=mysql-relay-log --replicate-do-db=${TAP_MYSQL_REPLICA_DB}
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --server-id=2
+      --log-bin=mysql-bin
+      --binlog-row-metadata=FULL
+      --relay-log=mysql-relay-log
+      --replicate-do-db=${TAP_MYSQL_REPLICA_DB}
     environment:
       MYSQL_ROOT_PASSWORD: ${TAP_MYSQL_REPLICA_ROOT_PASSWORD}
       MYSQL_USER: ${TAP_MYSQL_REPLICA_USER}
@@ -218,7 +226,11 @@ services:
       --log-bin=mysql-bin
       --binlog-format=ROW
       --binlog-row-image=FULL
+      --binlog-row-metadata=FULL
+      --gtid-mode=ON
+      --enforce-gtid-consistency=ON
       --binlog-do-db=${TAP_ORACLE_MYSQL_DB:-mysql8_source_db}
+      --binlog-do-db=tap_mysql_test
       --require-secure-transport=ON
       --ssl-cert=/etc/mysql/certificates/server-cert.pem
       --ssl-key=/etc/mysql/certificates/server-key.pem

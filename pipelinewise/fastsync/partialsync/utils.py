@@ -180,7 +180,6 @@ def load_into_snowflake(target, args, source_columns, primary_keys, s3_key_patte
             list(columns_diff['source_columns'].keys()) + added_metadata_columns,
             primary_keys,
             where_clause_sql,
-            hard_delete=args.target['hard_delete'] is True,
         )
         snowflake.drop_table(
             target['schema'],
@@ -429,12 +428,6 @@ def _get_args_parser_for_partialsync():
     parser.add_argument(
         '--temp_dir', help='Temporary directory required for CSV exports'
     )
-    parser.add_argument(
-        '--drop_pg_slot',
-        help='Drop pg replication slot before starting resync',
-        action='store_true',
-    )
-
     return parser
 
 

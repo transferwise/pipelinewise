@@ -23,7 +23,7 @@ def _create_ppw_config_file(table_mb):
 
 class TestResyncMariaDBToSF(TapMariaDB):
     """Test Resync MariaDB to SF."""
-    def setUp(self, *args, **kwargs):  # pylint: disable = unused-argument
+    def setUp(self, *args, **kwargs):
         super().setUp(tap_id=TAP_ID, target_id=TARGET_ID)
 
     def tearDown(self):

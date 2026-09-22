@@ -17,7 +17,7 @@ from pipelinewise.fastsync.partialsync import utils
 
 
 @dataclass
-class _PartialSyncRun:  # pylint: disable=too-many-instance-attributes
+class _PartialSyncRun:
     """Mutable state passed between ordered PartialSync phases."""
 
     table: tuple
@@ -85,7 +85,7 @@ def partial_sync_table(
         if run.iceberg_requested:
             return _publish_partial_iceberg(run)
         return _publish_partial_native(run)
-    except Exception as exc:  # pylint: disable=broad-exception-caught
+    except Exception as exc:
         return _partial_failure_result(run, exc)
     finally:
         run.iceberg_operation.close()

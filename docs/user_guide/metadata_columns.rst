@@ -1,11 +1,10 @@
 .. _metadata_columns:
 
-Metadata columns and deletes
-============================
+Metadata columns
+================
 
-Targets can add ``_SDC_`` columns that describe ingestion time and source-delete
-events. Configure the behaviour per tap because pipelines sharing a target can
-have different delete requirements.
+PostgreSQL and Snowflake targets automatically add ``_SDC_`` columns that
+describe ingestion time and source-delete events.
 
 
 Columns
@@ -26,41 +25,13 @@ Columns
      - Time a source delete event was received; ``NULL`` for active rows.
 
 
-Configuration outcomes
-----------------------
+Source deletes
+--------------
 
-.. list-table::
-   :header-rows: 1
-   :widths: 35 25 40
-   :width: 100%
+``_SDC_DELETED_AT`` is an internal deletion marker. PostgreSQL and Snowflake
+targets physically remove marked rows before acknowledging Singer state.
 
-   * - Settings
-     - Metadata
-     - Delete behaviour
-   * - ``hard_delete: true``
-     - Enabled automatically
-     - Physically removes a target row after a source delete event.
-   * - ``hard_delete: false`` and ``add_metadata_columns: true``
-     - Enabled
-     - Retains the row and sets ``_SDC_DELETED_AT``.
-   * - Both ``false``
-     - Disabled
-     - Retains the target row without marking the source delete.
-
-.. code-block:: yaml
-
-   add_metadata_columns: true
-   hard_delete: true
-
-``hard_delete`` defaults to ``true``. Only LOG_BASED replication emits
-individual source-delete events; incremental replication cannot detect deletes.
-Full-table and PartialSync publication semantics can remove rows as part of
-replacing or reconciling a selected range.
-
-.. deprecated:: 0.79.0
-
-   Soft delete (``hard_delete: false``) is scheduled for removal. New pipelines
-   should use hard delete and model retention in a controlled downstream layer.
-
-Changing delete mode does not rewrite historical target rows. Plan a resync or
-explicit target migration when existing data must adopt the new behaviour.
+Only LOG_BASED replication emits individual source-delete events. Key-based
+incremental replication cannot detect deleted source rows. FullSync replaces the
+target table, while PartialSync removes target rows that are missing from its
+selected source range. Singer FULL_TABLE behaviour remains connector-specific.

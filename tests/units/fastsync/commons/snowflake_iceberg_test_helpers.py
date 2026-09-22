@@ -107,7 +107,7 @@ class FakeSnowflake:
         self.queries.append((query, params, query_tag_props))
         response = self.responses.pop(0) if self.responses else []
         if isinstance(response, Exception):
-            raise response  # pylint: disable=raising-bad-type
+            raise response
         return response
 
     def query_with_timeout(self, query, params, timeout_seconds):

@@ -126,9 +126,9 @@ Run integration tests:
   make integration_tests
 ```
 
-### To run pylint:
+### To run Ruff:
 
 1. Install python dependencies and run python linter
 ```
-  make venv pylint
+  make venv lint
 ```

@@ -7,9 +7,6 @@ from uuid import uuid4
 from pipelinewise.data_diff.config import CheckDefinition
 from pipelinewise.data_diff.repository import DataDiffRepository
 
-# pylint: disable=missing-class-docstring,missing-function-docstring,invalid-name
-# pylint: disable=protected-access
-
 
 def _definition(config_hash_seed="one", *, tap_id="tap", source_table="payments"):
     # The seed varies frequency to produce different config hashes.

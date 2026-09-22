@@ -504,7 +504,7 @@ class TestLogicalReplication(unittest.TestCase):
 
         self.assertEqual('9999-12-31T00:00:00+00:00', output)
 
-    def test_row_to_singer_message(self):
+    def test_row_to_singer_message_with_timestamp_types(self):
         stream = {
             'stream': 'my_stream',
         }

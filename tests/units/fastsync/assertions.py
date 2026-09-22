@@ -69,7 +69,6 @@ def _create_object_names_to_mock(
     )
 
 
-# pylint: disable=missing-function-docstring,unused-variable
 def assert_sync_table_returns_true_on_success(
     sync_table: callable, package_nm: str, tap_class_nm: str, target_class_nm: str
 ) -> None:
@@ -112,7 +111,6 @@ def assert_sync_table_returns_true_on_success(
         assert res
 
 
-# pylint: disable=missing-function-docstring,unused-variable,invalid-name,no-member
 def assert_sync_table_exception_on_failed_copy(
     sync_table: callable,
     package_nm: str,
@@ -155,8 +153,7 @@ def assert_snowflake_sync_table_native_workflow(
     grant_error: Exception = None,
 ) -> None:
     """Assert the native Snowflake staging, publication, and state workflow."""
-    # pylint: disable=too-many-arguments,too-many-positional-arguments
-    # pylint: disable=too-many-locals,too-many-statements,no-member
+
     objects_to_mock = _create_object_names_to_mock(
         package_nm, tap_class_nm, 'FastSyncTargetSnowflake'
     )
@@ -396,8 +393,7 @@ def assert_snowflake_sync_table_iceberg_workflow(
     recovery_error=None,
 ) -> None:
     """Assert an Iceberg route publishes or recovers before state advances."""
-    # pylint: disable=too-many-arguments,too-many-positional-arguments
-    # pylint: disable=too-many-locals,too-many-statements,too-many-branches
+
     objects_to_mock = _create_object_names_to_mock(
         package_nm, tap_class_nm, 'FastSyncTargetSnowflake'
     )
@@ -408,7 +404,6 @@ def assert_snowflake_sync_table_iceberg_workflow(
                 **SNOWFLAKE_FASTSYNC_NS.target,
                 'dbname': 'TARGET_DB',
                 'default_target_schema': 'TARGET_SCHEMA',
-                'hard_delete': True,
                 'data_flattening_max_level': 0,
                 'target_table_format': 'iceberg',
                 'iceberg_version': 3,
@@ -795,7 +790,7 @@ def assert_snowflake_sync_table_rolls_back_later_upload_failure(
     rollback_cleanup_error: Exception = None,
 ) -> None:
     """A failed later upload removes local files and rolls back earlier S3 parts."""
-    # pylint: disable=too-many-locals
+
     objects_to_mock = _create_object_names_to_mock(
         package_nm, tap_class_nm, 'FastSyncTargetSnowflake'
     )
@@ -882,7 +877,6 @@ def assert_snowflake_sync_table_rolls_back_later_upload_failure(
             raise AssertionError(f'Unsupported source type: {source_type}')
 
 
-# pylint: disable=missing-function-docstring,unused-variable,invalid-name
 def assert_main_impl_exit_normally_on_success(
     main_impl: callable, package_nm: str, tap_class_nm: str, target_class_nm: str
 ) -> None:
@@ -894,15 +888,12 @@ def assert_main_impl_exit_normally_on_success(
         with patch(objects_to_mock.full_target_class_nm):
             with patch(objects_to_mock.sync_table_fn_nm):
                 with patch(objects_to_mock.multiproc_module_nm) as multiproc_mock:
-                    with patch(objects_to_mock.full_tap_class_nm) as tap_mock:
-                        tap_mock.return_value.drop_slot.side_effect = None
-
+                    with patch(objects_to_mock.full_tap_class_nm):
                         ns = Namespace(
                             **{
                                 'tables': ['table_1', 'table_2', 'table_3', 'table_4'],
                                 'target': {},
                                 'transform': None,
-                                'drop_pg_slot': False,
                                 'tap': {},
                                 'autoresync_size': None
                             }
@@ -934,10 +925,8 @@ def assert_main_impl_exit_normally_on_success(
                         multiproc_mock.Pool.assert_called_once_with(10)
                         assert utils_mock.parse_args.call_count == 1
                         assert mock_enter.return_value.map.call_count == 1
-                        assert tap_mock.return_value.drop_slot.call_count == 0
 
 
-# pylint: disable=missing-function-docstring,unused-variable,invalid-name
 def assert_main_impl_should_exit_with_error_on_failure(
     main_impl: callable, package_nm: str, tap_class_nm: str, target_class_nm: str
 ) -> None:
@@ -949,15 +938,12 @@ def assert_main_impl_should_exit_with_error_on_failure(
         with patch(objects_to_mock.full_target_class_nm):
             with patch(objects_to_mock.sync_table_fn_nm):
                 with patch(objects_to_mock.multiproc_module_nm) as multiproc_mock:
-                    with patch(objects_to_mock.full_tap_class_nm) as tap_mock:
-                        tap_mock.return_value.drop_slot.side_effect = None
-
+                    with patch(objects_to_mock.full_tap_class_nm):
                         ns = Namespace(
                             **{
                                 'tables': ['table_1', 'table_2', 'table_3', 'table_4'],
                                 'target': {},
                                 'transform': None,
-                                'drop_pg_slot': True,
                                 'tap': {
                                     'fastsync_parallelism': 4,
                                 },
@@ -986,13 +972,12 @@ def assert_main_impl_should_exit_with_error_on_failure(
                         with pytest.raises(SystemExit):
                             main_impl()
 
-                            # assertions
-                            assert utils_mock.parse_args.call_count == 1
-                            assert mock_enter.return_value.map.call_count == 1
-                            assert tap_mock.return_value.drop_slot.call_count == 1
-                            utils_mock.get_pool_size.assert_called_once_with(
-                                {
-                                    'fastsync_parallelism': 4,
-                                }
-                            )
-                            multiproc_mock.Pool.assert_called_once_with(10)
+                        # assertions
+                        assert utils_mock.parse_args.call_count == 1
+                        assert mock_enter.return_value.map.call_count == 1
+                        utils_mock.get_pool_size.assert_called_once_with(
+                            {
+                                'fastsync_parallelism': 4,
+                            }
+                        )
+                        multiproc_mock.Pool.assert_called_once_with(10)

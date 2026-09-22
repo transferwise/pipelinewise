@@ -8,7 +8,6 @@ from tests.units.fastsync.commons.snowflake_iceberg_test_helpers import (
 )
 
 
-# pylint: disable=too-few-public-methods
 class S3Mock:
     """
     Mocked boto3
@@ -17,14 +16,12 @@ class S3Mock:
     def __init__(self):
         pass
 
-    # pylint: disable=invalid-name
     def delete_object(self, Bucket, Key):
         """Do nothing when trying to delete file on s3"""
 
     def copy_object(self, **kwargs):
         """Mock if needed"""
 
-    # pylint: disable=unused-argument
     def head_object(self, **kwargs):
         """Mock if needed"""
         return {}
@@ -46,7 +43,7 @@ class FastSyncTargetSnowflakeMock(FastSyncTargetSnowflake):
         return []
 
 
-class TestFastSyncTargetSnowflake(TestCase):  # pylint: disable=too-many-public-methods
+class TestFastSyncTargetSnowflake(TestCase):
     """
     Unit tests for fastsync target snowflake
     """
@@ -329,7 +326,7 @@ class TestFastSyncTargetSnowflake(TestCase):  # pylint: disable=too-many-public-
         assert self.snowflake.executed_queries == [
             'COPY INTO test_schema."TEST_TABLE" FROM \'@dummy_stage/s3_key\''
             ' FILE_FORMAT = (type=CSV escape=NONE escape_unenclosed_field=\'\\x1e\''
-            ' field_optionally_enclosed_by=\'\"\' empty_field_as_null=TRUE skip_header=0'
+            ' field_optionally_enclosed_by=\'\"\' null_if=() empty_field_as_null=TRUE skip_header=0'
             ' compression=GZIP binary_format=HEX)'
         ]
         assert inserted_rows == 0
@@ -347,7 +344,7 @@ class TestFastSyncTargetSnowflake(TestCase):  # pylint: disable=too-many-public-
         assert self.snowflake.executed_queries == [
             'COPY INTO test_schema."FULL_TEMP" FROM \'@dummy_stage/s3_key\''
             ' FILE_FORMAT = (type=CSV escape=NONE escape_unenclosed_field=\'\\x1e\''
-            ' field_optionally_enclosed_by=\'\"\' empty_field_as_null=TRUE skip_header=0'
+            ' field_optionally_enclosed_by=\'\"\' null_if=() empty_field_as_null=TRUE skip_header=0'
             ' compression=GZIP binary_format=HEX)'
         ]
 
@@ -363,7 +360,7 @@ class TestFastSyncTargetSnowflake(TestCase):  # pylint: disable=too-many-public-
         assert self.snowflake.executed_queries == [
             'COPY INTO test_schema."PW_STAGE_123" FROM \'@dummy_stage/s3_key\''
             ' FILE_FORMAT = (type=CSV escape=NONE escape_unenclosed_field=\'\\x1e\''
-            ' field_optionally_enclosed_by=\'"\' empty_field_as_null=TRUE skip_header=0'
+            ' field_optionally_enclosed_by=\'"\' null_if=() empty_field_as_null=TRUE skip_header=0'
             ' compression=GZIP binary_format=HEX)'
         ]
 
@@ -380,7 +377,7 @@ class TestFastSyncTargetSnowflake(TestCase):  # pylint: disable=too-many-public-
         assert self.snowflake.executed_queries == [
             'COPY INTO test_schema."TABLE WITH SPACE AND UPPERCASE_TEMP" FROM \'@dummy_stage/s3 key with space\''
             ' FILE_FORMAT = (type=CSV escape=NONE escape_unenclosed_field=\'\\x1e\''
-            ' field_optionally_enclosed_by=\'\"\' empty_field_as_null=TRUE skip_header=0'
+            ' field_optionally_enclosed_by=\'\"\' null_if=() empty_field_as_null=TRUE skip_header=0'
             ' compression=GZIP binary_format=HEX)'
         ]
 
@@ -802,18 +799,17 @@ class TestFastSyncTargetSnowflake(TestCase):  # pylint: disable=too-many-public-
                 'UPDATE "MY_SCHEMA"."MY_TABLE_TEMP" SET '
                 '"COL_6" = CONCAT(SUBSTRING("COL_6", 1, 5), SHA2(SUBSTRING("COL_6", 5 + 1), 256)) '
                 'WHERE ("COL_1" = 30) AND ("COL_2" '
-                'REGEXP \'[0-9]{3}\.[0-9]{3}\');',  # pylint: disable=W1401  # noqa: W605
+                'REGEXP \'[0-9]{3}\\.[0-9]{3}\');',
                 'UPDATE "MY_SCHEMA"."MY_TABLE_TEMP" SET '
                 '"COL_7" = CASE WHEN LENGTH("COL_7") > 2 * 3 THEN '
                 'CONCAT(SUBSTRING("COL_7", 1, 3), REPEAT(\'*\', LENGTH("COL_7")-(2 * 3)), '
                 'SUBSTRING("COL_7", LENGTH("COL_7")-3+1, 3)) '
                 'ELSE REPEAT(\'*\', LENGTH("COL_7")) END WHERE ("COL_1" = 30) AND ("COL_2" '
-                'REGEXP \'[0-9]{3}\.[0-9]{3}\') AND ("COL_4" IS NULL);',  # pylint: disable=W1401  # noqa: W605
+                'REGEXP \'[0-9]{3}\\.[0-9]{3}\') AND ("COL_4" IS NULL);',
                 'UPDATE "MY_SCHEMA"."MY_TABLE_TEMP" SET "COL_1" = NULL, "COL_4" = 0, "COL_5" = SHA2("COL_5", 256);',
             ],
         )
 
-    # pylint: disable=invalid-name
     def test_default_archive_destination(self):
         """
         Validate parameters passed to s3 copy_object method when custom s3 bucket and folder are not defined
@@ -840,7 +836,6 @@ class TestFastSyncTargetSnowflake(TestCase):  # pylint: disable=too-many-public-
             MetadataDirective='REPLACE',
         )
 
-    # pylint: disable=invalid-name
     def test_custom_archive_destination(self):
         """
         Validate parameters passed to s3 copy_object method when using custom s3 bucket and folder
@@ -873,7 +868,6 @@ class TestFastSyncTargetSnowflake(TestCase):  # pylint: disable=too-many-public-
             MetadataDirective='REPLACE',
         )
 
-    # pylint: disable=invalid-name
     def test_copied_archive_metadata(self):
         """
         Validate parameters passed to s3 copy_object method when custom s3 bucket and folder are not defined

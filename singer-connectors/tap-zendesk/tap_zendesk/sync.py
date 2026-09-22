@@ -1,4 +1,4 @@
-# pylint: disable=invalid-name,missing-function-docstring,missing-class-docstring
+
 import json
 from zenpy.lib.api_objects import BaseObject
 from zenpy.lib.proxy import ProxyList
@@ -10,11 +10,13 @@ from singer import Transformer
 
 LOGGER = singer.get_logger('tap_zendesk')
 
+
 def process_record(record):
     """ Serializes Zenpy's internal classes into Python objects via ZendeskEncoder. """
     rec_str = json.dumps(record, cls=ZendeskEncoder)
     rec_dict = json.loads(rec_str)
     return rec_dict
+
 
 def sync_stream(state, start_date, instance):
     stream = instance.stream
@@ -48,8 +50,9 @@ def sync_stream(state, start_date, instance):
 
         return counter.value
 
+
 class ZendeskEncoder(json.JSONEncoder):
-    def default(self, obj): # pylint: disable=arguments-differ,method-hidden
+    def default(self, obj):
         if isinstance(obj, BaseObject):
             obj_dict = obj.to_dict()
             for k, v in list(obj_dict.items()):

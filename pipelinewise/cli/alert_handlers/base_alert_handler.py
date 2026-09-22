@@ -4,7 +4,6 @@ PipelineWise CLI - Base class of alert handlers
 from abc import ABC, abstractmethod
 
 
-# pylint: disable=too-few-public-methods
 class BaseAlertHandler(ABC):
     """
     Abstract base class for alert handlers
@@ -16,7 +15,6 @@ class BaseAlertHandler(ABC):
     ERROR = 'error'
 
     @abstractmethod
-    # pylint: disable=unnecessary-pass
     def send(self, message: str, level: str = ERROR, exc: Exception = None, **kwargs) -> None:
         """
         Send alert

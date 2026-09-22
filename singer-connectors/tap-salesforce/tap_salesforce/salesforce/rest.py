@@ -1,4 +1,4 @@
-# pylint: disable=protected-access
+
 import singer
 import singer.utils as singer_utils
 from requests.exceptions import HTTPError
@@ -7,6 +7,7 @@ from tap_salesforce.salesforce.exceptions import TapSalesforceException
 LOGGER = singer.get_logger('tap_salesforce')
 
 MAX_RETRIES = 4
+
 
 class Rest():
 
@@ -19,7 +20,6 @@ class Rest():
 
         return self._query_recur(query, catalog_entry, start_date)
 
-    # pylint: disable=too-many-arguments
     def _query_recur(
             self,
             query,

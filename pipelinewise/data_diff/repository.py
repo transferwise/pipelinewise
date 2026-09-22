@@ -43,7 +43,6 @@ class DataDiffRepository:
         """Run Alembic migrations via the shared backend database."""
         self.database.migrate()
 
-    # pylint: disable=too-many-locals
     def sync_definitions(
         self,
         definitions: Iterable[CheckDefinition],

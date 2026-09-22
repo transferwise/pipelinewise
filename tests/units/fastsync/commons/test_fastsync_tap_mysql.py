@@ -1,3 +1,4 @@
+import csv
 import io
 
 import pymysql
@@ -12,6 +13,12 @@ from pipelinewise.fastsync.commons.partial_sync_boundary import (
 from pipelinewise.fastsync.commons.tap_mysql import FastSyncTapMySql, MARIADB_ENGINE
 
 
+MYSQL_GTID_SET = (
+    '11111111-1111-1111-1111-111111111111:1-3:8-10,'
+    '22222222-2222-2222-2222-222222222222:1-55'
+)
+
+
 class FastSyncTapMySqlMock(FastSyncTapMySql):
     """
     Mocked FastSyncTapMySql class
@@ -23,8 +30,6 @@ class FastSyncTapMySqlMock(FastSyncTapMySql):
         self.executed_queries_unbuffered = []
         self.executed_queries = []
 
-    # pylint: disable=too-many-arguments
-    # pylint: disable=too-many-positional-arguments
     def query(self, query, conn=None, params=None, return_as_cursor=False, n_retry=1):
         if query.startswith('INVALID-SQL'):
             raise pymysql.err.InternalError
@@ -37,7 +42,6 @@ class FastSyncTapMySqlMock(FastSyncTapMySql):
         return []
 
 
-# pylint: disable=invalid-name,too-many-public-methods
 class TestFastSyncTapMySql(TestCase):
     """
     Unit tests for fastsync tap mysql
@@ -149,11 +153,52 @@ class TestFastSyncTapMySql(TestCase):
     def test_csv_export_distinguishes_null_from_empty_string(self):
         """An empty string is quoted while SQL NULL remains an empty field."""
         output = io.StringIO()
-        writer = tap_mysql._create_csv_writer(output)  # pylint: disable=protected-access
+        writer = tap_mysql._create_csv_writer(output)
 
         writer.writerow([None, '', 'text', 0])
 
         self.assertEqual(output.getvalue(), ',"","text","0"\r\n')
+
+    def test_csv_export_preserves_multiline_text_and_csv_syntax(self):
+        """Quoted CSV preserves text controls and syntax-sensitive characters."""
+        value = (
+            'line one\nline two\rline three\r\n'
+            '\tliteral \\n and \\t, "Unicode: 雪😀"\\'
+        )
+        output = io.StringIO()
+        writer = tap_mysql._create_csv_writer(output)
+
+        writer.writerow([value])
+
+        expected = '"' + value.replace('"', '""') + '"\r\n'
+        self.assertEqual(output.getvalue(), expected)
+        self.assertEqual(next(csv.reader(io.StringIO(output.getvalue()))), [value])
+
+    def test_text_projection_preserves_multiline_for_mysql_and_mariadb(self):
+        """Both engines remove only NUL before quoted CSV serialization."""
+        expected_projection = (
+            "ELSE concat('REPLACE(cast(`', column_name, "
+            "'` AS char CHARACTER SET utf8mb4)', \", CHAR(0), '')\")"
+        )
+
+        for engine in ('mysql', MARIADB_ENGINE):
+            with self.subTest(engine=engine):
+                self.mysql = FastSyncTapMySqlMock(
+                    connection_config={
+                        **self.connection_config,
+                        'engine': engine,
+                    }
+                )
+                with patch.object(
+                    self.mysql, 'query', return_value=[]
+                ) as query_mock:
+                    self.mysql.get_table_columns('my_db.my_table')
+
+                sql = query_mock.call_args.args[0]
+                self.assertIn(expected_projection, sql)
+                self.assertNotIn(
+                    "ELSE concat('REPLACE(REPLACE(REPLACE(cast(`'", sql
+                )
 
     def test_get_connection_to_primary(self):
         """
@@ -175,6 +220,7 @@ class TestFastSyncTapMySql(TestCase):
         self.assertEqual(conn_params['port'], creds['port'])
         self.assertEqual(conn_params['user'], creds['user'])
         self.assertEqual(conn_params['password'], creds['password'])
+        self.assertEqual(conn_params['charset'], 'utf8mb4')
 
     def test_get_connection_to_replica(self):
         """
@@ -257,25 +303,19 @@ class TestFastSyncTapMySql(TestCase):
 
         with patch.object(self.mysql, 'query') as query_method_mock:
 
-            expected_gtid = '0-192-444'
+            expected_gtid = '0-192-444,1-400-10'
 
             query_method_mock.side_effect = [
-                [{'current_gtids': f'1,,4-192, {expected_gtid},1-400-10'}],
-                [{'server_id': 192}]
+                [{'current_gtids': expected_gtid}],
             ]
 
             with patch('pymysql.connect') as mysql_connect_mock:
-                con = Mock()
-                mysql_connect_mock.return_value = con
-
                 result = self.mysql.fetch_current_log_pos()
 
-                query_method_mock.assert_has_calls([
-                    call('select @@gtid_slave_pos as current_gtids;'),
-                    call('select @@server_id as server_id;', con),
-                ])
+                query_method_mock.assert_called_once_with('select @@gtid_slave_pos as current_gtids;')
+                mysql_connect_mock.assert_not_called()
 
-            self.assertDictEqual(result, {'gtid': expected_gtid})
+            self.assertDictEqual(result, {'gtid': expected_gtid, 'gtid_complete': True})
 
     def test_fetch_current_log_pos_with_gtid_and_replica_mariadb_engine_gtid_not_found(self):
         """
@@ -300,8 +340,7 @@ class TestFastSyncTapMySql(TestCase):
 
     def test_fetch_current_log_pos_with_gtid_and_primary_mariadb_engine_succeeds(self):
         """
-        If using gtid is enabled and engine is primary mariadb which has a list of
-        gtids with one that has the same server id, then expect gtid result
+        Keep every MariaDB domain, including transactions from previous primaries.
         """
         self.connection_config['use_gtid'] = True
         self.connection_config['engine'] = MARIADB_ENGINE
@@ -310,22 +349,16 @@ class TestFastSyncTapMySql(TestCase):
 
         with patch.object(self.mysql, 'query') as query_method_mock:
 
-            expected_gtid = '0-192-444'
+            expected_gtid = '0-192-444,1-400-10'
 
             query_method_mock.side_effect = [
-                [{'current_gtids': f'0,{expected_gtid},43223,0-333-11,'}],
-                [{'server_id': 192}],
+                [{'current_gtids': expected_gtid}],
             ]
 
             result = self.mysql.fetch_current_log_pos()
 
-            query_method_mock.assert_has_calls(
-                [
-                    call('select @@gtid_current_pos as current_gtids;'),
-                    call('select @@server_id as server_id;', None),
-                ]
-            )
-            self.assertDictEqual(result, {'gtid': expected_gtid})
+            query_method_mock.assert_called_once_with('select @@gtid_current_pos as current_gtids;')
+            self.assertDictEqual(result, {'gtid': expected_gtid, 'gtid_complete': True})
 
     def test_fetch_current_log_pos_with_gtid_and_primary_mariadb_engine_no_gtid_found_expect_exception(self):
         """
@@ -352,12 +385,8 @@ class TestFastSyncTapMySql(TestCase):
                 ]
             )
 
-    def test_fetch_current_log_pos_with_gtid_and_primary_mariadb_engine_no_gtid_with_server_id_found_expect_exception(
-            self):
-        """
-        If using gtid is enabled and engine is primary mariadb which has a list of
-        gtids with none having the same server id, then expect an exception
-        """
+    def test_fetch_current_log_pos_rejects_empty_mariadb_gtid_set(self):
+        """An empty executed set cannot seed Singer auto-position replication."""
         self.connection_config['use_gtid'] = True
         self.connection_config['engine'] = MARIADB_ENGINE
 
@@ -365,26 +394,18 @@ class TestFastSyncTapMySql(TestCase):
 
         with patch.object(self.mysql, 'query') as query_method_mock:
 
-            query_method_mock.side_effect = [
-                [{'current_gtids': '0,43223,0-333-11,'}],
-                [{'server_id': 192}],
-            ]
+            query_method_mock.return_value = [{'current_gtids': ''}]
 
             with self.assertRaises(Exception) as context:
                 self.mysql.fetch_current_log_pos()
 
-            self.assertEqual('No suitable GTID was found.', str(context.exception))
+            self.assertEqual('GTID is not enabled.', str(context.exception))
 
-            query_method_mock.assert_has_calls(
-                [
-                    call('select @@gtid_current_pos as current_gtids;'),
-                    call('select @@server_id as server_id;', None),
-                ]
-            )
+            query_method_mock.assert_called_once_with('select @@gtid_current_pos as current_gtids;')
 
-    def test_fetch_current_log_pos_with_binlog_coordinate_and_replica_server(self):
+    def test_fetch_current_log_pos_uses_replica_applied_coordinates(self):
         """
-        fetch_current_log_pos without enabled usage of gtid will return binlog coordinates from replica server
+        Received events ahead of the replica snapshot must be replayed by Singer.
         """
         self.connection_config['use_gtid'] = False
 
@@ -394,20 +415,52 @@ class TestFastSyncTapMySql(TestCase):
         with patch.object(self.mysql, 'query') as query_method_mock:
             query_method_mock.return_value = [
                 {
-                    'Master_Log_File': 'binlog_xyz',
-                    'Read_Master_Log_Pos': 444,
+                    'Master_Log_File': 'binlog.000002',
+                    'Read_Master_Log_Pos': 999,
+                    'Relay_Master_Log_File': 'binlog.000001',
+                    'Exec_Master_Log_Pos': 444,
                 }
             ]
 
             result = self.mysql.fetch_current_log_pos()
 
-            query_method_mock.assert_called_once_with('SHOW SLAVE STATUS')
+            query_method_mock.assert_called_once_with('SHOW REPLICA STATUS')
 
             self.assertDictEqual(result, {
-                'log_file': 'binlog_xyz',
+                'log_file': 'binlog.000001',
                 'log_pos': 444,
                 'version': 1,
             })
+
+    def test_fetch_current_log_pos_rejects_missing_replica_applied_coordinates(self):
+        """Never replace unavailable applied coordinates with received coordinates."""
+        self.mysql = FastSyncTapMySql(self.connection_config, lambda x: x)
+        self.mysql.is_replica = True
+        for applied_fields in (
+            {},
+            {'Relay_Master_Log_File': '', 'Exec_Master_Log_Pos': 0},
+            {'Relay_Master_Log_File': 'binlog.000001', 'Exec_Master_Log_Pos': None},
+        ):
+            with self.subTest(applied_fields=applied_fields), patch.object(
+                self.mysql, 'query', return_value=[{
+                    'Master_Log_File': 'binlog.000002',
+                    'Read_Master_Log_Pos': 999,
+                    **applied_fields,
+                }]
+            ):
+                with self.assertRaisesRegex(Exception, 'no applied binary log coordinates'):
+                    self.mysql.fetch_current_log_pos()
+
+    def test_fetch_current_log_pos_rejects_multiple_replication_channels(self):
+        """Do not checkpoint an arbitrary primary when a replica has multiple sources."""
+        self.mysql = FastSyncTapMySql(self.connection_config, lambda x: x)
+        self.mysql.is_replica = True
+        with patch.object(self.mysql, 'query', return_value=[
+            {'Relay_Master_Log_File': 'source1.000001', 'Exec_Master_Log_Pos': 444},
+            {'Relay_Master_Log_File': 'source2.000001', 'Exec_Master_Log_Pos': 555},
+        ]):
+            with self.assertRaisesRegex(Exception, 'single replication channel'):
+                self.mysql.fetch_current_log_pos()
 
     def test_fetch_current_log_pos_with_binlog_coordinate_and_primary_server(self):
         """
@@ -433,7 +486,54 @@ class TestFastSyncTapMySql(TestCase):
                 'version': 1,
             })
 
-            query_method_mock.assert_called_once_with('SHOW MASTER STATUS')
+            query_method_mock.assert_called_once_with('SHOW BINARY LOG STATUS')
+
+    def test_fetch_current_log_pos_with_modern_replica_field_names(self):
+        """MySQL 8.4 reports applied source coordinates under its renamed fields."""
+        self.mysql = FastSyncTapMySql(self.connection_config, lambda x: x)
+        self.mysql.is_replica = True
+        with patch.object(self.mysql, 'query', return_value=[{
+            'Source_Log_File': 'binlog.000002',
+            'Read_Source_Log_Pos': 999,
+            'Relay_Source_Log_File': 'binlog.000001',
+            'Exec_Source_Log_Pos': 444,
+        }]):
+            self.assertEqual(self.mysql.fetch_current_log_pos(), {
+                'log_file': 'binlog.000001', 'log_pos': 444, 'version': 1,
+            })
+
+    def test_binlog_status_falls_back_for_older_mysql_syntax(self):
+        """MySQL releases before the SHOW rename remain supported."""
+        self.mysql = FastSyncTapMySql(self.connection_config, lambda x: x)
+        for modern, legacy in (
+            ('SHOW BINARY LOG STATUS', 'SHOW MASTER STATUS'),
+            ('SHOW REPLICA STATUS', 'SHOW SLAVE STATUS'),
+        ):
+            with self.subTest(statement=modern), patch.object(self.mysql, 'query') as query_mock:
+                query_mock.side_effect = [pymysql.err.ProgrammingError(1064, 'syntax error'), [{'position': 444}]]
+                self.assertEqual(self.mysql._query_binlog_status(modern, legacy), [{'position': 444}])
+                self.assertEqual(query_mock.call_args_list, [call(modern), call(legacy)])
+
+    def test_binlog_status_preserves_non_syntax_errors(self):
+        """Authentication and operational failures do not trigger a legacy retry."""
+        self.mysql = FastSyncTapMySql(self.connection_config, lambda x: x)
+        for error in (
+            pymysql.err.ProgrammingError(1146, 'missing table'),
+            pymysql.err.OperationalError(1227, 'access denied'),
+        ):
+            with self.subTest(error=error), patch.object(self.mysql, 'query', side_effect=error) as query_mock:
+                with self.assertRaises(type(error)):
+                    self.mysql._query_binlog_status('SHOW BINARY LOG STATUS', 'SHOW MASTER STATUS')
+                query_mock.assert_called_once_with('SHOW BINARY LOG STATUS')
+
+    def test_binlog_status_uses_mariadb_syntax(self):
+        """Explicit MariaDB configuration avoids an unsupported syntax probe."""
+        self.mysql = FastSyncTapMySql({**self.connection_config, 'engine': MARIADB_ENGINE}, lambda x: x)
+        with patch.object(self.mysql, 'query', return_value=[{'position': 444}]) as query_mock:
+            self.assertEqual(self.mysql._query_binlog_status(
+                'SHOW BINARY LOG STATUS', 'SHOW MASTER STATUS'
+            ), [{'position': 444}])
+            query_mock.assert_called_once_with('SHOW MASTER STATUS')
 
     def test_fetch_current_log_pos_with_gtid_and_mysql_but_gtid_mode_is_off_fails(self):
         """
@@ -458,7 +558,7 @@ class TestFastSyncTapMySql(TestCase):
 
     def test_fetch_current_log_pos_with_gtid_and_primary_mysql_engine_finds_gtid(self):
         """
-        If using gtid is enabled and engine is mysql and gtid mode is on, then it should find the expected gtid
+        Snapshot handover retains multiple UUIDs and disjoint intervals.
         """
         self.connection_config['use_gtid'] = True
 
@@ -468,28 +568,27 @@ class TestFastSyncTapMySql(TestCase):
         with patch.object(self.mysql, 'query') as query_method_mock:
             query_method_mock.side_effect = [
                 [{'gtid_mode': 'ON'}],
-                [{'current_gtids': 'xyz:2:4,abc:1,def:1-55'}],
-                [{'server_uuid': 'abc'}],
+                [{'current_gtids': MYSQL_GTID_SET}],
             ]
 
             with patch('pymysql.connect') as mysql_connect_mock:
 
                 result = self.mysql.fetch_current_log_pos()
                 self.assertDictEqual(result, {
-                    'gtid': 'abc:1'
+                    'gtid': MYSQL_GTID_SET,
+                    'gtid_complete': True,
                 })
 
                 query_method_mock.assert_has_calls([
                     call('select @@gtid_mode as gtid_mode;'),
                     call('select @@GLOBAL.gtid_executed as current_gtids;'),
-                    call('select @@server_uuid as server_uuid;', None),
                 ])
 
                 mysql_connect_mock.assert_not_called()
 
     def test_fetch_current_log_pos_with_gtid_and_replica_mysql_engine_finds_gtid(self):
         """
-        If using gtid is enabled and engine is mysql and gtid mode is on, then it should find the expected gtid
+        Replica handover retains its complete applied set without contacting the primary.
         """
         self.connection_config['use_gtid'] = True
 
@@ -499,25 +598,41 @@ class TestFastSyncTapMySql(TestCase):
         with patch.object(self.mysql, 'query') as query_method_mock:
             query_method_mock.side_effect = [
                 [{'gtid_mode': 'ON'}],
-                [{'current_gtids': 'xyz:2:4,abc:1,def:1-55'}],
-                [{'server_uuid': 'abc'}],
+                [{'current_gtids': MYSQL_GTID_SET}],
             ]
 
             with patch('pymysql.connect') as mysql_connect_mock:
-                con = Mock()
-                mysql_connect_mock.return_value = con
-
                 result = self.mysql.fetch_current_log_pos()
                 self.assertDictEqual(result, {
-                    'gtid': 'abc:1'
+                    'gtid': MYSQL_GTID_SET,
+                    'gtid_complete': True,
                 })
 
                 query_method_mock.assert_has_calls([
                     call('select @@gtid_mode as gtid_mode;'),
                     call('select @@GLOBAL.gtid_executed as current_gtids;'),
-                    call('select @@server_uuid as server_uuid;', con),
                 ])
-                mysql_connect_mock.assert_called_once()
+                mysql_connect_mock.assert_not_called()
+
+    def test_fetch_current_log_pos_marks_sparse_mysql_gtid_complete(self):
+        """A genuine singleton set must not be confused with a legacy scalar watermark."""
+        position = '24bc7850-2c16-11e6-a073-0242ac110002:599'
+        self.mysql = FastSyncTapMySql({**self.connection_config, 'use_gtid': True}, lambda x: x)
+        with patch.object(self.mysql, 'query', side_effect=[
+            [{'gtid_mode': 'ON'}], [{'current_gtids': position}],
+        ]):
+            self.assertEqual(self.mysql.fetch_current_log_pos(), {
+                'gtid': position, 'gtid_complete': True,
+            })
+
+    def test_fetch_current_log_pos_rejects_empty_mysql_gtid_set(self):
+        """GTID mode alone does not guarantee an executed transaction exists."""
+        self.mysql = FastSyncTapMySql({**self.connection_config, 'use_gtid': True}, lambda x: x)
+        with patch.object(self.mysql, 'query', side_effect=[
+            [{'gtid_mode': 'ON'}], [{'current_gtids': ''}],
+        ]):
+            with self.assertRaisesRegex(Exception, 'No GTID was found'):
+                self.mysql.fetch_current_log_pos()
 
     def test_invalid_dates_are_nulled_for_every_temporal_type(self):
         """MySQL accepts dates no target will take, so FastSync must null them.

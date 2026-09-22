@@ -95,7 +95,13 @@ REGEXES=()
 for CHECK in "$@"
 do
   if [[ ${CHECK} == "python" ]]; then
-    REGEX="(^tests\/|^pipelinewise\/|^singer-connectors\/|^scripts\/ci_(check_no_file_changes|require_env)\.sh$|^setup\.py|^Makefile)"
+    REGEX="(^tests\/|^pipelinewise\/|^singer-connectors\/|^docs\/.*\.py$|^scripts\/.*\.py$|"
+    REGEX+="^scripts\/ci_(check_no_file_changes|require_env)\.sh$|"
+    REGEX+="^\.github\/workflows\/[^/]+\.(yml|yaml)$|^\.pre-commit-config\.yaml$|^pyproject\.toml$|"
+    # Reintroduced retired-tool configs must trigger the tests that reject them.
+    REGEX+="(^|\/)(\.bandit|\.flake8|\.isort\.cfg|\.mypy\.ini|\.pylintrc|\.style\.yapf|"
+    REGEX+="\.yapfignore|mypy\.ini|pylintrc|pyrightconfig\.json)$|"
+    REGEX+="^setup\.py|^Makefile)"
     echo "Searching for changes in python files"
 
   elif [[ ${CHECK} == "doc" ]]; then

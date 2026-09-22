@@ -20,7 +20,6 @@ def _save_state_worker(state_path, table, bookmark, ready, finished):
     finished.set()
 
 
-# pylint: disable=missing-function-docstring,invalid-name,too-few-public-methods
 class MySqlMock:
     """
     MySQL mock
@@ -29,7 +28,6 @@ class MySqlMock:
     def fetch_current_log_pos(self):
         return {'log_file': 'mysqld-bin.000001', 'log_pos': '123456', 'version': 1}
 
-    # pylint: disable=unused-argument
     def fetch_current_incremental_key_pos(self, table, replication_key):
         return {
             'replication_key': replication_key,
@@ -46,7 +44,6 @@ class PostgresMock:
     def fetch_current_log_pos(self):
         return {'lsn': '16/B374D848', 'version': 1}
 
-    # pylint: disable=unused-argument
     def fetch_current_incremental_key_pos(self, table, replication_key):
         return {
             'replication_key': replication_key,
@@ -60,12 +57,11 @@ class S3CsvMock:
     S3 CSV mock
     """
 
-    # pylint: disable=unused-argument
     def fetch_current_incremental_key_pos(self, table, replication_key):
         return {'modified_since': '2019-11-15T07:39:44.171098'}
 
 
-class TestFastSyncUtils(TestCase):  # pylint: disable=too-many-public-methods
+class TestFastSyncUtils(TestCase):
     """
     Unit tests for fastsync common functions
     """
@@ -131,7 +127,8 @@ class TestFastSyncUtils(TestCase):  # pylint: disable=too-many-public-methods
                         processes.append(process)
 
                     for ready in ready_events:
-                        self.assertTrue(ready.wait(timeout=10))
+                        # Coverage slows spawned-worker imports, especially in emulated dev containers.
+                        self.assertTrue(ready.wait(timeout=30))
                     self.assertFalse(
                         any(finished.wait(timeout=0.5) for finished in finished_events)
                     )
@@ -770,6 +767,12 @@ class TestFastSyncUtils(TestCase):  # pylint: disable=too-many-public-methods
         with pytest.raises(Exception):
             utils.check_config(config, required_keys)
 
+    def test_check_config_ignores_legacy_delete_setting(self):
+        """Existing FullSync and PartialSync runtime JSON remains accepted."""
+        for value in (True, False, None, 'false'):
+            with self.subTest(value=value):
+                utils.check_config({'hard_delete': value}, [])
+
     @patch(
         'pipelinewise.fastsync.commons.utils.multiprocessing.cpu_count', return_value=10
     )
@@ -857,7 +860,6 @@ class TestFastSyncUtils(TestCase):  # pylint: disable=too-many-public-methods
                 'tap': './tap.yml',
                 'properties': './prop.json',
                 'transform': None,
-                'drop_pg_slot': True,
                 'target': './target.yml',
                 'tables': 'schema.table_1,schema.table_2',
                 'temp_dir': './',
@@ -878,7 +880,6 @@ class TestFastSyncUtils(TestCase):  # pylint: disable=too-many-public-methods
             vars(args),
             {
                 'tables': {'schema.table_1', 'schema.table_2'},
-                'drop_pg_slot': True,
                 'tap': {},
                 'target': {},
                 'transform': {},
@@ -896,7 +897,7 @@ class TestFastSyncUtils(TestCase):  # pylint: disable=too-many-public-methods
     ):
         """
         test args parsing:
-            one table is specified out of 2, this should return a drop_pg_slot = False
+            one table is specified out of 2
         """
         mock_args.return_value = argparse.Namespace(
             **{

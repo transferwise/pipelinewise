@@ -33,9 +33,10 @@ step ran and report pass/skip/fail counts.
 
 ## E2E matrix
 
-These groups mirror `.github/workflows/e2e_tests.yml`; update both together. CI
-runs eight Snowflake groups concurrently on isolated runners; local groups
-share/reset fixtures/config and must run serially:
+These groups mirror `.github/workflows/e2e_tests.yml` in required-check order
+`e2e_tests_01` through `e2e_tests_09`; update both together. CI runs eight
+Snowflake groups concurrently on isolated runners; local groups share/reset
+fixtures/config and must run serially:
 
 ```bash
 run_e2e() { docker exec -t pipelinewise pytest "$@" -vx --timer-top-n 10; }
@@ -56,6 +57,7 @@ run_e2e \
 
 run_e2e \
   tests/end_to_end/target_snowflake/tap_postgres/test_partial_sync_pg_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_postgres/test_multiline_native_pg_to_sf.py \
   tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_with_custom_buffer_size.py \
   tests/end_to_end/data_diff/test_postgres_to_snowflake.py \
   tests/end_to_end/target_snowflake/tap_yugabyte/test_partial_sync_yugabyte_to_sf.py
@@ -73,11 +75,11 @@ run_e2e \
 
 run_e2e \
   tests/end_to_end/target_snowflake/tap_mariadb/test_iceberg_v3_mariadb_to_sf.py \
-  tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_soft_delete.py \
   tests/end_to_end/target_snowflake/tap_mongodb/test_replicate_mongodb_to_sf.py
 
 run_e2e \
   tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_mysql/test_multiline_native_mysql_to_sf.py \
   tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_table_size_check.py \
   tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf.py \
   tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf_with_archive_load_files.py
@@ -85,15 +87,26 @@ run_e2e \
 run_e2e \
   tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_table_size_check.py \
   tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_mariadb/test_multiline_native_mariadb_to_sf.py \
   tests/end_to_end/target_snowflake/tap_mariadb/test_defined_partial_sync_mariadb_to_sf.py \
   tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_with_split_large_files.py
 ```
 
-Run all nine only for a full suite; otherwise run every affected group. MariaDB
-and PostgreSQL cover native and explicit v3; genuine MySQL covers explicit v3.
+Run all nine only for a full suite; otherwise run every affected group. MariaDB,
+PostgreSQL, and genuine MySQL cover native and explicit v3.
 Do not infer one format from another. `SHOW PRIMARY KEYS` does not prove Iceberg
 identifier fields; compare raw-metadata `identifier-field-ids` with current
 schema field IDs.
+
+### Multiline coverage
+
+Verify exact UTF-8 bytes, SQL NULL versus empty strings, and literal escapes
+through native and explicit-v3 FullSync/PartialSync for MariaDB, MySQL, and
+PostgreSQL. Reuse `target_snowflake/multiline_values.py`; do not normalize values
+in assertions. Connector integration separately covers Singer CSV loading.
+
+Native multiline coverage runs in the PostgreSQL partial, MySQL Iceberg, and
+MariaDB native CI groups above; the matrix contract enforces exact-once coverage.
 
 ## Credentials and destructive scope
 

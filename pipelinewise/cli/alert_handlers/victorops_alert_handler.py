@@ -19,7 +19,6 @@ ALERT_LEVEL_MESSAGE_TYPES = {
 }
 
 
-# pylint: disable=too-few-public-methods
 class VictoropsAlertHandler(BaseAlertHandler):
     """
     VictorOps Alert Handler class

@@ -2,9 +2,8 @@
 
 import sys
 import json
-import argparse
 import singer
-from singer import metadata, utils
+import singer.utils
 from tap_twilio.client import TwilioClient
 from tap_twilio.discover import discover
 from tap_twilio.sync import sync
@@ -17,6 +16,7 @@ REQUIRED_CONFIG_KEYS = [
     'start_date',
     'user_agent'
 ]
+
 
 def do_discover():
     LOGGER.info('Starting discover')
@@ -46,6 +46,7 @@ def main():
                  config=config,
                  catalog=parsed_args.catalog,
                  state=state)
+
 
 if __name__ == '__main__':
     main()

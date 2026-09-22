@@ -92,7 +92,7 @@ def _new_conversion_attempt(
     )
 
 
-class SnowflakeNativeToIcebergConverter:  # pylint: disable=too-few-public-methods
+class SnowflakeNativeToIcebergConverter:
     """Safely build and optionally promote a managed Iceberg v3 copy."""
 
     def __init__(self, snowflake, runtime_dir: str):
@@ -109,7 +109,7 @@ class SnowflakeNativeToIcebergConverter:  # pylint: disable=too-few-public-metho
         )
 
     def _assert_equal_contents(self, source, destination, columns):
-        return self.evidence_service._assert_equal_contents(  # pylint: disable=protected-access
+        return self.evidence_service._assert_equal_contents(
             source,
             destination,
             columns,

@@ -9,15 +9,12 @@ from pipelinewise.fastsync.commons import utils as common_utils
 from pipelinewise.fastsync.commons.snowflake_iceberg import PartialSyncBoundary
 
 
-# pylint: disable=too-many-instance-attributes, too-few-public-methods
 class PartialSync2SFArgs:
     """Arguments for using in mysql to snowflake tests"""
-    # pylint: disable=too-many-arguments
-    # pylint: disable=too-many-positional-arguments
-    # pylint: disable=too-many-locals
+
     def __init__(self, temp_test_dir, table='email',
                  start_value='FOO_START', end_value='FOO_END', state='state.json',
-                 hard_delete=None, drop_target_table=False,
+                 drop_target_table=False,
                  target_table_format=None, iceberg_version=None,
                  data_flattening_max_level=0):
         resources_dir = f'{os.path.dirname(__file__)}/resources'
@@ -26,8 +23,6 @@ class PartialSync2SFArgs:
         target_config = self._load_json_config(f'{config_dir}/tmp/target_config_tmp.json')
         transform_config = self._load_json_config(f'{config_dir}/target_snowflake/tap_mysql/transformation.json')
         properties_config = self._load_json_config(f'{config_dir}/target_snowflake/tap_mysql/properties.json')
-        if hard_delete is not None:
-            target_config['hard_delete'] = hard_delete
         if target_table_format is not None:
             target_config['target_table_format'] = target_table_format
         if iceberg_version is not None:
@@ -91,9 +86,7 @@ def assert_iceberg_partial_sync_workflow(
     recovery_error=None,
 ):
     """Assert a source route uses durable Iceberg PartialSync publication."""
-    # pylint: disable=too-many-arguments
-    # pylint: disable=too-many-locals,too-many-statements
-    # pylint: disable=too-many-branches
+
     package_name = route_module.__name__
     args = PartialSync2SFArgs(
         temp_test_dir='/tmp',

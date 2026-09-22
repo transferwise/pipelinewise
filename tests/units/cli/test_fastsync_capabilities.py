@@ -145,7 +145,7 @@ def test_capability_registry_is_immutable():
     )
 
     with pytest.raises(TypeError):
-        capability_policy._FASTSYNC_CAPABILITIES[key] = FastSyncCapabilities()  # pylint: disable=protected-access
+        capability_policy._FASTSYNC_CAPABILITIES[key] = FastSyncCapabilities()
 
 
 def test_legacy_pair_views_are_immutable():
@@ -196,7 +196,6 @@ def test_singer_iceberg_keeps_flattening():
     tap = {
         'id': 'test_tap',
         'type': 'tap-mongodb',
-        'hard_delete': True,
         'target_table_format': 'iceberg',
         'iceberg_version': 3,
         'data_flattening_max_level': 3,

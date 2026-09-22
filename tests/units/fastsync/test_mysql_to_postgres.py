@@ -12,7 +12,6 @@ TAP = 'FastSyncTapMySql'
 TARGET = 'FastSyncTargetPostgres'
 
 
-# pylint: disable=missing-function-docstring,invalid-name
 class S3CsvToPostgres(unittest.TestCase):
     """
     Unit tests for fastsync mysql to postgres
@@ -30,6 +29,7 @@ class S3CsvToPostgres(unittest.TestCase):
         self.assertEqual('JSONB', tap_type_to_target_type('multilinestring', None))
         self.assertEqual('JSONB', tap_type_to_target_type('multipolygon', None))
         self.assertEqual('JSONB', tap_type_to_target_type('geometrycollection', None))
+        self.assertEqual('JSONB', tap_type_to_target_type('geomcollection', None))
 
     def test_tap_type_to_target_type_with_undefined_tap_type_returns_CHARACTER_VARYING(
         self,

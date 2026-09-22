@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# pylint: disable=too-many-locals,missing-function-docstring
+
 
 import singer
 
@@ -163,7 +163,6 @@ def sync_table(mysql_conn, catalog_entry, state, columns, stream_version):
 
             params = {}
 
-            # pylint:disable=duplicate-code
             common.sync_query(cur,
                               catalog_entry,
                               state,

@@ -14,15 +14,15 @@ from jsonschema import Draft7Validator, FormatChecker
 from singer import get_logger
 from datetime import datetime, timedelta
 
-from target_snowflake.file_formats import csv
-from target_snowflake.file_formats import parquet
 from target_snowflake import stream_utils
 
 from target_snowflake.db_sync import DbSync, RECORD_UPDATE_MODE_PATCH
 from target_snowflake.file_format import FileFormatTypes
 from target_snowflake.exceptions import (
+    FileFormatNotFoundException,
+    InvalidFileFormatException,
     RecordValidationException,
-    UnexpectedValueTypeException,
+    UnexpectedValueTypeException as UnexpectedValueTypeException,
     InvalidValidationOperationException
 )
 
@@ -70,11 +70,11 @@ def get_snowflake_statics(config):
     Returns:
         tuple of retrieved items: table_cache, file_format_type
     """
+    db = DbSync(config)
     table_cache = []
-    if not ('disable_table_cache' in config and config['disable_table_cache']):
+    if not config.get('disable_table_cache'):
         LOGGER.info('Getting catalog objects from PipelineWise table cache...')
 
-        db = DbSync(config)  # pylint: disable=invalid-name
         table_cache = db.get_table_columns(
             table_schemas=stream_utils.get_schema_names_from_config(config))
 
@@ -84,8 +84,7 @@ def get_snowflake_statics(config):
     return table_cache, file_format_type
 
 
-# pylint: disable=too-many-locals,too-many-branches,too-many-statements,invalid-name
-def persist_lines(config, lines, table_cache=None, file_format_type: FileFormatTypes = None) -> None:
+def persist_lines(config, lines, table_cache=None, file_format_type: FileFormatTypes = None) -> None:  # noqa: C901
     """Main loop to read and consume singer messages from stdin
 
     Params:
@@ -95,9 +94,8 @@ def persist_lines(config, lines, table_cache=None, file_format_type: FileFormatT
                      INFORMATION_SCHEMA and SHOW queries as possible.
                      If not provided then an SQL query will be generated at runtime to
                      get all the required information from Snowflake
-        file_format_type: Optional FileFormatTypes value that defines which supported file format to use
-                          to load data into Snowflake.
-                          If not provided then it will be detected automatically
+        file_format_type: Optional previously validated FileFormatTypes value from startup.
+                          Reuses validation across streams; if omitted, each stream detects and validates its format.
 
     Returns:
         tuple of retrieved items: table_cache, file_format_type
@@ -168,10 +166,7 @@ def persist_lines(config, lines, table_cache=None, file_format_type: FileFormatT
                 total_row_count[stream] += 1
 
             # append record
-            if config.get('add_metadata_columns') or config.get('hard_delete'):
-                record = stream_utils.add_metadata_values_to_record(o)
-            else:
-                record = o['record']
+            record = stream_utils.add_metadata_values_to_record(o)
 
             store_record(records_to_load[stream], primary_key_string, record, stream_to_sync[stream])
 
@@ -277,13 +272,10 @@ def persist_lines(config, lines, table_cache=None, file_format_type: FileFormatT
 
                 key_properties[stream] = o['key_properties']
 
-                if config.get('add_metadata_columns') or config.get('hard_delete'):
-                    stream_to_sync[stream] = DbSync(config,
-                                                    add_metadata_columns_to_schema(o),
-                                                    table_cache,
-                                                    file_format_type)
-                else:
-                    stream_to_sync[stream] = DbSync(config, o, table_cache, file_format_type)
+                stream_to_sync[stream] = DbSync(config,
+                                                add_metadata_columns_to_schema(o),
+                                                table_cache,
+                                                file_format_type)
 
                 if archive_load_files:
                     archive_load_files_data[stream] = {
@@ -319,8 +311,8 @@ def persist_lines(config, lines, table_cache=None, file_format_type: FileFormatT
             LOGGER.debug('Setting state to %s', o['value'])
             state = o['value']
 
-            # # set flushed state if it's not defined or there are no records so far
-            if not flushed_state or sum(row_count.values()) == 0:
+            # A first state received after records is not durable until those records are loaded.
+            if sum(row_count.values()) == 0:
                 flushed_state = copy.deepcopy(state)
 
         else:
@@ -337,7 +329,6 @@ def persist_lines(config, lines, table_cache=None, file_format_type: FileFormatT
     emit_state(copy.deepcopy(flushed_state))
 
 
-# pylint: disable=too-many-arguments
 def flush_streams(
         streams,
         row_count,
@@ -388,7 +379,6 @@ def flush_streams(
             row_count=row_count,
             db_sync=stream_to_sync[stream],
             no_compression=config.get('no_compression'),
-            delete_rows=config.get('hard_delete'),
             temp_dir=config.get('temp_dir'),
             archive_load_files=copy.copy(archive_load_files_data.get(stream, None))
         ) for stream in streams_to_flush)
@@ -398,7 +388,7 @@ def flush_streams(
         streams[stream] = {}
 
         # Update flushed streams
-        if filter_streams:
+        if filter_streams and flushed_state is not None:
             # update flushed_state position if we have state information for the stream
             if state is not None and stream in state.get('bookmarks', {}):
                 # Create bookmark key if not exists
@@ -407,28 +397,25 @@ def flush_streams(
                 # Copy the stream bookmark from the latest state
                 flushed_state['bookmarks'][stream] = copy.deepcopy(state['bookmarks'][stream])
 
-        # If we flush every bucket use the latest state
-        else:
-            flushed_state = copy.deepcopy(state)
-
         if stream in archive_load_files_data:
             archive_load_files_data[stream]['min'] = None
             archive_load_files_data[stream]['max'] = None
 
-    # Return with state message with flushed positions
+    if not filter_streams or (flushed_state is None and not any(row_count.values())):
+        return copy.deepcopy(state)
+
+    # Without a durable baseline, a partial flush cannot safely acknowledge the first state.
     return flushed_state
 
 
-def load_stream_batch(stream, records, row_count, db_sync, no_compression=False, delete_rows=False,
+def load_stream_batch(stream, records, row_count, db_sync, no_compression=False,
                       temp_dir=None, archive_load_files=None):
     """Load one batch of the stream into target table"""
     # Load into snowflake
     if row_count[stream] > 0:
         flush_records(stream, records, db_sync, temp_dir, no_compression, archive_load_files)
 
-        # Delete soft-deleted, flagged rows - where _sdc_deleted at is not null
-        if delete_rows:
-            db_sync.delete_rows(stream)
+        db_sync.delete_rows(stream)
 
         # reset row count for the current stream
         row_count[stream] = 0
@@ -557,8 +544,12 @@ def main():
     else:
         config = {}
 
-    # Init columns cache
-    table_cache, file_format_type = get_snowflake_statics(config)
+    # Validate the named format and initialize the optional columns cache.
+    try:
+        table_cache, file_format_type = get_snowflake_statics(config)
+    except (InvalidFileFormatException, FileFormatNotFoundException) as ex:
+        LOGGER.error('%s', ex)
+        raise SystemExit(1) from None
 
     # Consume singer messages
     singer_messages = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8')

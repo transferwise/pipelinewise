@@ -18,9 +18,6 @@ from pipelinewise.data_diff.runner import (
     scheduled_slot,
 )
 
-# pylint: disable=missing-class-docstring,missing-function-docstring,invalid-name
-# pylint: disable=too-many-instance-attributes,attribute-defined-outside-init
-
 
 def _check():
     return {

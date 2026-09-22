@@ -4,9 +4,8 @@ venv:
 	pip install --upgrade pip setuptools wheel ;\
 	pip install -e .[test]
 
-pylint:
-	. ./venv/bin/activate ;\
-	pylint --rcfile .pylintrc target_postgres/
+lint:
+	cd ../.. && singer-connectors/target-postgres/venv/bin/ruff check singer-connectors/target-postgres/target_postgres/
 
 unit_test:
 	. ./venv/bin/activate ;\

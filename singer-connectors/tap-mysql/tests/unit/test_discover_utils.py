@@ -92,6 +92,21 @@ def test_ordinary_longtext_remains_a_string():
     assert schema.format is None
 
 
+@pytest.mark.parametrize('data_type', ['geometrycollection', 'geomcollection'])
+def test_geometry_collection_names_remain_selected_and_spatial(data_type):
+    column = discover_utils.Column(
+        'source_db', 'events', 'location', data_type, None, None, None, data_type, '', False,
+    )
+
+    schema = discover_utils.schema_for_column(column)
+    column_metadata = metadata.to_map(discover_utils.create_column_metadata([column]))
+
+    assert schema.type == ['null', 'object']
+    assert schema.format == 'spatial'
+    assert column_metadata[('properties', 'location')]['selected-by-default'] is True
+    assert discover_utils.is_supported_column_type(data_type)
+
+
 @pytest.mark.parametrize('detect_json_aliases', [False, True])
 def test_json_alias_catalog_query_is_opt_in_and_exact(detect_json_aliases):
     connection = MagicMock()

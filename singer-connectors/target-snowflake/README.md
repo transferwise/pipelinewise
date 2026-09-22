@@ -54,21 +54,45 @@ It's reading incoming messages from STDIN and using the properites in `config.js
 
 You need to create a few objects in snowflake in one schema before start using this target.
 
-1. Create a named file format. This will be used by the MERGE/COPY commands to parse the files correctly from S3. You can use CSV or Parquet file formats.
+1. Create a named CSV file format. The MERGE/COPY commands use it to parse
+   staged files correctly:
 
-To use CSV files:
-```
+```sql
 CREATE FILE FORMAT {database}.{schema}.{file_format_name}
-TYPE = 'CSV' ESCAPE='\\' FIELD_OPTIONALLY_ENCLOSED_BY='"';
+TYPE = 'CSV'
+RECORD_DELIMITER = '0x0A'
+FIELD_DELIMITER = '0x2C'
+ESCAPE = '0x5C'
+FIELD_OPTIONALLY_ENCLOSED_BY = '0x22'
+SKIP_HEADER = 0
+PARSE_HEADER = FALSE
+SKIP_BLANK_LINES = FALSE
+TRIM_SPACE = FALSE
+EMPTY_FIELD_AS_NULL = TRUE
+ENCODING = 'UTF8'
+MULTI_LINE = TRUE
+NULL_IF = ();
 ```
 
-To use Parquet files (experimental):
+The target validates the configured object type and these effective CSV options
+before consuming Singer input. They preserve SQL `NULL`, empty strings, LF, CR,
+CRLF, tabs, CSV punctuation, Unicode, and literal backslash sequences as
+distinct values. A non-CSV or incompatible named format is rejected.
 
-```
-CREATE FILE FORMAT {database}.{schema}.{file_format_name} TYPE = 'PARQUET';
-```
+Validation resolves the exact configured database, schema, and file-format
+name, including quoted identifiers, rather than a same-named format elsewhere.
 
-**Important:** Parquet files are not supported with [table stages](https://docs.snowflake.com/en/user-guide/data-load-local-file-system-create-stage.html#table-stages). If you want to use Parquet files then you need to have an external stage in snowflake. Please read further for more details in point 4).
+PipelineWise FastSync does not use this named object; its Snowflake loader
+supplies inline CSV options. This prerequisite applies to Singer
+`target-snowflake` loads.
+
+To migrate an existing CSV format, stop all loads sharing it and apply the
+required settings shown above before resuming. Deploy the updated target writer
+as well; changing the format alone does not fix older writers' text handling.
+
+The change applies only to later loads. Resync affected tables from their source
+if an earlier target version normalized or removed control characters; the
+original values cannot be reconstructed from Snowflake.
 
 2. Create a Role with all the required permissions:
 
@@ -156,10 +180,10 @@ Full list of options in `config.json`:
 | s3_region_name                      | String  | No         | Default region when creating new connections |
 | s3_acl                              | String  | No         | S3 ACL name to set on the uploaded files                                                   |
 | stage                               | String  | No         | Named external stage name created at pre-requirements section. Has to be a fully qualified name including the schema name. If not specified, table internal stage are used. When this is defined then `s3_bucket` has to be defined as well. |
-| file_format                         | String  | Yes        | Named file format name created at pre-requirements section. Has to be a fully qualified name including the schema name. |
+| file_format                         | String  | Yes        | Named CSV file format created in the pre-requirements section. Has to be a fully qualified name including the schema name. |
 | batch_size_rows                     | Integer |            | (Default: 100000) Maximum number of rows in each batch. At the end of each batch, the rows in the batch are loaded into Snowflake. |
 | batch_wait_limit_seconds            | Integer |            | (Default: None) Maximum time to wait for batch to reach `batch_size_rows`. |
-| flush_all_streams                   | Boolean |            | (Default: False) Flush and load every stream into Snowflake when one batch is full. Warning: This may trigger the COPY command to use files with low number of records, and may cause performance problems. |
+| flush_all_streams                   | Boolean |            | (Standalone default: False; PipelineWise default: True) Flush and load every buffered stream into Snowflake when one batch is full. Set `false` to flush only that stream. Enabling this can produce smaller, more frequent COPY/MERGE loads and increase loading cost. |
 | parallelism                         | Integer |            | (Default: 0) The number of threads used to flush tables. 0 will create a thread for each stream, up to parallelism_max. -1 will create a thread for each CPU core. Any other positive number will create that number of threads, up to parallelism_max. |
 | parallelism_max                     | Integer |            | (Default: 16) Max number of parallel threads to use when flushing tables. |
 | default_target_schema               | String  |            | Name of the schema where the tables will be created, **without** database prefix. If `schema_mapping` is not defined then every stream sent by the tap is loaded into this schema.    |
@@ -167,8 +191,6 @@ Full list of options in `config.json`:
 | schema_mapping                      | Object  |            | Useful if you want to load multiple streams from one tap to multiple Snowflake schemas.<br><br>If the tap sends the `stream_id` in `<schema_name>-<table_name>` format then this option overwrites the `default_target_schema` value. Note, that using `schema_mapping` you can overwrite the `default_target_schema_select_permission` value to grant SELECT permissions to different groups per schemas or optionally you can create indices automatically for the replicated tables.<br><br> **Note**: This is an experimental feature and recommended to use via PipelineWise YAML files that will generate the object mapping in the right JSON format. For further info check a [PipelineWise YAML Example]
 | disable_table_cache                 | Boolean |            | (Default: False) By default the connector caches the available table structures in Snowflake at startup. In this way it doesn't need to run additional queries when ingesting data to check if altering the target tables is required. With `disable_table_cache` option you can turn off this caching. You will always see the most recent table structures but will cause an extra query runtime. |
 | client_side_encryption_master_key   | String  |            | (Default: None) When this is defined, Client-Side Encryption is enabled. The data in S3 will be encrypted, No third parties, including Amazon AWS and any ISPs, can see data in the clear. Snowflake COPY command will decrypt the data once it's in Snowflake. The master key must be 256-bit length and must be encoded as base64 string. |
-| add_metadata_columns                | Boolean |            | (Default: False) Metadata columns add extra row level information about data ingestions, (i.e. when was the row read in source, when was inserted or deleted in snowflake etc.) Metadata columns are creating automatically by adding extra columns to the tables with a column prefix `_SDC_`. The column names are following the stitch naming conventions documented at https://www.stitchdata.com/docs/data-structure/integration-schemas#sdc-columns. Enabling metadata columns will flag the deleted rows by setting the `_SDC_DELETED_AT` metadata column. Without the `add_metadata_columns` option the deleted rows from singer taps will not be recongisable in Snowflake. |
-| hard_delete                         | Boolean |            | (Default: False) When `hard_delete` option is true then DELETE SQL commands will be performed in Snowflake to delete rows in tables. It's achieved by continuously checking the  `_SDC_DELETED_AT` metadata column sent by the singer tap. Due to deleting rows requires metadata columns, `hard_delete` option automatically enables the `add_metadata_columns` option as well. |
 | data_flattening_max_level           | Integer |            | (Default: 0) Object type RECORD items from taps can be loaded into VARIANT columns as JSON (default) or we can flatten the schema by creating columns automatically.<br><br>When value is 0 (default) then flattening functionality is turned off. |
 | primary_key_required                | Boolean |            | (Default: True) Log based and Incremental replications on tables with no Primary Key cause duplicates when merging UPDATE events. When set to true, stop loading data if no Primary Key is defined. |
 | validate_records                    | Boolean |            | (Default: False) Validate every single record message to the corresponding JSON schema. This option is disabled by default and invalid RECORD messages will fail only at load time by Snowflake. Enabling this option will detect invalid records earlier but could cause performance degradation. |
@@ -178,6 +200,17 @@ Full list of options in `config.json`:
 | archive_load_files                  | Boolean |            | (Default: False) When enabled, the files loaded to Snowflake will also be stored in `archive_load_files_s3_bucket` under the key `/{archive_load_files_s3_prefix}/{schema_name}/{table_name}/`. All archived files will have `tap`, `schema`, `table` and `archived-by` as S3 metadata keys. When incremental replication is used, the archived files will also have the following S3 metadata keys: `incremental-key`, `incremental-key-min` and `incremental-key-max`. 
 | archive_load_files_s3_prefix        | String  |            | (Default: "archive") When `archive_load_files` is enabled, the archived files will be placed in the archive S3 bucket under this prefix.
 | archive_load_files_s3_bucket        | String  |            | (Default: Value of `s3_bucket`) When `archive_load_files` is enabled, the archived files will be placed in this bucket.
+
+### Delete handling
+
+Metadata columns are always added automatically. `_SDC_EXTRACTED_AT` and
+`_SDC_BATCHED_AT` describe ingestion, and `_SDC_DELETED_AT` carries source-delete
+events.
+
+Every non-empty stream load removes target rows whose `_SDC_DELETED_AT` is not
+NULL before acknowledging state. The deletion predicate covers the whole table. Metadata
+columns remain present for subsequent delete processing. Source deletes must be
+emitted by the tap; key-based incremental replication cannot discover them.
 
 ### To run tests:
 
@@ -196,7 +229,6 @@ Full list of options in `config.json`:
   export TARGET_SNOWFLAKE_S3_KEY_PREFIX=<bucket-directory>
   export TARGET_SNOWFLAKE_STAGE=<stage-object-with-schema-name>
   export TARGET_SNOWFLAKE_FILE_FORMAT_CSV=<file-format-csv-object-with-schema-name>
-  export TARGET_SNOWFLAKE_FILE_FORMAT_PARQUET=<file-format-parquet-object-with-schema-name>
   export CLIENT_SIDE_ENCRYPTION_MASTER_KEY=<client_side_encryption_master_key>
 ```
 
@@ -218,15 +250,11 @@ Full list of options in `config.json`:
   pytest tests/integration
 ```
 
-### To run pylint:
+### To run Ruff:
 
 1. Install python dependencies and run python linter
 ```
-  python3 -m venv venv
-  . venv/bin/activate
-  pip install --upgrade pip
-  pip install .[test]
-  pylint target_snowflake
+  make venv lint
 ```
 
 ## License

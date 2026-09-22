@@ -43,7 +43,6 @@ class TestSplitGzipFile(TestCase):
         for temp_file in glob.glob('@test_*_tmp*'):
             unlink(temp_file)
 
-    # pylint: disable=W0212
     def test_bytes_to_megabytes(self):
         """
         Test bytes to megabytes transformer
@@ -75,7 +74,6 @@ class TestSplitGzipFile(TestCase):
         with self.assertRaises(ValueError):
             split_gzip.open('basefile', max_chunks=-1)
 
-    # pylint: disable=W0212
     def test_gen_export_chunk_filename(self):
         """
         Test generating chunked filenames

@@ -490,7 +490,7 @@ class SnowflakeAdapter(DatabaseAdapter):
     """Snowflake metadata and aggregate operations."""
 
     def resolve_columns(self, schema, table, requested, *, allow_missing=False):
-        import snowflake.connector  # pylint: disable=import-outside-toplevel
+        import snowflake.connector
 
         with self.connection.cursor(snowflake.connector.DictCursor) as cursor:
             cursor.execute(
@@ -541,7 +541,7 @@ class SnowflakeAdapter(DatabaseAdapter):
         )
 
     def execute_metrics(self, sql, params, checks):
-        import snowflake.connector  # pylint: disable=import-outside-toplevel
+        import snowflake.connector
 
         started = perf_counter()
         with self.connection.cursor(snowflake.connector.DictCursor) as cursor:

@@ -1,4 +1,4 @@
-# pylint: disable=invalid-name,missing-function-docstring,missing-class-docstring,unused-argument
+
 import os
 import json
 import datetime
@@ -28,8 +28,10 @@ CUSTOM_TYPES = {
     'checkbox': 'boolean',
 }
 
+
 def get_abs_path(path):
     return os.path.join(os.path.dirname(os.path.realpath(__file__)), path)
+
 
 def process_custom_field(field):
     """ Take a custom field description and return a schema for it. """
@@ -52,6 +54,7 @@ def process_custom_field(field):
 
     return field_schema
 
+
 class Stream():
     name = None
     replication_method = None
@@ -70,14 +73,13 @@ class Stream():
         if value and utils.strptime_with_tz(value) > current_bookmark:
             singer.write_bookmark(state, self.name, self.replication_key, value)
 
-
     def load_schema(self):
         schema_file = "schemas/{}.json".format(self.name)
         with open(get_abs_path(schema_file)) as f:
             schema = json.load(f)
         return self._add_custom_fields(schema)
 
-    def _add_custom_fields(self, schema): # pylint: disable=no-self-use
+    def _add_custom_fields(self, schema):
         return schema
 
     def load_metadata(self):
@@ -100,6 +102,7 @@ class Stream():
 
     def is_selected(self):
         return self.stream is not None
+
 
 def raise_or_log_zenpy_apiexception(schema, stream, e):
     # There are multiple tiers of Zendesk accounts. Some of them have
@@ -128,7 +131,7 @@ class Organizations(Stream):
         # NB: Zenpy doesn't have a public endpoint for this at time of writing
         #     Calling into underlying query method to grab all fields
         try:
-            field_gen = self.client.organizations._query_zendesk(endpoint.organization_fields, # pylint: disable=protected-access
+            field_gen = self.client.organizations._query_zendesk(endpoint.organization_fields,
                                                                  'organization_field')
         except zenpy.lib.exception.APIException as e:
             return raise_or_log_zenpy_apiexception(schema, self.name, e)
@@ -144,6 +147,7 @@ class Organizations(Stream):
         for organization in organizations:
             self.update_bookmark(state, organization.updated_at)
             yield (self.stream, organization)
+
 
 class Users(Stream):
     name = "users"
@@ -168,6 +172,7 @@ class Users(Stream):
             self.update_bookmark(state, user.updated_at)
             yield (self.stream, user)
 
+
 class Tickets(Stream):
     name = "tickets"
     replication_method = "INCREMENTAL"
@@ -176,6 +181,7 @@ class Tickets(Stream):
     last_record_emit = {}
     buf = {}
     buf_time = 60
+
     def _buffer_record(self, record):
         stream_name = record[0].tap_stream_id
         if self.last_record_emit.get(stream_name) is None:
@@ -197,8 +203,7 @@ class Tickets(Stream):
                 yield rec
             self.buf[stream_name] = []
 
-    # pylint: disable=too-many-locals,too-many-statements
-    def sync(self, state):
+    def sync(self, state):  # noqa: C901
         bookmark = self.get_bookmark(state)
         tickets = self.client.tickets.incremental(start_time=bookmark)
 
@@ -326,6 +331,7 @@ class Tickets(Stream):
         emit_sub_stream_metrics(comments_stream)
         singer.write_state(state)
 
+
 class TicketAudits(Stream):
     name = "ticket_audits"
     replication_method = "INCREMENTAL"
@@ -337,6 +343,7 @@ class TicketAudits(Stream):
             self.count += 1
             yield (self.stream, ticket_audit)
 
+
 class TicketMetrics(Stream):
     name = "ticket_metrics"
     replication_method = "INCREMENTAL"
@@ -346,6 +353,7 @@ class TicketMetrics(Stream):
         ticket_metric = self.client.tickets.metrics(ticket=ticket_id)
         self.count += 1
         yield (self.stream, ticket_metric)
+
 
 class TicketComments(Stream):
     name = "ticket_comments"
@@ -357,6 +365,7 @@ class TicketComments(Stream):
         for ticket_comment in ticket_comments:
             self.count += 1
             yield (self.stream, ticket_comment)
+
 
 class SatisfactionRatings(Stream):
     name = "satisfaction_ratings"
@@ -381,6 +390,7 @@ class SatisfactionRatings(Stream):
                 self.update_bookmark(state, satisfaction_rating.updated_at)
             yield (self.stream, satisfaction_rating)
 
+
 class Groups(Stream):
     name = "groups"
     replication_method = "INCREMENTAL"
@@ -397,6 +407,7 @@ class Groups(Stream):
                 # so we can't save state until we've seen all records
                 self.update_bookmark(state, group.updated_at)
                 yield (self.stream, group)
+
 
 class Macros(Stream):
     name = "macros"
@@ -415,17 +426,19 @@ class Macros(Stream):
                 self.update_bookmark(state, macro.updated_at)
                 yield (self.stream, macro)
 
+
 class Tags(Stream):
     name = "tags"
     replication_method = "FULL_TABLE"
     key_properties = ["name"]
 
-    def sync(self, state): # pylint: disable=unused-argument
+    def sync(self, state):
         # NB: Setting page to force it to paginate all tags, instead of just the
         #     top 100 popular tags
         tags = self.client.tags(page=1)
         for tag in tags:
             yield (self.stream, tag)
+
 
 class TicketFields(Stream):
     name = "ticket_fields"
@@ -444,6 +457,7 @@ class TicketFields(Stream):
                 self.update_bookmark(state, field.updated_at)
                 yield (self.stream, field)
 
+
 class TicketForms(Stream):
     name = "ticket_forms"
     replication_method = "INCREMENTAL"
@@ -460,6 +474,7 @@ class TicketForms(Stream):
                 # so we can't save state until we've seen all records
                 self.update_bookmark(state, form.updated_at)
                 yield (self.stream, form)
+
 
 class GroupMemberships(Stream):
     name = "group_memberships"
@@ -487,13 +502,15 @@ class GroupMemberships(Stream):
                 else:
                     LOGGER.info('Received group_membership record with no id or updated_at, skipping...')
 
+
 class SLAPolicies(Stream):
     name = "sla_policies"
     replication_method = "FULL_TABLE"
 
-    def sync(self, state): # pylint: disable=unused-argument
+    def sync(self, state):
         for policy in self.client.sla_policies():
             yield (self.stream, policy)
+
 
 STREAMS = {
     "tickets": Tickets,

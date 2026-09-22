@@ -1,6 +1,5 @@
 import copy
 import time
-import psycopg2
 import psycopg2.extras
 import singer
 
@@ -15,7 +14,6 @@ LOGGER = singer.get_logger('tap_postgres')
 UPDATE_BOOKMARK_PERIOD = 1000
 
 
-# pylint: disable=invalid-name,missing-function-docstring,too-many-locals,duplicate-code
 def sync_view(conn_info, stream, state, desired_columns, md_map):
     time_extracted = utils.now()
 
@@ -71,7 +69,6 @@ def sync_view(conn_info, stream, state, desired_columns, md_map):
     return state
 
 
-# pylint: disable=too-many-statements,duplicate-code
 def sync_table(conn_info, stream, state, desired_columns, md_map):
     time_extracted = utils.now()
 
