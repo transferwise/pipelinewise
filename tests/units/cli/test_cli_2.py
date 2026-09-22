@@ -113,3 +113,41 @@ class TestCli2:
             {'host': 'localhost'},
             allow_unsupported_version_for_config_removal=True,
         )
+
+    def test_cleanup_after_deleted_config_of_tap_yugabyte(self):
+        """Test that cleanup of config and slot of deleted yugabyte tap takes place"""
+        old_config = {
+            'targets': [
+                {
+                    'id': 'target_one',
+                    'type': 'target-snowflake',
+                    'taps': [dict(id='tap_one', type='tap-mysql'), dict(id='tap_two', type='tap-yugabyte')]
+                },
+                {
+                    'id': 'target_two',
+                    'type': 'target-s3-csv',
+                    'taps': [dict(id='tap_three', type='tap-mysql'), dict(id='tap_four', type='tap-yugabyte')]
+                }
+            ]
+        }
+
+        with patch('pipelinewise.cli.pipelinewise.utils.silentremove') as silentremove:
+            with patch('pipelinewise.cli.pipelinewise.FastSyncTapYugabyte.drop_slot') as drop_slot:
+                with patch('pipelinewise.cli.pipelinewise.Config.get_connector_config_file') as \
+                        get_connector_config_file:
+                    with NamedTemporaryFile(suffix='.json') as fhandler:
+                        fhandler.write(
+                            b'{"host": "localhost", "load_balance": "any", '
+                            b'"topology_keys": "cloud1.region1.zone1"}'
+                        )
+                        fhandler.seek(0)
+                        get_connector_config_file.return_value = fhandler.name
+
+                        deleted_taps_count = self.pipelinewise.cleanup_after_deleted_config(old_config)
+
+        assert deleted_taps_count == 1
+        assert silentremove.call_args_list == [call(f'{CONFIG_DIR}/target_two/tap_four')]
+
+        # load_balance/topology_keys are dropped because this runs under the main venv's
+        # stock psycopg2-binary, which rejects them as invalid connection options
+        drop_slot.assert_called_once_with({'host': 'localhost'})

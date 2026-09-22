@@ -202,7 +202,7 @@ class TestFastSyncTapYugabyte(TestCase):  # pylint: disable=too-many-public-meth
                 state,
             )
 
-    def test_get_connection_builds_conn_string(self):
+    def test_get_connection_builds_conn_params(self):
         """get_connection must use the right credentials and enable autocommit"""
         creds = {
             'host': 'my_host',
@@ -217,12 +217,31 @@ class TestFastSyncTapYugabyte(TestCase):  # pylint: disable=too-many-public-meth
 
         self.assertEqual(connection, connect_mock.return_value)
         connect_mock.assert_called_once_with(
-            "host='my_host' port='my_port' user='my_user' password='my_password' dbname='my_db'"
+            host='my_host',
+            port='my_port',
+            user='my_user',
+            password='my_password',
+            dbname='my_db',
         )
         self.assertTrue(connection.autocommit)
 
+    def test_get_connection_passes_password_verbatim(self):
+        """get_connection must not quote or escape a password containing spaces and quotes"""
+        creds = {
+            'host': 'my_host',
+            'user': 'my_user',
+            'password': "pa ss'word\\",
+            'dbname': 'my_db',
+            'port': 'my_port',
+        }
+
+        with patch.object(tap_yugabyte.psycopg2, 'connect') as connect_mock:
+            FastSyncTapYugabyte.get_connection(creds)
+
+        self.assertEqual("pa ss'word\\", connect_mock.call_args.kwargs['password'])
+
     def test_get_connection_with_ssl(self):
-        """get_connection must append sslmode=require when ssl is requested"""
+        """get_connection must request sslmode=require when ssl is requested"""
         creds = {
             'host': 'my_host',
             'user': 'my_user',
@@ -236,12 +255,16 @@ class TestFastSyncTapYugabyte(TestCase):  # pylint: disable=too-many-public-meth
             FastSyncTapYugabyte.get_connection(creds)
 
         connect_mock.assert_called_once_with(
-            "host='my_host' port='my_port' user='my_user' password='my_password' dbname='my_db' "
-            "sslmode='require'"
+            host='my_host',
+            port='my_port',
+            user='my_user',
+            password='my_password',
+            dbname='my_db',
+            sslmode='require',
         )
 
     def test_get_connection_with_load_balance(self):
-        """get_connection must append load_balance when set in connection_config"""
+        """get_connection must forward an unquoted load_balance when set in connection_config"""
         creds = {
             'host': 'my_host',
             'user': 'my_user',
@@ -254,13 +277,19 @@ class TestFastSyncTapYugabyte(TestCase):  # pylint: disable=too-many-public-meth
         with patch.object(tap_yugabyte.psycopg2, 'connect') as connect_mock:
             FastSyncTapYugabyte.get_connection(creds)
 
+        # The driver strips these two options itself, so a quoted value would reach libpq
+        # and be rejected as an invalid connection option.
         connect_mock.assert_called_once_with(
-            "host='my_host' port='my_port' user='my_user' password='my_password' dbname='my_db' "
-            "load_balance='true'"
+            host='my_host',
+            port='my_port',
+            user='my_user',
+            password='my_password',
+            dbname='my_db',
+            load_balance='true',
         )
 
     def test_get_connection_with_topology_keys(self):
-        """get_connection must append topology_keys when set in connection_config"""
+        """get_connection must forward an unquoted topology_keys when set in connection_config"""
         creds = {
             'host': 'my_host',
             'user': 'my_user',
@@ -275,9 +304,32 @@ class TestFastSyncTapYugabyte(TestCase):  # pylint: disable=too-many-public-meth
             FastSyncTapYugabyte.get_connection(creds)
 
         connect_mock.assert_called_once_with(
-            "host='my_host' port='my_port' user='my_user' password='my_password' dbname='my_db' "
-            "load_balance='any' topology_keys='cloud1.region1.zone1,cloud1.region1.zone2'"
+            host='my_host',
+            port='my_port',
+            user='my_user',
+            password='my_password',
+            dbname='my_db',
+            load_balance='any',
+            topology_keys='cloud1.region1.zone1,cloud1.region1.zone2',
         )
+
+    def test_get_connection_omits_unset_load_balancing_options(self):
+        """get_connection must not send load_balance/topology_keys when they are unset"""
+        creds = {
+            'host': 'my_host',
+            'user': 'my_user',
+            'password': 'my_password',
+            'dbname': 'my_db',
+            'port': 'my_port',
+            'load_balance': '',
+            'topology_keys': '',
+        }
+
+        with patch.object(tap_yugabyte.psycopg2, 'connect') as connect_mock:
+            FastSyncTapYugabyte.get_connection(creds)
+
+        self.assertNotIn('load_balance', connect_mock.call_args.kwargs)
+        self.assertNotIn('topology_keys', connect_mock.call_args.kwargs)
 
     def test_drop_slot_retries_while_slot_is_active(self):
         """drop_slot must retry on 'slot is active' and eventually succeed"""

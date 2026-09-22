@@ -129,25 +129,27 @@ class FastSyncTapYugabyte:
         Returns:
             psycopg2 Connection instance
         """
-        template = "host='{}' port='{}' user='{}' password='{}' dbname='{}'"
-        conn_string = template.format(
-            connection_config['host'],
-            connection_config['port'],
-            connection_config['user'],
-            connection_config['password'],
-            connection_config['dbname'],
-        )
+        # Keyword arguments rather than a conninfo string: the psycopg2-yugabyte driver parses
+        # load_balance/topology_keys out of a DSN with a regex that rejects quoted values,
+        # and unquoted interpolation would break on passwords containing spaces or quotes.
+        conn_params = {
+            'host': connection_config['host'],
+            'port': connection_config['port'],
+            'user': connection_config['user'],
+            'password': connection_config['password'],
+            'dbname': connection_config['dbname'],
+        }
 
         if connection_config.get('ssl') == 'true':
-            conn_string += " sslmode='require'"
+            conn_params['sslmode'] = 'require'
 
         if connection_config.get('load_balance'):
-            conn_string += f" load_balance='{connection_config['load_balance']}'"
+            conn_params['load_balance'] = connection_config['load_balance']
 
         if connection_config.get('topology_keys'):
-            conn_string += f" topology_keys='{connection_config['topology_keys']}'"
+            conn_params['topology_keys'] = connection_config['topology_keys']
 
-        conn = psycopg2.connect(conn_string)
+        conn = psycopg2.connect(**conn_params)
 
         # Set connection to autocommit
         conn.autocommit = True

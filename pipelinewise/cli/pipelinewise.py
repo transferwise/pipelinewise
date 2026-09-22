@@ -2642,7 +2642,13 @@ TAP RUN SUMMARY
                         allow_unsupported_version_for_config_removal=True,
                     )
                 else:
-                    FastSyncTapYugabyte.drop_slot(tap_config)
+                    # Slot cleanup runs in-process from the main pipelinewise venv, whose stock
+                    # psycopg2-binary rejects the YugabyteDB driver's load balancing options.
+                    FastSyncTapYugabyte.drop_slot({
+                        key: value
+                        for key, value in tap_config.items()
+                        if key not in ('load_balance', 'topology_keys')
+                    })
 
         utils.silentremove(self.get_tap_dir(target_id, tap_id))
 

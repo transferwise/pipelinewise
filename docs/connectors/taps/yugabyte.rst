@@ -107,7 +107,9 @@ Configuration
      - Enables YugabyteDB's client-side load balancing across cluster nodes
        for this connection. ``"true"`` distributes connections uniformly;
        ``"any"`` is required together with ``topology_keys`` for
-       topology-aware placement.
+       topology-aware placement. Accepts ``"true"``, ``"false"``, ``"any"``,
+       ``"only-rr"``, ``"only-primary"``, ``"prefer-rr"``, and
+       ``"prefer-primary"``; any other value fails at connection time.
    * - ``topology_keys``
      - No
      - None
@@ -132,10 +134,16 @@ Configuration
      - CPU count
      - Controls concurrent FastSync table exports.
 
-``load_balance`` and ``topology_keys`` apply to every connection opened for
-this tap, including FastSync FullSync/PartialSync bulk exports and LOG_BASED
-streaming, since both connect through YugabyteDB's native-load-balancing
-psycopg2 driver.
+``load_balance`` and ``topology_keys`` apply to every replication connection
+opened for this tap, including FastSync FullSync/PartialSync bulk exports and
+LOG_BASED streaming, since both connect through YugabyteDB's
+native-load-balancing psycopg2 driver.
+
+The one exception is the replication-slot cleanup that runs when a tap's
+configuration is removed and ``pipelinewise import_config`` drops its slot. That
+cleanup runs inside PipelineWise itself, which uses the stock psycopg2 driver, so
+it ignores both options and connects directly to the configured ``host``. Keep
+that host reachable, or drop the slot manually if it is not.
 
 Common tap settings are documented in :ref:`yaml_configuration`. Generate the
 full template with ``pipelinewise init``.

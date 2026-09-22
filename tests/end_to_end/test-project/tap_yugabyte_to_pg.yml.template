@@ -22,6 +22,7 @@ db_conn:
   password: "${TAP_YUGABYTE_PASSWORD}"   # Plain string or vault encrypted
   dbname: "${TAP_YUGABYTE_DB}"           # YSQL database name
   fastsync_parallelism: 1
+  load_balance: "true"
 
 
 # ------------------------------------------------------------------------------
