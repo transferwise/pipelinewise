@@ -204,3 +204,68 @@ class TestStrategyNames:
         names = {keyset.STRATEGY_PK_RANGE, keyset.STRATEGY_BUCKET_INDEX,
                  keyset.STRATEGY_PLAIN_SCAN}
         assert len(names) == 3
+
+
+class FakeCursor:
+    """Returns queued rows, so the key checks can be exercised without a server."""
+
+    def __init__(self, rows):
+        self._rows = list(rows)
+        self.executed = []
+
+    def execute(self, sql, params=None):
+        self.executed.append((sql, params))
+
+    def fetchone(self):
+        return self._rows.pop(0) if self._rows else None
+
+
+class TestRequireMonotonicKey:
+    """(not_null, is_unique, sequence_name, data_type, is_identity) then (seqcache,)"""
+
+    def test_unique_not_null_sequence_key_is_usable(self):
+        cur = FakeCursor([(True, True, 's.orders_id_seq', 'bigint', False), (1,)])
+        v = keyset.require_monotonic_key(cur, 's', 'orders', 'id', ['id'])
+        assert v['usable'] is True
+        assert v['tiebreaker'] is None
+        assert v['risks'] == []          # cache of 1 keeps commit order with key order
+
+    def test_cached_sequence_is_flagged_with_its_real_block_size(self):
+        cur = FakeCursor([(True, True, 's.orders_id_seq', 'bigint', False), (100,)])
+        v = keyset.require_monotonic_key(cur, 's', 'orders', 'id', ['id'])
+        assert v['usable'] is True       # usable, but not safe on its own
+        assert 'caches 100 values per connection' in v['risks'][0]
+
+    def test_nullable_key_is_a_hard_failure(self):
+        cur = FakeCursor([(False, True, None, 'timestamptz', False)])
+        v = keyset.require_monotonic_key(cur, 's', 'orders', 'updated_at', ['id'])
+        assert v['usable'] is False
+        assert 're-sync on every run' in v['hard_failures'][0]
+
+    def test_non_unique_key_borrows_the_primary_key_as_tiebreaker(self):
+        cur = FakeCursor([(True, False, None, 'timestamptz', False)])
+        v = keyset.require_monotonic_key(cur, 's', 'orders', 'created_at', ['id'])
+        assert v['usable'] is True
+        assert v['tiebreaker'] == ['id']
+
+    def test_non_unique_key_with_no_primary_key_cannot_be_made_deterministic(self):
+        cur = FakeCursor([(True, False, None, 'timestamptz', False)])
+        v = keyset.require_monotonic_key(cur, 's', 'orders', 'created_at', [])
+        assert v['usable'] is False
+        assert 'no primary key to break' in v['hard_failures'][0]
+
+    def test_timestamp_key_is_flagged_for_transaction_start_time(self):
+        cur = FakeCursor([(True, True, None, 'timestamptz', False)])
+        v = keyset.require_monotonic_key(cur, 's', 'orders', 'created_at', ['id'])
+        assert 'transaction start time' in v['risks'][0]
+
+    def test_key_with_no_increasing_guarantee_at_all_is_flagged(self):
+        cur = FakeCursor([(True, True, None, 'numeric', False)])
+        v = keyset.require_monotonic_key(cur, 's', 'orders', 'amount', ['id'])
+        assert 'nothing\n' not in v['risks'][0]
+        assert 'guarantees it increases' in v['risks'][0]
+
+    def test_missing_column_is_reported_not_crashed(self):
+        v = keyset.require_monotonic_key(FakeCursor([]), 's', 'orders', 'nope', ['id'])
+        assert v['usable'] is False
+        assert 'does not exist' in v['hard_failures'][0]

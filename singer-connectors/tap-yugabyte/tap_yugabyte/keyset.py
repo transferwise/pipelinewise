@@ -472,3 +472,100 @@ def plan_partial_sync(cur, schema_name, table_name, boundary_column, start_value
         suggestion += f" WHERE \"{boundary_column}\" >= '{start_value}'"
     return {'indexed': False, 'index': None, 'partial_indexes': partial,
             'suggestion': suggestion, 'via_bucket_index': None, 'note': None}
+
+
+# ------------------------------------------------- monotonic key eligibility
+
+_KEY_FACTS_SQL = """
+SELECT a.attnotnull,
+       COALESCE(u.indisunique, false)                          AS is_unique,
+       pg_get_serial_sequence(%s, a.attname)                   AS sequence_name,
+       format_type(a.atttypid, a.atttypmod)                    AS data_type,
+       a.attidentity IN ('a', 'd')                             AS is_identity
+FROM pg_attribute a
+JOIN pg_class c ON c.oid = a.attrelid
+JOIN pg_namespace n ON n.oid = c.relnamespace
+LEFT JOIN pg_index u ON u.indrelid = c.oid AND u.indisunique
+                    AND u.indnatts = 1 AND a.attnum = u.indkey[0]
+WHERE n.nspname = %s AND c.relname = %s AND a.attname = %s
+  AND a.attnum > 0 AND NOT a.attisdropped
+"""
+
+
+def require_monotonic_key(cur, schema_name, table_name, column, pk_columns=()):
+    """Check whether `column` can serve as an INCREMENTAL watermark.
+
+    A watermark is sound only when every row committed after a run carries a key
+    above that run's bookmark. Three separable things have to hold, and they fail
+    for different reasons:
+
+    NOT NULL       a NULL key is never written to the bookmark, so those rows are
+                   re-read on every run forever. Hard failure.
+    total order    ties make paging non-deterministic at the boundary. A unique
+                   column has this already; anything else needs the primary key
+                   appended as a tiebreaker.
+    commit order   the one that actually loses data, and the one nothing in the
+                   schema records. YugabyteDB hands out sequence values in
+                   per-connection blocks, so one session can be committing ids
+                   1..100 while another commits 101..200: a run bookmarking 150
+                   never sees id 40 committed a moment later. The block size is
+                   the sequence's own CACHE, read here rather than assumed.
+
+    Note this is not needed for FULL_TABLE. Keyset paging wants a total order,
+    which every primary key has by definition, and monotonicity buys it nothing --
+    a UUID key pages exactly as well.
+    """
+    cur.execute(_KEY_FACTS_SQL,
+                (f'{schema_name}.{table_name}', schema_name, table_name, column))
+    row = cur.fetchone()
+    if row is None:
+        return {'usable': False, 'column': column, 'tiebreaker': None,
+                'hard_failures': [f'{column} does not exist on {schema_name}.{table_name}'],
+                'risks': []}
+    not_null, is_unique, sequence_name, data_type, is_identity = row
+
+    hard_failures, risks = [], []
+    if not not_null:
+        hard_failures.append(
+            f'{column} is nullable. NULL is never written to the bookmark, so '
+            f'NULL-keyed rows re-sync on every run.'
+        )
+
+    tiebreaker = None
+    if not is_unique:
+        tiebreaker = [c for c in pk_columns if c != column] or None
+        if tiebreaker is None:
+            hard_failures.append(
+                f'{column} is not unique and the table has no primary key to break '
+                f'ties with, so paging cannot be made deterministic.'
+            )
+
+    if sequence_name:
+        cur.execute('SELECT seqcache FROM pg_sequence WHERE seqrelid = %s::regclass',
+                    (sequence_name,))
+        cached = cur.fetchone()
+        cache = cached[0] if cached else None
+        if cache and cache > 1:
+            risks.append(
+                f'{column} draws from {sequence_name}, which caches {cache} values '
+                f'per connection. Commit order does not follow key order across '
+                f'{cache} x (concurrent writers). Lower the cache, carry a lag '
+                f'window at least that wide, or use LOG_BASED.'
+            )
+    elif data_type.startswith(('timestamp', 'date')):
+        risks.append(
+            f'{column} is a timestamp, so it records transaction start time. A long '
+            f'write transaction commits rows stamped before an already-advanced '
+            f'bookmark. Carry a lag window wider than the longest write transaction, '
+            f'or use LOG_BASED.'
+        )
+    else:
+        risks.append(
+            f'{column} is neither sequence-backed nor a timestamp, so nothing '
+            f'guarantees it increases at all. Confirm the application only ever '
+            f'assigns increasing values.'
+        )
+
+    return {'usable': not hard_failures, 'column': column, 'tiebreaker': tiebreaker,
+            'hard_failures': hard_failures, 'risks': risks,
+            'is_identity': is_identity, 'sequence': sequence_name}
