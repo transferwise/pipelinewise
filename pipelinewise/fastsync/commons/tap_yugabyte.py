@@ -11,7 +11,7 @@ import psycopg2.extras
 from argparse import Namespace
 from typing import Dict
 
-from . import utils, split_gzip
+from . import utils, split_gzip, yb_retry
 from .partial_sync_boundary import PartialSyncBoundary
 from ...utils import safe_column_name
 
@@ -30,14 +30,12 @@ _RETRYABLE_DROP_SLOT_ERRORS = (
     psycopg2.errors.SerializationFailure,  # pylint: disable=no-member
 )
 
-# A `yb_read_time`-pinned read validates its session's cached catalog snapshot against
-# the cluster's current catalog version. A concurrent DDL elsewhere in the cluster can
-# bump that version after the snapshot was pinned but before the tablet server's
-# heartbeat-driven propagation reaches this session, so a read against an otherwise
-# valid, still-current boundary transiently raises InternalError_/MISMATCHED_SCHEMA
-# until the bump propagates; the boundary itself does not need to be recreated.
-_MISMATCHED_SCHEMA_RETRY_ATTEMPTS = 5
-_MISMATCHED_SCHEMA_RETRY_INTERVAL_SECONDS = 2
+# MISMATCHED_SCHEMA, one of the errors the general read-retry policy in yb_retry
+# covers: a `yb_read_time`-pinned read validates its session's cached catalog
+# snapshot against the cluster's current catalog version, and a concurrent DDL
+# elsewhere can bump that version after the snapshot was pinned but before the
+# tablet server's heartbeat-driven propagation reaches this session. The boundary
+# itself stays valid, so the read just needs asking again.
 
 
 class FastSyncTapYugabyte:
@@ -429,83 +427,86 @@ class FastSyncTapYugabyte:
         """
         full_table_name = table_name
 
-        for attempt in range(1, _MISMATCHED_SCHEMA_RETRY_ATTEMPTS + 1):
-            try:
-                if self._snapshot_ht is not None:
-                    # Session-level GUC; must be its own statement, not inside a transaction
-                    # block (YugabyteDB rejects `SET LOCAL yb_read_time` inside BEGIN/COMMIT).
-                    LOGGER.info('Pinning export snapshot to yb_read_time %s ht', self._snapshot_ht)
-                    self.curr.execute(f"SET yb_read_time TO '{self._snapshot_ht} ht'")
+        def _discard_partial_export(_attempt, _exc):
+            # a failed copy_expert leaves a truncated .gz (and any -partNNN chunks)
+            # behind; the retry re-opens the base path but would not remove the
+            # extra chunks, so they are cleared before the export starts over
+            for stale in glob.glob(f'{path}*'):
+                try:
+                    os.remove(stale)
+                except OSError:
+                    LOGGER.warning('Could not remove partial export file %s', stale)
 
-                table_columns = self.get_table_columns(full_table_name, max_num, date_type)
-                column_safe_sql_values = [c.get('safe_sql_value') for c in table_columns]
+        def _export():
+            if self._snapshot_ht is not None:
+                # Session-level GUC; must be its own statement, not inside a transaction
+                # block (YugabyteDB rejects `SET LOCAL yb_read_time` inside BEGIN/COMMIT).
+                LOGGER.info('Pinning export snapshot to yb_read_time %s ht', self._snapshot_ht)
+                self.curr.execute(f"SET yb_read_time TO '{self._snapshot_ht} ht'")
 
-                # If self.get_table_columns returns zero row then table not exist
-                if len(column_safe_sql_values) == 0:
-                    raise Exception(f'{full_table_name} table not found.')
+            table_columns = self.get_table_columns(full_table_name, max_num, date_type)
+            column_safe_sql_values = [c.get('safe_sql_value') for c in table_columns]
 
-                source_boundary = (
-                    boundary.source_sql(
-                        'postgres',
-                        [column[0] for column in table_columns],
+            # If self.get_table_columns returns zero row then table not exist
+            if len(column_safe_sql_values) == 0:
+                raise Exception(f'{full_table_name} table not found.')
+
+            source_boundary = (
+                boundary.source_sql(
+                    'postgres',
+                    [column[0] for column in table_columns],
+                )
+                if boundary is not None
+                else None
+            )
+
+            schema_name, bare_table_name = full_table_name.split('.')
+
+            column_safe_sql_values = column_safe_sql_values + [
+                "now() AT TIME ZONE 'UTC' AS _SDC_EXTRACTED_AT",
+                "now() AT TIME ZONE 'UTC' AS _SDC_BATCHED_AT",
+                'null _SDC_DELETED_AT'
+            ]
+
+            if source_boundary is not None:
+                where_clause = self.curr.mogrify(
+                    source_boundary.statement,
+                    source_boundary.parameters,
+                )
+                if isinstance(where_clause, bytes):
+                    connection_encoding = self.curr.connection.encoding
+                    python_encoding = psycopg2.extensions.encodings.get(
+                        connection_encoding, connection_encoding
                     )
-                    if boundary is not None
-                    else None
-                )
+                    where_clause = where_clause.decode(python_encoding)
+            else:
+                where_clause = ''
 
-                schema_name, bare_table_name = full_table_name.split('.')
+            sql = f"""COPY (SELECT {','.join(column_safe_sql_values)}
+            FROM {schema_name}."{bare_table_name}"{where_clause}) TO STDOUT with CSV DELIMITER ','
+            """
 
-                column_safe_sql_values = column_safe_sql_values + [
-                    "now() AT TIME ZONE 'UTC' AS _SDC_EXTRACTED_AT",
-                    "now() AT TIME ZONE 'UTC' AS _SDC_BATCHED_AT",
-                    'null _SDC_DELETED_AT'
-                ]
+            LOGGER.info('Exporting data: %s', sql)
 
-                if source_boundary is not None:
-                    where_clause = self.curr.mogrify(
-                        source_boundary.statement,
-                        source_boundary.parameters,
-                    )
-                    if isinstance(where_clause, bytes):
-                        connection_encoding = self.curr.connection.encoding
-                        python_encoding = psycopg2.extensions.encodings.get(
-                            connection_encoding, connection_encoding
-                        )
-                        where_clause = where_clause.decode(python_encoding)
-                else:
-                    where_clause = ''
+            gzip_splitter = split_gzip.open(
+                path,
+                mode='wb',
+                chunk_size_mb=split_file_chunk_size_mb,
+                max_chunks=split_file_max_chunks if split_large_files else 0,
+                compress=compress,
+            )
 
-                sql = f"""COPY (SELECT {','.join(column_safe_sql_values)}
-                FROM {schema_name}."{bare_table_name}"{where_clause}) TO STDOUT with CSV DELIMITER ','
-                """
+            with gzip_splitter as split_gzip_files:
+                self.curr.copy_expert(sql, split_gzip_files, size=131072)
 
-                LOGGER.info('Exporting data: %s', sql)
-
-                gzip_splitter = split_gzip.open(
-                    path,
-                    mode='wb',
-                    chunk_size_mb=split_file_chunk_size_mb,
-                    max_chunks=split_file_max_chunks if split_large_files else 0,
-                    compress=compress,
-                )
-
-                with gzip_splitter as split_gzip_files:
-                    self.curr.copy_expert(sql, split_gzip_files, size=131072)
-                return
-            except psycopg2.errors.InternalError_ as exc:  # pylint: disable=no-member
-                if 'MISMATCHED_SCHEMA' not in str(exc) or attempt == _MISMATCHED_SCHEMA_RETRY_ATTEMPTS:
-                    raise
-                LOGGER.warning(
-                    'Pinned yb_read_time export of %s hit a transient catalog-version '
-                    'mismatch (attempt %s/%s), retrying in %s seconds once the version '
-                    'bump propagates: %s',
-                    full_table_name,
-                    attempt,
-                    _MISMATCHED_SCHEMA_RETRY_ATTEMPTS,
-                    _MISMATCHED_SCHEMA_RETRY_INTERVAL_SECONDS,
-                    exc,
-                )
-                time.sleep(_MISMATCHED_SCHEMA_RETRY_INTERVAL_SECONDS)
+        # the export is a read that rewrites its own output from scratch, so any
+        # non-permanent failure -- a read restart, a tablet move, a catalog-version
+        # bump under a pinned yb_read_time -- is simply run again
+        yb_retry.retry_read(
+            _export,
+            f'bulk export of {full_table_name}',
+            before_retry=_discard_partial_export,
+        )
 
     def export_source_table_data(
             self, args: Namespace, tap_id: str,

@@ -1,0 +1,269 @@
+"""Bucketed keyset scanning: index prerequisite, snapshot pinning, key discovery.
+
+A YugabyteDB primary key is HASH-sharded unless it was declared ASC/DESC, and a
+hash-sharded key has no order to scan along. That makes the obvious resumable
+full-table scan -- order by the key, remember where you stopped -- degrade into a
+full table scan on every resume.
+
+The fix is a prerequisite index that supplies an order the key itself does not
+have: ((yb_hash_code(<pk>) % N) HASH, <pk> ASC). The leading column takes only N
+values and every scan predicate against it is an equality, which is the one
+access pattern hash sharding serves; the key columns trail it ASC, so each bucket
+is an ordered range that a cursor can walk and resume inside.
+
+N is the only knob. It fixes the index expression, the number of buckets, and
+therefore the maximum useful parallelism, because a worker owns exactly one
+bucket. Because N appears in both the index and every query, it is validated
+against the live index rather than trusted from config.
+"""
+
+import re
+
+BUCKETS_DEFAULT = 3
+INDEX_SUFFIX = '_pw_keyset'
+
+# Columns whose names conventionally carry an insert-time watermark, most
+# specific first. Used only to rank discovered candidates, never to select one
+# without the caller's consent.
+_CREATED_NAME_HINTS = (
+    'created_at', 'created', 'inserted_at', 'inserted',
+    'create_time', 'created_on', 'creation_date',
+)
+
+
+def quoted(columns):
+    return [f'"{c}"' for c in columns]
+
+
+def bucket_expr(pk_columns, buckets, escape_percent=False):
+    """Bucket discriminator. Rendered identically in the index and in every scan;
+    any divergence silently costs the index and falls back to a full scan.
+
+    psycopg2 treats `%` as the start of a placeholder in any statement it is given
+    parameters for -- including an empty sequence -- so the modulo operator has to
+    be doubled in those, and left alone in statements executed without parameters
+    (the index DDL, the max-key probe). Passing the wrong one does not produce a
+    slow query, it produces an IndexError or a malformed statement.
+    """
+    modulo = '%%' if escape_percent else '%'
+    return f"(yb_hash_code({', '.join(quoted(pk_columns))}) {modulo} {buckets})"
+
+
+def order_by_sql(pk_columns, direction='ASC'):
+    """Per-column ORDER BY. A ROW() expression here is opaque to the planner and
+    forces a blocking sort even when the index could have supplied the order."""
+    return ', '.join(f'{c} {direction}' for c in quoted(pk_columns))
+
+
+def tuple_sql(pk_columns):
+    """Row constructor for keyset comparison. Correct and index-usable in a
+    WHERE clause -- unlike in ORDER BY, where it defeats the index."""
+    return f"({', '.join(quoted(pk_columns))})"
+
+
+def placeholders(pk_columns):
+    return f"({', '.join(['%s'] * len(pk_columns))})"
+
+
+def index_name(table_name):
+    return f'{table_name}{INDEX_SUFFIX}'
+
+
+def index_ddl(fq_table_name, table_name, pk_columns, buckets, tablets=None):
+    """DDL for the prerequisite index.
+
+    Uniqueness is free -- the bucket is a function of the key, so (bucket, key)
+    is unique exactly when the key is -- and it lets the index back a keyset
+    cursor without a recheck against the base table.
+    """
+    split = f' SPLIT INTO {tablets} TABLETS' if tablets else ''
+    return (
+        f'CREATE UNIQUE INDEX {index_name(table_name)} ON {fq_table_name} '
+        f'(({bucket_expr(pk_columns, buckets)}) HASH, {order_by_sql(pk_columns)})'
+        f'{split}'
+    )
+
+
+def parse_index_buckets(indexdef):
+    """Recover the bucket count from a live index definition, or None if the
+    index is not one of ours."""
+    match = re.search(r'yb_hash_code\([^)]*\)\s*%\s*(\d+)', indexdef or '')
+    return int(match.group(1)) if match else None
+
+
+def validate_index(cur, schema_name, table_name, pk_columns, buckets):
+    """Confirm the prerequisite index exists and agrees with the configured
+    bucket count.
+
+    A mismatch is reported rather than tolerated: the scans would still return
+    correct rows, but each would silently become a full table scan, which is the
+    failure mode hardest to notice from the outside.
+    """
+    cur.execute(
+        'SELECT pg_get_indexdef(i.oid) '
+        'FROM pg_class c '
+        'JOIN pg_namespace n ON n.oid = c.relnamespace '
+        'JOIN pg_index x ON x.indrelid = c.oid '
+        'JOIN pg_class i ON i.oid = x.indexrelid '
+        'WHERE n.nspname = %s AND c.relname = %s AND i.relname = %s',
+        (schema_name, table_name, index_name(table_name)),
+    )
+    row = cur.fetchone()
+    fq_table_name = f'"{schema_name}"."{table_name}"'
+    if row is None:
+        return False, (
+            f'Parallel keyset sync of {schema_name}.{table_name} requires a bucket '
+            f'index. Create it with:\n  '
+            f'{index_ddl(fq_table_name, table_name, pk_columns, buckets, buckets)};'
+        )
+    found = parse_index_buckets(row[0])
+    if found != buckets:
+        return False, (
+            f'{index_name(table_name)} is built with {found} buckets but the tap is '
+            f'configured for {buckets}. Rebuild the index, or set '
+            f'keyset_buckets: {found}.'
+        )
+    return True, None
+
+
+def pin_snapshot(conn, hybrid_time, security_definer_proc=None):
+    """Pin this connection to a hybrid-time snapshot so every worker reads the
+    same instant.
+
+    `yb_read_time` is superuser-only and is rejected inside an explicit
+    transaction block, so it is issued as its own statement with autocommit on.
+    A least-privilege tap user instead calls a SECURITY DEFINER procedure, which
+    is the pattern YugabyteDB documents for this case. The session is read-only
+    for as long as it stays pinned.
+    """
+    if hybrid_time is None:
+        return
+    previous_autocommit = conn.autocommit
+    conn.autocommit = True
+    try:
+        with conn.cursor() as cur:
+            if security_definer_proc:
+                cur.execute(f'CALL {security_definer_proc}(%s)', (f'{hybrid_time} ht',))
+            else:
+                cur.execute(f"SET yb_read_time TO '{hybrid_time} ht'")
+    finally:
+        conn.autocommit = previous_autocommit
+
+
+REPLICATION_KEY_CANDIDATES_SQL = """
+SELECT a.attname,
+       format_type(a.atttypid, a.atttypmod)                    AS data_type,
+       a.attnotnull                                            AS not_null,
+       a.attidentity IN ('a', 'd')                             AS is_identity,
+       COALESCE(pg_get_expr(d.adbin, d.adrelid) LIKE 'nextval(%%', false)
+                                                               AS is_sequence_default,
+       COALESCE(x.indisprimary, false)                         AS is_primary_key,
+       COALESCE(u.indisunique, false)                          AS is_unique
+FROM pg_attribute a
+JOIN pg_class c ON c.oid = a.attrelid
+JOIN pg_namespace n ON n.oid = c.relnamespace
+LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+LEFT JOIN pg_index x ON x.indrelid = c.oid AND x.indisprimary
+                    AND a.attnum = ANY (x.indkey)
+LEFT JOIN pg_index u ON u.indrelid = c.oid AND u.indisunique
+                    AND u.indnatts = 1 AND a.attnum = u.indkey[0]
+WHERE n.nspname = %s AND c.relname = %s
+  AND a.attnum > 0 AND NOT a.attisdropped
+ORDER BY a.attnum
+"""
+
+
+def discover_replication_key_candidates(cur, schema_name, table_name):
+    """Rank columns that could serve as an INCREMENTAL replication key.
+
+    Two shapes qualify: a sequence-backed integer (identity column or a
+    nextval() default) and a creation timestamp. Both are returned with the
+    caveats that apply to them, because on YugabyteDB neither is safe on its own
+    -- see `replication_key_warnings`.
+
+    Returns dicts ordered best-first, each with `column`, `kind`, `unique`, and
+    `tiebreaker_required`.
+    """
+    cur.execute(REPLICATION_KEY_CANDIDATES_SQL, (schema_name, table_name))
+    candidates = []
+    for (name, data_type, not_null, is_identity, is_sequence_default,
+         is_primary_key, is_unique) in cur.fetchall():
+        lowered = name.lower()
+        unique = bool(is_primary_key or is_unique)
+        if is_identity or is_sequence_default:
+            candidates.append({
+                'column': name, 'kind': 'sequence', 'data_type': data_type,
+                'unique': unique, 'not_null': bool(not_null),
+                'tiebreaker_required': not unique,
+                # a unique candidate beats a non-unique one of the same shape: it
+                # needs no tiebreaker and can page on its own
+                'rank': (0, 0 if unique else 1, 0 if is_identity else 1),
+            })
+        elif data_type.startswith(('timestamp', 'date')) and any(
+                hint in lowered for hint in _CREATED_NAME_HINTS):
+            # a creation timestamp is never unique on its own: two rows written in
+            # the same transaction share it exactly
+            hint_rank = next(i for i, h in enumerate(_CREATED_NAME_HINTS) if h in lowered)
+            candidates.append({
+                'column': name, 'kind': 'created_timestamp', 'data_type': data_type,
+                'unique': False, 'not_null': bool(not_null),
+                'tiebreaker_required': True,
+                'rank': (1, 1, hint_rank),
+            })
+    candidates.sort(key=lambda c: c['rank'])
+    for candidate in candidates:
+        del candidate['rank']
+    return candidates
+
+
+def replication_key_warnings(candidate, pk_columns, sequence_cache_minval=None):
+    """Explain why a candidate is not, by itself, a safe INCREMENTAL watermark.
+
+    A watermark is only sound when key order matches commit order. On
+    YugabyteDB it does not, for either candidate shape:
+
+    Sequence-backed columns are handed out in per-connection blocks
+    (ysql_sequence_cache_method=connection, ysql_sequence_cache_minval=100 by
+    default), so one session can be committing ids 1..100 while another commits
+    101..200. A run that bookmarks max(id)=150 will never see id=40 committed a
+    moment later.
+
+    Creation timestamps carry the transaction's start time, so a long-running
+    transaction commits rows stamped before a watermark that has already moved
+    past them -- and clock skew between nodes widens the same gap.
+
+    Neither is fixed by a tiebreaker. A tiebreaker only makes the ordering
+    total, which matters for deterministic paging; it does not make key order
+    agree with commit order. That needs either a lag window, or LOG_BASED.
+    """
+    warnings = []
+    if candidate['tiebreaker_required']:
+        tiebreaker = ', '.join(pk_columns) if pk_columns else 'the primary key'
+        warnings.append(
+            f"{candidate['column']} is not unique, so paging by it alone can "
+            f'repeat or skip rows that share a value; it needs a tiebreaker '
+            f'({tiebreaker}) to give a total order.'
+        )
+    if not candidate['not_null']:
+        warnings.append(
+            f"{candidate['column']} is nullable, and NULL is never written to the "
+            f'bookmark, so NULL-keyed rows re-sync on every run.'
+        )
+    if candidate['kind'] == 'sequence':
+        cache = sequence_cache_minval if sequence_cache_minval is not None else 100
+        warnings.append(
+            f"{candidate['column']} is sequence-backed, and YugabyteDB caches "
+            f'{cache} values per connection, so commit order does not follow id '
+            f'order. Rows committed after the bookmark can carry ids far below '
+            f'it and be missed permanently. Use LOG_BASED, or lower '
+            f'ysql_sequence_cache_minval, or carry a lag window of at least '
+            f'{cache} x (concurrent writers).'
+        )
+    if candidate['kind'] == 'created_timestamp':
+        warnings.append(
+            f"{candidate['column']} records transaction start time, so a long "
+            f'transaction commits rows stamped earlier than an advanced '
+            f'bookmark. Carry a lag window wider than the longest write '
+            f'transaction, or use LOG_BASED.'
+        )
+    return warnings

@@ -71,8 +71,10 @@ class TestSyncTableWithPk(unittest.TestCase):
     def tearDownClass(cls) -> None:
         cls.patcher.stop()
 
+    @patch('tap_yugabyte.keyset.validate_index', return_value=(True, None))
     @patch('tap_yugabyte.db.hstore_available', return_value=False)
-    def test_fresh_sync_snapshots_max_pk_and_clears_bookmarks_on_completion(self, _hstore_available):
+    def test_fresh_sync_snapshots_max_pk_and_clears_bookmarks_on_completion(
+            self, _hstore_available, _validate_index):
         """A fresh sync (no prior bookmark) snapshots max_pk_values, then clears both
         resume bookmarks once the bounded scan completes."""
         stream = {'tap_stream_id': 'public-country', 'stream': 'country', 'table_name': 'country'}
@@ -86,10 +88,12 @@ class TestSyncTableWithPk(unittest.TestCase):
         bookmarks = result['bookmarks']['public-country']
         self.assertIsNone(bookmarks['max_pk_values'])
         self.assertIsNone(bookmarks['last_pk_fetched'])
+        self.assertIsNone(bookmarks['completed_buckets'])
         self.assertIn('version', bookmarks)
 
+    @patch('tap_yugabyte.keyset.validate_index', return_value=(True, None))
     @patch('tap_yugabyte.db.hstore_available', return_value=False)
-    def test_resumed_sync_reuses_stream_version(self, _hstore_available):
+    def test_resumed_sync_reuses_stream_version(self, _hstore_available, _validate_index):
         """A run that resumes from an existing max_pk_values bookmark reuses that
         stream's version instead of minting a new one."""
         stream = {'tap_stream_id': 'public-country', 'stream': 'country', 'table_name': 'country'}
@@ -153,9 +157,9 @@ class TestSyncTableResumeQuery(unittest.TestCase):
             return self._cursor
 
     def test_resume_builds_tuple_comparison_with_bound_params(self):
-        """last_pk_fetched/max_pk_values bookmarks become a parameterized
-        `(pk) > (%s) AND (pk) <= (%s)` clause with the bookmarked values as params,
-        never interpolated directly into the SQL text."""
+        """A bucket resuming from its own last_pk_fetched builds a parameterized
+        `(pk) > (%s) AND (pk) <= (%s)` clause, with the bookmarked values bound
+        rather than interpolated into the SQL text."""
         recording_cursor = self._RecordingCursor()
         recording_connect = self._RecordingConnect(recording_cursor)
 
@@ -167,22 +171,31 @@ class TestSyncTableResumeQuery(unittest.TestCase):
         state = {'bookmarks': {'public-country': {
             'version': 999,
             'max_pk_values': ['ZZZ'],
-            'last_pk_fetched': ['AAA'],
+            # only bucket 1 was interrupted; the others have not started
+            'last_pk_fetched': {'1': ['AAA']},
+            'completed_buckets': [0, 2],
         }}}
 
-        conn_config = {'host': 'foo', 'dbname': 'foo_db', 'user': 'foo_user', 'password': 'foo_pass', 'port': 12345}
+        conn_config = {'host': 'foo', 'dbname': 'foo_db', 'user': 'foo_user',
+                       'password': 'foo_pass', 'port': 12345, 'keyset_buckets': 3}
 
         with patch('psycopg2.connect') as mocked_connect, \
+                patch('tap_yugabyte.keyset.validate_index', return_value=(True, None)), \
                 patch('tap_yugabyte.db.hstore_available', return_value=False):
             mocked_connect.return_value.__enter__.return_value = recording_connect
 
             sync_table(conn_config, stream, state, ['code'], md_map)
 
-        select_calls = [call for call in recording_cursor.executed if call[1] is not None]
-        self.assertEqual(1, len(select_calls))
-        sql, params = select_calls[0]
+        bucket_scans = [call for call in recording_cursor.executed
+                        if call[1] and 'yb_hash_code' in call[0] and 'bucket_maxima' not in call[0]]
+        self.assertEqual(1, len(bucket_scans))
+        sql, params = bucket_scans[0]
         self.assertIn('> (%s)', sql)
         self.assertIn('<= (%s)', sql)
+        # doubled so psycopg2's placeholder interpolation leaves a single operator
+        self.assertIn('%%', sql)
+        # the key columns are ordered individually; a ROW() here would force a sort
+        self.assertIn('ORDER BY "code" ASC', sql)
         self.assertNotIn('AAA', sql)
         self.assertNotIn('ZZZ', sql)
         self.assertEqual(['AAA', 'ZZZ'], params)
@@ -217,3 +230,46 @@ class TestSyncTableNoPk(unittest.TestCase):
         self.assertNotIn('max_pk_values', bookmarks)
         self.assertNotIn('last_pk_fetched', bookmarks)
         self.assertIn('version', bookmarks)
+
+
+class TestLegacyStateMigration(unittest.TestCase):
+    """State written before bucketing must not crash or be misread"""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        cls.patcher = patch('psycopg2.connect')
+        mocked_connect = cls.patcher.start()
+        mocked_connect.return_value.__enter__.return_value = MockedConnect()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.patcher.stop()
+
+    @patch('tap_yugabyte.keyset.validate_index', return_value=(True, None))
+    @patch('tap_yugabyte.db.hstore_available', return_value=False)
+    def test_pre_bucketing_last_pk_fetched_list_is_discarded(
+            self, _hstore_available, _validate_index):
+        """An older tap stored one cursor position as a list. It says nothing about
+        any individual bucket, so it is dropped rather than indexed into."""
+        stream = {'tap_stream_id': 'public-country', 'stream': 'country',
+                  'table_name': 'country'}
+        md_map = {
+            (): {'schema-name': 'public', 'table-key-properties': ['id']},
+            ('properties', 'id'): {'sql-datatype': 'integer'},
+        }
+        state = {'bookmarks': {'public-country': {
+            'version': 999,
+            'max_pk_values': [1234],
+            'last_pk_fetched': [1000],   # legacy shape: a bare list, not per bucket
+        }}}
+
+        result = sync_table(self.conn_config, stream, state, ['id'], md_map)
+
+        self.assertEqual(999, result['bookmarks']['public-country']['version'])
+
+    def setUp(self) -> None:
+        self.conn_config = {
+            'host': 'foo', 'dbname': 'foo_db', 'user': 'foo_user',
+            'password': 'foo_pass', 'port': 12345,
+        }

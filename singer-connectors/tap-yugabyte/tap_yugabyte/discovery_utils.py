@@ -16,7 +16,11 @@ Column = collections.namedtuple('Column', [
     "numeric_precision",
     "numeric_scale",
     "is_array",
-    "is_enum"
+    "is_enum",
+    # position of this column within the primary-key index, 0-based, NULL when the
+    # column is not part of it. Keyset scanning compares and orders by the key as a
+    # tuple, so the tuple has to be built in index order, not table column order.
+    "pk_ordinality"
 
 ])
 
@@ -87,7 +91,8 @@ SELECT
                                         END,
                                        information_schema._pg_truetypmod(a.*, pgt.*))::information_schema.cardinal_number AS numeric_scale,
   pgt.typcategory                       = 'A' AS is_array,
-  COALESCE(subpgt.typtype, pgt.typtype) = 'e' AS is_enum
+  COALESCE(subpgt.typtype, pgt.typtype) = 'e' AS is_enum,
+  array_position(i.indkey::int2[], a.attnum)  AS pk_ordinality
 FROM pg_attribute a
 LEFT JOIN pg_type AS pgt ON a.atttypid = pgt.oid
 JOIN pg_class
@@ -141,7 +146,19 @@ def discover_columns(connection, table_info):
 
             mdata = {}
             columns = table_info[schema_name][table_name]['columns']
-            table_pks = [col_name for col_name, col_info in columns.items() if col_info.is_primary_key]
+            # ordered by position within the primary-key index, not by table column
+            # order: the two differ whenever the key was declared in a different
+            # order than the columns, and a keyset scan built on the wrong order
+            # still returns correct rows but cannot use the index to find them
+            table_pks = [
+                col_name
+                for col_name, _ in sorted(
+                    ((name, info) for name, info in columns.items()
+                     if info.is_primary_key),
+                    key=lambda item: (item[1].pk_ordinality is None,
+                                      item[1].pk_ordinality),
+                )
+            ]
             with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
                 cur.execute(" SELECT current_database()")
                 database_name = cur.fetchone()[0]
