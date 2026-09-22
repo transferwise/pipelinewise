@@ -176,8 +176,8 @@ class TestIncrementalSelectSql(TestCase):
         self.assertIn('(yb_hash_code("id") % 3) = 0 AND  "created_at"  >= ', sql)
 
     def test_no_index_hint_is_emitted(self):
-        # a hint inside the subquery was never read by pg_hint_plan at all, and a
-        # hint that IS read costs the Index Only Scan -- see
+        # a hint here is read -- it just costs the Index Only Scan the planner
+        # picks unaided, and reaches only one branch anyway. See
         # keyset.bucket_branches_sql
         self.assertNotIn('IndexScan', self._sql())
         self.assertNotIn('/*+', self._sql())

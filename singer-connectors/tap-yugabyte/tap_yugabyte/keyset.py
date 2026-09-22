@@ -1425,11 +1425,12 @@ def replication_key_index_ddl(fq_table_name, table_name, replication_key,
 #   leading comment, plain statement   WARNING: bad index hint name "no_such_index"
 #   inside the subquery                WARNING: error trying to get hints from comment
 #
-# So it was never doing anything: `hints_anywhere` is off and only the comment
-# leading the whole statement is parsed. The INCREMENTAL scan emits no hint now
-# and needs none -- see bucket_branches_sql for what a hint does to the UNION ALL
-# shape when it IS read, which is to lose the Index Only Scan. full_table still
-# hints, and its hint is the leading token of its statement, where it is read.
+# Those warnings are real but they are not evidence the hint was ignored: an A/B
+# on the same shape shows a nested hint IS applied -- unhinted plans an Index Only
+# Scan, and `/*+ SeqScan(healthy) */` inside the subquery plans a Seq Scan. The
+# INCREMENTAL scan emits no hint now because it does not need one and a hint makes
+# the plan worse -- see bucket_branches_sql, where hinting costs the Index Only
+# Scan. full_table still hints, and its hint leads its statement.
 #
 # index_for_replication_key stays: it names the index the scan reads and the DDL
 # creates, which is a separate question from hinting it.

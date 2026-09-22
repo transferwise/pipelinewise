@@ -229,14 +229,10 @@ class TestTheFourIndexShapes:
         assert keyset.index_for_replication_key('t', 'id', ['id']) == 't_pw_keyset'
 
     def test_the_incremental_scan_no_longer_renders_a_hint(self):
-        # replication_key_hint is gone. It put the hint inside the
-        # yb_speedup_trick subquery, a position pg_hint_plan never reads --
-        # hints_anywhere is off, so only the comment leading the whole statement
-        # is parsed. Probed with a deliberately bogus index name, which the
-        # extension reports whenever it parses a hint it cannot apply:
-        #   leading comment   WARNING: bad index hint name "no_such_index"
-        #   inside a subquery WARNING: error trying to get hints from comment
-        # See keyset.bucket_branches_sql for what a hint does when it IS read.
+        # replication_key_hint is gone -- not because the hint was ignored (a
+        # nested hint IS applied: unhinted the subquery plans an Index Only
+        # Scan, and `/*+ SeqScan(healthy) */` inside it plans a Seq Scan) but
+        # because it does not help and can hurt. See bucket_branches_sql.
         assert not hasattr(keyset, 'replication_key_hint')
 
     def test_replication_key_that_is_not_the_primary_key_gets_its_own(self):
@@ -410,11 +406,11 @@ class TestBucketBranches:
         assert 'AND' not in sql
 
     def test_no_index_hint_is_emitted(self):
-        # a hint inside a branch is never read (pg_hint_plan: hints_anywhere is
-        # off), one leading hint on the bare table name reaches exactly ONE
-        # branch, and N leading hints on per-branch aliases reach all of them and
-        # make it worse -- IndexScan replaces the Index Only Scan the planner
-        # picks unaided, 80,000 storage rows scanned against 40,000
+        # one leading hint on the bare table name reaches exactly ONE branch,
+        # because every branch writes the same relation name, and N hints on the
+        # per-branch aliases reach all of them and make it worse -- IndexScan
+        # replaces the Index Only Scan the planner picks unaided, adding a heap
+        # fetch per row: 80,000 storage rows scanned against 40,000
         assert 'IndexScan' not in self._sql()
         assert '/*+' not in self._sql()
 
