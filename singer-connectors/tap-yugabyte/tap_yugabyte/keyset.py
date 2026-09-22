@@ -928,11 +928,25 @@ def replication_key_index_ddl(fq_table_name, table_name, replication_key,
     Three details make this the same shape as the primary-key index rather than a
     second idea:
 
-    The discriminator hashes the PRIMARY KEY, not the replication key. One
-    expression and one bucket count then cover every index on the table. It also
-    keeps an index entry in the tablet it was written to when the replication key
-    changes: bucketing on `updated_at` moves the entry to another tablet on every
-    update, which is the write this index exists to make cheap.
+    The discriminator hashes the PRIMARY KEY, not the replication key. Either
+    works -- INCREMENTAL names every bucket rather than targeting one, so the
+    bucket never has to be computable from the cursor, and both give the same
+    plan. What separates them is where a batch lands.
+
+    `now()` is transaction-start time, so every row written in one transaction
+    carries the identical timestamp, and one timestamp hashes to one bucket. A
+    9,000-row insert in a single transaction distributed 2960/2955/3085 across
+    three buckets when hashed on the key, and 9000/0/0 when hashed on the
+    timestamp -- the whole batch on one tablet, which is what the bucketing
+    exists to prevent. Primary keys are distinct by construction and do not do
+    this.
+
+    (It is not a write-volume difference: the entry is a delete plus an insert
+    either way, because the replication key is part of the index key in both
+    designs. Measured at 3,000 storage writes for 1,000 updated rows on both.)
+
+    Hashing the primary key also means one expression and one bucket count cover
+    every index on the table.
 
     The primary key trails the replication key. That makes the order total, so a
     cursor can resume inside a group of rows sharing a timestamp instead of

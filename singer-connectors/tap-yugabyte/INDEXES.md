@@ -29,12 +29,37 @@ deviate, and the failures are quiet.
 
 | Rule | If you deviate |
 |---|---|
-| The bucket hashes the **primary key**, always — never the ordering column | The scan's bucket predicate does not match the index expression, so the index is unusable. Bucketing on `updated_at` additionally moves the index entry to a different tablet on every update, which is the write this index exists to make cheap |
+| The bucket hashes the **primary key**, always — never the ordering column | For shapes 1 and 2 this is a hard requirement: a parallel worker owns one bucket and resumes on its primary-key cursor, so the bucket must be computable from that cursor. For shapes 3 and 4 it is a choice, and the reason is below |
 | `ASC` on the bucket, never `HASH` | `SPLIT AT VALUES` is rejected, so bucket→tablet placement is whatever the hash space gives you, and workers contend |
 | The primary key is the **last** thing in the index | The order is not total. A resume re-reads every row sharing the last value it saw, and the index cannot answer without a trip to the table |
 | `UNIQUE` | Free, because the primary key trails. It is what lets the index answer alone |
 | `SPLIT AT VALUES` with N−1 boundaries | A range-sharded index gets **one** tablet. All N buckets land on it, the parallelism buys nothing, and the workers contend on a single tablet |
 | One N everywhere — index, tap config, every table | The scan names bucket values the index does not have. Full table scan |
+
+### Why the bucket hashes the primary key even in shapes 3 and 4
+
+`INCREMENTAL` names every bucket (`IN (0, 1, ... N-1)`) rather than targeting
+one, so the bucket never has to be derivable from the cursor and either column
+would work. The read plans are identical. What differs is where a batch lands:
+
+```sql
+-- 9,000 rows inserted in ONE transaction, counted per bucket
+bucket = yb_hash_code(id)         -> 2960 / 2955 / 3085
+bucket = yb_hash_code(updated_at) -> 9000 /    0 /    0
+```
+
+`now()` is **transaction-start** time, so every row written in one transaction
+carries the identical timestamp, and one timestamp hashes to one bucket. A bulk
+load, a backfill or a batch job puts its entire batch on a single tablet — the
+thing the bucketing exists to prevent. Primary keys are distinct by construction
+and do not do this.
+
+This is *not* a write-volume difference. The index entry is a delete plus an
+insert either way, because the replication key is part of the index key in both
+designs: 3,000 storage write requests for 1,000 updated rows, measured on both.
+
+Hashing the primary key also means one expression and one bucket count cover
+every index on a table, rather than one per indexed column.
 
 `N` is `keyset_buckets` in the tap config. **Default 3.** It fixes the index
 expression, the tablet count, and the maximum useful parallelism, because a
