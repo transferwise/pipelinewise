@@ -39,9 +39,9 @@ class TestIndexDefinition:
     def test_ddl_hash_shards_the_bucket_and_range_orders_the_key(self):
         ddl = keyset.index_ddl('s.orders', 'orders', ['tenant', 'id'], 8, tablets=8)
         assert 'CREATE UNIQUE INDEX orders_pw_keyset ON s.orders' in ddl
-        assert '((yb_hash_code("tenant", "id") % 8)) HASH' in ddl
+        assert '((yb_hash_code("tenant", "id") % 8)) ASC' in ddl
         assert '"tenant" ASC, "id" ASC' in ddl
-        assert ddl.endswith('SPLIT INTO 8 TABLETS')
+        assert ddl.endswith('SPLIT AT VALUES ((1), (2), (3), (4), (5), (6), (7))')
 
     @pytest.mark.parametrize('indexdef,expected', [
         ('CREATE UNIQUE INDEX t_pw_keyset ON s.t USING lsm '
@@ -167,13 +167,17 @@ class TestMergeScan:
         assert keyset.bucket_in_sql(['id'], 3, escape_percent=True) == \
             '(yb_hash_code("id") %% 3) IN (0, 1, 2)'
 
-    def test_guc_covers_the_bucket_count(self):
+    def test_settings_cover_the_bucket_count(self):
         # below the bucket count the planner cannot merge every stream and falls
         # back to sorting the whole result
-        assert keyset.merge_scan_guc_sql(16) == 'SET yb_max_merge_scan_streams = 16'
+        assert keyset.scan_settings_sql(16)[0] == 'SET yb_max_merge_scan_streams = 16'
 
-    def test_guc_has_a_floor_for_small_bucket_counts(self):
-        assert keyset.merge_scan_guc_sql(3) == 'SET yb_max_merge_scan_streams = 8'
+    def test_settings_have_a_floor_for_small_bucket_counts(self):
+        assert keyset.scan_settings_sql(3)[0] == 'SET yb_max_merge_scan_streams = 8'
+
+    def test_sequential_scan_is_deprioritised(self):
+        # the index hint alone does not get the streaming plan; this does
+        assert 'SET enable_seqscan = off' in keyset.scan_settings_sql(3)
 
 
 class TestLeadingColumnOrdering:

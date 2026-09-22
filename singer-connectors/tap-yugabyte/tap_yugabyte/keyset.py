@@ -160,32 +160,57 @@ def max_pk_values_sql(fq_table_name, table_name, pk_columns, buckets, merge_scan
     return f'SELECT {cols} FROM (\n{branches}\n) bucket_maxima ORDER BY {desc} LIMIT 1'
 
 
-def merge_scan_guc_sql(buckets):
-    """Session setting that lets an index scan merge the per-bucket streams.
+def scan_settings_sql(buckets):
+    """Session settings a bucketed keyset scan needs, in order.
 
-    Without it the planner has no way to produce ordered output from a
-    multi-valued leading column and falls back to a sort over the whole result,
-    even when the index condition is already right.
+    yb_max_merge_scan_streams lets the scan merge the per-bucket streams instead
+    of sorting the whole result, and must be at least the bucket count.
+
+    enable_seqscan is what actually makes the planner take it. The index hint
+    alone does not: measured, the hinted query still chose a sequential scan and
+    a 2.9MB external merge sort, because that is cheaper in wall clock and the
+    cost model does not price streaming or spilling. Deprioritising the
+    sequential scan is the only thing that reliably gets the streaming plan.
+    It is a session setting on a connection that runs nothing but these scans,
+    and it does not forbid a sequential scan -- a table with no usable index
+    still gets one.
     """
-    return f'SET yb_max_merge_scan_streams = {max(buckets, 8)}'
+    return [
+        f'SET yb_max_merge_scan_streams = {max(buckets, 8)}',
+        'SET enable_seqscan = off',
+    ]
 
 
 def index_name(table_name):
     return f'{table_name}{INDEX_SUFFIX}'
 
 
+def split_at_values(buckets):
+    """Tablet boundaries placing exactly one bucket per tablet.
+
+    A range-sharded index gets a single tablet unless boundaries are given, and
+    one tablet is the thing the bucketing exists to avoid. Splitting at every
+    bucket value but the first gives a deterministic bucket-to-tablet mapping:
+    bucket k is tablet k, so the workers do not contend and no bucket shares a
+    tablet with another. Hash sharding cannot promise that -- it maps N values
+    into the hash space and wherever they land is wherever they land.
+    """
+    return ', '.join(f'({b})' for b in range(1, buckets))
+
+
 def index_ddl(fq_table_name, table_name, pk_columns, buckets, tablets=None):
     """DDL for the prerequisite index.
 
-    Uniqueness is free -- the bucket is a function of the key, so (bucket, key)
-    is unique exactly when the key is -- and it lets the index back a keyset
+    The bucket column is range-sharded, not hashed, so the tablet boundaries can
+    be stated: see split_at_values. The key columns trail it ASC, so each bucket
+    is an ordered range a cursor can walk and resume inside. Uniqueness is free --
+    the bucket is a function of the key -- and it lets the index back a keyset
     cursor without a recheck against the base table.
     """
-    split = f' SPLIT INTO {tablets} TABLETS' if tablets else ''
     return (
         f'CREATE UNIQUE INDEX {index_name(table_name)} ON {fq_table_name} '
-        f'(({bucket_expr(pk_columns, buckets)}) HASH, {order_by_sql(pk_columns)})'
-        f'{split}'
+        f'(({bucket_expr(pk_columns, buckets)}) ASC, {order_by_sql(pk_columns)}) '
+        f'SPLIT AT VALUES ({split_at_values(buckets)})'
     )
 
 
@@ -721,3 +746,35 @@ def require_monotonic_key(cur, schema_name, table_name, column, pk_columns=()):
     return {'usable': not hard_failures, 'column': column, 'tiebreaker': tiebreaker,
             'hard_failures': hard_failures, 'risks': risks,
             'is_identity': is_identity, 'sequence': sequence_name}
+
+
+# --------------------------------------------- replication-key keyset index
+
+def replication_key_index_name(table_name, replication_key):
+    return f'{table_name}_{replication_key}{INDEX_SUFFIX}'
+
+
+def replication_key_index_ddl(fq_table_name, table_name, replication_key, buckets):
+    """Bucketed index for an INCREMENTAL replication key.
+
+    A plain (key ASC) index serves the watermark query, but a replication key is
+    almost always a timestamp or a sequence -- values that only ever increase --
+    so every insert lands at the tail of a range-sharded index and one tablet
+    takes the whole write load. Bucketing spreads the tail across N tablets while
+    keeping each bucket ordered, exactly as it does for the primary key.
+
+    The cost is that the scan must now name every bucket: without that predicate
+    the planner cannot use an index led by the discriminator, and the watermark
+    query reads the whole table. incremental.py emits it.
+    """
+    return (
+        f'CREATE INDEX {replication_key_index_name(table_name, replication_key)} '
+        f'ON {fq_table_name} '
+        f'(({bucket_expr([replication_key], buckets)}) ASC, "{replication_key}" ASC) '
+        f'SPLIT AT VALUES ({split_at_values(buckets)})'
+    )
+
+
+def replication_key_hint(table_name, replication_key):
+    return (f'/*+ IndexScan({table_name} '
+            f'{replication_key_index_name(table_name, replication_key)}) */')

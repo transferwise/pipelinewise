@@ -164,7 +164,8 @@ def _fetch_max_pk_values(conn_info, fq_table_name, table_name, pk_columns, bucke
             with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
                 merge_scan = keyset.merge_scan_available(cur)
                 if merge_scan:
-                    cur.execute(keyset.merge_scan_guc_sql(buckets))
+                    for setting in keyset.scan_settings_sql(buckets):
+                        cur.execute(setting)
                 select_sql = keyset.max_pk_values_sql(
                     fq_table_name, table_name, pk_columns, buckets, merge_scan)
                 LOGGER.info('select %s', select_sql)
@@ -213,7 +214,8 @@ def _scan_bucket(conn_info, stream, state, desired_columns, md_map, pk_columns,
         with _open_reader(conn_info, hybrid_time, proc) as conn:
             with conn.cursor() as setup:
                 if keyset.merge_scan_available(setup):
-                    setup.execute(keyset.merge_scan_guc_sql(buckets))
+                    for setting in keyset.scan_settings_sql(buckets):
+                        setup.execute(setting)
             with conn.cursor(cursor_factory=psycopg2.extras.DictCursor,
                              name=f'stitch_cursor_bucket_{bucket}') as cur:
                 cur.itersize = yb_db.CURSOR_ITER_SIZE

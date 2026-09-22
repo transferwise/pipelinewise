@@ -9,6 +9,7 @@ from functools import partial
 from singer import metrics
 
 import tap_yugabyte.db as yb_db
+import tap_yugabyte.keyset as keyset
 
 
 LOGGER = singer.get_logger('tap_yugabyte')
@@ -87,7 +88,8 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
                                               "replication_key_value": replication_key_value,
                                               "schema_name": schema_name,
                                               "table_name": stream['table_name'],
-                                              "limit": conn_info['limit']
+                                              "limit": conn_info['limit'],
+                                              "keyset_buckets": conn_info.get('keyset_buckets'),
                                               })
                 LOGGER.info('select statement: %s with itersize %s', select_sql, cur.itersize)
                 cur.execute(select_sql)
@@ -122,21 +124,47 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
 
 
 def _get_select_sql(params):
+    """Build the extraction query.
+
+    The bucket predicate names every bucket so the planner can use an index led
+    by the discriminator; without it that index is unusable and the query reads
+    the whole table. The hint and the session settings are there because the
+    merge plan is otherwise a cost decision, and the cost model prefers a
+    sequential scan and an external merge sort -- faster in wall clock, and it
+    spills instead of streaming.
+
+    The subquery, labelled yb_speedup_trick as in tap-postgres, keeps the
+    column-expression projection from defeating the index scan.
+    """
     escaped_columns = params['escaped_columns']
     replication_key = yb_db.prepare_columns_sql(params['replication_key'])
     replication_key_sql_datatype = params['replication_key_sql_datatype']
     replication_key_value = params['replication_key_value']
     schema_name = params['schema_name']
     table_name = params['table_name']
+    buckets = params.get('keyset_buckets')
 
-    limit_statement = f'LIMIT {params["limit"]}' if params["limit"] else ''
-    where_statement = f"WHERE {replication_key} >= '{replication_key_value}'::{replication_key_sql_datatype}" \
-        if replication_key_value else ""
+    limit_statement = f'LIMIT {params["limit"]}' if params['limit'] else ''
+
+    predicates = []
+    if buckets:
+        predicates.append(keyset.bucket_in_sql([params['replication_key']], buckets))
+    if replication_key_value:
+        # cast to the column's own discovered type: a timestamptz value compared
+        # against a timestamp column is accepted as an index condition and then
+        # rechecked against every row, which looks identical in the plan
+        predicates.append(
+            f"{replication_key} >= '{replication_key_value}'"
+            f'::{replication_key_sql_datatype}'
+        )
+    where_statement = f'WHERE {" AND ".join(predicates)}' if predicates else ''
+    hint = (keyset.replication_key_hint(table_name, params['replication_key'])
+            if buckets else '')
 
     select_sql = f"""
     SELECT {','.join(escaped_columns)}
     FROM (
-        SELECT *
+        {hint} SELECT *
         FROM {yb_db.fully_qualified_table_name(schema_name, table_name)}
         {where_statement}
         ORDER BY {replication_key} ASC {limit_statement}
