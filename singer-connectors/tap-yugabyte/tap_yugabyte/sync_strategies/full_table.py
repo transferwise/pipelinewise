@@ -150,7 +150,7 @@ def _sync_table_without_pk(conn_info, stream, state, desired_columns, md_map):
 # ------------------------------------------------- bucketed keyset scan
 
 
-def _fetch_max_pk_values(conn_info, fq_table_name, pk_columns, buckets):
+def _fetch_max_pk_values(conn_info, fq_table_name, table_name, pk_columns, buckets):
     """Snapshot the largest primary-key tuple, bounding the scan against inserts
     that land while it runs.
 
@@ -166,7 +166,7 @@ def _fetch_max_pk_values(conn_info, fq_table_name, pk_columns, buckets):
                 if merge_scan:
                     cur.execute(keyset.merge_scan_guc_sql(buckets))
                 select_sql = keyset.max_pk_values_sql(
-                    fq_table_name, pk_columns, buckets, merge_scan)
+                    fq_table_name, table_name, pk_columns, buckets, merge_scan)
                 LOGGER.info('select %s', select_sql)
                 cur.execute(select_sql)
                 row = cur.fetchone()
@@ -177,8 +177,8 @@ def _fetch_max_pk_values(conn_info, fq_table_name, pk_columns, buckets):
 
 # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
 def _scan_bucket(conn_info, stream, state, desired_columns, md_map, pk_columns,
-                 buckets, bucket, fq_table_name, max_pk_values, stream_version,
-                 time_extracted, emit, read_bookmark, counter):
+                 buckets, bucket, fq_table_name, table_name, max_pk_values,
+                 stream_version, time_extracted, emit, read_bookmark, counter):
     """Read one bucket to completion on its own connection.
 
     The statement is rebuilt from the bucket's bookmark on every attempt, so a
@@ -205,7 +205,8 @@ def _scan_bucket(conn_info, stream, state, desired_columns, md_map, pk_columns,
             predicates.append(f'{keyset.tuple_sql(pk_columns)} <= '
                               f'{keyset.placeholders(pk_columns)}')
             params.extend(max_pk_values)
-        select_sql = (f"SELECT {','.join(escaped)} FROM {fq_table_name} "
+        select_sql = (f"{keyset.index_hint(table_name)} "
+                      f"SELECT {','.join(escaped)} FROM {fq_table_name} "
                       f'WHERE {" AND ".join(predicates)} '
                       f'ORDER BY {keyset.order_by_sql(pk_columns)}')
 
@@ -257,7 +258,8 @@ def _sync_table_with_pk(conn_info, stream, state, desired_columns, md_map, pk_co
     singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
 
     if max_pk_values is None:
-        max_pk_values = _fetch_max_pk_values(conn_info, fq_table_name, pk_columns, buckets)
+        max_pk_values = _fetch_max_pk_values(conn_info, fq_table_name, table_name,
+                                             pk_columns, buckets)
         state = singer.write_bookmark(state, tap_stream_id, 'max_pk_values', max_pk_values)
         singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
 
@@ -314,8 +316,8 @@ def _sync_table_with_pk(conn_info, stream, state, desired_columns, md_map, pk_co
             futures = [
                 pool.submit(_scan_bucket, conn_info, stream, state, desired_columns,
                             md_map, pk_columns, buckets, bucket, fq_table_name,
-                            max_pk_values, nascent_stream_version, time_extracted,
-                            emit, read_bookmark, counter)
+                            table_name, max_pk_values, nascent_stream_version,
+                            time_extracted, emit, read_bookmark, counter)
                 for bucket in pending
             ]
             for future in futures:

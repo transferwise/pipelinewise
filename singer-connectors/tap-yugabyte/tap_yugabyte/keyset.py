@@ -110,6 +110,19 @@ def bucket_in_sql(pk_columns, buckets, escape_percent=False):
     return f'{bucket_expr(pk_columns, buckets, escape_percent)} IN ({values})'
 
 
+def index_hint(table_name):
+    """Pin the scan to the keyset index.
+
+    The merge plan is a cost decision, and the cost model does not price what
+    this scan is for: at moderate sizes it prefers a sequential scan and an
+    external merge sort, which is faster in wall clock and spills to disk
+    instead of streaming. Measured on 50k rows it chose a 2.9MB spill over the
+    index. The tap wants the streaming plan every time, not the cheaper one,
+    so the choice is stated rather than left to the estimate.
+    """
+    return f'/*+ IndexScan({table_name} {index_name(table_name)}) */'
+
+
 def merge_scan_available(cur):
     """Whether this server build has the merge-scan setting at all.
 
@@ -121,7 +134,7 @@ def merge_scan_available(cur):
     return cur.fetchone()[0] > 0
 
 
-def max_pk_values_sql(fq_table_name, pk_columns, buckets, merge_scan):
+def max_pk_values_sql(fq_table_name, table_name, pk_columns, buckets, merge_scan):
     """Largest key tuple in the table, in whichever form this server can serve.
 
     With merge scan, one index condition over every bucket and the streams merged
@@ -133,12 +146,13 @@ def max_pk_values_sql(fq_table_name, pk_columns, buckets, merge_scan):
     """
     cols = ', '.join(quoted(pk_columns))
     desc = order_by_sql(pk_columns, 'DESC')
+    hint = index_hint(table_name)
     if merge_scan:
-        return (f'SELECT {cols} FROM {fq_table_name} '
+        return (f'{hint} SELECT {cols} FROM {fq_table_name} '
                 f'WHERE {bucket_in_sql(pk_columns, buckets)} '
                 f'ORDER BY {desc} LIMIT 1')
     branches = '\nUNION ALL\n'.join(
-        f'  (SELECT {cols} FROM {fq_table_name} '
+        f'  ({hint} SELECT {cols} FROM {fq_table_name} '
         f'WHERE {bucket_expr(pk_columns, buckets)} = {bucket} '
         f'ORDER BY {desc} LIMIT 1)'
         for bucket in range(buckets)
