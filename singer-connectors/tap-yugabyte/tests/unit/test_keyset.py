@@ -219,6 +219,11 @@ class FakeCursor:
     def fetchone(self):
         return self._rows.pop(0) if self._rows else None
 
+    def fetchall(self):
+        """Next queued row is a list of rows; absent or None means no rows."""
+        nxt = self._rows.pop(0) if self._rows else None
+        return nxt or []
+
 
 class TestRequireMonotonicKey:
     """(not_null, is_unique, owned_sequence, data_type, is_identity, column_default)
@@ -238,7 +243,7 @@ class TestRequireMonotonicKey:
         assert 'caches 100 values per connection' in v['risks'][0]
 
     def test_nullable_key_is_a_hard_failure(self):
-        cur = FakeCursor([(False, True, None, 'timestamptz', False, None)])
+        cur = FakeCursor([(False, True, None, 'timestamptz', False, None), []])
         v = keyset.require_monotonic_key(cur, 's', 'orders', 'updated_at', ['id'])
         assert v['usable'] is False
         assert 're-sync on every run' in v['hard_failures'][0]
@@ -323,3 +328,32 @@ class TestTemporalNameRanking:
     ])
     def test_name_rank(self, name, hints, expected):
         assert keyset._name_rank(name, hints) == expected
+
+
+class TestModificationTimestampIsAClaim:
+    """A name saying 'updated' is not a mechanism that updates anything."""
+
+    def test_no_update_trigger_means_nothing_maintains_it(self):
+        # facts row, then an empty trigger lookup
+        cur = FakeCursor([(True, True, None, 'timestamptz', False, 'now()'), []])
+        v = keyset.require_monotonic_key(cur, 's', 't', 'updated_at', ['id'])
+        assert any('no row-level UPDATE trigger' in r for r in v['risks'])
+        assert any('never moves again' in r for r in v['risks'])
+
+    def test_existing_update_trigger_is_reported_but_not_trusted(self):
+        cur = FakeCursor([(True, True, None, 'timestamptz', False, None),
+                          [('touch_updated',)]])
+        v = keyset.require_monotonic_key(cur, 's', 't', 'updated_at', ['id'])
+        assert any('may be maintained by touch_updated' in r for r in v['risks'])
+
+    def test_creation_named_column_is_not_asked_about_triggers(self):
+        cur = FakeCursor([(True, True, None, 'timestamptz', False, 'now()')])
+        v = keyset.require_monotonic_key(cur, 's', 't', 'created_at', ['id'])
+        # only the transaction-start-time risk; no trigger question is relevant
+        assert len(v['risks']) == 1
+        assert 'transaction start time' in v['risks'][0]
+
+    def test_neither_kind_outranks_the_other(self):
+        # both sit in the same rank group: they fail differently, not worse
+        assert keyset._name_rank('updated_at', keyset._MODIFIED_NAME_HINTS) is not None
+        assert keyset._name_rank('created_at', keyset._CREATED_NAME_HINTS) is not None

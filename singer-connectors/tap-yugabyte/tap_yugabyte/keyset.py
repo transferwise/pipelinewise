@@ -33,6 +33,15 @@ INDEX_SUFFIX = '_pw_keyset'
 # row is updated, so INCREMENTAL sees the update; a creation time never moves
 # again after insert, so every update after the first is invisible. Preferring
 # creation columns -- which reads naturally -- is exactly backwards.
+# A name suggesting modification time is a claim, not a mechanism. A column
+# called `updated_at` carrying only DEFAULT now() is set on insert and never
+# again -- it is a creation column wearing the wrong name, and nothing about the
+# name says otherwise. Only a row-level UPDATE trigger actually maintains one;
+# anything else is the application remembering, on every write path, forever.
+#
+# So neither kind is ranked above the other. They fail differently: a creation
+# column misses every update, and a modification column misses every update the
+# application forgot to stamp. Both are guesses that LOG_BASED does not need.
 _MODIFIED_NAME_HINTS = (
     'updated_at', 'updated', 'modified_at', 'modified', 'last_modified',
     'changed_at', 'changed', 'update_time', 'mtime',
@@ -254,9 +263,9 @@ def discover_replication_key_candidates(cur, schema_name, table_name):
             if modified_rank is not None:
                 kind, group, hint_rank = 'modified_timestamp', 1, modified_rank
             elif created_rank is not None:
-                kind, group, hint_rank = 'created_timestamp', 2, created_rank
+                kind, group, hint_rank = 'created_timestamp', 1, created_rank
             else:
-                kind, group, hint_rank = 'unknown_timestamp', 3, 0
+                kind, group, hint_rank = 'unknown_timestamp', 2, 0
             candidates.append({
                 'column': name, 'kind': kind, 'data_type': data_type,
                 'unique': False, 'not_null': bool(not_null),
@@ -524,6 +533,31 @@ WHERE n.nspname = %s AND c.relname = %s AND a.attname = %s
 """
 
 
+_UPDATE_TRIGGER_SQL = """
+SELECT t.tgname
+FROM pg_trigger t
+JOIN pg_class c ON c.oid = t.tgrelid
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname = %s AND c.relname = %s
+  AND NOT t.tgisinternal
+  AND (t.tgtype & 16) <> 0     -- fires on UPDATE
+  AND (t.tgtype & 1) <> 0      -- FOR EACH ROW
+"""
+
+
+def _has_update_trigger(cur, schema_name, table_name):
+    """Whether any row-level UPDATE trigger exists on the table.
+
+    Necessary for a modification timestamp to maintain itself, and not
+    sufficient: which column a trigger touches is inside its function body, and
+    reading that is guesswork. The absence is the useful half -- with no such
+    trigger, a column named for modification time is maintained by the
+    application or not at all.
+    """
+    cur.execute(_UPDATE_TRIGGER_SQL, (schema_name, table_name))
+    return [row[0] for row in cur.fetchall()]
+
+
 def _sequence_from_default(column_default):
     """Sequence named by a `nextval('...')` default, when the column does not own it."""
     if not column_default:
@@ -599,13 +633,28 @@ def require_monotonic_key(cur, schema_name, table_name, column, pk_columns=()):
                 f'{cache} x (concurrent writers). Lower the cache, carry a lag '
                 f'window at least that wide, or use LOG_BASED.'
             )
-    elif data_type.startswith(('timestamp', 'date')):
+    elif data_type.startswith(('timestamp', 'date', 'time')):
         risks.append(
             f'{column} is a timestamp, so it records transaction start time. A long '
             f'write transaction commits rows stamped before an already-advanced '
             f'bookmark. Carry a lag window wider than the longest write transaction, '
             f'or use LOG_BASED.'
         )
+        if _name_rank(column.lower(), _MODIFIED_NAME_HINTS) is not None:
+            triggers = _has_update_trigger(cur, schema_name, table_name)
+            if not triggers:
+                risks.append(
+                    f'{column} is named for modification time but the table has no '
+                    f'row-level UPDATE trigger, so nothing in the database maintains '
+                    f'it. If it carries only a DEFAULT it is set on insert and never '
+                    f'moves again, and updates are invisible despite the name.'
+                )
+            else:
+                risks.append(
+                    f'{column} may be maintained by {", ".join(triggers)}, but which '
+                    f'column a trigger touches is not recorded anywhere -- confirm it '
+                    f'sets {column} on every update path.'
+                )
     else:
         risks.append(
             f'{column} is neither sequence-backed nor a timestamp, so nothing '
