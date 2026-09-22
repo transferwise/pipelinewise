@@ -24,13 +24,31 @@ import psycopg2
 BUCKETS_DEFAULT = 3
 INDEX_SUFFIX = '_pw_keyset'
 
-# Columns whose names conventionally carry an insert-time watermark, most
-# specific first. Used only to rank discovered candidates, never to select one
-# without the caller's consent.
+# Name fragments that hint at what a temporal column records. They rank
+# candidates; they never decide whether one is a candidate at all. A column
+# called `ts_insert` or `event_time` is just as likely to be the right watermark
+# as one called `created_at`, and gating on the name loses it silently.
+#
+# The split matters more than the hints do. A modification time advances when a
+# row is updated, so INCREMENTAL sees the update; a creation time never moves
+# again after insert, so every update after the first is invisible. Preferring
+# creation columns -- which reads naturally -- is exactly backwards.
+_MODIFIED_NAME_HINTS = (
+    'updated_at', 'updated', 'modified_at', 'modified', 'last_modified',
+    'changed_at', 'changed', 'update_time', 'mtime',
+)
 _CREATED_NAME_HINTS = (
     'created_at', 'created', 'inserted_at', 'inserted',
-    'create_time', 'created_on', 'creation_date',
+    'create_time', 'created_on', 'creation_date', 'ctime',
 )
+
+
+def _name_rank(lowered, hints):
+    """Position of the first matching hint, or None when nothing matches."""
+    for position, hint in enumerate(hints):
+        if hint in lowered:
+            return position
+    return None
 
 
 def quoted(columns):
@@ -227,16 +245,23 @@ def discover_replication_key_candidates(cur, schema_name, table_name):
                 # needs no tiebreaker and can page on its own
                 'rank': (0, 0 if unique else 1, 0 if is_identity else 1),
             })
-        elif data_type.startswith(('timestamp', 'date')) and any(
-                hint in lowered for hint in _CREATED_NAME_HINTS):
-            # a creation timestamp is never unique on its own: two rows written in
-            # the same transaction share it exactly
-            hint_rank = next(i for i, h in enumerate(_CREATED_NAME_HINTS) if h in lowered)
+        elif data_type.startswith(('timestamp', 'date', 'time')):
+            # every temporal column is a candidate; the name only orders them.
+            # A timestamp is never unique on its own either -- two rows written in
+            # the same transaction carry the same value exactly.
+            modified_rank = _name_rank(lowered, _MODIFIED_NAME_HINTS)
+            created_rank = _name_rank(lowered, _CREATED_NAME_HINTS)
+            if modified_rank is not None:
+                kind, group, hint_rank = 'modified_timestamp', 1, modified_rank
+            elif created_rank is not None:
+                kind, group, hint_rank = 'created_timestamp', 2, created_rank
+            else:
+                kind, group, hint_rank = 'unknown_timestamp', 3, 0
             candidates.append({
-                'column': name, 'kind': 'created_timestamp', 'data_type': data_type,
+                'column': name, 'kind': kind, 'data_type': data_type,
                 'unique': False, 'not_null': bool(not_null),
                 'tiebreaker_required': True,
-                'rank': (1, 1, hint_rank),
+                'rank': (group, 1, hint_rank),
             })
     candidates.sort(key=lambda c: c['rank'])
     for candidate in candidates:
@@ -476,13 +501,20 @@ def plan_partial_sync(cur, schema_name, table_name, boundary_column, start_value
 
 # ------------------------------------------------- monotonic key eligibility
 
+# pg_get_serial_sequence only reports a sequence the column OWNS -- the
+# dependency serial/bigserial/IDENTITY sets up. A sequence attached by hand,
+# `DEFAULT nextval('some_seq')`, drives the column just as much but is invisible
+# to it, so the raw default is carried too and parsed as a fallback. Missing it
+# would drop the cache warning on exactly the columns that need it.
 _KEY_FACTS_SQL = """
 SELECT a.attnotnull,
        COALESCE(u.indisunique, false)                          AS is_unique,
-       pg_get_serial_sequence(%s, a.attname)                   AS sequence_name,
+       pg_get_serial_sequence(%s, a.attname)                   AS owned_sequence,
        format_type(a.atttypid, a.atttypmod)                    AS data_type,
-       a.attidentity IN ('a', 'd')                             AS is_identity
+       a.attidentity IN ('a', 'd')                             AS is_identity,
+       pg_get_expr(d.adbin, d.adrelid)                         AS column_default
 FROM pg_attribute a
+LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
 JOIN pg_class c ON c.oid = a.attrelid
 JOIN pg_namespace n ON n.oid = c.relnamespace
 LEFT JOIN pg_index u ON u.indrelid = c.oid AND u.indisunique
@@ -490,6 +522,14 @@ LEFT JOIN pg_index u ON u.indrelid = c.oid AND u.indisunique
 WHERE n.nspname = %s AND c.relname = %s AND a.attname = %s
   AND a.attnum > 0 AND NOT a.attisdropped
 """
+
+
+def _sequence_from_default(column_default):
+    """Sequence named by a `nextval('...')` default, when the column does not own it."""
+    if not column_default:
+        return None
+    match = re.search(r"nextval\('([^']+)'", column_default)
+    return match.group(1) if match else None
 
 
 def require_monotonic_key(cur, schema_name, table_name, column, pk_columns=()):
@@ -522,7 +562,8 @@ def require_monotonic_key(cur, schema_name, table_name, column, pk_columns=()):
         return {'usable': False, 'column': column, 'tiebreaker': None,
                 'hard_failures': [f'{column} does not exist on {schema_name}.{table_name}'],
                 'risks': []}
-    not_null, is_unique, sequence_name, data_type, is_identity = row
+    not_null, is_unique, owned_sequence, data_type, is_identity, column_default = row
+    sequence_name = owned_sequence or _sequence_from_default(column_default)
 
     hard_failures, risks = [], []
     if not not_null:
@@ -545,6 +586,12 @@ def require_monotonic_key(cur, schema_name, table_name, column, pk_columns=()):
                     (sequence_name,))
         cached = cur.fetchone()
         cache = cached[0] if cached else None
+        if not owned_sequence:
+            risks.append(
+                f'{column} draws from {sequence_name} through a plain default rather '
+                f'than owning it, so the sequence can be dropped, repointed or reset '
+                f'without any change to the column.'
+            )
         if cache and cache > 1:
             risks.append(
                 f'{column} draws from {sequence_name}, which caches {cache} values '

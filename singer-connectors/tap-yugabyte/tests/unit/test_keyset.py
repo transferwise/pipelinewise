@@ -221,46 +221,47 @@ class FakeCursor:
 
 
 class TestRequireMonotonicKey:
-    """(not_null, is_unique, sequence_name, data_type, is_identity) then (seqcache,)"""
+    """(not_null, is_unique, owned_sequence, data_type, is_identity, column_default)
+    then (seqcache,)"""
 
     def test_unique_not_null_sequence_key_is_usable(self):
-        cur = FakeCursor([(True, True, 's.orders_id_seq', 'bigint', False), (1,)])
+        cur = FakeCursor([(True, True, 's.orders_id_seq', 'bigint', False, None), (1,)])
         v = keyset.require_monotonic_key(cur, 's', 'orders', 'id', ['id'])
         assert v['usable'] is True
         assert v['tiebreaker'] is None
         assert v['risks'] == []          # cache of 1 keeps commit order with key order
 
     def test_cached_sequence_is_flagged_with_its_real_block_size(self):
-        cur = FakeCursor([(True, True, 's.orders_id_seq', 'bigint', False), (100,)])
+        cur = FakeCursor([(True, True, 's.orders_id_seq', 'bigint', False, None), (100,)])
         v = keyset.require_monotonic_key(cur, 's', 'orders', 'id', ['id'])
         assert v['usable'] is True       # usable, but not safe on its own
         assert 'caches 100 values per connection' in v['risks'][0]
 
     def test_nullable_key_is_a_hard_failure(self):
-        cur = FakeCursor([(False, True, None, 'timestamptz', False)])
+        cur = FakeCursor([(False, True, None, 'timestamptz', False, None)])
         v = keyset.require_monotonic_key(cur, 's', 'orders', 'updated_at', ['id'])
         assert v['usable'] is False
         assert 're-sync on every run' in v['hard_failures'][0]
 
     def test_non_unique_key_borrows_the_primary_key_as_tiebreaker(self):
-        cur = FakeCursor([(True, False, None, 'timestamptz', False)])
+        cur = FakeCursor([(True, False, None, 'timestamptz', False, None)])
         v = keyset.require_monotonic_key(cur, 's', 'orders', 'created_at', ['id'])
         assert v['usable'] is True
         assert v['tiebreaker'] == ['id']
 
     def test_non_unique_key_with_no_primary_key_cannot_be_made_deterministic(self):
-        cur = FakeCursor([(True, False, None, 'timestamptz', False)])
+        cur = FakeCursor([(True, False, None, 'timestamptz', False, None)])
         v = keyset.require_monotonic_key(cur, 's', 'orders', 'created_at', [])
         assert v['usable'] is False
         assert 'no primary key to break' in v['hard_failures'][0]
 
     def test_timestamp_key_is_flagged_for_transaction_start_time(self):
-        cur = FakeCursor([(True, True, None, 'timestamptz', False)])
+        cur = FakeCursor([(True, True, None, 'timestamptz', False, None)])
         v = keyset.require_monotonic_key(cur, 's', 'orders', 'created_at', ['id'])
         assert 'transaction start time' in v['risks'][0]
 
     def test_key_with_no_increasing_guarantee_at_all_is_flagged(self):
-        cur = FakeCursor([(True, True, None, 'numeric', False)])
+        cur = FakeCursor([(True, True, None, 'numeric', False, None)])
         v = keyset.require_monotonic_key(cur, 's', 'orders', 'amount', ['id'])
         assert 'nothing\n' not in v['risks'][0]
         assert 'guarantees it increases' in v['risks'][0]
@@ -269,3 +270,56 @@ class TestRequireMonotonicKey:
         v = keyset.require_monotonic_key(FakeCursor([]), 's', 'orders', 'nope', ['id'])
         assert v['usable'] is False
         assert 'does not exist' in v['hard_failures'][0]
+
+
+class TestSequenceFromDefault:
+    """A sequence the column does not own is still driving the column."""
+
+    @pytest.mark.parametrize('default,expected', [
+        ("nextval('pwtest.loose_seq'::regclass)", 'pwtest.loose_seq'),
+        ("nextval('trap_a_bigserial_seq'::regclass)", 'trap_a_bigserial_seq'),
+        ("nextval('s.q'::regclass)", 's.q'),
+        ('now()', None),
+        ("'x'::text", None),
+        (None, None),
+        ('', None),
+    ])
+    def test_sequence_name_recovered_from_a_plain_default(self, default, expected):
+        assert keyset._sequence_from_default(default) == expected
+
+    def test_unowned_sequence_still_reports_its_cache(self):
+        # (not_null, is_unique, owned_sequence, data_type, is_identity, column_default)
+        cur = FakeCursor([
+            (True, True, None, 'bigint', False, "nextval('s.loose'::regclass)"),
+            (100,),
+        ])
+        v = keyset.require_monotonic_key(cur, 's', 't', 'c', ['id'])
+        assert v['sequence'] == 's.loose'
+        # the cache warning is the one that would have been lost entirely
+        assert any('caches 100 values per connection' in r for r in v['risks'])
+        assert any('rather than owning it' in r for r in v['risks'])
+
+    def test_owned_sequence_is_not_flagged_for_ownership(self):
+        cur = FakeCursor([
+            (True, True, 's.t_c_seq', 'bigint', False, "nextval('s.t_c_seq'::regclass)"),
+            (1,),
+        ])
+        v = keyset.require_monotonic_key(cur, 's', 't', 'c', ['id'])
+        assert v['sequence'] == 's.t_c_seq'
+        assert v['risks'] == []
+
+
+class TestTemporalNameRanking:
+    """Names order candidates; they never decide whether one is a candidate."""
+
+    @pytest.mark.parametrize('name,hints,expected', [
+        ('updated_at', keyset._MODIFIED_NAME_HINTS, 0),
+        ('last_modified', keyset._MODIFIED_NAME_HINTS, 3),   # 'modified' hits before the exact hint
+        ('created_at', keyset._CREATED_NAME_HINTS, 0),
+        ('createdat', keyset._CREATED_NAME_HINTS, 1),        # no underscore, 'created' still hits
+        ('date_created', keyset._CREATED_NAME_HINTS, 1),
+        ('event_time', keyset._CREATED_NAME_HINTS, None),    # no hint: still a candidate, just last
+        ('ts_insert', keyset._MODIFIED_NAME_HINTS, None),
+    ])
+    def test_name_rank(self, name, hints, expected):
+        assert keyset._name_rank(name, hints) == expected
