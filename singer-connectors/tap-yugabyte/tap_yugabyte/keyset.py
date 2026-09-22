@@ -64,6 +64,19 @@ def quoted(columns):
     return [f'"{c}"' for c in columns]
 
 
+def quoted_name(identifier):
+    """One identifier, quoted for DDL.
+
+    Index names are DERIVED from the table name, so a table whose name needs
+    quoting -- `"Order Items"`, any mixed-case name -- yields an index name that
+    needs it too. Emitting it bare produces DDL that does not parse
+    (`CREATE UNIQUE INDEX Order Items_pw_keyset ...`), and the only place that
+    surfaces is the operator's terminal, after the preflight has already
+    reported the table as merely needing an index.
+    """
+    return '"{}"'.format(identifier.replace('"', '""'))
+
+
 def bucket_expr(pk_columns, buckets, escape_percent=False):
     """Bucket discriminator. Rendered identically in the index and in every scan;
     any divergence silently costs the index and falls back to a full scan.
@@ -410,7 +423,7 @@ def index_ddl(fq_table_name, table_name, pk_columns, buckets, tablets=None):
     cursor without a recheck against the base table.
     """
     return (
-        f'CREATE UNIQUE INDEX {index_name(table_name)} ON {fq_table_name} '
+        f'CREATE UNIQUE INDEX {quoted_name(index_name(table_name))} ON {fq_table_name} '
         f'(({bucket_expr(pk_columns, buckets)}) ASC, {order_by_sql(pk_columns)}) '
         f'SPLIT AT VALUES ({split_at_values(buckets)})'
     )
@@ -1408,7 +1421,7 @@ def replication_key_index_ddl(fq_table_name, table_name, replication_key,
     trailing = ', '.join(f'{c} ASC' for c in quoted(pk_columns))
     return (
         f'CREATE UNIQUE INDEX '
-        f'{replication_key_index_name(table_name, replication_key)} '
+        f'{quoted_name(replication_key_index_name(table_name, replication_key))} '
         f'ON {fq_table_name} '
         f'(({bucket_expr(pk_columns, buckets)}) ASC, "{replication_key}" ASC, '
         f'{trailing}) '

@@ -365,6 +365,41 @@ def _sync_table_with_pk(conn_info, stream, state, desired_columns, md_map, pk_co
             legacy_bookmark, tap_stream_id)
         state = singer.write_bookmark(state, tap_stream_id, 'last_pk_fetched', {})
 
+    # Every per-bucket bookmark is a statement about `yb_hash_code(pk) % N`, and
+    # under a different N it is a statement about partitions that do not exist:
+    # `completed_buckets` retires a bucket number whose rows are now a different
+    # set, and `last_pk_fetched` lower-bounds a bucket it never scanned. Both
+    # skip rows, both report success, and neither is detectable from the bookmark
+    # itself -- nothing in `{"2": [2389]}` says which N produced it. Measured on
+    # a 3,000-row table, resuming an interrupted N=8 scan at N=2: 1,965 rows
+    # delivered, every bookmark cleared, ACTIVATE_VERSION emitted, 1,035 rows
+    # silently missing.
+    #
+    # validate_index does not cover this. It compares the config against the
+    # live index, so the mismatched cases (config moved, index did not, or the
+    # reverse) are caught before any row moves -- and the case that loses rows is
+    # the one where the operator did exactly what the docs say and rebuilt both.
+    #
+    # An ABSENT keyset_buckets counts as a change: a state written before this
+    # bookmark existed carries per-bucket positions whose N cannot be recovered,
+    # so the only safe reading is that it is unknown. Discarding restarts the
+    # scan inside the same max_pk_values bound -- the bound and the stream
+    # version are N-independent and are deliberately kept -- and the target
+    # upserts by primary key, so it costs time and nothing else.
+    bookmarked_buckets = singer.get_bookmark(state, tap_stream_id, 'keyset_buckets')
+    if bookmarked_buckets != buckets and (
+            singer.get_bookmark(state, tap_stream_id, 'last_pk_fetched')
+            or singer.get_bookmark(state, tap_stream_id, 'completed_buckets')):
+        LOGGER.warning(
+            'Discarding per-bucket resume bookmarks for %s: they were written '
+            'for keyset_buckets=%s and this run is configured for %s, so every '
+            'bucket number in them names a different set of rows. The bounded '
+            'scan restarts and the target deduplicates by primary key.',
+            tap_stream_id, bookmarked_buckets, buckets)
+        state = singer.write_bookmark(state, tap_stream_id, 'last_pk_fetched', {})
+        state = singer.write_bookmark(state, tap_stream_id, 'completed_buckets', None)
+    state = singer.write_bookmark(state, tap_stream_id, 'keyset_buckets', buckets)
+
     def read_bookmark(bucket):
         with write_lock:
             fetched = singer.get_bookmark(state, tap_stream_id, 'last_pk_fetched') or {}
@@ -410,6 +445,7 @@ def _sync_table_with_pk(conn_info, stream, state, desired_columns, md_map, pk_co
     state = singer.write_bookmark(state, tap_stream_id, 'max_pk_values', None)
     state = singer.write_bookmark(state, tap_stream_id, 'last_pk_fetched', None)
     state = singer.write_bookmark(state, tap_stream_id, 'completed_buckets', None)
+    state = singer.write_bookmark(state, tap_stream_id, 'keyset_buckets', None)
 
     singer.write_message(activate_version_message)
     return state

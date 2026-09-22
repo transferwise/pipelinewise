@@ -177,6 +177,7 @@ class TestSyncTableResumeQuery(unittest.TestCase):
         state = {'bookmarks': {'public-country': {
             'version': 999,
             'max_pk_values': ['ZZZ'],
+            'keyset_buckets': 3,
             # only bucket 1 was interrupted; the others have not started
             'last_pk_fetched': {'1': ['AAA']},
             'completed_buckets': [0, 2],
@@ -239,6 +240,7 @@ class TestSyncTableResumeQuery(unittest.TestCase):
         state = {'bookmarks': {'public-events': {
             'version': 999,
             'max_pk_values': [9, 9, 9],
+            'keyset_buckets': 3,
             'last_pk_fetched': {'1': [1, 2, 3]},
             'completed_buckets': [0, 2],
         }}}
@@ -292,6 +294,7 @@ class TestSyncTableResumeQuery(unittest.TestCase):
         state = {'bookmarks': {'public-events': {
             'version': 999,
             'max_pk_values': [9, 9],
+            'keyset_buckets': 3,
             'last_pk_fetched': {},
             'completed_buckets': [0, 2],
         }}}
@@ -429,7 +432,7 @@ class TestBranchSequenceDrainsCorrectly(unittest.TestCase):
         return [(a, b, c)
                 for a in (1, 2, 3) for b in range(1, 6) for c in range(1, 9)]
 
-    def _run(self, table, state):
+    def _run(self, table, state, conn_config=None):
         emitted = []
 
         def record(message):
@@ -443,7 +446,8 @@ class TestBranchSequenceDrainsCorrectly(unittest.TestCase):
                 patch('tap_yugabyte.retry.time.sleep'), \
                 patch('singer.write_message', side_effect=record):
             mocked_connect.return_value.__enter__.return_value = _FakeConnection(table)
-            result = sync_table(self.CONN, self.STREAM, state, self.PK, self.MD_MAP)
+            result = sync_table(conn_config or self.CONN, self.STREAM, state,
+                                self.PK, self.MD_MAP)
         return emitted, result
 
     def _fresh_state(self, table):
@@ -494,6 +498,7 @@ class TestBranchSequenceDrainsCorrectly(unittest.TestCase):
         state = {'bookmarks': {'public-events': {
             'version': 999,
             'max_pk_values': list(table.max_pk),
+            'keyset_buckets': 3,
             'last_pk_fetched': bookmarks,
         }}}
         emitted, _ = self._run(table, state)
@@ -522,6 +527,7 @@ class TestBranchSequenceDrainsCorrectly(unittest.TestCase):
         state = {'bookmarks': {'public-events': {
             'version': 999,
             'max_pk_values': list(table.max_pk),
+            'keyset_buckets': 3,
             'last_pk_fetched': bookmarks,
         }}}
         emitted, _ = self._run(table, state)
@@ -530,6 +536,62 @@ class TestBranchSequenceDrainsCorrectly(unittest.TestCase):
         expected = sorted(set(keys) - set(already))
         self.assertEqual(expected, sorted(emitted))
         self.assertEqual(len(emitted), len(set(emitted)), 'a row was emitted twice')
+
+    def test_a_changed_bucket_count_restarts_rather_than_skipping_rows(self):
+        """Every per-bucket bookmark means `yb_hash_code(pk) % N`, so under a new
+        N it retires and lower-bounds partitions that hold different rows. The
+        bookmarks are discarded instead: re-reading is free, skipping is not.
+
+        Without the guard this drops the rows the old bookmarks claimed --
+        measured against a live cluster, an interrupted N=8 scan resumed at N=2
+        delivered 1,965 of 3,000 rows and reported success.
+        """
+        keys = self._keys()
+        old = _FakeKeysetTable(keys, buckets=3)
+        bookmarks, delivered = {}, []
+        for bucket in range(3):
+            rows = sorted(k for k in keys if old.bucket_of(k) == bucket)
+            midpoint = len(rows) // 2
+            bookmarks[str(bucket)] = list(rows[midpoint - 1])
+            delivered.extend(rows[:midpoint])
+
+        state = {'bookmarks': {'public-events': {
+            'version': 999,
+            'max_pk_values': list(old.max_pk),
+            'keyset_buckets': 3,
+            'last_pk_fetched': bookmarks,
+            'completed_buckets': [0],
+        }}}
+
+        wider = dict(self.CONN, keyset_buckets=5)
+        emitted, result = self._run(_FakeKeysetTable(keys, buckets=5), state, wider)
+
+        self.assertEqual(sorted(keys), sorted(emitted),
+                         'a row was skipped across the bucket-count change')
+        bucket_state = result['bookmarks']['public-events']
+        self.assertIsNone(bucket_state['keyset_buckets'])
+        self.assertIsNone(bucket_state['completed_buckets'])
+
+    def test_an_unrecorded_bucket_count_also_restarts(self):
+        """State written before the count was recorded carries per-bucket
+        positions whose N cannot be recovered, so the only safe reading of a
+        missing `keyset_buckets` is that it does not match."""
+        keys = self._keys()
+        table = _FakeKeysetTable(keys, buckets=3)
+        bookmarks = {}
+        for bucket in range(3):
+            rows = sorted(k for k in keys if table.bucket_of(k) == bucket)
+            bookmarks[str(bucket)] = list(rows[len(rows) // 2 - 1])
+
+        state = {'bookmarks': {'public-events': {
+            'version': 999,
+            'max_pk_values': list(table.max_pk),
+            'last_pk_fetched': bookmarks,      # no keyset_buckets alongside it
+            'completed_buckets': [0, 2],
+        }}}
+        emitted, _ = self._run(table, state)
+
+        self.assertEqual(sorted(keys), sorted(emitted))
 
     def test_retry_rebuilds_the_ladder_at_the_last_row_emitted(self):
         """One bucket, so the failure lands on a known row. The replacement

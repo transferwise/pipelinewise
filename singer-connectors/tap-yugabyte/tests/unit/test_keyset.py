@@ -159,7 +159,7 @@ def _tuples(width, values):
 class TestIndexDefinition:
     def test_ddl_hash_shards_the_bucket_and_range_orders_the_key(self):
         ddl = keyset.index_ddl('s.orders', 'orders', ['tenant', 'id'], 8, tablets=8)
-        assert 'CREATE UNIQUE INDEX orders_pw_keyset ON s.orders' in ddl
+        assert 'CREATE UNIQUE INDEX "orders_pw_keyset" ON s.orders' in ddl
         assert '((yb_hash_code("tenant", "id") % 8)) ASC' in ddl
         assert '"tenant" ASC, "id" ASC' in ddl
         assert ddl.endswith('SPLIT AT VALUES ((1), (2), (3), (4), (5), (6), (7))')
@@ -187,7 +187,7 @@ class TestTheFourIndexShapes:
         assert (keyset.index_ddl('s.t', 't', ['id'], 3)
                 == keyset.index_ddl('s.t', 't', ['id'], 3))
         ddl = keyset.index_ddl('s.t', 't', ['id'], 3)
-        assert ddl == ('CREATE UNIQUE INDEX t_pw_keyset ON s.t '
+        assert ddl == ('CREATE UNIQUE INDEX "t_pw_keyset" ON s.t '
                        '(((yb_hash_code("id") % 3)) ASC, "id" ASC) '
                        'SPLIT AT VALUES ((1), (2))')
 
@@ -203,7 +203,7 @@ class TestTheFourIndexShapes:
 
     def test_shape_3_ends_in_the_primary_key_and_is_unique(self):
         ddl = keyset.replication_key_index_ddl('s.t', 't', 'created_at', ['id'], 3)
-        assert ddl == ('CREATE UNIQUE INDEX t_created_at_pw_keyset ON s.t '
+        assert ddl == ('CREATE UNIQUE INDEX "t_created_at_pw_keyset" ON s.t '
                        '(((yb_hash_code("id") % 3)) ASC, "created_at" ASC, "id" ASC) '
                        'SPLIT AT VALUES ((1), (2))')
 
@@ -812,7 +812,7 @@ class TestRuntimeGateMatchesThePreflight:
         usable, reason = keyset.validate_index(
             self._cursor(None), 's', 't', ['id'], 3)
         assert usable is False
-        assert 'CREATE UNIQUE INDEX t_pw_keyset' in reason
+        assert 'CREATE UNIQUE INDEX "t_pw_keyset"' in reason
 
 
 class PlanCursor:
@@ -866,7 +866,7 @@ class TestPlanKeysetStrategy:
     def test_a_range_sharded_key_reports_the_ddl_that_satisfies_it(self):
         plan = self._plan(self.RANGE_PK)
         assert plan['index_ddl'] == keyset.index_ddl('"s"."t"', 't', ['id'], 3)
-        assert 'CREATE UNIQUE INDEX t_pw_keyset' in plan['index_ddl']
+        assert 'CREATE UNIQUE INDEX "t_pw_keyset"' in plan['index_ddl']
 
     def test_both_shardings_ask_for_the_same_index(self):
         # the index is a function of the key and the bucket count, not of how
