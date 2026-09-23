@@ -494,9 +494,12 @@ behaviour.</p></td>
 <td><p>No</p></td>
 <td><p>Server-specific connector defaults</p></td>
 <td><p>Runs after the connector defaults and can extend or override them.
-Defaults set UTC, <code class="docutils literal notranslate"><span class="pre">wait_timeout=28800</span></code>, <code class="docutils literal notranslate"><span class="pre">net_read_timeout=3600</span></code>, and
+Singer, FullSync, and PartialSync set UTC, <code class="docutils literal notranslate"><span class="pre">wait_timeout=28800</span></code>,
+<code class="docutils literal notranslate"><span class="pre">net_read_timeout=3600</span></code>, <code class="docutils literal notranslate"><span class="pre">net_write_timeout=3600</span></code>, and
 <code class="docutils literal notranslate"><span class="pre">innodb_lock_wait_timeout=3600</span></code>. MariaDB also sets
-<code class="docutils literal notranslate"><span class="pre">max_statement_time=0</span></code>.</p></td>
+<code class="docutils literal notranslate"><span class="pre">max_statement_time=0</span></code>; MySQL sets
+<code class="docutils literal notranslate"><span class="pre">max_execution_time=0</span></code>. Providing only some custom settings keeps
+the other defaults.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fastsync_parallelism</span></code></p></td>
 <td><p>No</p></td>
@@ -517,7 +520,13 @@ required to reconstruct a target row.</p></li>
 present and otherwise detect the connected server. The resolved engine is
 used consistently for session defaults, GTID handling, binlog status, and
 managed Iceberg v3 JSON aliases. MariaDB sessions set
-<code class="docutils literal notranslate"><span class="pre">max_statement_time=0</span></code>; MySQL sessions do not.</p></li>
+<code class="docutils literal notranslate"><span class="pre">max_statement_time=0</span></code>; MySQL uses
+<code class="docutils literal notranslate"><span class="pre">max_execution_time=0</span></code> instead. MySQL’s limit is in milliseconds and
+applies to read-only SELECT statements; MariaDB’s is in seconds.
+If the server lacks the built-in timeout variable, PipelineWise warns and
+continues without applying it. Check that <code class="docutils literal notranslate"><span class="pre">engine</span></code> matches the server;
+this does not change engine selection. Unknown variables in custom
+<code class="docutils literal notranslate"><span class="pre">session_sqls</span></code> still fail the connection.</p></li>
 <li><p>MySQL partial-JSON events and MySQL/MariaDB compressed binlog events are not
 supported by the bundled decoder. Keep <code class="docutils literal notranslate"><span class="pre">binlog_row_value_options</span></code> empty,
 <code class="docutils literal notranslate"><span class="pre">binlog_transaction_compression</span></code> disabled, and MariaDB <code class="docutils literal notranslate"><span class="pre">log_bin_compress</span></code>
@@ -545,8 +554,11 @@ affected tables when upgrading a tap suspected of dropping rows.</p></li>
 <li><p>MariaDB 11.4 zero <code class="docutils literal notranslate"><span class="pre">End_log_pos</span></code> values are supported. Do not enable
 <code class="docutils literal notranslate"><span class="pre">binlog_legacy_event_pos</span></code> for PipelineWise.</p></li>
 <li><p>PipelineWise retries a lost file/position connection twice from
-target-acknowledged state. Retries are at-least-once and remain in the run’s
-single terminal log. Standalone <code class="docutils literal notranslate"><span class="pre">tap-mysql</span></code> exits for its supervisor to
+target-acknowledged state, waiting 30 seconds before the second attempt and
+60 seconds before the third. Recoverable disconnects log warnings; a
+disconnect on the final attempt includes a traceback and fails the run.
+Retries are at-least-once and remain in the run’s single terminal log.
+Standalone <code class="docutils literal notranslate"><span class="pre">tap-mysql</span></code> retains its traceback and exits for its supervisor to
 restart; GTID and metadata connections keep their safe reconnect behavior.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">TRUNCATE</span></code> on a selected table stops binlog replication because it has no
 per-row delete images. FullSync that table to capture the resulting contents

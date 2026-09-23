@@ -507,18 +507,25 @@ during query ([Errno 104] Connection reset by peer)')
 </pre></div>
 </div>
 <p><em>Why it happens:</em>
-A large export can exceed a source session timeout.</p>
+A large export or a slow target can exceed the source’s network write timeout.
+Network interruptions, server restarts, and failovers can also break a connection.</p>
+<p>For Singer file/position binlog disconnects, PipelineWise retries from
+target-acknowledged state after 30 seconds, then after 60 seconds. The first
+two disconnects log warnings without tracebacks. A third disconnect fails the
+run with a traceback; unrelated errors are not suppressed.</p>
 <p><em>How to fix:</em>
 PipelineWise applies its session defaults first, then runs configured
-<code class="docutils literal notranslate"><span class="pre">session_sqls</span></code>. Add only the extra setting or override you need. For large
-exports, increase the write timeout:</p>
+<code class="docutils literal notranslate"><span class="pre">session_sqls</span></code>. Singer, FullSync, and PartialSync default to a one-hour
+<code class="docutils literal notranslate"><span class="pre">net_write_timeout</span></code>. If a longer blocked write is expected, override only
+that setting:</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">dbname</span><span class="p">:</span><span class="w"> </span><span class="s">"your_database"</span>
 <span class="nt">session_sqls</span><span class="p">:</span>
-<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SET SESSION net_write_timeout=3600</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SET SESSION net_write_timeout=7200</span>
 </pre></div>
 </div>
-<p>MariaDB <code class="docutils literal notranslate"><span class="pre">max_statement_time</span></code> is disabled automatically. Do not configure this
-MariaDB-only variable for MySQL.</p>
+<p>Statement timeouts are disabled automatically with MariaDB
+<code class="docutils literal notranslate"><span class="pre">max_statement_time=0</span></code> or MySQL <code class="docutils literal notranslate"><span class="pre">max_execution_time=0</span></code>. Use only the setting
+supported by the source engine when overriding it.</p>
 </section>
 <section id="unknown-encoding-utf8mb3">
 <span id="troubleshooting-mysql-utf8mb3"></span><h4>Unknown encoding: utf8mb3<a class="headerlink" href="#unknown-encoding-utf8mb3" title="Link to this heading"></a></h4>
