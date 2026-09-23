@@ -460,9 +460,10 @@ position is purged, the affected tables require a resync.</p>
 </thead>
 <tbody>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">engine</span></code></p></td>
-<td><p>For MariaDB GTID</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">mysql</span></code></p></td>
-<td><p>Selects MariaDB or MySQL source-specific semantics.</p></td>
+<td><p>No</p></td>
+<td><p>Detected from the connected server</p></td>
+<td><p>Overrides automatic MariaDB or MySQL detection for source-specific
+behaviour.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">use_gtid</span></code></p></td>
 <td><p>No</p></td>
@@ -491,8 +492,11 @@ position is purged, the affected tables require a resync.</p>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">session_sqls</span></code></p></td>
 <td><p>No</p></td>
-<td><p>Connector defaults</p></td>
-<td><p>Sets session variables after connecting.</p></td>
+<td><p>Server-specific connector defaults</p></td>
+<td><p>Runs after the connector defaults and can extend or override them.
+Defaults set UTC, <code class="docutils literal notranslate"><span class="pre">wait_timeout=28800</span></code>, <code class="docutils literal notranslate"><span class="pre">net_read_timeout=3600</span></code>, and
+<code class="docutils literal notranslate"><span class="pre">innodb_lock_wait_timeout=3600</span></code>. MariaDB also sets
+<code class="docutils literal notranslate"><span class="pre">max_statement_time=0</span></code>.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fastsync_parallelism</span></code></p></td>
 <td><p>No</p></td>
@@ -509,6 +513,11 @@ full template with <code class="docutils literal notranslate"><span class="pre">
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">binlog_row_image</span></code> must remain <code class="docutils literal notranslate"><span class="pre">FULL</span></code>; sparse row images can omit values
 required to reconstruct a target row.</p></li>
+<li><p>Singer, FullSync, and PartialSync use an explicit <code class="docutils literal notranslate"><span class="pre">engine</span></code> value when
+present and otherwise detect the connected server. The resolved engine is
+used consistently for session defaults, GTID handling, binlog status, and
+managed Iceberg v3 JSON aliases. MariaDB sessions set
+<code class="docutils literal notranslate"><span class="pre">max_statement_time=0</span></code>; MySQL sessions do not.</p></li>
 <li><p>MySQL partial-JSON events and MySQL/MariaDB compressed binlog events are not
 supported by the bundled decoder. Keep <code class="docutils literal notranslate"><span class="pre">binlog_row_value_options</span></code> empty,
 <code class="docutils literal notranslate"><span class="pre">binlog_transaction_compression</span></code> disabled, and MariaDB <code class="docutils literal notranslate"><span class="pre">log_bin_compress</span></code>
@@ -518,25 +527,27 @@ Previously logged unsupported events still require a resync.</p></li>
 retain all source UUIDs or MariaDB domains. Keep the upgraded connector when
 resuming these complete-set bookmarks; older versions cannot reliably parse
 multi-source history. XA transactions are not supported.</p></li>
-<li><p>Existing MySQL/MariaDB GTID bookmarks without <code class="docutils literal notranslate"><span class="pre">gtid_complete:</span> <span class="pre">true</span></code> require
-a one-time FullSync before resuming. Older taps retained only a latest
-transaction or partial source history; even a range-shaped bookmark can omit
-previous-primary UUIDs or MariaDB domains. New snapshots set this marker only
-after capturing complete history. Do not add it manually or invent GTID ranges.
-Rejection does not modify the saved state or automatically resync the target.
-The startup error lists all selected streams with missing or incomplete legacy
-GTIDs so the required resync can be planned together.</p></li>
+<li><p>Legacy GTID bookmarks without <code class="docutils literal notranslate"><span class="pre">gtid_complete:</span> <span class="pre">true</span></code> are upgraded when their
+file/position coordinates remain available. This does not require FastSync.
+GTID-only bookmarks cannot be recovered and fail without changing state. Do
+not add the marker manually or invent GTID ranges.</p></li>
 <li><p>File/position checkpoints also wait for safe transaction boundaries. An
-identifiable unsafe legacy bookmark inside row events is rejected before decoding;
-resync the affected tables instead of manually advancing the bookmark.
+unsafe legacy bookmark replays from the nearest proven boundary and skips rows
+already acknowledged by each stream. State advances only after target
+acknowledgement. Recovery fails without changing state if the retained binlog
+cannot prove a boundary.
+Proving the boundary scans that retained binlog from its beginning. Large
+binlogs can take time and temporarily increase source read load.
 MariaDB can infer a GTID from a saved file/position only at a verified
-transaction boundary; ambiguous positions require FullSync instead.
+transaction boundary.
 Not every historical omission can be detected from a saved position; resync
 affected tables when upgrading a tap suspected of dropping rows.</p></li>
-<li><p>A lost binlog connection in file/position mode stops the run. Retry normally
-to resume from durable state; the decoder cannot safely reconnect using its
-last packet position inside a transaction. GTID mode retains safe reconnects.
-Separate table-metadata connections can still retry transient disconnects.</p></li>
+<li><p>MariaDB 11.4 zero <code class="docutils literal notranslate"><span class="pre">End_log_pos</span></code> values are supported. Do not enable
+<code class="docutils literal notranslate"><span class="pre">binlog_legacy_event_pos</span></code> for PipelineWise.</p></li>
+<li><p>PipelineWise retries a lost file/position connection twice from
+target-acknowledged state. Retries are at-least-once and remain in the run’s
+single terminal log. Standalone <code class="docutils literal notranslate"><span class="pre">tap-mysql</span></code> exits for its supervisor to
+restart; GTID and metadata connections keep their safe reconnect behavior.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">TRUNCATE</span></code> on a selected table stops binlog replication because it has no
 per-row delete images. FullSync that table to capture the resulting contents
 before resuming Singer.</p></li>
@@ -560,15 +571,20 @@ in string values. Singer connections use <code class="docutils literal notransla
 <code class="docutils literal notranslate"><span class="pre">utf8mb4</span></code> connections and uses an <code class="docutils literal notranslate"><span class="pre">utf8mb4</span></code> text projection; an explicitly
 narrower FastSync connection charset can still limit representable characters.
 FastSync removes NUL characters.</p></li>
-<li><p>Finish pending managed-Iceberg FastSync recovery before upgrading from the
-previous default charset, or retain explicit <code class="docutils literal notranslate"><span class="pre">charset:</span> <span class="pre">utf8</span></code> while finishing
-recovery. Recovery rejects a changed source encoding; use <code class="docutils literal notranslate"><span class="pre">utf8mb4</span></code> for
-subsequent runs after clearing the pending attempt.</p></li>
+<li><p>Finish pending managed-Iceberg attempts with the PipelineWise version and
+configuration that created them before upgrading. Matching the previous
+charset alone is insufficient: recovery identity also includes engine and
+session settings, and older manifests lack the saved engine needed for
+re-export. See <a class="reference internal" href="../targets/snowflake_iceberg.html#snowflake-iceberg-recovery"><span class="std std-ref">Concurrency and recovery</span></a> for recovery guidance.</p></li>
+<li><p>Managed-Iceberg recovery that re-exports source data requires the same resolved
+MySQL or MariaDB engine recorded in the manifest. Recovery from completed
+staging does not reconnect to the source or recheck its engine. Resolve
+pending recovery before replacing or repointing the source server.</p></li>
 <li><p>Snowflake Singer, FullSync, and PartialSync can target managed Iceberg v3 with
 explicit tap-level configuration. See <a class="reference internal" href="../targets/snowflake_iceberg.html#snowflake-iceberg"><span class="std std-ref">Snowflake Iceberg tables</span></a>.</p></li>
-<li><p>On an explicit v3 route with <code class="docutils literal notranslate"><span class="pre">engine:</span> <span class="pre">mariadb</span></code>, MariaDB’s generated
-<code class="docutils literal notranslate"><span class="pre">JSON_VALID</span></code> constraint identifies its <code class="docutils literal notranslate"><span class="pre">JSON</span></code>-alias <code class="docutils literal notranslate"><span class="pre">LONGTEXT</span></code> columns
-for <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> loading. Plain <code class="docutils literal notranslate"><span class="pre">LONGTEXT</span></code> and native routes remain strings.
+<li><p>On a v3 route, MariaDB’s generated <code class="docutils literal notranslate"><span class="pre">JSON_VALID</span></code> constraint identifies its
+<code class="docutils literal notranslate"><span class="pre">JSON</span></code>-alias <code class="docutils literal notranslate"><span class="pre">LONGTEXT</span></code> columns for <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> loading. Plain
+<code class="docutils literal notranslate"><span class="pre">LONGTEXT</span></code> and native routes remain strings.
 Object, array, string, number, Boolean, and null JSON roots are carried as
 validated JSON text and restored as <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code>. JSON null remains distinct
 from SQL <code class="docutils literal notranslate"><span class="pre">NULL</span></code>.</p></li>

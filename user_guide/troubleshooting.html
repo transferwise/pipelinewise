@@ -507,19 +507,18 @@ during query ([Errno 104] Connection reset by peer)')
 </pre></div>
 </div>
 <p><em>Why it happens:</em>
-Server session defaults are not conducive to PipelineWise type workloads.</p>
+A large export can exceed a source session timeout.</p>
 <p><em>How to fix:</em>
-Add the following <code class="docutils literal notranslate"><span class="pre">session_sqls</span></code> block to your <code class="docutils literal notranslate"><span class="pre">tap.yml</span></code>:</p>
+PipelineWise applies its session defaults first, then runs configured
+<code class="docutils literal notranslate"><span class="pre">session_sqls</span></code>. Add only the extra setting or override you need. For large
+exports, increase the write timeout:</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">dbname</span><span class="p">:</span><span class="w"> </span><span class="s">"your_database"</span>
 <span class="nt">session_sqls</span><span class="p">:</span>
-<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SET SESSION max_statement_time=0</span>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SET SESSION net_write_timeout=3600</span>
-<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SET SESSION time_zone="+0:00"</span>
-<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SET SESSION wait_timeout=28800</span>
-<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SET SESSION net_read_timeout=3600</span>
-<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SET SESSION innodb_lock_wait_timeout=3600</span>
 </pre></div>
 </div>
+<p>MariaDB <code class="docutils literal notranslate"><span class="pre">max_statement_time</span></code> is disabled automatically. Do not configure this
+MariaDB-only variable for MySQL.</p>
 </section>
 <section id="unknown-encoding-utf8mb3">
 <span id="troubleshooting-mysql-utf8mb3"></span><h4>Unknown encoding: utf8mb3<a class="headerlink" href="#unknown-encoding-utf8mb3" title="Link to this heading"></a></h4>

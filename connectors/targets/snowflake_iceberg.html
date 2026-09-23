@@ -503,7 +503,7 @@ than converting it silently.</p>
 numeric fields to Iceberg <code class="docutils literal notranslate"><span class="pre">DOUBLE</span></code>. The latter preserves 64-bit floating-point
 range instead of narrowing to Iceberg <code class="docutils literal notranslate"><span class="pre">FLOAT</span></code>. Native and fixed-point
 <code class="docutils literal notranslate"><span class="pre">NUMBER(precision,</span> <span class="pre">scale)</span></code> mappings are unchanged. PostgreSQL
-<code class="docutils literal notranslate"><span class="pre">hstore</span></code> maps to <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> on this route. For <code class="docutils literal notranslate"><span class="pre">engine:</span> <span class="pre">mariadb</span></code>, a
+<code class="docutils literal notranslate"><span class="pre">hstore</span></code> maps to <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> on this route. For MariaDB sources, a
 <code class="docutils literal notranslate"><span class="pre">LONGTEXT</span></code> column with MariaDB’s exact generated <code class="docutils literal notranslate"><span class="pre">JSON_VALID</span></code> constraint is
 treated as the <code class="docutils literal notranslate"><span class="pre">JSON</span></code> alias and maps to <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code>; ordinary <code class="docutils literal notranslate"><span class="pre">LONGTEXT</span></code> and
 native routes remain strings. Object, array, string, number, Boolean, and null
@@ -646,6 +646,19 @@ state remains unchanged. Restart the same command without editing state, removin
 staging, or deleting either recovery file. Use the same generated runtime
 directory, tap ID, route, source table, target mapping, account/user/role,
 staging configuration, and transformation contract.</p>
+<p>Recovery from completed staging publishes and hands over the saved bookmark
+without reconnecting to the source. It does not recheck the source engine or
+physical server identity. Resolve pending recovery before replacing or
+repointing the source server, even when the replacement uses the same engine.</p>
+<p>For MySQL/MariaDB attempts that need re-export, a manifest without a saved source
+engine stops recovery. This can occur with manifests created before engine
+binding was introduced. Finish the attempt with the PipelineWise version and
+configuration that created it before upgrading. Changing only the charset
+cannot supply the missing engine evidence. If the original version or source is
+unavailable, stop affected replication and arrange a recovery plan after
+inspecting the publication state. Preserve the manifest, target pointer, state,
+and remaining staging evidence; do not delete recovery files or edit state to
+bypass the check.</p>
 <p>For CTAS and <code class="docutils literal notranslate"><span class="pre">INSERT</span> <span class="pre">OVERWRITE</span></code>, PipelineWise polls query history every five
 seconds for up to 900 seconds by default. Set the positive integer
 <code class="docutils literal notranslate"><span class="pre">iceberg_query_history_poll_timeout_seconds</span></code> in the Snowflake target’s
