@@ -1,0 +1,1449 @@
+"""Bucketed keyset scanning: index prerequisite, snapshot pinning, key discovery.
+
+A YugabyteDB primary key is HASH-sharded unless it was declared ASC/DESC, and a
+hash-sharded key has no order to scan along. That makes the obvious resumable
+full-table scan -- order by the key, remember where you stopped -- degrade into a
+full table scan on every resume.
+
+The fix is a prerequisite index that supplies an order the key itself does not
+have: ((yb_hash_code(<pk>) % N) HASH, <pk> ASC). The leading column takes only N
+values and every scan predicate against it is an equality, which is the one
+access pattern hash sharding serves; the key columns trail it ASC, so each bucket
+is an ordered range that a cursor can walk and resume inside.
+
+N is the only knob. It fixes the index expression, the number of buckets, and
+therefore the maximum useful parallelism, because a worker owns exactly one
+bucket. Because N appears in both the index and every query, it is validated
+against the live index rather than trusted from config.
+"""
+
+import re
+
+import psycopg2
+
+BUCKETS_DEFAULT = 3
+INDEX_SUFFIX = '_pw_keyset'
+
+# Name fragments that hint at what a temporal column records. They rank
+# candidates; they never decide whether one is a candidate at all. A column
+# called `ts_insert` or `event_time` is just as likely to be the right watermark
+# as one called `created_at`, and gating on the name loses it silently.
+#
+# The split matters more than the hints do. A modification time advances when a
+# row is updated, so INCREMENTAL sees the update; a creation time never moves
+# again after insert, so every update after the first is invisible. Preferring
+# creation columns -- which reads naturally -- is exactly backwards.
+# A name suggesting modification time is a claim, not a mechanism. A column
+# called `updated_at` carrying only DEFAULT now() is set on insert and never
+# again -- it is a creation column wearing the wrong name, and nothing about the
+# name says otherwise. Only a row-level UPDATE trigger actually maintains one;
+# anything else is the application remembering, on every write path, forever.
+#
+# So neither kind is ranked above the other. They fail differently: a creation
+# column misses every update, and a modification column misses every update the
+# application forgot to stamp. Both are guesses that LOG_BASED does not need.
+_MODIFIED_NAME_HINTS = (
+    'updated_at', 'updated', 'modified_at', 'modified', 'last_modified',
+    'changed_at', 'changed', 'update_time', 'mtime',
+)
+_CREATED_NAME_HINTS = (
+    'created_at', 'created', 'inserted_at', 'inserted',
+    'create_time', 'created_on', 'creation_date', 'ctime',
+)
+
+
+def _name_rank(lowered, hints):
+    """Position of the first matching hint, or None when nothing matches."""
+    for position, hint in enumerate(hints):
+        if hint in lowered:
+            return position
+    return None
+
+
+def quoted(columns):
+    return [f'"{c}"' for c in columns]
+
+
+def quoted_name(identifier):
+    """One identifier, quoted for DDL.
+
+    Index names are DERIVED from the table name, so a table whose name needs
+    quoting -- `"Order Items"`, any mixed-case name -- yields an index name that
+    needs it too. Emitting it bare produces DDL that does not parse
+    (`CREATE UNIQUE INDEX Order Items_pw_keyset ...`), and the only place that
+    surfaces is the operator's terminal, after the preflight has already
+    reported the table as merely needing an index.
+    """
+    return '"{}"'.format(identifier.replace('"', '""'))
+
+
+def bucket_expr(pk_columns, buckets, escape_percent=False):
+    """Bucket discriminator. Rendered identically in the index and in every scan;
+    any divergence silently costs the index and falls back to a full scan.
+
+    psycopg2 treats `%` as the start of a placeholder in any statement it is given
+    parameters for -- including an empty sequence -- so the modulo operator has to
+    be doubled in those, and left alone in statements executed without parameters
+    (the index DDL, the max-key probe). Passing the wrong one does not produce a
+    slow query, it produces an IndexError or a malformed statement.
+    """
+    modulo = '%%' if escape_percent else '%'
+    return f"(yb_hash_code({', '.join(quoted(pk_columns))}) {modulo} {buckets})"
+
+
+def order_by_sql(pk_columns, direction='ASC'):
+    """Per-column ORDER BY. A ROW() expression here is opaque to the planner and
+    forces a blocking sort even when the index could have supplied the order."""
+    return ', '.join(f'{c} {direction}' for c in quoted(pk_columns))
+
+
+def keyset_predicate(columns, after=True):
+    """Lexicographic comparison of `columns` against a bound, expanded into the
+    conjunctive form the index can actually bound.
+
+    The natural way to write this is a row constructor -- `(a, b) > (%s, %s)`.
+    PostgreSQL optimises that into a range when the columns lead the index;
+    YugabyteDB does not when something else leads it, and the bucket
+    discriminator always does. The plan still reads `Index Cond`, so nothing
+    about it says the scan degraded -- but every remaining index entry in the
+    bucket is read and dropped. Measured on 50k rows with a two-column key:
+    9,221 index rows scanned to return 5, against 22 for the form below. Three
+    columns: 9,221 against 177.
+
+    The expansion states the leading column as a plain range first, which is
+    what gives the scan a start position, and leaves the rest as a filter the
+    storage layer evaluates over the rows that remain:
+
+        a >= %s AND (a > %s OR b >= %s) AND (a > %s OR b > %s OR c > %s)
+
+    On a composite key only the leading column reaches the Index Cond; the rest
+    is a storage filter over the whole leading-value group, so the cost is the
+    size of that group rather than the rows returned. That is fine for the
+    UPPER bound (`after=False`), which is a stop condition on a scan that is
+    going to read to the end of the bucket anyway -- the last leading-value
+    group is the most it can over-read, and max_pk_values is the table's actual
+    maximum, so in practice nothing lies beyond it.
+
+    It is NOT fine for the resume bound, which is a seek: see `keyset_branches`,
+    which is what `_scan_bucket` uses to restart a composite-key scan.
+
+    A single-column key needs none of this -- `(a) > (%s)` already collapses to
+    `a > %s` -- and it is emitted as the plain comparison.
+
+    Returns (sql, parameter_order), where parameter_order lists the index into
+    the caller's value sequence for each placeholder, since values repeat.
+    """
+    strict, last = ('>', '>') if after else ('<', '<=')
+    loose = '>=' if after else '<='
+    cols = quoted(columns)
+    if len(cols) == 1:
+        return f'{cols[0]} {last} %s', [0]
+
+    clauses, order = [], []
+    for i in range(len(cols)):
+        terms = []
+        for j in range(i):
+            terms.append(f'{cols[j]} {strict} %s')
+            order.append(j)
+        final = last if i == len(cols) - 1 else loose
+        terms.append(f'{cols[i]} {final} %s')
+        order.append(i)
+        clauses.append(terms[0] if len(terms) == 1 else f'({" OR ".join(terms)})')
+    return ' AND '.join(clauses), order
+
+
+def keyset_params(values, order):
+    """Lay the caller's values out in the order keyset_predicate's placeholders
+    consume them."""
+    return [values[i] for i in order]
+
+
+def keyset_branches(columns):
+    """The resume comparison as a LADDER OF STATEMENTS rather than one predicate.
+
+    `key > (X, Y, Z)` is the union of one range per equality prefix, and each of
+    those ranges is something the index can seek to exactly:
+
+        a = X AND b = Y AND c > Z      -- the rest of the (X, Y) group
+        a = X AND b > Y                -- the rest of the X group
+        a > X                          -- everything after X
+
+    They are disjoint, they are consecutive, and listed in this order they are
+    in ascending key order. The caller issues them as separate statements, in
+    order, on one connection: see full_table._scan_bucket.
+
+    WHY NOT ONE STATEMENT. Every single-statement form is worse:
+
+    A row constructor, `(a, b, c) > (X, Y, Z)`, reads as an Index Cond and then
+    rechecks every remaining entry in the bucket -- see keyset_predicate.
+
+    The conjunctive expansion keyset_predicate returns gets the leading column
+    into the Index Cond and nothing else, so the scan starts at the head of the
+    leading-value GROUP and storage-filters its way forward. Measured, full
+    drain, no LIMIT, cursor five rows from the end, keyset index used every
+    time: 250 distinct leading values -> 135 index rows scanned to return 5;
+    a three-column key -> 662 to return 5; a constant leading column -> 33,220
+    to return 5, the entire bucket. Composite keys with a low-cardinality
+    leading column -- (tenant_id, id), (region, id) -- are the common case in
+    the services this ships to, so the last row is the realistic one.
+
+    `UNION ALL` of these same branches in one statement gets the same optimal
+    seek, and was rejected anyway. Its ordering rests on `Append` emitting
+    children in branch order, which neither SQL nor PostgreSQL guarantees. It
+    held in testing only because `DECLARE CURSOR` suppresses parallelism
+    (measured: 0 parallel workers through the named cursor, 6 for the identical
+    statement under plain EXPLAIN). Let costing ever put a Gather above the
+    Append and `Parallel Append` reorders children deliberately -- and
+    _scan_bucket bookmarks the last row it emitted, so a reorder walks the
+    bookmark BACKWARDS and rows are dropped silently on the next resume.
+
+    Adding an outer `ORDER BY` over the UNION ALL to force the order is worse
+    still: it puts a blocking Sort on the equality-prefix branch -- 1,807 kB
+    resuming from the midpoint, 3,194 kB from the start of the degenerate
+    fixture -- a full blocking sort of the bucket, in exactly the case this
+    exists to fix.
+
+    Splitting into statements moves the ordering guarantee somewhere it is
+    actually guaranteed. Within a statement it is the ORDER BY; between
+    statements it is the caller's own loop. The bookmark therefore advances
+    monotonically by construction, and the silent-loss risk is gone rather than
+    merely unobserved.
+
+    A SINGLE-COLUMN KEY YIELDS EXACTLY ONE BRANCH, `a > %s` -- byte for byte
+    the statement this path has always issued. That is not a coincidence to be
+    preserved by hand; it falls out of the ladder having one rung.
+
+    Returns [(sql, parameter_order), ...] most-specific first, with
+    parameter_order in the shape keyset_params consumes.
+    """
+    cols = quoted(columns)
+    branches = []
+    for i in range(len(cols) - 1, -1, -1):
+        terms = [f'{cols[j]} = %s' for j in range(i)]
+        terms.append(f'{cols[i]} > %s')
+        branches.append((' AND '.join(terms), list(range(i + 1))))
+    return branches
+
+
+def bucket_in_sql(pk_columns, buckets, escape_percent=False):
+    """`(<bucket expr>) IN (0, 1, ... N-1)` -- every bucket, as one predicate.
+
+    YugabyteDB turns this into a single index condition over all N values and,
+    with yb_max_merge_scan_streams >= N, merges the N per-bucket sorted streams
+    into one ordered result. It works against the expression index directly --
+    the source table needs no generated column and no schema change, only the
+    index.
+
+    It has to be a literal IN list: the planner does not derive one from a CHECK
+    constraint, and BETWEEN degrades to a storage filter over the whole index.
+
+    ONLY SAFE ON A PLAIN CURSOR. The merge is performed by the storage layer, and
+    under a NAMED server-side cursor (`DECLARE CURSOR`) YugabyteDB does not
+    perform it: the N per-bucket streams come back CONCATENATED, each ascending
+    internally and the whole not ascending. `EXPLAIN` reports `Merge Streams: N`
+    either way -- the plans are byte-identical -- so nothing about the plan says
+    which of the two happened. Measured on rt.healthy, 40,000 rows, same session,
+    same settings, only the cursor varying:
+
+        cursor  rows    ORDER BY violations  bucket changes along the stream
+        plain   40,000  0                    26,712   (interleaved -- merged)
+        named   40,000  2                    2        (concatenated -- N-1)
+
+    So this is for statements read through a plain cursor, and for those the
+    ordering only has to hold within one fetch of everything -- max_pk_values_sql
+    reads a single row. Anything streamed through a named cursor must use
+    bucket_branches_sql instead, which puts the ordering in the plan rather than
+    in the storage layer.
+    """
+    values = ', '.join(str(b) for b in range(buckets))
+    return f'{bucket_expr(pk_columns, buckets, escape_percent)} IN ({values})'
+
+
+# pylint: disable=too-many-arguments,too-many-positional-arguments
+def bucket_branches_sql(fq_table_name, pk_columns, buckets, order_by,
+                        extra_predicate=None, escape_percent=False):
+    """One ordered branch per bucket, `UNION ALL`ed -- the body of the subquery.
+
+    THE CALLER MUST PUT AN OUTER `ORDER BY` OVER THE RESULT. This returns the
+    branches only; on their own they are a bare `Append`, whose child order
+    neither SQL nor PostgreSQL guarantees and which measures exactly as badly as
+    the merge scan does under a cursor (2 ORDER BY violations on rt.healthy,
+    identical to the IN-list form). The outer `ORDER BY` is what makes the shape
+    correct rather than lucky: the planner is OBLIGED to satisfy it, so it emits
+    `Merge Append` where the branches already supply the order and `Sort` where
+    they do not. Correctness then rests on the planner honouring an `ORDER BY`
+    rather than on `Append` emitting children in branch order.
+
+    Unlike the merge scan, `Merge Append` is a plan node, so a named server-side
+    cursor honours it. Measured on rt.healthy through the tap's own named cursor:
+    0 violations, 40,000 rows.
+
+    Each branch states its bucket as an EQUALITY, which is the access pattern a
+    hash-sharded discriminator serves, and carries `extra_predicate` -- the
+    INCREMENTAL bookmark -- so both reach the same `Index Cond`:
+
+        Index Cond: (((yb_hash_code(id) % 3)) = 0
+                     AND (updated_at >= '...'::timestamp with time zone))
+
+    which is what gives early termination under a `LIMIT`: with `LIMIT 10000`
+    over three buckets each branch reads 4,096 index rows, not its share of the
+    table.
+
+    NO INDEX HINT IS EMITTED, and one must not be added:
+
+    - a hint nested inside the subquery IS read -- A/B on the exact
+      yb_speedup_trick shape: unhinted plans an Index Only Scan, and the same
+      statement with `/*+ SeqScan(healthy) */` inside the subquery plans a Seq
+      Scan. The hint this statement used to carry was therefore doing something;
+      it just was not doing anything useful.
+    - one leading hint naming the bare table reaches exactly ONE branch, because
+      every branch writes the same relation name. Probed with `SeqScan(healthy)`:
+      one branch sequentially scanned, the other two still on the index.
+    - N leading hints against per-branch aliases do reach every branch, and make
+      the plan WORSE: `IndexScan` forces a plain `Index Scan` in place of the
+      `Index Only Scan` the planner picks unaided, adding a heap fetch per row --
+      80,000 storage rows scanned against 40,000 on a full drain, 24,576 against
+      12,288 under `LIMIT 10000`.
+    - unhinted is already the right plan everywhere it was measured: `Merge
+      Append` over N `Index Only Scan`s with `Heap Fetches: 0`, on an ANALYZEd
+      table and on one that has never been ANALYZEd, with the tap's session
+      settings and with none at all.
+
+    `escape_percent` doubles the modulo for a statement psycopg2 is given
+    parameters for. The INCREMENTAL scan interpolates its bookmark as a literal
+    and passes none, so it wants the default -- see bucket_expr.
+    """
+    expr = bucket_expr(pk_columns, buckets, escape_percent)
+    branches = []
+    for bucket in range(buckets):
+        predicates = [f'{expr} = {bucket}']
+        if extra_predicate:
+            predicates.append(extra_predicate)
+        branches.append(f'        (SELECT * FROM {fq_table_name} '
+                        f'WHERE {" AND ".join(predicates)} '
+                        f'ORDER BY {order_by})')
+    return '\n        UNION ALL\n'.join(branches)
+
+
+def index_hint(table_name):
+    """Pin the scan to the keyset index.
+
+    The merge plan is a cost decision, and the cost model does not price what
+    this scan is for: at moderate sizes it prefers a sequential scan and an
+    external merge sort, which is faster in wall clock and spills to disk
+    instead of streaming. Measured on 50k rows it chose a 2.9MB spill over the
+    index. The tap wants the streaming plan every time, not the cheaper one,
+    so the choice is stated rather than left to the estimate.
+    """
+    return f'/*+ IndexScan({table_name} {index_name(table_name)}) */'
+
+
+def merge_scan_available(cur):
+    """Whether this server build has the merge-scan setting at all.
+
+    Checked rather than assumed: older YugabyteDB has no such parameter, and SET
+    on one that does not exist raises rather than being ignored. The scan has a
+    correct form either way, so this picks between them instead of failing.
+    """
+    cur.execute("SELECT count(*) FROM pg_settings WHERE name = 'yb_max_merge_scan_streams'")
+    return cur.fetchone()[0] > 0
+
+
+def max_pk_values_sql(fq_table_name, table_name, pk_columns, buckets, merge_scan):
+    """Largest key tuple in the table, in whichever form this server can serve.
+
+    With merge scan, one index condition over every bucket and the streams merged
+    into order. Without it, a branch per bucket: each carries its own LIMIT, so
+    each reads exactly one index entry and the outer sort orders N rows. The
+    branching form is wordier but needs nothing set -- and the IN-list form
+    without the setting reads the whole index, which is the failure worth
+    avoiding since nothing about the plan says it happened.
+    """
+    cols = ', '.join(quoted(pk_columns))
+    desc = order_by_sql(pk_columns, 'DESC')
+    hint = index_hint(table_name)
+    if merge_scan:
+        return (f'{hint} SELECT {cols} FROM {fq_table_name} '
+                f'WHERE {bucket_in_sql(pk_columns, buckets)} '
+                f'ORDER BY {desc} LIMIT 1')
+    branches = '\nUNION ALL\n'.join(
+        f'  ({hint} SELECT {cols} FROM {fq_table_name} '
+        f'WHERE {bucket_expr(pk_columns, buckets)} = {bucket} '
+        f'ORDER BY {desc} LIMIT 1)'
+        for bucket in range(buckets)
+    )
+    return f'SELECT {cols} FROM (\n{branches}\n) bucket_maxima ORDER BY {desc} LIMIT 1'
+
+
+def scan_settings_sql(buckets):
+    """Session settings a bucketed keyset scan needs, in order.
+
+    yb_max_merge_scan_streams lets the scan merge the per-bucket streams instead
+    of sorting the whole result, and must be at least the bucket count.
+
+    enable_seqscan is what actually makes the planner take it. The index hint
+    alone does not: measured, the hinted query still chose a sequential scan and
+    a 2.9MB external merge sort, because that is cheaper in wall clock and the
+    cost model does not price streaming or spilling. Deprioritising the
+    sequential scan is the only thing that reliably gets the streaming plan.
+    It is a session setting on a connection that runs nothing but these scans,
+    and it does not forbid a sequential scan -- a table with no usable index
+    still gets one.
+    """
+    return [
+        f'SET yb_max_merge_scan_streams = {max(buckets, 8)}',
+        'SET enable_seqscan = off',
+    ]
+
+
+def index_name(table_name):
+    return f'{table_name}{INDEX_SUFFIX}'
+
+
+def split_at_values(buckets):
+    """Tablet boundaries placing exactly one bucket per tablet.
+
+    A range-sharded index gets a single tablet unless boundaries are given, and
+    one tablet is the thing the bucketing exists to avoid. Splitting at every
+    bucket value but the first gives a deterministic bucket-to-tablet mapping:
+    bucket k is tablet k, so the workers do not contend and no bucket shares a
+    tablet with another. Hash sharding cannot promise that -- it maps N values
+    into the hash space and wherever they land is wherever they land.
+    """
+    return ', '.join(f'({b})' for b in range(1, buckets))
+
+
+def index_ddl(fq_table_name, table_name, pk_columns, buckets, tablets=None):
+    """DDL for the prerequisite index.
+
+    The bucket column is range-sharded, not hashed, so the tablet boundaries can
+    be stated: see split_at_values. The key columns trail it ASC, so each bucket
+    is an ordered range a cursor can walk and resume inside. Uniqueness is free --
+    the bucket is a function of the key -- and it lets the index back a keyset
+    cursor without a recheck against the base table.
+    """
+    return (
+        f'CREATE UNIQUE INDEX {quoted_name(index_name(table_name))} ON {fq_table_name} '
+        f'(({bucket_expr(pk_columns, buckets)}) ASC, {order_by_sql(pk_columns)}) '
+        f'SPLIT AT VALUES ({split_at_values(buckets)})'
+    )
+
+
+_INDEX_SHAPE_SQL = """
+SELECT pg_get_indexdef(i.oid), x.indisunique, p.num_tablets,
+       x.indisvalid, x.indisready, x.indoption[0]
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+JOIN pg_index x ON x.indrelid = c.oid
+JOIN pg_class i ON i.oid = x.indexrelid
+CROSS JOIN LATERAL yb_table_properties(i.oid) p
+WHERE n.nspname = %s AND c.relname = %s AND i.relname = %s
+"""
+
+
+def _index_key_columns(indexdef):
+    """Key column names from a rendered index definition, in order.
+
+    Splits the key list at top-level commas only, so a composite bucket
+    expression -- `yb_hash_code(tenant, id)` -- stays one key, and strips the
+    quoting `pg_get_indexdef` applies to any name that needs it.
+    """
+    body = indexdef[indexdef.index('USING lsm (') + len('USING lsm ('):]
+    body = body[:body.rindex(')')]
+    depth, current, parts = 0, [], []
+    for char in body:
+        if char == ',' and depth == 0:
+            parts.append(''.join(current).strip())
+            current = []
+            continue
+        if char == '(':
+            depth += 1
+        elif char == ')':
+            depth -= 1
+        current.append(char)
+    parts.append(''.join(current).strip())
+    return [part.rsplit(' ', 1)[0].strip().strip('"') for part in parts]
+
+
+def describe_index(cur, schema_name, table_name, wanted_name):
+    """What a keyset index on this table actually is, read from the catalog.
+
+    Returns None when it does not exist. The key list comes from the index
+    definition text because the leading column is an expression, which pg_index
+    stores as a parse tree and reports as attnum 0; the rest of the shape --
+    uniqueness, tablet count -- is read properly.
+    """
+    cur.execute(_INDEX_SHAPE_SQL, (schema_name, table_name, wanted_name))
+    row = cur.fetchone()
+    if row is None:
+        return None
+    indexdef, is_unique, num_tablets, is_valid, is_ready, leading_indoption = row
+    # the key list is the parenthesised group following `USING lsm `
+    body = indexdef[indexdef.index('USING lsm (') + len('USING lsm ('):]
+    body = body[:body.rindex(')')]
+    depth, current, parts = 0, [], []
+    for char in body:
+        if char == ',' and depth == 0:
+            parts.append(''.join(current).strip())
+            current = []
+            continue
+        if char == '(':
+            depth += 1
+        elif char == ')':
+            depth -= 1
+        current.append(char)
+    parts.append(''.join(current).strip())
+    trailing = [part.rsplit(' ', 1)[0].strip('"') for part in parts[1:]]
+    return {
+        'name': wanted_name,
+        'definition': indexdef,
+        'unique': is_unique,
+        'buckets': parse_index_buckets(indexdef),
+        'bucket_columns': _bucket_columns(parts[0]),
+        'trailing': trailing,
+        'tablets': num_tablets,
+        'valid': is_valid,
+        'ready': is_ready,
+        'bucket_is_ordered': _column_is_ordered(leading_indoption),
+    }
+
+
+def _bucket_columns(leading):
+    """Column names inside the leading yb_hash_code(...) expression."""
+    match = re.search(r'yb_hash_code\(([^)]*)\)', leading or '')
+    if not match:
+        return []
+    return [c.strip().strip('"') for c in match.group(1).split(',') if c.strip()]
+
+
+def check_index(cur, schema_name, table_name, wanted_name, pk_columns,
+                trailing, buckets):
+    """Confirm one index matches the shape the tap requires, or say what is wrong.
+
+    Every index the tap needs is the same shape -- the primary key hashed into N
+    buckets, ASC, then the ordering columns, ending in the primary key, UNIQUE,
+    one tablet per bucket. This checks all of it, because each part fails
+    differently and none of them fails loudly:
+
+    wrong bucket count -- the scan predicate names buckets the index does not
+    have, so the index is unusable and the scan is a full table scan;
+    bucketed on the wrong column -- same, and it also moves index entries between
+    tablets when the replication key changes;
+    missing trailing primary key -- the order is not total, so a resume re-reads
+    every row sharing the last value seen, and the index cannot answer alone;
+    not unique -- a duplicate key would be accepted and then emitted twice;
+    one tablet -- the bucketing bought nothing and all N workers contend on it.
+    """
+    found = describe_index(cur, schema_name, table_name, wanted_name)
+    if found is None:
+        return None, [f'{wanted_name} does not exist.']
+
+    problems = []
+    # An index whose backfill never finished exists, is named correctly, and has
+    # exactly the right definition -- and the planner will not use it. Nothing
+    # about the table or the definition says so; the scan just silently becomes a
+    # sequential scan and an external sort. Measured: a 30,000-row drain sorting
+    # 2,432 kB to disk behind an index that reads as perfect.
+    if not found['valid'] or not found['ready']:
+        problems.append(
+            f'{wanted_name} exists but is not valid ('
+            f"indisvalid={found['valid']}, indisready={found['ready']}): its "
+            f'backfill did not complete, so the planner ignores it and every '
+            f'scan is a full table scan. Drop and recreate it.')
+    if not found['bucket_is_ordered']:
+        problems.append(
+            f'{wanted_name} declares the bucket HASH, not ASC. A hashed '
+            f'discriminator cannot be split one bucket per tablet, so the '
+            f'bucket-to-tablet mapping is whatever the hash space gives.')
+    if found['buckets'] is None:
+        problems.append(
+            f'{wanted_name} is not a bucket index -- its leading key is not '
+            f'yb_hash_code(...) % N, so no scan of ours can use it.')
+    elif found['buckets'] != buckets:
+        problems.append(
+            f"{wanted_name} is built with {found['buckets']} buckets but the tap "
+            f'is configured for {buckets}. Every scan names {buckets} bucket '
+            f'values, so the index cannot serve it -- rebuild the index, or set '
+            f'keyset_buckets: {found["buckets"]}.')
+    if found['bucket_columns'] != list(pk_columns):
+        problems.append(
+            f"{wanted_name} hashes {', '.join(found['bucket_columns']) or 'nothing'} "
+            f"but the scan hashes {', '.join(pk_columns)}.")
+    if found['trailing'] != list(trailing):
+        problems.append(
+            f"{wanted_name} orders by {', '.join(found['trailing'])} but the scan "
+            f"orders by {', '.join(trailing)}.")
+    if not found['unique']:
+        problems.append(f'{wanted_name} is not UNIQUE.')
+    if found['tablets'] is not None and found['tablets'] < buckets:
+        cause = ('Without SPLIT AT VALUES the whole index is one tablet and the '
+                 'buckets share it.' if found['bucket_is_ordered'] else
+                 'SPLIT AT VALUES is not legal on a hashed bucket, which is the '
+                 'real fault here.')
+        problems.append(
+            f"{wanted_name} has {found['tablets']} tablet(s) for {buckets} "
+            f'buckets. {cause}')
+    return found, problems
+
+
+def parse_index_buckets(indexdef):
+    """Recover the bucket count from a live index definition, or None if the
+    index is not one of ours."""
+    match = re.search(r'yb_hash_code\([^)]*\)\s*%\s*(\d+)', indexdef or '')
+    return int(match.group(1)) if match else None
+
+
+def validate_index(cur, schema_name, table_name, pk_columns, buckets):
+    """The runtime gate before a bucketed parallel sync, as (usable, reason).
+
+    This used to carry its own, weaker copy of the checks -- existence and bucket
+    count, nothing else -- while the preflight tool called check_index and
+    verified the whole shape. The preflight was therefore strictly stricter than
+    the thing it was meant to predict, and the gap was exactly the failures that
+    do not announce themselves: an index whose backfill never completed passed
+    here and the planner refused it, so every one of the N workers sequentially
+    scanned the whole table with `enable_seqscan = off` set and the hint ignored.
+
+    It delegates now, so there is one implementation and the gate cannot drift
+    behind the tool again.
+    """
+    found, problems = check_index(cur, schema_name, table_name,
+                                  index_name(table_name), pk_columns,
+                                  pk_columns, buckets)
+    if found is None:
+        fq_table_name = f'"{schema_name}"."{table_name}"'
+        return False, (
+            f'Parallel keyset sync of {schema_name}.{table_name} requires a bucket '
+            f'index. Create it with:\n  '
+            f'{index_ddl(fq_table_name, table_name, pk_columns, buckets)};'
+        )
+    if problems:
+        return False, '\n  '.join(problems)
+    return True, None
+
+
+def pin_snapshot(conn, hybrid_time, security_definer_proc=None):
+    """Pin this connection to a hybrid-time snapshot so every worker reads the
+    same instant.
+
+    `yb_read_time` is superuser-only and is rejected inside an explicit
+    transaction block, so it is issued as its own statement with autocommit on.
+    A least-privilege tap user instead calls a SECURITY DEFINER procedure, which
+    is the pattern YugabyteDB documents for this case. The session is read-only
+    for as long as it stays pinned.
+    """
+    if hybrid_time is None:
+        return
+    previous_autocommit = conn.autocommit
+    conn.autocommit = True
+    try:
+        with conn.cursor() as cur:
+            if security_definer_proc:
+                cur.execute(f'CALL {security_definer_proc}(%s)', (f'{hybrid_time} ht',))
+            else:
+                cur.execute(f"SET yb_read_time TO '{hybrid_time} ht'")
+    finally:
+        conn.autocommit = previous_autocommit
+
+
+REPLICATION_KEY_CANDIDATES_SQL = """
+SELECT a.attname,
+       format_type(a.atttypid, a.atttypmod)                    AS data_type,
+       a.attnotnull                                            AS not_null,
+       a.attidentity IN ('a', 'd')                             AS is_identity,
+       COALESCE(pg_get_expr(d.adbin, d.adrelid) LIKE 'nextval(%%', false)
+                                                               AS is_sequence_default,
+       COALESCE(x.indisprimary, false)                         AS is_primary_key,
+       COALESCE(u.indisunique, false)                          AS is_unique
+FROM pg_attribute a
+JOIN pg_class c ON c.oid = a.attrelid
+JOIN pg_namespace n ON n.oid = c.relnamespace
+LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+LEFT JOIN pg_index x ON x.indrelid = c.oid AND x.indisprimary
+                    AND a.attnum = ANY (x.indkey)
+LEFT JOIN pg_index u ON u.indrelid = c.oid AND u.indisunique
+                    AND u.indnatts = 1 AND a.attnum = u.indkey[0]
+WHERE n.nspname = %s AND c.relname = %s
+  AND a.attnum > 0 AND NOT a.attisdropped
+ORDER BY a.attnum
+"""
+
+
+def discover_replication_key_candidates(cur, schema_name, table_name):
+    """Rank columns that could serve as an INCREMENTAL replication key.
+
+    Two shapes qualify: a sequence-backed integer (identity column or a
+    nextval() default) and a creation timestamp. Both are returned with the
+    caveats that apply to them, because on YugabyteDB neither is safe on its own
+    -- see `replication_key_warnings`.
+
+    Returns dicts ordered best-first, each with `column`, `kind`, `unique`, and
+    `tiebreaker_required`.
+    """
+    cur.execute(REPLICATION_KEY_CANDIDATES_SQL, (schema_name, table_name))
+    candidates = []
+    for (name, data_type, not_null, is_identity, is_sequence_default,
+         is_primary_key, is_unique) in cur.fetchall():
+        lowered = name.lower()
+        unique = bool(is_primary_key or is_unique)
+        if is_identity or is_sequence_default:
+            candidates.append({
+                'column': name, 'kind': 'sequence', 'data_type': data_type,
+                'unique': unique, 'not_null': bool(not_null),
+                'tiebreaker_required': not unique,
+                # a unique candidate beats a non-unique one of the same shape: it
+                # needs no tiebreaker and can page on its own
+                'rank': (0, 0 if unique else 1, 0 if is_identity else 1),
+            })
+        elif data_type.startswith(('timestamp', 'date', 'time')):
+            # every temporal column is a candidate; the name only orders them.
+            # A timestamp is never unique on its own either -- two rows written in
+            # the same transaction carry the same value exactly.
+            modified_rank = _name_rank(lowered, _MODIFIED_NAME_HINTS)
+            created_rank = _name_rank(lowered, _CREATED_NAME_HINTS)
+            if modified_rank is not None:
+                kind, group, hint_rank = 'modified_timestamp', 1, modified_rank
+            elif created_rank is not None:
+                kind, group, hint_rank = 'created_timestamp', 1, created_rank
+            else:
+                kind, group, hint_rank = 'unknown_timestamp', 2, 0
+            candidates.append({
+                'column': name, 'kind': kind, 'data_type': data_type,
+                'unique': False, 'not_null': bool(not_null),
+                'tiebreaker_required': True,
+                'rank': (group, 1, hint_rank),
+            })
+    candidates.sort(key=lambda c: c['rank'])
+    for candidate in candidates:
+        del candidate['rank']
+    return candidates
+
+
+def replication_key_warnings(candidate, pk_columns, sequence_cache_minval=None):
+    """Explain why a candidate is not, by itself, a safe INCREMENTAL watermark.
+
+    A watermark is only sound when key order matches commit order. On
+    YugabyteDB it does not, for either candidate shape:
+
+    Sequence-backed columns are handed out in per-connection blocks
+    (ysql_sequence_cache_method=connection, ysql_sequence_cache_minval=100 by
+    default), so one session can be committing ids 1..100 while another commits
+    101..200. A run that bookmarks max(id)=150 will never see id=40 committed a
+    moment later.
+
+    Creation timestamps carry the transaction's start time, so a long-running
+    transaction commits rows stamped before a watermark that has already moved
+    past them -- and clock skew between nodes widens the same gap.
+
+    Neither is fixed by a tiebreaker. A tiebreaker only makes the ordering
+    total, which matters for deterministic paging; it does not make key order
+    agree with commit order. That needs either a lag window, or LOG_BASED.
+    """
+    warnings = []
+    if candidate['tiebreaker_required']:
+        tiebreaker = ', '.join(pk_columns) if pk_columns else 'the primary key'
+        warnings.append(
+            f"{candidate['column']} is not unique, so paging by it alone can "
+            f'repeat or skip rows that share a value; it needs a tiebreaker '
+            f'({tiebreaker}) to give a total order.'
+        )
+    if not candidate['not_null']:
+        warnings.append(
+            f"{candidate['column']} is nullable, and NULL is never written to the "
+            f'bookmark, so NULL-keyed rows re-sync on every run.'
+        )
+    if candidate['kind'] == 'sequence':
+        cache = sequence_cache_minval if sequence_cache_minval is not None else 100
+        warnings.append(
+            f"{candidate['column']} is sequence-backed, and YugabyteDB caches "
+            f'{cache} values per connection, so commit order does not follow id '
+            f'order. Rows committed after the bookmark can carry ids far below '
+            f'it and be missed permanently. Use LOG_BASED, or lower '
+            f'ysql_sequence_cache_minval, or carry a lag window of at least '
+            f'{cache} x (concurrent writers).'
+        )
+    if candidate['kind'] == 'created_timestamp':
+        warnings.append(
+            f"{candidate['column']} records transaction start time, so a long "
+            f'transaction commits rows stamped earlier than an advanced '
+            f'bookmark. Carry a lag window wider than the longest write '
+            f'transaction, or use LOG_BASED.'
+        )
+    return warnings
+
+
+# --------------------------------------------------------------- eligibility
+
+STRATEGY_PK_RANGE = 'pk_range'
+STRATEGY_BUCKET_INDEX = 'bucket_index'
+STRATEGY_PLAIN_SCAN = 'plain_scan'
+
+_SHARDING_SQL = """
+SELECT c.relkind, p.num_hash_key_columns, p.num_tablets
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+CROSS JOIN LATERAL yb_table_properties(c.oid) p
+WHERE n.nspname = %s AND c.relname = %s
+"""
+
+# An index can serve ordered range access on `column` when that column leads it
+# and is stored in sorted order. A HASH leading column cannot: it is ordered by
+# hash, which has nothing to do with the column's own ordering.
+# The join on indkey[0] is what restricts this to indexes the column LEADS --
+# and it also excludes every expression index, because an expression key is
+# stored as attnum 0 and matches no column. A bucket index is therefore never
+# returned here: it leads with the discriminator, not with the column.
+_RANGE_INDEX_SQL = """
+SELECT i.relname,
+       x.indoption[0]                               AS leading_indoption,
+       x.indpred IS NOT NULL                        AS is_partial,
+       pg_get_expr(x.indpred, x.indrelid)           AS predicate
+FROM pg_index x
+JOIN pg_class i ON i.oid = x.indexrelid
+JOIN pg_class c ON c.oid = x.indrelid
+JOIN pg_namespace n ON n.oid = c.relnamespace
+JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum = x.indkey[0]
+WHERE n.nspname = %s AND c.relname = %s AND a.attname = %s
+  -- an index whose backfill has not finished exists with a perfect definition
+  -- and the planner ignores it. On YugabyteDB that window is minutes, not
+  -- milliseconds, because index backfills serialise within a database
+  AND x.indisvalid AND x.indisready
+"""
+
+
+_KEYSET_INDEX_SQL = """
+SELECT i.relname, pg_get_indexdef(i.oid)
+FROM pg_index x
+JOIN pg_class i ON i.oid = x.indexrelid
+JOIN pg_class c ON c.oid = x.indrelid
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname = %s AND c.relname = %s
+  AND x.indkey[0] = 0
+  AND pg_get_indexdef(i.oid) LIKE '%%yb_hash_code%%'
+  AND x.indisvalid AND x.indisready
+"""
+
+
+def _hashable(cur, type_name):
+    """Whether yb_hash_code accepts this type.
+
+    Probed against a NULL literal rather than a type allow-list: it costs no
+    storage read, it is authoritative for the server actually being talked to,
+    and the set of accepted types is not something the tap should be tracking.
+    The rejection is an error, so inside a transaction the probe is wrapped in a
+    savepoint to keep it from poisoning the surrounding work. Under autocommit
+    each statement is already its own transaction and SAVEPOINT is itself an
+    error, so the guard is skipped rather than assumed either way.
+    """
+    in_transaction = not getattr(cur.connection, 'autocommit', False)
+    if in_transaction:
+        cur.execute('SAVEPOINT yb_hash_probe')
+    try:
+        cur.execute(f'SELECT yb_hash_code(NULL::{type_name})')
+        cur.fetchone()
+        if in_transaction:
+            cur.execute('RELEASE SAVEPOINT yb_hash_probe')
+        return True
+    except psycopg2.Error:
+        if in_transaction:
+            cur.execute('ROLLBACK TO SAVEPOINT yb_hash_probe')
+        return False
+
+
+# pg_index.indoption carries one bitmask per key column. Bits 0 and 1 are
+# PostgreSQL's DESC and NULLS FIRST; YugabyteDB adds bit 2 for a hash-sharded
+# column. Observed on this server: ASC 0, NULLS FIRST 2, DESC 3 (DESC implies
+# NULLS FIRST), HASH 4 -- and `(a, b) HASH, c ASC, d DESC` reads `4 4 0 3`,
+# agreeing with yb_table_properties' num_hash_key_columns of 2.
+INDOPTION_HASH = 4
+
+
+def _column_is_ordered(indoption):
+    """True when an index key column is stored sorted rather than hashed.
+
+    Read from the catalog rather than from pg_get_indexdef's text. The text is a
+    rendering meant for people: it is not a stable interface, a change to how it
+    spells a modifier would be silent here, and matching a column name inside it
+    invites confusing a name with a prefix of another. The bitmask is the thing
+    the planner itself uses.
+    """
+    return (indoption & INDOPTION_HASH) == 0
+
+
+# pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-return-statements
+def _no_index_possible(blockers):
+    return {'strategy': STRATEGY_PLAIN_SCAN, 'index_ddl': None,
+            'index_required': False, 'note': None, 'blockers': blockers}
+
+
+def plan_keyset_strategy(cur, schema_name, table_name, pk_columns, pk_types, buckets):
+    """Decide how this table can be scanned, and what creating the index would need.
+
+    Three outcomes:
+
+    `bucket_index` the primary key is hash-sharded, so it has no order at all and
+                  ordered access needs the bucket index.
+    `pk_range`    the primary key is range-sharded, so the TABLE is scannable in
+                  key order -- but the tap is not written to exploit that, so the
+                  same index is required. See below.
+    `plain_scan`  no index can be built, so the sync is a single non-resumable
+                  pass. `blockers` says why, and `index_required` is False.
+
+    `index_required` is True for both of the first two and `index_ddl` carries
+    the statement that satisfies it. `strategy` says only what the table's
+    sharding is; it does not say whether an index is needed.
+
+    WHY A RANGE-SHARDED PRIMARY KEY STILL NEEDS THE INDEX. It reads as though it
+    should not: the key is stored sorted, so `ORDER BY <pk>` streams and a cursor
+    can resume inside it. The tap does not scan that way. full_table partitions
+    the table into N buckets and gives each one to a worker, and a bucket is
+    `yb_hash_code(<pk>) % N` -- an expression the base table does not carry and
+    cannot order by. So every bucket predicate against the bare table is a full
+    scan whatever the sharding, and full_table.sync_table gates on
+    `validate_index`, which requires this index unconditionally.
+
+    Reporting `pk_range` as needing nothing was therefore a contract the code
+    never honoured: the preflight said OK, the operator created nothing, and the
+    sync silently fell through to `_sync_table_without_pk` -- one non-resumable,
+    non-parallel pass. The index is the cheaper half of that trade, so the
+    contract is what changes here, not the scan.
+    """
+    cur.execute(_SHARDING_SQL, (schema_name, table_name))
+    row = cur.fetchone()
+    if row is None:
+        return _no_index_possible([f'{schema_name}.{table_name} was not found'])
+    relkind, num_hash_key_columns, num_tablets = row[0], row[1], row[2]
+
+    if relkind in ('v', 'm'):
+        return _no_index_possible(['a view has no primary key and cannot be indexed'])
+
+    if not pk_columns:
+        return _no_index_possible(['the table has no primary key to page on'])
+
+    # probed before the sharding is considered, because the bucket index hashes
+    # the primary key in both cases: a range-sharded key of a type yb_hash_code
+    # refuses cannot get one either, and saying `pk_range` there would promise a
+    # parallel scan that cannot be built
+    unhashable = [c for c, t in zip(pk_columns, pk_types) if not _hashable(cur, t)]
+    if unhashable:
+        return _no_index_possible([
+            f'yb_hash_code does not accept {", ".join(unhashable)}, so the '
+            f'bucket discriminator cannot be computed'
+        ])
+
+    fq_table_name = f'"{schema_name}"."{table_name}"'
+    ddl = index_ddl(fq_table_name, table_name, pk_columns, buckets,
+                    tablets=num_tablets or buckets)
+    if num_hash_key_columns == 0:
+        return {
+            'strategy': STRATEGY_PK_RANGE,
+            'index_ddl': ddl,
+            'index_required': True,
+            'note': (
+                f'The primary key is range-sharded, so the table itself is '
+                f'scannable in key order -- but the tap partitions by '
+                f'yb_hash_code({", ".join(pk_columns)}) % {buckets}, which the '
+                f'table cannot order by, so it needs {index_name(table_name)} '
+                f'exactly as a hash-sharded key does. Without it the sync drops '
+                f'to a single non-resumable, non-parallel pass.'
+            ),
+            'blockers': [],
+        }
+    return {
+        'strategy': STRATEGY_BUCKET_INDEX,
+        'index_ddl': ddl,
+        'index_required': True,
+        'note': (
+            f'The primary key is hash-sharded, so it has no order to page along. '
+            f'Without {index_name(table_name)} every resume re-reads the whole '
+            f'table.'
+        ),
+        'blockers': [],
+    }
+
+
+def plan_partial_sync(cur, schema_name, table_name, boundary_column, start_value=None):
+    """Decide whether a PartialSync boundary can be served by an index.
+
+    PartialSync bounds an arbitrary configured column, not the primary key, so
+    the keyset index built for full-table sync does nothing for it. What it needs
+    is an index that column leads in sorted order.
+
+    When the boundary has a fixed lower bound, a partial index over just that
+    range is the cheaper answer: it indexes the rows being synced instead of the
+    whole table. It only applies while queries stay inside its predicate -- a
+    boundary that later moves below `start_value` silently stops using it -- so
+    it is offered, never created implicitly.
+    """
+    cur.execute(_RANGE_INDEX_SQL, (schema_name, table_name, boundary_column))
+    usable, partial = [], []
+    for name, leading_indoption, is_partial, predicate in cur.fetchall():
+        if not _column_is_ordered(leading_indoption):
+            continue
+        (partial if is_partial else usable).append((name, predicate))
+
+    if usable:
+        return {'indexed': True, 'index': usable[0][0], 'partial_indexes': partial,
+                'suggestion': None, 'via_bucket_index': None, 'note': None}
+
+    # A bucket index does not lead with the boundary column -- the discriminator
+    # does -- so no column-name lookup finds it. It can still serve the range,
+    # but only if the query names every bucket, which lets the index bound the
+    # trailing key and the merge scan put the streams back in order. That is a
+    # change to the PartialSync predicate, not something an index alone provides.
+    cur.execute(_KEYSET_INDEX_SQL, (schema_name, table_name))
+    for name, indexdef in cur.fetchall():
+        # splitting the key list on commas does not survive contact with real
+        # definitions: a composite bucket renders as `yb_hash_code(tenant, id)`,
+        # whose own comma lands mid-expression, and a column needing quotes
+        # renders as `"pct%done" ASC`, which no unquoted comparison matches
+        trailing = _index_key_columns(indexdef)[1:]
+        if trailing and trailing[0] == boundary_column:
+            return {
+                'indexed': False, 'index': None, 'partial_indexes': partial,
+                'suggestion': None,
+                'via_bucket_index': name,
+                'note': (
+                    f'{name} bounds this range already -- YugabyteDB bounds a '
+                    f'trailing column under an unbounded leading one, measured '
+                    f'identical with and without a bucket predicate. Naming every '
+                    f'bucket is required for ORDER BY, which PartialSync does not '
+                    f'use, so no predicate change is needed here.'
+                ),
+            }
+
+    fq_table_name = f'"{schema_name}"."{table_name}"'
+    # A partial index is the cheaper answer when the boundary has a fixed lower
+    # bound -- but `usable` above counts only non-partial indexes, so suggesting
+    # one produced an operator-visible loop: run the DDL, re-run the check, get
+    # the identical suggestion back, forever. It is offered as a note instead,
+    # and the suggestion is the index that actually changes the verdict.
+    suggestion = (
+        f'CREATE INDEX {table_name}_pw_partial ON {fq_table_name} '
+        f'("{boundary_column}" ASC)'
+    )
+    note = None
+    if start_value is not None:
+        note = (
+            f'If this boundary never moves below {start_value!r}, a partial index '
+            f'covers the synced rows for less write cost:\n  CREATE INDEX '
+            f'{table_name}_pw_partial ON {fq_table_name} ("{boundary_column}" ASC) '
+            f"WHERE \"{boundary_column}\" >= '{start_value}';\n"
+            f'It stops being used the moment a query reaches below that bound, '
+            f'which is why it is not the default suggestion.'
+        )
+    return {'indexed': False, 'index': None, 'partial_indexes': partial,
+            'suggestion': suggestion, 'via_bucket_index': None, 'note': note}
+
+
+# ------------------------------------------------- monotonic key eligibility
+
+# pg_get_serial_sequence only reports a sequence the column OWNS -- the
+# dependency serial/bigserial/IDENTITY sets up. A sequence attached by hand,
+# `DEFAULT nextval('some_seq')`, drives the column just as much but is invisible
+# to it, so the raw default is carried too and parsed as a fallback. Missing it
+# would drop the cache warning on exactly the columns that need it.
+_KEY_FACTS_SQL = """
+SELECT a.attnotnull,
+       COALESCE(u.indisunique, false)                          AS is_unique,
+       pg_get_serial_sequence(%s, a.attname)                   AS owned_sequence,
+       format_type(a.atttypid, a.atttypmod)                    AS data_type,
+       a.attidentity IN ('a', 'd')                             AS is_identity,
+       pg_get_expr(d.adbin, d.adrelid)                         AS column_default
+FROM pg_attribute a
+LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+JOIN pg_class c ON c.oid = a.attrelid
+JOIN pg_namespace n ON n.oid = c.relnamespace
+LEFT JOIN pg_index u ON u.indrelid = c.oid AND u.indisunique
+                    AND u.indnatts = 1 AND a.attnum = u.indkey[0]
+WHERE n.nspname = %s AND c.relname = %s AND a.attname = %s
+  AND a.attnum > 0 AND NOT a.attisdropped
+"""
+
+
+_UPDATE_TRIGGER_SQL = """
+SELECT t.tgname
+FROM pg_trigger t
+JOIN pg_class c ON c.oid = t.tgrelid
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname = %s AND c.relname = %s
+  AND NOT t.tgisinternal
+  AND (t.tgtype & 16) <> 0     -- fires on UPDATE
+  AND (t.tgtype & 1) <> 0      -- FOR EACH ROW
+"""
+
+
+def _has_update_trigger(cur, schema_name, table_name):
+    """Whether any row-level UPDATE trigger exists on the table.
+
+    Necessary for a modification timestamp to maintain itself, and not
+    sufficient: which column a trigger touches is inside its function body, and
+    reading that is guesswork. The absence is the useful half -- with no such
+    trigger, a column named for modification time is maintained by the
+    application or not at all.
+    """
+    cur.execute(_UPDATE_TRIGGER_SQL, (schema_name, table_name))
+    return [row[0] for row in cur.fetchall()]
+
+
+def _sequence_from_default(column_default):
+    """Sequence named by a `nextval('...')` default, when the column does not own it."""
+    if not column_default:
+        return None
+    match = re.search(r"nextval\('([^']+)'", column_default)
+    return match.group(1) if match else None
+
+
+def require_monotonic_key(cur, schema_name, table_name, column, pk_columns=()):
+    """Check whether `column` can serve as an INCREMENTAL watermark.
+
+    A watermark is sound only when every row committed after a run carries a key
+    above that run's bookmark. Three separable things have to hold, and they fail
+    for different reasons:
+
+    NOT NULL       a NULL key is never written to the bookmark, so those rows are
+                   re-read on every run forever. Hard failure.
+    total order    ties make paging non-deterministic at the boundary. A unique
+                   column has this already; anything else needs the primary key
+                   appended as a tiebreaker.
+    commit order   the one that actually loses data, and the one nothing in the
+                   schema records. YugabyteDB hands out sequence values in
+                   per-connection blocks, so one session can be committing ids
+                   1..100 while another commits 101..200: a run bookmarking 150
+                   never sees id 40 committed a moment later. The block size is
+                   the sequence's own CACHE, read here rather than assumed.
+
+    Note this is not needed for FULL_TABLE. Keyset paging wants a total order,
+    which every primary key has by definition, and monotonicity buys it nothing --
+    a UUID key pages exactly as well.
+    """
+    cur.execute(_KEY_FACTS_SQL,
+                (f'{schema_name}.{table_name}', schema_name, table_name, column))
+    row = cur.fetchone()
+    if row is None:
+        return {'usable': False, 'column': column, 'tiebreaker': None,
+                'hard_failures': [f'{column} does not exist on {schema_name}.{table_name}'],
+                'risks': []}
+    not_null, is_unique, owned_sequence, data_type, is_identity, column_default = row
+    sequence_name = owned_sequence or _sequence_from_default(column_default)
+
+    hard_failures, risks = [], []
+    if not not_null:
+        hard_failures.append(
+            f'{column} is nullable. NULL is never written to the bookmark, so '
+            f'NULL-keyed rows re-sync on every run.'
+        )
+
+    tiebreaker = None
+    if not is_unique:
+        tiebreaker = [c for c in pk_columns if c != column] or None
+        if tiebreaker is None:
+            hard_failures.append(
+                f'{column} is not unique and the table has no primary key to break '
+                f'ties with, so paging cannot be made deterministic.'
+            )
+
+    if sequence_name:
+        cur.execute('SELECT seqcache FROM pg_sequence WHERE seqrelid = %s::regclass',
+                    (sequence_name,))
+        cached = cur.fetchone()
+        cache = cached[0] if cached else None
+        if not owned_sequence:
+            risks.append(
+                f'{column} draws from {sequence_name} through a plain default rather '
+                f'than owning it, so the sequence can be dropped, repointed or reset '
+                f'without any change to the column.'
+            )
+        if cache and cache > 1:
+            risks.append(
+                f'{column} draws from {sequence_name}, which caches {cache} values '
+                f'per connection. Commit order does not follow key order across '
+                f'{cache} x (concurrent writers). Lower the cache, carry a lag '
+                f'window at least that wide, or use LOG_BASED.'
+            )
+    elif data_type.startswith(('timestamp', 'date', 'time')):
+        risks.append(
+            f'{column} is a timestamp, so it records transaction start time. A long '
+            f'write transaction commits rows stamped before an already-advanced '
+            f'bookmark. Carry a lag window wider than the longest write transaction, '
+            f'or use LOG_BASED.'
+        )
+        if _name_rank(column.lower(), _MODIFIED_NAME_HINTS) is not None:
+            triggers = _has_update_trigger(cur, schema_name, table_name)
+            if not triggers:
+                risks.append(
+                    f'{column} is named for modification time but the table has no '
+                    f'row-level UPDATE trigger, so nothing in the database maintains '
+                    f'it. If it carries only a DEFAULT it is set on insert and never '
+                    f'moves again, and updates are invisible despite the name.'
+                )
+            else:
+                risks.append(
+                    f'{column} may be maintained by {", ".join(triggers)}, but which '
+                    f'column a trigger touches is not recorded anywhere -- confirm it '
+                    f'sets {column} on every update path.'
+                )
+    else:
+        risks.append(
+            f'{column} is neither sequence-backed nor a timestamp, so nothing '
+            f'guarantees it increases at all. Confirm the application only ever '
+            f'assigns increasing values.'
+        )
+
+    return {'usable': not hard_failures, 'column': column, 'tiebreaker': tiebreaker,
+            'hard_failures': hard_failures, 'risks': risks,
+            'is_identity': is_identity, 'sequence': sequence_name}
+
+
+# ------------------------------------------------ INCREMENTAL tie groups
+
+# Rows sharing one replication-key value. Singer INCREMENTAL state carries one
+# scalar and the resume predicate is `>=`, so a run advances only by reaching a
+# LARGER value than the one it started on -- which means draining the whole
+# starting group first. A group bigger than one run can drain therefore never
+# advances the bookmark, and the sync makes no progress ever. See INDEXES.md,
+# "Resuming inside a tie group".
+
+# Below this many rows a group is not worth a warning whatever the table: it is
+# one bookmark flush (incremental.UPDATE_BOOKMARK_PERIOD, 10,000), so the re-read
+# a resume costs is smaller than the state the run writes while doing it. Named
+# here rather than imported because incremental imports this module.
+TIE_GROUP_MIN_ROWS = 10_000
+
+# With no `limit` configured a run has no row cap: it drains to the end in one
+# statement and always advances, so a livelock needs the run to be KILLED before
+# it clears the group. How far a run gets before dying is roughly a share of the
+# table, so that is what the group is measured against. Half is the point past
+# which a run reliably getting halfway through the table still cannot clear the
+# group. It is the soft half of the rule -- the `limit` comparison below is
+# exact and needs no judgement.
+TIE_GROUP_TABLE_FRACTION = 0.5
+
+# reltuples, null_frac, n_distinct and the largest frequency in the MCV list.
+# All four come from ANALYZE's stored statistics, so this reads catalog rows
+# only and never touches the table -- the alternative, `GROUP BY key ORDER BY
+# count DESC LIMIT 1`, is a full scan and an aggregate, which is not something
+# to run against production on every preflight.
+#
+# max() over the array rather than most_common_freqs[1]: the list is documented
+# as descending, but taking the maximum of at most 100 floats costs nothing and
+# does not depend on that holding.
+_TIE_GROUP_SQL = """
+SELECT c.reltuples,
+       s.attname IS NOT NULL                              AS analyzed,
+       s.null_frac,
+       s.n_distinct,
+       (SELECT max(f) FROM unnest(s.most_common_freqs) f) AS top_freq
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+LEFT JOIN pg_stats s ON s.schemaname = n.nspname
+                    AND s.tablename = c.relname
+                    AND s.attname = %s
+WHERE n.nspname = %s AND c.relname = %s
+"""
+
+
+def _estimate_largest_tie_group(rows, n_distinct, top_freq):
+    """Largest number of rows sharing one value, and where the number came from.
+
+    The MCV list is the direct answer when there is one: ANALYZE stores the most
+    common values with their frequencies, so the largest frequency times the row
+    estimate IS the largest group. Measured against a 40,050-row table with a
+    40,000-row group: 0.9986333 x 40050 = 39,995, against 40,000 actual.
+
+    With no MCV list, no value was common enough to store, and n_distinct
+    supplies an AVERAGE group instead -- negative is a ratio of distinct values
+    to rows, so -1 is a column with no ties at all. An average is a floor, not a
+    bound, which is why it is labelled.
+    """
+    if rows is None:
+        return None, None
+    if top_freq is not None:
+        return max(1, int(top_freq * rows + 0.5)), 'most_common_vals'
+    if n_distinct is None or n_distinct == 0:       # 0 is ANALYZE's "unknown"
+        return None, None
+    if n_distinct < 0:
+        return max(1, int(1.0 / -n_distinct + 0.5)), 'n_distinct (average)'
+    return max(1, int(rows / n_distinct + 0.5)), 'n_distinct (average)'
+
+
+def measure_tie_groups(cur, schema_name, table_name, replication_key, run_limit=None):
+    """Largest group of rows sharing one replication-key value, and what it means.
+
+    `run_limit` is the tap's `limit` config -- the LIMIT incremental.py puts on
+    the extraction query. When it is set the verdict is exact rather than a
+    heuristic:
+
+        a run reads `WHERE key >= <bookmark> ORDER BY key, pk LIMIT <run_limit>`
+
+    so if the group at the bookmark holds `run_limit` rows or more, every row the
+    run reads carries that same value, the bookmark is rewritten to the value it
+    already held, and the next run issues the identical statement. It is not a
+    slowdown; the sync never advances again, and nothing in the log says so. That
+    is severity `livelock`.
+
+    With no `limit` there is no row cap -- a run drains to the end of the table in
+    one statement and the bookmark moves as rows are emitted -- so a run that
+    COMPLETES always advances. The failure then needs a run to be killed before it
+    clears the group, which is a wall-clock question this cannot answer, so a
+    large group is reported as `risk` rather than as a verdict.
+
+    Returns severity one of None, 'risk', 'livelock', 'unknown', plus the
+    measurement and `risks`, a list of sentences in the shape
+    require_monotonic_key returns them.
+    """
+    cur.execute(_TIE_GROUP_SQL, (replication_key, schema_name, table_name))
+    row = cur.fetchone()
+    if row is None:
+        return {'column': replication_key, 'rows': None, 'largest_tie_group': None,
+                'fraction': None, 'source': None, 'severity': 'unknown',
+                'risks': [f'{schema_name}.{table_name} was not found.']}
+    reltuples, analyzed, _null_frac, n_distinct, top_freq = row
+
+    # PostgreSQL 15 stores -1 for "never analysed"; 0 is an empty table or the
+    # same thing on older rows. Either way there is no row count to scale by.
+    rows = int(reltuples) if reltuples is not None and reltuples > 0 else None
+    largest, source = _estimate_largest_tie_group(rows, n_distinct, top_freq)
+
+    result = {'column': replication_key, 'rows': rows, 'largest_tie_group': largest,
+              'fraction': (largest / rows) if largest and rows else None,
+              'source': source, 'severity': None, 'risks': []}
+
+    if not analyzed or largest is None:
+        result['severity'] = 'unknown'
+        result['risks'].append(
+            f'{replication_key} has no column statistics, so the size of its '
+            f'largest tie group is unknown. A tie group bigger than one run can '
+            f'drain never advances the bookmark. Run ANALYZE '
+            f'{schema_name}.{table_name} and re-check.'
+        )
+        return result
+
+    shared = (f'{largest:,} of {rows:,} rows ({result["fraction"]:.0%}) share one '
+              f'{replication_key} value, estimated from {source}')
+
+    if run_limit and largest >= run_limit:
+        result['severity'] = 'livelock'
+        result['risks'].append(
+            f'{shared} -- at or above the configured limit of {run_limit:,}. A run '
+            f'that starts on that value reads {run_limit:,} rows all carrying it, '
+            f'writes the bookmark it already had, and the next run issues the '
+            f'identical statement: the sync cannot advance past this value, ever. '
+            f'Raise limit above {largest:,}, pick a higher-cardinality replication '
+            f'key, or use LOG_BASED.'
+        )
+        return result
+
+    if largest >= TIE_GROUP_MIN_ROWS and result['fraction'] >= TIE_GROUP_TABLE_FRACTION:
+        result['severity'] = 'risk'
+        result['risks'].append(
+            f'{shared}. The resume predicate is >=, so a run has to drain the whole '
+            f'group before the bookmark can move; a run killed inside it restarts '
+            f'the group from the beginning. Prefer a higher-cardinality replication '
+            f'key, or use LOG_BASED.'
+        )
+    return result
+
+
+# --------------------------------------------- replication-key keyset index
+
+def replication_key_index_name(table_name, replication_key):
+    return f'{table_name}_{replication_key}{INDEX_SUFFIX}'
+
+
+def index_for_replication_key(table_name, replication_key, pk_columns):
+    """Name of the index an INCREMENTAL scan should use.
+
+    When the replication key IS the primary key -- a bigserial id used as the
+    watermark -- the primary-key keyset index is already `(bucket, id)`, which is
+    exactly what a replication-key index would be. Naming a separate one asks for
+    an index nobody created; a hint that names a missing index is not an error,
+    it is silently dropped, and the scan falls back to whatever the cost model
+    prefers. Which, on a full drain, is a sequential scan and an external sort.
+    """
+    if list(pk_columns) == [replication_key]:
+        return index_name(table_name)
+    return replication_key_index_name(table_name, replication_key)
+
+
+def replication_key_index_ddl(fq_table_name, table_name, replication_key,
+                              pk_columns, buckets):
+    """Bucketed index for an INCREMENTAL replication key.
+
+    A plain (key ASC) index serves the watermark query, but a replication key is
+    almost always a timestamp or a sequence -- values that only ever increase --
+    so every insert lands at the tail of a range-sharded index and one tablet
+    takes the whole write load. Bucketing spreads the tail across N tablets while
+    keeping each bucket ordered, exactly as it does for the primary key.
+
+    Three details make this the same shape as the primary-key index rather than a
+    second idea:
+
+    The discriminator hashes the PRIMARY KEY, not the replication key. Either
+    works -- INCREMENTAL names every bucket rather than targeting one, so the
+    bucket never has to be computable from the cursor, and both give the same
+    plan. What separates them is where a batch lands.
+
+    `now()` is transaction-start time, so every row written in one transaction
+    carries the identical timestamp, and one timestamp hashes to one bucket. A
+    9,000-row insert in a single transaction distributed 2960/2955/3085 across
+    three buckets when hashed on the key, and 9000/0/0 when hashed on the
+    timestamp -- the whole batch on one tablet, which is what the bucketing
+    exists to prevent. Primary keys are distinct by construction and do not do
+    this.
+
+    (It is not a write-volume difference: the entry is a delete plus an insert
+    either way, because the replication key is part of the index key in both
+    designs. Measured at 3,000 storage writes for 1,000 updated rows on both.)
+
+    Hashing the primary key also means one expression and one bucket count cover
+    every index on the table.
+
+    The primary key trails the replication key. That makes the order total, so a
+    cursor can resume inside a group of rows sharing a timestamp instead of
+    re-reading the whole group, and it makes the index UNIQUE -- which lets it
+    answer from the index alone.
+
+    The scan must name every bucket. Bounding a range does not need it
+    (YugabyteDB bounds a trailing column under an unbounded leading one), but
+    ORDER BY does: without the predicate the plan is a sort, and on a full drain
+    a sequential scan and an external merge. incremental.py emits it.
+    """
+    if list(pk_columns) == [replication_key]:
+        # the primary-key index already is this index -- see
+        # index_for_replication_key, which is what the scan hints. Emitting the
+        # replication-key form here names an index nothing uses and repeats the
+        # key column, `(bucket ASC, "id" ASC, "id" ASC)`, which the server
+        # accepts: a service owner running it builds a second copy of an index
+        # they already have, and nothing ever reads it.
+        return index_ddl(fq_table_name, table_name, pk_columns, buckets)
+
+    trailing = ', '.join(f'{c} ASC' for c in quoted(pk_columns))
+    return (
+        f'CREATE UNIQUE INDEX '
+        f'{quoted_name(replication_key_index_name(table_name, replication_key))} '
+        f'ON {fq_table_name} '
+        f'(({bucket_expr(pk_columns, buckets)}) ASC, "{replication_key}" ASC, '
+        f'{trailing}) '
+        f'SPLIT AT VALUES ({split_at_values(buckets)})'
+    )
+
+
+# replication_key_hint() used to live here. It rendered
+# `/*+ IndexScan(<table> <index>) */` for incremental._get_select_sql, which
+# placed it INSIDE the yb_speedup_trick subquery -- a position pg_hint_plan never
+# reads. Probed with a deliberately bogus index name, which the extension reports
+# when it parses a hint it cannot apply:
+#
+#   leading comment, plain statement   WARNING: bad index hint name "no_such_index"
+#   inside the subquery                WARNING: error trying to get hints from comment
+#
+# Those warnings are real but they are not evidence the hint was ignored: an A/B
+# on the same shape shows a nested hint IS applied -- unhinted plans an Index Only
+# Scan, and `/*+ SeqScan(healthy) */` inside the subquery plans a Seq Scan. The
+# INCREMENTAL scan emits no hint now because it does not need one and a hint makes
+# the plan worse -- see bucket_branches_sql, where hinting costs the Index Only
+# Scan. full_table still hints, and its hint leads its statement.
+#
+# index_for_replication_key stays: it names the index the scan reads and the DDL
+# creates, which is a separate question from hinting it.
