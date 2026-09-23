@@ -1002,3 +1002,59 @@ class TestMeasureTieGroups:
         m = keyset.measure_tie_groups(FakeCursor([]), 's', 't', 'updated_at')
         assert m['severity'] == 'unknown'
         assert 'not found' in m['risks'][0]
+
+
+class TestAttemptCap:
+    """A SQLSTATE that covers two failures deserving different treatment gets a
+    cap. 57014 is the case: the server answers it both for a cancel, which the
+    next attempt succeeds through, and for a statement_timeout shorter than one
+    FETCH, where all eight attempts fail identically after ~45s of backoff."""
+
+    def _err(self, sqlstate):
+        class E(psycopg2.Error):
+            @property
+            def pgcode(self_inner):
+                return sqlstate
+        return E('boom')
+
+    def test_57014_stops_at_two_attempts(self):
+        from tap_yugabyte import retry
+        assert retry.attempt_cap(self._err('57014'), 8) == 2
+
+    def test_an_ordinary_transient_state_keeps_the_full_budget(self):
+        from tap_yugabyte import retry
+        assert retry.attempt_cap(self._err('40001'), 8) == 8
+
+    def test_a_fault_with_no_sqlstate_keeps_the_full_budget(self):
+        # every connection-level fault measured arrived with pgcode None --
+        # a terminated backend, a YSQL restart -- so this is the common path
+        from tap_yugabyte import retry
+        assert retry.attempt_cap(psycopg2.OperationalError('server closed'), 8) == 8
+
+    def test_the_cap_never_raises_the_budget(self):
+        from tap_yugabyte import retry
+        assert retry.attempt_cap(self._err('57014'), 1) == 1
+
+    def test_both_retry_policies_agree(self):
+        """The tap and FastSync classify faults identically.
+
+        They drifted once already -- 42704 was missing from FastSync's set,
+        which meant a GUC the server does not have was retried eight times on
+        the export path and failed fast on the tap's. Loaded by path rather
+        than imported, so this runs in the tap's own suite without pulling in
+        the pipelinewise package.
+        """
+        import importlib.util
+        import pathlib
+        from tap_yugabyte import retry as tap_retry
+
+        path = (pathlib.Path(__file__).resolve().parents[4]
+                / 'pipelinewise' / 'fastsync' / 'commons' / 'yb_retry.py')
+        if not path.exists():
+            pytest.skip('fastsync retry module not present in this checkout')
+        spec = importlib.util.spec_from_file_location('_yb_retry', path)
+        yb_retry = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(yb_retry)
+
+        assert tap_retry.PERMANENT_SQLSTATES == yb_retry.PERMANENT_SQLSTATES
+        assert tap_retry.MAX_ATTEMPTS_BY_SQLSTATE == yb_retry.MAX_ATTEMPTS_BY_SQLSTATE

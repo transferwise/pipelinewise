@@ -46,6 +46,28 @@ PERMANENT_SQLSTATES = frozenset({
     '42846',  # cannot_coerce
 })
 
+# Retry, but not eight times. A SQLSTATE lands here when it covers two failures
+# that deserve different treatment and nothing on the exception separates them.
+# Kept identical to the tap's own MAX_ATTEMPTS_BY_SQLSTATE, which carries the
+# full argument; the two policies were brought into line and stay that way.
+#
+# 57014 query_canceled is the case. The server answers it both when something
+# cancels a statement and when `statement_timeout` expires. A cancel is
+# genuinely transient: the second attempt runs unimpeded and succeeds. A
+# statement_timeout shorter than the export it is applied to is the opposite --
+# the cap applies to every attempt equally, so all eight are guaranteed to fail
+# identically after burning the whole backoff schedule (~45s), and the export
+# fails anyway.
+#
+# Deliberately NOT separated by message text. The distinguishing string is a
+# server-side message, rewritten between releases and translated by
+# lc_messages, so matching it fails open on exactly the clusters least like the
+# one it was written against. The cap reaches the same outcome from the
+# SQLSTATE alone.
+MAX_ATTEMPTS_BY_SQLSTATE = {
+    '57014': 2,  # query_canceled -- a cancel and a statement_timeout, same code
+}
+
 
 class PermanentSourceError(Exception):
     """A source error that retrying cannot fix."""
@@ -59,6 +81,20 @@ def is_permanent(exc):
     """
     state = getattr(exc, 'pgcode', None)
     return state is not None and state in PERMANENT_SQLSTATES
+
+
+def attempt_cap(exc, max_attempts):
+    """How many attempts this error is worth, never more than `max_attempts`.
+
+    Read off the error that just occurred rather than the run as a whole: the
+    schedule a fault deserves is a property of the fault. An uncapped SQLSTATE
+    -- or none at all, which is every connection-level fault -- gets the full
+    allowance.
+    """
+    capped = MAX_ATTEMPTS_BY_SQLSTATE.get(getattr(exc, 'pgcode', None))
+    if capped is None:
+        return max_attempts
+    return min(max_attempts, capped)
 
 
 def _backoff_seconds(attempt, initial, maximum):
@@ -77,6 +113,11 @@ def retry_read(operation, description, max_attempts=DEFAULT_MAX_ATTEMPTS,
     it owns: a bulk export re-opens its output file, since a failed attempt
     leaves a partial one behind. `before_retry` runs first so the caller can
     discard that partial output.
+
+    Some SQLSTATEs stop short of `max_attempts`; see MAX_ATTEMPTS_BY_SQLSTATE.
+    Giving up under a cap raises the source error exactly as exhausting the
+    full allowance does -- it is a shorter schedule, not a new verdict, so a
+    caller cannot tell the two apart and nothing downstream has to.
     """
     last_exc = None
     for attempt in range(1, max_attempts + 1):
@@ -89,12 +130,22 @@ def retry_read(operation, description, max_attempts=DEFAULT_MAX_ATTEMPTS,
                 raise PermanentSourceError(
                     f'{description} failed permanently (SQLSTATE {state}): {exc}'
                 ) from exc
-            if attempt == max_attempts:
+            allowed = attempt_cap(exc, max_attempts)
+            if attempt >= allowed:
+                if allowed < max_attempts:
+                    LOGGER.warning(
+                        '%s giving up after attempt %s: SQLSTATE %s is capped '
+                        'at %s attempts of the %s configured, because the '
+                        'retries it does not get are the ones that could not '
+                        'have differed. Last error: %s',
+                        description, attempt, state, allowed, max_attempts,
+                        str(exc).strip().splitlines()[0],
+                    )
                 break
             delay = _backoff_seconds(attempt, initial_backoff, max_backoff)
             LOGGER.warning(
                 '%s failed on attempt %s/%s (SQLSTATE %s); retrying in %.2fs: %s',
-                description, attempt, max_attempts, state, delay,
+                description, attempt, allowed, state, delay,
                 str(exc).strip().splitlines()[0],
             )
             if before_retry is not None:

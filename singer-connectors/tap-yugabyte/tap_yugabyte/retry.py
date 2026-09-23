@@ -51,6 +51,32 @@ PERMANENT_SQLSTATES = frozenset({
     '42846',  # cannot_coerce
 })
 
+# Retry, but not eight times. A SQLSTATE lands here when it covers two failures
+# that deserve different treatment and nothing on the exception separates them.
+#
+# 57014 query_canceled is the case. The server answers it both when something
+# cancels a statement and when `statement_timeout` expires. A cancel is
+# genuinely transient: the second attempt runs unimpeded and succeeds. A
+# statement_timeout shorter than one FETCH is the opposite -- the cap applies to
+# every attempt equally, so all eight are guaranteed to fail identically, and
+# the scan emits zero rows after burning the whole backoff schedule (measured:
+# ~45s of pure backoff per bucket, and it fails anyway).
+#
+# Two attempts serve both. The cancel recovers on the second, which is all it
+# ever needed. The misconfigured timeout fails in the time of two statements
+# rather than eight plus backoff, and surfaces the real error promptly instead
+# of leaving an operator watching a pipeline that is not doing anything.
+#
+# Deliberately NOT separated by message text. The distinguishing string --
+# 'canceling statement due to statement timeout' against '...due to user
+# request' -- is a server-side message: it is rewritten between releases and
+# translated by lc_messages, so matching it fails open on exactly the clusters
+# least like the one it was written against. The cap reaches the same outcome
+# from the SQLSTATE alone.
+MAX_ATTEMPTS_BY_SQLSTATE = {
+    '57014': 2,  # query_canceled -- a cancel and a statement_timeout, same code
+}
+
 # Named only so operators can recognise them in logs; the policy retries anything
 # absent from PERMANENT_SQLSTATES, so this list does not gate behaviour.
 KNOWN_TRANSIENT_SQLSTATES = {
@@ -92,6 +118,20 @@ def is_permanent(exc):
     return state in PERMANENT_SQLSTATES
 
 
+def attempt_cap(exc, max_attempts):
+    """How many attempts this error is worth, never more than `max_attempts`.
+
+    Read off the error that just occurred rather than the run as a whole: the
+    schedule a fault deserves is a property of the fault. An uncapped SQLSTATE
+    -- or none at all, which is every connection-level fault -- gets the full
+    allowance.
+    """
+    capped = MAX_ATTEMPTS_BY_SQLSTATE.get(_sqlstate(exc))
+    if capped is None:
+        return max_attempts
+    return min(max_attempts, capped)
+
+
 def _backoff_seconds(attempt, initial, maximum):
     """Exponential backoff with full jitter.
 
@@ -117,6 +157,11 @@ def retry_read(operation, description, max_attempts=DEFAULT_MAX_ATTEMPTS,
 
     `on_retry` is invoked before each re-run so the caller can re-read its
     bookmark and narrow the replacement query to the rows it still needs.
+
+    Some SQLSTATEs stop short of `max_attempts`; see MAX_ATTEMPTS_BY_SQLSTATE.
+    Giving up under a cap raises the source error exactly as exhausting the
+    full allowance does -- it is a shorter schedule, not a new verdict, so a
+    caller cannot tell the two apart and nothing downstream has to.
     """
     last_exc = None
     for attempt in range(1, max_attempts + 1):
@@ -129,12 +174,24 @@ def retry_read(operation, description, max_attempts=DEFAULT_MAX_ATTEMPTS,
                 raise PermanentSourceError(
                     f'{description} failed permanently (SQLSTATE {state}): {exc}'
                 ) from exc
-            if attempt == max_attempts:
+            allowed = attempt_cap(exc, max_attempts)
+            if attempt >= allowed:
+                if allowed < max_attempts:
+                    LOGGER.warning(
+                        '%s giving up after attempt %s: SQLSTATE %s (%s) is '
+                        'capped at %s attempts of the %s configured, because '
+                        'the retries it does not get are the ones that could '
+                        'not have differed. Last error: %s',
+                        description, attempt, state,
+                        KNOWN_TRANSIENT_SQLSTATES.get(state, 'unclassified'),
+                        allowed, max_attempts,
+                        str(exc).strip().splitlines()[0],
+                    )
                 break
             delay = _backoff_seconds(attempt, initial_backoff, max_backoff)
             LOGGER.warning(
                 '%s failed on attempt %s/%s (SQLSTATE %s: %s); retrying in %.2fs: %s',
-                description, attempt, max_attempts, state,
+                description, attempt, allowed, state,
                 KNOWN_TRANSIENT_SQLSTATES.get(state, 'unclassified'),
                 delay, str(exc).strip().splitlines()[0],
             )
