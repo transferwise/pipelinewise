@@ -58,8 +58,9 @@ MYSQL_BINLOG_DISCONNECT_MARKER = {
     'version': 1,
 }
 MYSQL_BINLOG_DISCONNECT_CONTROL_PREFIX = 'PIPELINEWISE_CONTROL:'
-MYSQL_BINLOG_DISCONNECT_MAX_ATTEMPTS = 3
-MYSQL_BINLOG_DISCONNECT_RETRY_DELAY_SECONDS = 1
+MYSQL_BINLOG_DISCONNECT_RETRY_DELAYS_SECONDS = (30, 60)
+MYSQL_BINLOG_DISCONNECT_MAX_ATTEMPTS = len(MYSQL_BINLOG_DISCONNECT_RETRY_DELAYS_SECONDS) + 1
+MYSQL_BINLOG_RETRY_PENDING_ENV = 'PIPELINEWISE_MYSQL_BINLOG_RETRY_PENDING'
 
 
 def _persist_singer_state(path: str, state: str) -> None:
@@ -1112,6 +1113,10 @@ class PipelineWise:
                 profiling_mode=self.profiling_mode,
                 profiling_dir=self.profiling_dir,
             )
+            if tap.type == ConnectorType.TAP_MYSQL.value:
+                retry_pending = int(attempt < MYSQL_BINLOG_DISCONNECT_MAX_ATTEMPTS)
+                # The assignment applies only to the tap, not the remaining pipeline stages.
+                command = f'{MYSQL_BINLOG_RETRY_PENDING_ENV}={retry_pending} {command}'
 
             try:
                 commands.run_command(command, self.tap_run_log_file, line_callback)
@@ -1124,6 +1129,7 @@ class PipelineWise:
                 if not retryable_disconnect or attempt == MYSQL_BINLOG_DISCONNECT_MAX_ATTEMPTS:
                     raise
 
+                retry_delay = MYSQL_BINLOG_DISCONNECT_RETRY_DELAYS_SECONDS[attempt - 1]
                 failed_log = commands.log_file_with_status(
                     self.tap_run_log_file, commands.STATUS_FAILED)
                 if os.path.isfile(failed_log):
@@ -1131,15 +1137,17 @@ class PipelineWise:
                     os.replace(failed_log, running_log)
                     with open(running_log, 'a', encoding='utf-8') as logfile:
                         logfile.write(f'\nRetrying Singer pipeline: attempt {attempt + 1} '
-                                      f'of {MYSQL_BINLOG_DISCONNECT_MAX_ATTEMPTS}\n')
+                                      f'of {MYSQL_BINLOG_DISCONNECT_MAX_ATTEMPTS} '
+                                      f'(waiting {retry_delay} seconds)\n')
 
                 self.logger.warning(
-                    'MySQL binlog connection lost; retrying the Singer pipeline from durable state '
+                    'MySQL binlog connection lost; retrying the Singer pipeline from durable state in %s seconds '
                     '(attempt %s of %s).',
+                    retry_delay,
                     attempt + 1,
                     MYSQL_BINLOG_DISCONNECT_MAX_ATTEMPTS,
                 )
-                sleep(MYSQL_BINLOG_DISCONNECT_RETRY_DELAY_SECONDS)
+                sleep(retry_delay)
 
         # update the state file one last time to make sure it always has the last state message.
         if state is not None:

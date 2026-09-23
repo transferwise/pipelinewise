@@ -8,6 +8,7 @@ from pymysqlreplication import BinLogStreamReader
 from tap_mysql.connection import (
     DEFAULT_SESSION_SQLS,
     MARIADB_MAX_STATEMENT_TIME_SQL,
+    MYSQL_MAX_EXECUTION_TIME_SQL,
     MySQLConnection,
     fetch_server_id,
     fetch_server_uuid,
@@ -36,7 +37,8 @@ class TestConnection(unittest.TestCase):
             run_session_sqls(mariadb_conn)
             mariadb_sqls = [args.args[1] for args in run_sql.call_args_list]
 
-        self.assertEqual(mysql_sqls, DEFAULT_SESSION_SQLS)
+        self.assertEqual(mysql_sqls, [*DEFAULT_SESSION_SQLS, MYSQL_MAX_EXECUTION_TIME_SQL])
+        self.assertIn('SET @@session.net_write_timeout=3600', mysql_sqls)
         self.assertNotIn(MARIADB_MAX_STATEMENT_TIME_SQL, mysql_sqls)
         self.assertEqual(
             mariadb_sqls,
@@ -69,10 +71,10 @@ class TestConnection(unittest.TestCase):
             'detected',
         )
 
-    def test_explicit_engine_selects_defaults_without_server_detection(self):
+    def test_explicit_engine_selects_defaults_regardless_of_server_flavor(self):
         base_config = {'host': 'localhost', 'port': 3306, 'user': 'test', 'password': 'test'}
         cases = (
-            ('mysql', '11.4.10-MariaDB-log', DEFAULT_SESSION_SQLS),
+            ('mysql', '11.4.10-MariaDB-log', [*DEFAULT_SESSION_SQLS, MYSQL_MAX_EXECUTION_TIME_SQL]),
             (
                 'mariadb',
                 '8.0.39',
@@ -92,6 +94,58 @@ class TestConnection(unittest.TestCase):
                     expected_sqls,
                 )
                 conn.get_server_info.assert_not_called()
+
+    def test_unavailable_builtin_timeout_warns_and_keeps_custom_settings(self):
+        for engine, timeout_sql in (
+            ('mysql', MYSQL_MAX_EXECUTION_TIME_SQL), ('mariadb', MARIADB_MAX_STATEMENT_TIME_SQL)
+        ):
+            with self.subTest(engine=engine):
+                conn = MySQLConnection({
+                    'host': 'localhost', 'port': 3306, 'user': 'test', 'password': 'test',
+                    'engine': engine, 'session_sqls': ['SET SESSION net_write_timeout=7200'],
+                })
+
+                def execute(_connection, sql):
+                    if sql == timeout_sql:
+                        raise OperationalError(1193, 'Unknown system variable')
+
+                with patch('tap_mysql.connection.run_sql', side_effect=execute) as run_sql, \
+                        self.assertLogs('tap_mysql', 'WARNING') as logs:
+                    run_session_sqls(conn)
+
+                self.assertEqual(conn.resolved_engine, engine)
+                self.assertEqual([args.args[1] for args in run_sql.call_args_list], [
+                    *DEFAULT_SESSION_SQLS, timeout_sql, 'SET SESSION net_write_timeout=7200',
+                ])
+                self.assertIn('Built-in timeout not applied', '\n'.join(logs.output))
+
+    def test_session_operational_errors_other_than_builtin_1193_propagate(self):
+        cases = [
+            (MYSQL_MAX_EXECUTION_TIME_SQL, 1142, False),
+            (MYSQL_MAX_EXECUTION_TIME_SQL, 2013, False),
+            (DEFAULT_SESSION_SQLS[0], 1193, False),
+            (MYSQL_MAX_EXECUTION_TIME_SQL, 1193, True),
+        ]
+        for failing_sql, code, custom in cases:
+            with self.subTest(sql=failing_sql, code=code, custom=custom):
+                conn = MySQLConnection({
+                    'host': 'localhost', 'port': 3306, 'user': 'test', 'password': 'test',
+                    'engine': 'mysql', 'session_sqls': [failing_sql] if custom else [],
+                })
+                error = OperationalError(code, 'Session setup failed')
+                seen = 0
+
+                def execute(_connection, sql):
+                    nonlocal seen
+                    if sql == failing_sql:
+                        seen += 1
+                        if not custom or seen > 1:
+                            raise error
+
+                with patch('tap_mysql.connection.run_sql', side_effect=execute), \
+                        self.assertRaises(OperationalError) as raised:
+                    run_session_sqls(conn)
+                self.assertIs(raised.exception, error)
 
     def test_connection_does_not_mutate_config_or_materialize_an_engine(self):
         config = {'host': 'localhost', 'port': 3306, 'user': 'test', 'password': 'test'}
@@ -141,6 +195,35 @@ class TestConnection(unittest.TestCase):
             ],
         )
         conn.get_server_info.assert_called_once_with()
+
+    def test_partial_session_overrides_keep_other_defaults(self):
+        for engine in ('mysql', 'mariadb'):
+            statement_timeout = 'max_statement_time' if engine == 'mariadb' else 'max_execution_time'
+            for custom_sqls in ([], None, ['SET SESSION net_write_timeout=7200'],
+                                [f'SET SESSION {statement_timeout}=123']):
+                with self.subTest(engine=engine, custom_sqls=custom_sqls):
+                    config = {
+                        'host': 'localhost', 'port': 3306, 'user': 'test', 'password': 'test',
+                        'engine': engine, 'session_sqls': custom_sqls,
+                    }
+                    conn = MySQLConnection(config)
+                    with patch('tap_mysql.connection.run_sql') as run_sql:
+                        run_session_sqls(conn)
+
+                    expected = [
+                        'SET @@session.time_zone="+0:00"',
+                        'SET @@session.wait_timeout=28800',
+                        'SET @@session.net_read_timeout=3600',
+                        'SET @@session.net_write_timeout=3600',
+                        'SET @@session.innodb_lock_wait_timeout=3600',
+                    ]
+                    if engine == 'mariadb':
+                        expected.append('SET @@session.max_statement_time=0')
+                    else:
+                        expected.append('SET @@session.max_execution_time=0')
+                    expected.extend(custom_sqls or [])
+                    self.assertEqual([invocation.args[1] for invocation in run_sql.call_args_list], expected)
+                    self.assertEqual(config['session_sqls'], custom_sqls)
 
     def test_gtid_reconnect_and_non_network_errors_remain_driver_handled(self):
         for use_gtid, error_code in [(True, 2006), (True, 2013), (False, 1142)]:

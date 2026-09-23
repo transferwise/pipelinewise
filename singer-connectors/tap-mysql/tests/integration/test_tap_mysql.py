@@ -1425,7 +1425,10 @@ class TestSessionSqls(unittest.TestCase):
                 conn = MySQLConnectionMock(config=test_utils.get_db_config())
                 connect_with_backoff(conn)
 
-        self.assertEqual(self.executed_queries, tap_mysql.connection.DEFAULT_SESSION_SQLS)
+        self.assertEqual(self.executed_queries, [
+            *tap_mysql.connection.DEFAULT_SESSION_SQLS,
+            tap_mysql.connection.MYSQL_MAX_EXECUTION_TIME_SQL,
+        ])
 
     def test_open_connections_with_default_mariadb_session_sqls(self):
         """The handshake detects MariaDB when engine is omitted."""
@@ -1462,7 +1465,10 @@ class TestSessionSqls(unittest.TestCase):
                 })
                 connect_with_backoff(conn)
 
-        self.assertEqual(self.executed_queries, tap_mysql.connection.DEFAULT_SESSION_SQLS)
+        self.assertEqual(self.executed_queries, [
+            *tap_mysql.connection.DEFAULT_SESSION_SQLS,
+            tap_mysql.connection.MYSQL_MAX_EXECUTION_TIME_SQL,
+        ])
         get_server_info.assert_not_called()
 
     def test_detected_defaults_apply_to_connected_server(self):
@@ -1475,11 +1481,78 @@ class TestSessionSqls(unittest.TestCase):
         with connect_with_backoff(conn) as open_conn:
             version = open_conn.get_server_info()
             with open_conn.cursor() as cursor:
-                cursor.execute('SELECT @@session.innodb_lock_wait_timeout')
-                self.assertEqual(cursor.fetchone()[0], 3600)
+                cursor.execute(
+                    'SELECT @@session.time_zone, @@session.wait_timeout, @@session.net_read_timeout, '
+                    '@@session.net_write_timeout, @@session.innodb_lock_wait_timeout')
+                self.assertEqual(cursor.fetchone(), ('+00:00', 28800, 3600, 3600, 3600))
                 if 'mariadb' in version.lower():
                     cursor.execute('SELECT @@session.max_statement_time')
                     self.assertEqual(float(cursor.fetchone()[0]), 0.0)
+                else:
+                    cursor.execute('SELECT @@session.max_execution_time')
+                    self.assertEqual(cursor.fetchone()[0], 0)
+
+    def test_explicit_engines_tolerate_only_unavailable_builtin_timeouts(self):
+        """Both override directions work without hiding unsupported custom SQL."""
+        for engine in ('mysql', 'mariadb'):
+            with self.subTest(engine=engine):
+                conn = MySQLConnection({
+                    **test_utils.get_db_config(), 'engine': engine,
+                    'cursorclass': pymysql.cursors.Cursor,
+                    'session_sqls': ['SET SESSION net_write_timeout=7200'],
+                })
+                with patch.object(tap_mysql.connection.LOGGER, 'warning') as warning, \
+                        connect_with_backoff(conn) as open_conn:
+                    detected_engine = 'mariadb' if 'mariadb' in open_conn.get_server_info().lower() else 'mysql'
+                    self.assertEqual(open_conn.resolved_engine, engine)
+                    with open_conn.cursor() as cursor:
+                        cursor.execute('SELECT @@session.net_write_timeout, @@session.time_zone')
+                        self.assertEqual(cursor.fetchone(), (7200, '+00:00'))
+                    if engine == detected_engine:
+                        warning.assert_not_called()
+                    else:
+                        self.assertTrue(any('Built-in timeout not applied' in args.args[0]
+                                            for args in warning.call_args_list))
+                        # The same SQL supplied explicitly must still fail.
+                        open_conn.session_sqls = [
+                            tap_mysql.connection.MYSQL_MAX_EXECUTION_TIME_SQL if engine == 'mysql'
+                            else tap_mysql.connection.MARIADB_MAX_STATEMENT_TIME_SQL
+                        ]
+                        with self.assertRaises(pymysql.err.OperationalError) as raised:
+                            tap_mysql.connection.run_session_sqls(open_conn)
+                        self.assertEqual(raised.exception.args[0], 1193)
+
+    def test_partial_session_override_keeps_other_connected_defaults(self):
+        conn = MySQLConnection({
+            **test_utils.get_db_config(),
+            'cursorclass': pymysql.cursors.Cursor,
+            'session_sqls': ['SET SESSION net_write_timeout=7200'],
+        })
+
+        with connect_with_backoff(conn) as open_conn:
+            with open_conn.cursor() as cursor:
+                cursor.execute(
+                    'SELECT @@session.time_zone, @@session.wait_timeout, @@session.net_read_timeout, '
+                    '@@session.net_write_timeout, @@session.innodb_lock_wait_timeout')
+                self.assertEqual(cursor.fetchone(), ('+00:00', 28800, 3600, 7200, 3600))
+                if 'mariadb' in open_conn.get_server_info().lower():
+                    cursor.execute('SELECT @@session.max_statement_time')
+                    self.assertEqual(float(cursor.fetchone()[0]), 0.0)
+                else:
+                    cursor.execute('SELECT @@session.max_execution_time')
+                    self.assertEqual(cursor.fetchone()[0], 0)
+
+    def test_statement_timeout_can_override_detected_default(self):
+        conn = MySQLConnection({**test_utils.get_db_config(), 'cursorclass': pymysql.cursors.Cursor})
+        with connect_with_backoff(conn) as open_conn:
+            variable = 'max_statement_time' if open_conn.resolved_engine == 'mariadb' else 'max_execution_time'
+            open_conn.session_sqls = [f'SET SESSION {variable}=123']
+            tap_mysql.connection.run_session_sqls(open_conn)
+            with open_conn.cursor() as cursor:
+                cursor.execute(f'SELECT @@session.{variable}, @@session.net_write_timeout')
+                timeout, write_timeout = cursor.fetchone()
+                self.assertEqual(float(timeout), 123.0)
+                self.assertEqual(write_timeout, 3600)
 
     def test_open_connections_with_session_sqls(self):
         """Custom session parameters should be applied if defined"""

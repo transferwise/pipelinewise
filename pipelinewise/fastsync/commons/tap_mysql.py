@@ -22,13 +22,16 @@ DEFAULT_EXPORT_BATCH_ROWS = 50000
 MARIADB_ENGINE = 'mariadb'
 MYSQL_ENGINE = 'mysql'
 DEFAULT_USE_GTID = False
+DEFAULT_NET_WRITE_TIMEOUT_SQL = 'SET @@session.net_write_timeout=3600'
 DEFAULT_SESSION_SQLS = [
     'SET @@session.time_zone="+0:00"',
     'SET @@session.wait_timeout=28800',
     'SET @@session.net_read_timeout=3600',
+    DEFAULT_NET_WRITE_TIMEOUT_SQL,
     'SET @@session.innodb_lock_wait_timeout=3600',
 ]
 MARIADB_MAX_STATEMENT_TIME_SQL = 'SET @@session.max_statement_time=0'
+MYSQL_MAX_EXECUTION_TIME_SQL = 'SET @@session.max_execution_time=0'
 _REPORTED_SESSION_ENGINE_SELECTIONS = set()
 
 
@@ -55,6 +58,8 @@ def default_session_sqls(engine):
     session_sqls = list(DEFAULT_SESSION_SQLS)
     if engine == MARIADB_ENGINE:
         session_sqls.append(MARIADB_MAX_STATEMENT_TIME_SQL)
+    elif engine == MYSQL_ENGINE:
+        session_sqls.append(MYSQL_MAX_EXECUTION_TIME_SQL)
     return session_sqls
 
 
@@ -213,16 +218,25 @@ class FastSyncTapMySql:
         """
         configured_session_sqls = self.connection_config.get('session_sqls')
         session_sqls = [
-            *default_session_sqls(self.source_engine),
-            *(configured_session_sqls if isinstance(configured_session_sqls, list) else []),
+            (sql, sql in (MARIADB_MAX_STATEMENT_TIME_SQL, MYSQL_MAX_EXECUTION_TIME_SQL))
+            for sql in default_session_sqls(self.source_engine)
         ]
+        session_sqls.extend((sql, False) for sql in (
+            configured_session_sqls if isinstance(configured_session_sqls, list) else []
+        ))
 
         warnings = []
-        if session_sqls and isinstance(session_sqls, list):
-            for sql in session_sqls:
+        for sql, optional_timeout in session_sqls:
+            for conn in (self.conn, self.conn_unbuffered):
                 try:
-                    self.query(sql)
-                    self.query(sql, self.conn_unbuffered)
+                    self._run_session_sql(conn, sql)
+                except pymysql.err.OperationalError as exc:
+                    if not optional_timeout or not exc.args or exc.args[0] != 1193:
+                        raise
+                    warnings.append(
+                        f'Built-in timeout not applied: {sql}; server does not support this variable. '
+                        'Check the configured source engine.'
+                    )
                 except pymysql.err.InternalError:
                     warnings.append(f'Could not set session variable: {sql}')
 
@@ -232,6 +246,12 @@ class FastSyncTapMySql:
             )
         for warning in warnings:
             LOGGER.warning(warning)
+
+    @staticmethod
+    def _run_session_sql(conn, sql):
+        """Initialize directly: query reconnects would recursively initialize sessions."""
+        with conn.cursor() as cursor:
+            cursor.execute(sql)
 
     def close_connections(self, silent=False):
         """

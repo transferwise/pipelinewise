@@ -15,7 +15,7 @@ from pipelinewise.cli.pipelinewise import (
     MYSQL_BINLOG_DISCONNECT_CONTROL_PREFIX,
     MYSQL_BINLOG_DISCONNECT_MARKER,
     MYSQL_BINLOG_DISCONNECT_MAX_ATTEMPTS,
-    MYSQL_BINLOG_DISCONNECT_RETRY_DELAY_SECONDS,
+    MYSQL_BINLOG_RETRY_PENDING_ENV,
     PipelineWise,
     _is_retryable_mysql_disconnect,
     _persist_singer_state,
@@ -60,7 +60,7 @@ def test_disconnect_rebuilds_command_from_latest_durable_state(tmp_path):
         return f'command-{len(seen_states)}'
 
     def run_command(command, _log_file, line_callback):
-        if command == 'command-1':
+        if command.endswith('command-1'):
             line_callback('{"bookmarks":{"db-items":{"log_pos":100}}}\n')
             line_callback('{"bookmarks":{"db-items":{"log_pos":123}}}\n')
             line_callback(marker_line())
@@ -73,8 +73,11 @@ def test_disconnect_rebuilds_command_from_latest_durable_state(tmp_path):
         pipelinewise.run_tap_singer(tap, target, transform)
 
     assert seen_states == [None, {'bookmarks': {'db-items': {'log_pos': 123}}}]
-    assert [invocation.args[0] for invocation in run.call_args_list] == ['command-1', 'command-2']
-    retry_sleep.assert_called_once_with(MYSQL_BINLOG_DISCONNECT_RETRY_DELAY_SECONDS)
+    assert [invocation.args[0] for invocation in run.call_args_list] == [
+        f'{MYSQL_BINLOG_RETRY_PENDING_ENV}=1 command-1',
+        f'{MYSQL_BINLOG_RETRY_PENDING_ENV}=1 command-2',
+    ]
+    retry_sleep.assert_called_once_with(30)
 
 
 def test_disconnect_stops_after_two_retries_and_retains_latest_durable_state(tmp_path):
@@ -97,7 +100,12 @@ def test_disconnect_stops_after_two_retries_and_retains_latest_durable_state(tmp
             pipelinewise.run_tap_singer(tap, target, transform)
 
     assert build.call_count == run.call_count == MYSQL_BINLOG_DISCONNECT_MAX_ATTEMPTS
-    assert retry_sleep.call_args_list == [call(MYSQL_BINLOG_DISCONNECT_RETRY_DELAY_SECONDS)] * 2
+    assert retry_sleep.call_args_list == [call(30), call(60)]
+    assert [invocation.args[0] for invocation in run.call_args_list] == [
+        f'{MYSQL_BINLOG_RETRY_PENDING_ENV}=1 command',
+        f'{MYSQL_BINLOG_RETRY_PENDING_ENV}=1 command',
+        f'{MYSQL_BINLOG_RETRY_PENDING_ENV}=0 command',
+    ]
     assert json.loads(state_path.read_text()) == {'bookmarks': {'db-items': {'log_pos': 300}}}
 
 
@@ -119,6 +127,33 @@ class ProcessOutput:
 
     def poll(self):
         return self.returncode
+
+
+@pytest.mark.parametrize('error_code', [2006, 2013])
+def test_warning_without_control_marker_retains_disconnect_in_failure_summary_without_retry(tmp_path, error_code):
+    pipelinewise = runner(tmp_path)
+    tap, target, transform = params(tmp_path / 'state.json')
+    cause = f"pymysql.err.OperationalError: ({error_code}, 'source disconnected')"
+    warning = (
+        'WARNING tap_mysql - Binlog connection lost; PipelineWise will retry from durable state. '
+        f'Cause: {cause}\n'
+    )
+
+    with patch.object(commands, 'build_singer_command', return_value='command') as build, \
+            patch.object(commands, 'Popen', return_value=ProcessOutput(warning, 1)) as popen, \
+            patch('pipelinewise.cli.pipelinewise.sleep') as retry_sleep:
+        with pytest.raises(commands.RunCommandException) as raised:
+            pipelinewise.run_tap_singer(tap, target, transform)
+
+    assert 'Return code: 1' in str(raised.value)
+    assert f'Error(s) found:\n{warning}' in str(raised.value)
+    assert cause in str(raised.value)
+    build.assert_called_once()
+    popen.assert_called_once()
+    retry_sleep.assert_not_called()
+    failed_log = (tmp_path / 'run.log.failed').read_text()
+    assert failed_log == warning
+    assert 'Traceback (most recent call last)' not in failed_log
 
 
 @pytest.mark.parametrize('terminal_status', ['success', 'failed'])
@@ -145,6 +180,7 @@ def test_one_combined_terminal_log_and_no_retry_from_an_earlier_attempt_marker(t
     assert 'first attempt' in combined_log
     assert 'last attempt' in combined_log
     assert 'Retrying Singer pipeline: attempt 2 of 3' in combined_log
+    assert '(waiting 30 seconds)' in combined_log
     assert marker_line() in combined_log
 
 
@@ -158,7 +194,7 @@ def test_retry_marker_is_independent_of_logging_format(tmp_path, human_log):
     tap, target, transform = params(tmp_path / 'state.json')
 
     def run_command(command, _log_file, line_callback):
-        if command == 'first':
+        if command.endswith('first'):
             line_callback(human_log)
             line_callback(marker_line())
             raise commands.RunCommandException('No recognizable message or failed log')
@@ -194,6 +230,8 @@ def test_human_messages_exception_text_and_other_taps_cannot_trigger_retry(tmp_p
     assert raised.value is failure
     build.assert_called_once()
     run.assert_called_once()
+    if tap_type != 'tap-mysql':
+        assert run.call_args.args[0] == 'command'
     retry_sleep.assert_not_called()
 
 
@@ -232,6 +270,11 @@ def test_tap_and_orchestrator_share_the_control_protocol():
                           and target.id == 'MYSQL_BINLOG_DISCONNECT_CONTROL_PREFIX'
                           for target in node.targets))
     assert ast.literal_eval(prefix) == MYSQL_BINLOG_DISCONNECT_CONTROL_PREFIX
+    retry_env = next(node.value for node in module.body if isinstance(node, ast.Assign)
+                     and any(isinstance(target, ast.Name)
+                             and target.id == 'MYSQL_BINLOG_RETRY_PENDING_ENV'
+                             for target in node.targets))
+    assert ast.literal_eval(retry_env) == MYSQL_BINLOG_RETRY_PENDING_ENV
 
 
 def test_frequent_singer_state_saves_use_debug_but_other_atomic_saves_keep_info(tmp_path):

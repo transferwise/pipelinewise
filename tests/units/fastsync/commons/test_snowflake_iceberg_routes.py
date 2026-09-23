@@ -321,12 +321,37 @@ def test_fastsync_recovery_identity_keeps_server_detected_timeout_non_semantic()
     assert identities[1]['source']['engine'] == 'mysql'
     assert identities[0]['source']['charset'] == routes.DEFAULT_CHARSET
     assert identities[0]['source']['use_gtid'] is routes.DEFAULT_USE_GTID
-    assert detected_sqls == routes.DEFAULT_SESSION_SQLS
-    assert mysql_sqls == routes.DEFAULT_SESSION_SQLS
+    previous_defaults = [
+        'SET @@session.time_zone="+0:00"',
+        'SET @@session.wait_timeout=28800',
+        'SET @@session.net_read_timeout=3600',
+        'SET @@session.innodb_lock_wait_timeout=3600',
+    ]
+    assert detected_sqls == previous_defaults
+    assert mysql_sqls == previous_defaults
     assert custom_sqls == [
-        *routes.DEFAULT_SESSION_SQLS,
+        *previous_defaults,
         'SET custom_session_setting=1',
     ]
+
+
+@pytest.mark.parametrize('custom_sqls', [None, [], ['SET SESSION net_write_timeout=7200']])
+def test_new_default_write_timeout_preserves_existing_recovery_identity(custom_sqls):
+    args = _recovery_args(tap_override={'session_sqls': custom_sqls})
+    current = _recovery_identity(args)
+    previous_defaults = [sql for sql in routes.DEFAULT_SESSION_SQLS if 'net_write_timeout' not in sql]
+    with mock.patch.object(routes, 'DEFAULT_SESSION_SQLS', previous_defaults):
+        previous = _recovery_identity(args)
+    assert current == previous
+
+
+def test_custom_write_timeout_remains_bound_to_recovery_identity():
+    default = _recovery_identity(_recovery_args())
+    custom = _recovery_identity(_recovery_args(tap_override={
+        'session_sqls': ['SET SESSION net_write_timeout=7200'],
+    }))
+    assert custom['stream_fingerprint'] == default['stream_fingerprint']
+    assert custom['fingerprint'] != default['fingerprint']
 
 
 def test_fastsync_recovery_identity_uses_separate_opaque_stream_keys():

@@ -3,6 +3,7 @@
 from . import utils
 from .tap_mysql import (
     DEFAULT_CHARSET,
+    DEFAULT_NET_WRITE_TIMEOUT_SQL,
     DEFAULT_SESSION_SQLS,
     DEFAULT_USE_GTID,
 )
@@ -199,7 +200,8 @@ def fastsync_recovery_identity(
         source_identity.update({
             'charset': source_config.get('charset', DEFAULT_CHARSET),
             'session_sqls': [
-                *DEFAULT_SESSION_SQLS,
+                # The new transport timeout must not invalidate existing recovery manifests.
+                *(sql for sql in DEFAULT_SESSION_SQLS if sql != DEFAULT_NET_WRITE_TIMEOUT_SQL),
                 *(configured_session_sqls if isinstance(configured_session_sqls, list) else []),
             ],
             'use_gtid': source_config.get('use_gtid', DEFAULT_USE_GTID),

@@ -1,6 +1,7 @@
 
 import copy
 import json
+import os
 import pymysql
 import singer
 import sys
@@ -14,6 +15,7 @@ from tap_mysql.connection import (
     connect_with_backoff,
     MYSQL_BINLOG_DISCONNECT_CONTROL_PREFIX,
     MYSQL_BINLOG_DISCONNECT_MARKER,
+    MYSQL_BINLOG_RETRY_PENDING_ENV,
     MySQLConnection,
     fetch_server_id as fetch_server_id,
     MYSQL_ENGINE,
@@ -486,5 +488,12 @@ def main():
             marker = json.dumps(MYSQL_BINLOG_DISCONNECT_MARKER, separators=(',', ':'))
             sys.stderr.write(f'{MYSQL_BINLOG_DISCONNECT_CONTROL_PREFIX}{marker}\n')
             sys.stderr.flush()
+            if os.environ.get(MYSQL_BINLOG_RETRY_PENDING_ENV) == '1':
+                cause = exc.__cause__ or exc
+                LOGGER.warning(
+                    'Binlog connection lost; PipelineWise will retry from durable state. Cause: %s.%s: %s',
+                    type(cause).__module__, type(cause).__qualname__, cause,
+                )
+                raise SystemExit(1) from None
         LOGGER.critical(exc)
         raise exc
