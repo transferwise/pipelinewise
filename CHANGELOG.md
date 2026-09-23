@@ -1,3 +1,17 @@
+0.91.1 (2026-09-23)
+-------------------
+
+- Set MySQL and MariaDB ``net_write_timeout=3600`` for Singer, FullSync, and
+  PartialSync so source connections tolerate longer target stalls
+- Disable MySQL SELECT timeouts with ``max_execution_time=0``; keep MariaDB's
+  ``max_statement_time=0`` default
+- Warn and continue if the server lacks a built-in statement-timeout variable;
+  keep unknown-variable errors fatal for custom ``session_sqls``
+- Avoid recursive FastSync reconnects when session setup fails
+- Preserve pending Iceberg recovery when the default network write timeout changes
+- Wait 30 and 60 seconds between PipelineWise-managed binlog retries; keep the
+  cause and error code in retry warnings and the traceback on terminal disconnects
+
 0.91.0 (2026-09-22)
 -------------------
 

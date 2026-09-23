@@ -110,9 +110,12 @@ Configuration
      - No
      - Server-specific connector defaults
      - Runs after the connector defaults and can extend or override them.
-       Defaults set UTC, ``wait_timeout=28800``, ``net_read_timeout=3600``, and
+       Singer, FullSync, and PartialSync set UTC, ``wait_timeout=28800``,
+       ``net_read_timeout=3600``, ``net_write_timeout=3600``, and
        ``innodb_lock_wait_timeout=3600``. MariaDB also sets
-       ``max_statement_time=0``.
+       ``max_statement_time=0``; MySQL sets
+       ``max_execution_time=0``. Providing only some custom settings keeps
+       the other defaults.
    * - ``fastsync_parallelism``
      - No
      - CPU count
@@ -131,7 +134,13 @@ Operational notes
   present and otherwise detect the connected server. The resolved engine is
   used consistently for session defaults, GTID handling, binlog status, and
   managed Iceberg v3 JSON aliases. MariaDB sessions set
-  ``max_statement_time=0``; MySQL sessions do not.
+  ``max_statement_time=0``; MySQL uses
+  ``max_execution_time=0`` instead. MySQL's limit is in milliseconds and
+  applies to read-only SELECT statements; MariaDB's is in seconds.
+  If the server lacks the built-in timeout variable, PipelineWise warns and
+  continues without applying it. Check that ``engine`` matches the server;
+  this does not change engine selection. Unknown variables in custom
+  ``session_sqls`` still fail the connection.
 - MySQL partial-JSON events and MySQL/MariaDB compressed binlog events are not
   supported by the bundled decoder. Keep ``binlog_row_value_options`` empty,
   ``binlog_transaction_compression`` disabled, and MariaDB ``log_bin_compress``
@@ -159,8 +168,11 @@ Operational notes
 - MariaDB 11.4 zero ``End_log_pos`` values are supported. Do not enable
   ``binlog_legacy_event_pos`` for PipelineWise.
 - PipelineWise retries a lost file/position connection twice from
-  target-acknowledged state. Retries are at-least-once and remain in the run's
-  single terminal log. Standalone ``tap-mysql`` exits for its supervisor to
+  target-acknowledged state, waiting 30 seconds before the second attempt and
+  60 seconds before the third. Recoverable disconnects log warnings; a
+  disconnect on the final attempt includes a traceback and fails the run.
+  Retries are at-least-once and remain in the run's single terminal log.
+  Standalone ``tap-mysql`` retains its traceback and exits for its supervisor to
   restart; GTID and metadata connections keep their safe reconnect behavior.
 - ``TRUNCATE`` on a selected table stops binlog replication because it has no
   per-row delete images. FullSync that table to capture the resulting contents

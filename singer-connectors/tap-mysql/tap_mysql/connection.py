@@ -17,6 +17,7 @@ MYSQL_ENGINE = 'mysql'
 _REPORTED_SESSION_ENGINE_SELECTIONS = set()
 
 MYSQL_BINLOG_DISCONNECT_CONTROL_PREFIX = 'PIPELINEWISE_CONTROL:'
+MYSQL_BINLOG_RETRY_PENDING_ENV = 'PIPELINEWISE_MYSQL_BINLOG_RETRY_PENDING'
 MYSQL_BINLOG_DISCONNECT_MARKER = {
     'type': 'PIPELINEWISE_CONTROL',
     'component': 'tap-mysql',
@@ -29,11 +30,14 @@ class BinlogStreamDisconnectedError(RuntimeError):
     """A file-position stream must restart from target-acknowledged state."""
 
 
+DEFAULT_NET_WRITE_TIMEOUT_SQL = 'SET @@session.net_write_timeout=3600'
 DEFAULT_SESSION_SQLS = ['SET @@session.time_zone="+0:00"',
                         'SET @@session.wait_timeout=28800',
                         'SET @@session.net_read_timeout=3600',
+                        DEFAULT_NET_WRITE_TIMEOUT_SQL,
                         'SET @@session.innodb_lock_wait_timeout=3600']
 MARIADB_MAX_STATEMENT_TIME_SQL = 'SET @@session.max_statement_time=0'
+MYSQL_MAX_EXECUTION_TIME_SQL = 'SET @@session.max_execution_time=0'
 
 
 def resolve_source_engine(connection, configured_engine=None):
@@ -64,6 +68,8 @@ def default_session_sqls(connection, configured_engine=None):
     session_sqls = list(DEFAULT_SESSION_SQLS)
     if engine == MARIADB_ENGINE:
         session_sqls.append(MARIADB_MAX_STATEMENT_TIME_SQL)
+    elif engine == MYSQL_ENGINE:
+        session_sqls.append(MYSQL_MAX_EXECUTION_TIME_SQL)
     return session_sqls
 
 
@@ -81,17 +87,26 @@ def connect_with_backoff(connection):
 def run_session_sqls(connection):
     configured_session_sqls = connection.session_sqls
     session_sqls = [
-        *default_session_sqls(connection, connection.configured_engine),
-        *(configured_session_sqls if isinstance(configured_session_sqls, list) else []),
+        (sql, sql in (MARIADB_MAX_STATEMENT_TIME_SQL, MYSQL_MAX_EXECUTION_TIME_SQL))
+        for sql in default_session_sqls(connection, connection.configured_engine)
     ]
+    session_sqls.extend((sql, False) for sql in (
+        configured_session_sqls if isinstance(configured_session_sqls, list) else []
+    ))
 
     warnings = []
-    if session_sqls and isinstance(session_sqls, list):
-        for sql in session_sqls:
-            try:
-                run_sql(connection, sql)
-            except pymysql.err.InternalError as exc:
-                warnings.append(f'Could not set session variable `{sql}`: {exc}')
+    for sql, optional_timeout in session_sqls:
+        try:
+            run_sql(connection, sql)
+        except pymysql.err.OperationalError as exc:
+            if not optional_timeout or not exc.args or exc.args[0] != 1193:
+                raise
+            warnings.append(
+                f'Built-in timeout not applied: {sql}; server does not support this variable. '
+                'Check the configured source engine.'
+            )
+        except pymysql.err.InternalError as exc:
+            warnings.append(f'Could not set session variable `{sql}`: {exc}')
 
     if warnings:
         LOGGER.warning('Encountered non-fatal errors when configuring session that could impact performance:')

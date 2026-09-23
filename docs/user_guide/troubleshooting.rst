@@ -151,21 +151,29 @@ Lost connection to MySQL server (Errno 104, Connection reset by peer)
     during query ([Errno 104] Connection reset by peer)')
 
 *Why it happens:*
-A large export can exceed a source session timeout.
+A large export or a slow target can exceed the source's network write timeout.
+Network interruptions, server restarts, and failovers can also break a connection.
+
+For Singer file/position binlog disconnects, PipelineWise retries from
+target-acknowledged state after 30 seconds, then after 60 seconds. The first
+two disconnects log warnings without tracebacks. A third disconnect fails the
+run with a traceback; unrelated errors are not suppressed.
 
 *How to fix:*
 PipelineWise applies its session defaults first, then runs configured
-``session_sqls``. Add only the extra setting or override you need. For large
-exports, increase the write timeout:
+``session_sqls``. Singer, FullSync, and PartialSync default to a one-hour
+``net_write_timeout``. If a longer blocked write is expected, override only
+that setting:
 
 .. code-block:: yaml
 
     dbname: "your_database"
     session_sqls:
-      - SET SESSION net_write_timeout=3600
+      - SET SESSION net_write_timeout=7200
 
-MariaDB ``max_statement_time`` is disabled automatically. Do not configure this
-MariaDB-only variable for MySQL.
+Statement timeouts are disabled automatically with MariaDB
+``max_statement_time=0`` or MySQL ``max_execution_time=0``. Use only the setting
+supported by the source engine when overriding it.
 
 .. _troubleshooting_mysql_utf8mb3:
 

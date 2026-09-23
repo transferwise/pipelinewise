@@ -82,8 +82,13 @@ List of config parameters:
 | ssl_cert          | string                        | No       | -                                                                                                                                                                 | for self-signed SSL                                                                                                       |
 | ssl_key           | string                        | No       | -                                                                                                                                                                 | for self-signed SSL                                                                                                       |
 | internal_hostname | string | No       | -                                                                                                                                                                 | Override match hostname for google cloud                                                                                  |
-| session_sqls      | List of strings               | No       | MySQL: ```['SET @@session.time_zone="+0:00"', 'SET @@session.wait_timeout=28800', 'SET @@session.net_read_timeout=3600', 'SET @@session.innodb_lock_wait_timeout=3600']```<br/>MariaDB: the MySQL list plus ```SET @@session.max_statement_time=0``` | Set session variables dynamically. Defaults use the explicit `engine` when configured and otherwise detect the connected server. Configured statements run afterward, so later values override defaults. |
+| session_sqls      | List of strings               | No       | Both engines: ```['SET @@session.time_zone="+0:00"', 'SET @@session.wait_timeout=28800', 'SET @@session.net_read_timeout=3600', 'SET @@session.net_write_timeout=3600', 'SET @@session.innodb_lock_wait_timeout=3600']```<br/>MariaDB adds ```SET @@session.max_statement_time=0```; MySQL adds ```SET @@session.max_execution_time=0``` | Set session variables dynamically. Defaults use the explicit `engine` when configured and otherwise detect the connected server. Configured statements run afterward, so later values override defaults without removing other defaults. |
 
+
+If the server lacks the built-in statement-timeout variable, the tap warns and
+continues without applying it. Check that `engine` matches the server; engine
+selection is unchanged. Unknown variables in custom `session_sqls` still fail
+the connection.
 
 ### Discovery mode
 
@@ -325,8 +330,11 @@ resync tables with suspected historical omissions.
 MariaDB 11.4 intermediate events with zero `End_log_pos` are supported without
 enabling `binlog_legacy_event_pos`. On a lost file/position connection,
 PipelineWise retries the complete Singer pipeline twice from target-acknowledged
-state and retains all attempts in one terminal run log. Standalone `tap-mysql`
-exits for its supervisor to restart; the decoder does not reconnect from a
+state, waiting 30 seconds before the second attempt and 60 seconds before the
+third. The first two disconnects log warnings without tracebacks; a third fails
+the run with a traceback. All attempts remain in one terminal run log.
+Standalone `tap-mysql` retains its traceback and exits for its supervisor to
+restart; the decoder does not reconnect from a
 potentially mid-transaction packet. GTID reconnects remain enabled.
 
 Keep `binlog_format=ROW` and `binlog_row_image=FULL`. Partial-JSON events,
