@@ -10,7 +10,11 @@ from pipelinewise.fastsync.commons import tap_mysql
 from pipelinewise.fastsync.commons.partial_sync_boundary import (
     PartialSyncBoundary,
 )
-from pipelinewise.fastsync.commons.tap_mysql import FastSyncTapMySql, MARIADB_ENGINE
+from pipelinewise.fastsync.commons.tap_mysql import (
+    MARIADB_ENGINE,
+    MARIADB_MAX_STATEMENT_TIME_SQL,
+    FastSyncTapMySql,
+)
 
 
 MYSQL_GTID_SET = (
@@ -95,15 +99,118 @@ class TestFastSyncTapMySql(TestCase):
         self.assertEqual(len(cursor.execute.call_args.args), 1)
 
     def test_open_connections_with_default_session_sqls(self):
-        """Default session parameters should be applied if no custom session SQLs"""
+        """MySQL must not receive MariaDB-only session parameters."""
         self.mysql = FastSyncTapMySqlMock(connection_config=self.connection_config)
         with patch('pymysql.connect') as mysql_connect_mock:
-            mysql_connect_mock.return_value = []
+            mysql_connect_mock.return_value.get_server_info.return_value = '8.0.39'
             self.mysql.open_connections()
 
-        # Test if session variables applied on both connections
         self.assertListEqual(self.mysql.executed_queries, tap_mysql.DEFAULT_SESSION_SQLS)
+        self.assertNotIn(MARIADB_MAX_STATEMENT_TIME_SQL, self.mysql.executed_queries)
         self.assertListEqual(self.mysql.executed_queries_unbuffered, self.mysql.executed_queries)
+
+    def test_open_connections_with_default_mariadb_session_sqls(self):
+        """The handshake detects MariaDB even when engine is omitted."""
+        self.mysql = FastSyncTapMySqlMock(connection_config=self.connection_config)
+        with patch('pymysql.connect') as mysql_connect_mock:
+            mysql_connect_mock.return_value.get_server_info.return_value = '11.4.10-MariaDB-log'
+            self.mysql.open_connections()
+
+        self.assertListEqual(
+            self.mysql.executed_queries,
+            [*tap_mysql.DEFAULT_SESSION_SQLS, MARIADB_MAX_STATEMENT_TIME_SQL],
+        )
+        self.assertListEqual(self.mysql.executed_queries_unbuffered, self.mysql.executed_queries)
+        mysql_connect_mock.return_value.get_server_info.assert_called_once_with()
+        self.assertEqual(self.mysql.source_engine, MARIADB_ENGINE)
+        self.assertTrue(self.mysql.is_mariadb)
+        self.assertEqual(self.mysql.connection_config['engine'], MARIADB_ENGINE)
+        self.assertFalse(MARIADB_MAX_STATEMENT_TIME_SQL.endswith(';'))
+
+    def test_initialization_does_not_mutate_caller_connection_config(self):
+        """FastSync defaults remain private to each source instance."""
+        original_config = self.connection_config.copy()
+
+        self.mysql = FastSyncTapMySql(self.connection_config, lambda value: value)
+
+        self.assertEqual(self.connection_config, original_config)
+        self.assertIsNot(self.mysql.connection_config, self.connection_config)
+        self.assertNotIn('engine', self.mysql.connection_config)
+        self.assertEqual(self.mysql.connection_config['charset'], tap_mysql.DEFAULT_CHARSET)
+
+    def test_reused_omitted_engine_config_still_detects_mariadb(self):
+        """An autoresync preflight construction cannot disable worker detection."""
+        preflight_source = FastSyncTapMySql(
+            self.connection_config,
+            lambda value: value,
+        )
+        self.assertNotIn('engine', preflight_source.connection_config)
+
+        self.mysql = FastSyncTapMySqlMock(connection_config=self.connection_config)
+        with patch('pymysql.connect') as mysql_connect_mock:
+            mysql_connect_mock.return_value.get_server_info.return_value = '11.4.10-MariaDB-log'
+            self.mysql.open_connections()
+
+        self.assertNotIn('engine', self.connection_config)
+        self.assertIsNone(self.mysql._configured_engine)
+        self.assertEqual(self.mysql.source_engine, MARIADB_ENGINE)
+        self.assertIn(MARIADB_MAX_STATEMENT_TIME_SQL, self.mysql.executed_queries)
+        mysql_connect_mock.return_value.get_server_info.assert_called_once_with()
+
+    def test_detected_engine_is_cached_across_reconnections(self):
+        self.mysql = FastSyncTapMySqlMock(connection_config=self.connection_config)
+        with patch('pymysql.connect') as mysql_connect_mock:
+            mysql_connect_mock.return_value.get_server_info.return_value = '11.4.10-MariaDB-log'
+            self.mysql.open_connections()
+            self.mysql.close_connections()
+            self.mysql.open_connections()
+
+        mysql_connect_mock.return_value.get_server_info.assert_called_once_with()
+        self.assertEqual(self.mysql.source_engine, MARIADB_ENGINE)
+
+    def test_engine_selection_is_reported_once_at_info(self):
+        connection = MagicMock()
+        connection.get_server_info.return_value = '11.4.10-MariaDB-log'
+
+        with patch.object(tap_mysql, '_REPORTED_SESSION_ENGINE_SELECTIONS', set()), \
+                patch.object(tap_mysql, 'LOGGER') as logger:
+            tap_mysql.resolve_source_engine(connection)
+            tap_mysql.resolve_source_engine(connection)
+
+        logger.info.assert_called_once_with(
+            'Using %s source engine (%s)',
+            'mariadb',
+            'detected',
+        )
+        logger.debug.assert_called_once_with(
+            'Using %s source engine (%s)',
+            'mariadb',
+            'detected',
+        )
+
+    def test_open_connections_prefers_explicit_engine_for_session_defaults(self):
+        cases = (
+            ('mysql', '11.4.10-MariaDB-log', tap_mysql.DEFAULT_SESSION_SQLS),
+            (
+                MARIADB_ENGINE,
+                '8.0.39',
+                [*tap_mysql.DEFAULT_SESSION_SQLS, MARIADB_MAX_STATEMENT_TIME_SQL],
+            ),
+        )
+
+        for configured_engine, server_info, expected_sqls in cases:
+            with self.subTest(configured_engine=configured_engine):
+                self.mysql = FastSyncTapMySqlMock(connection_config={
+                    **self.connection_config,
+                    'engine': configured_engine,
+                })
+                with patch('pymysql.connect') as mysql_connect_mock:
+                    mysql_connect_mock.return_value.get_server_info.return_value = server_info
+                    self.mysql.open_connections()
+
+                self.assertListEqual(self.mysql.executed_queries, expected_sqls)
+                self.assertEqual(self.mysql.source_engine, configured_engine)
+                mysql_connect_mock.return_value.get_server_info.assert_not_called()
 
     def test_close_connections_is_idempotent(self):
         """Each MySQL connection is closed once and its reference is cleared."""
@@ -256,15 +363,23 @@ class TestFastSyncTapMySql(TestCase):
         self.mysql = FastSyncTapMySqlMock(
             connection_config={
                 **self.connection_config,
+                'engine': MARIADB_ENGINE,
                 **{'session_sqls': session_sqls},
             }
         )
         with patch('pymysql.connect') as mysql_connect_mock:
-            mysql_connect_mock.return_value = []
+            mysql_connect_mock.return_value.get_server_info.return_value = '11.4.10-MariaDB-log'
             self.mysql.open_connections()
 
-        # Test if session variables applied on both connections
-        self.assertListEqual(self.mysql.executed_queries, session_sqls)
+        self.assertListEqual(
+            self.mysql.executed_queries,
+            [
+                *tap_mysql.DEFAULT_SESSION_SQLS,
+                MARIADB_MAX_STATEMENT_TIME_SQL,
+                *session_sqls,
+            ],
+        )
+        mysql_connect_mock.return_value.get_server_info.assert_not_called()
         self.assertListEqual(self.mysql.executed_queries_unbuffered, self.mysql.executed_queries)
 
     def test_open_connections_with_invalid_session_sqls(self):
@@ -281,11 +396,11 @@ class TestFastSyncTapMySql(TestCase):
             }
         )
         with patch('pymysql.connect') as mysql_connect_mock:
-            mysql_connect_mock.return_value = []
+            mysql_connect_mock.return_value.get_server_info.return_value = '8.0.39'
             self.mysql.open_connections()
 
-        # Test if session variables applied on both connections
         self.assertListEqual(self.mysql.executed_queries, [
+            *tap_mysql.DEFAULT_SESSION_SQLS,
             'SET SESSION max_statement_time=0',
             'SET SESSION wait_timeout=28800',
         ])
@@ -535,6 +650,31 @@ class TestFastSyncTapMySql(TestCase):
             ), [{'position': 444}])
             query_mock.assert_called_once_with('SHOW MASTER STATUS')
 
+    def test_detected_mariadb_engine_controls_binlog_status_and_gtid(self):
+        """An omitted engine uses one detected flavor for handover queries."""
+        self.mysql = FastSyncTapMySql({
+            **self.connection_config,
+            'use_gtid': True,
+        }, lambda x: x)
+        with patch('pymysql.connect') as mysql_connect_mock, patch.object(
+            self.mysql, 'query'
+        ) as query_mock:
+            mysql_connect_mock.return_value.get_server_info.return_value = (
+                '11.4.10-MariaDB-log'
+            )
+            self.mysql.open_connections()
+            query_mock.reset_mock()
+            query_mock.return_value = [{'current_gtids': '0-192-444'}]
+
+            self.assertEqual(self.mysql.fetch_current_log_pos(), {
+                'gtid': '0-192-444',
+                'gtid_complete': True,
+            })
+
+        query_mock.assert_called_once_with(
+            'select @@gtid_current_pos as current_gtids;'
+        )
+
     def test_fetch_current_log_pos_with_gtid_and_mysql_but_gtid_mode_is_off_fails(self):
         """
         If using gtid is enabled and engine is mysql but gtid mode is off, then expect an exception
@@ -728,6 +868,27 @@ class TestFastSyncTapMySql(TestCase):
         assert "REPLACE(LOWER(cc.check_clause), ' ', '') =" in sql
         assert "CONCAT('json_valid(`'" in sql
         assert ' LIKE ' not in sql
+
+    def test_detected_mariadb_iceberg_v3_detects_exact_json_aliases(self):
+        """An omitted engine still enables MariaDB's JSON alias projection."""
+        connection_config = {
+            **self.connection_config,
+            'target_table_format': 'iceberg',
+            'iceberg_version': 3,
+        }
+        self.mysql = FastSyncTapMySqlMock(connection_config=connection_config)
+        with patch('pymysql.connect') as mysql_connect_mock:
+            mysql_connect_mock.return_value.get_server_info.return_value = (
+                '11.4.10-MariaDB-log'
+            )
+            self.mysql.open_connections()
+
+        with patch.object(self.mysql, 'query', return_value=[]) as query_mock:
+            self.mysql.get_table_columns('my_db.my_table')
+
+        sql = query_mock.call_args.args[0]
+        assert "CASE WHEN is_json_alias THEN 'json' ELSE data_type END" in sql
+        assert 'information_schema.check_constraints' in sql
 
     def test_json_alias_detection_does_not_change_other_routes(self):
         """Native MariaDB and genuine MySQL keep their existing discovery query."""

@@ -5,7 +5,15 @@ from unittest.mock import patch, MagicMock, call
 from pymysql.cursors import Cursor, DictCursor
 from pymysql.err import OperationalError
 from pymysqlreplication import BinLogStreamReader
-from tap_mysql.connection import MySQLConnection, fetch_server_id, fetch_server_uuid, make_connection_wrapper
+from tap_mysql.connection import (
+    DEFAULT_SESSION_SQLS,
+    MARIADB_MAX_STATEMENT_TIME_SQL,
+    MySQLConnection,
+    fetch_server_id,
+    fetch_server_uuid,
+    make_connection_wrapper,
+    run_session_sqls,
+)
 
 
 class TestConnection(unittest.TestCase):
@@ -13,6 +21,126 @@ class TestConnection(unittest.TestCase):
     def test_default_charset_supports_four_byte_unicode(self):
         conn = MySQLConnection({'host': 'localhost', 'port': 3306, 'user': 'test', 'password': 'test'})
         self.assertEqual(conn.charset, 'utf8mb4')
+
+    def test_session_sql_defaults_are_detected_from_server(self):
+        base_config = {'host': 'localhost', 'port': 3306, 'user': 'test', 'password': 'test'}
+        mysql_conn = MySQLConnection(base_config)
+        mariadb_conn = MySQLConnection(base_config)
+        mysql_conn.get_server_info = MagicMock(return_value='8.0.39')
+        mariadb_conn.get_server_info = MagicMock(return_value='11.4.10-MariaDB-log')
+
+        with patch('tap_mysql.connection.run_sql') as run_sql:
+            run_session_sqls(mysql_conn)
+            mysql_sqls = [args.args[1] for args in run_sql.call_args_list]
+            run_sql.reset_mock()
+            run_session_sqls(mariadb_conn)
+            mariadb_sqls = [args.args[1] for args in run_sql.call_args_list]
+
+        self.assertEqual(mysql_sqls, DEFAULT_SESSION_SQLS)
+        self.assertNotIn(MARIADB_MAX_STATEMENT_TIME_SQL, mysql_sqls)
+        self.assertEqual(
+            mariadb_sqls,
+            [*DEFAULT_SESSION_SQLS, MARIADB_MAX_STATEMENT_TIME_SQL],
+        )
+        mysql_conn.get_server_info.assert_called_once_with()
+        mariadb_conn.get_server_info.assert_called_once_with()
+        self.assertFalse(MARIADB_MAX_STATEMENT_TIME_SQL.endswith(';'))
+
+    def test_session_engine_selection_is_reported_once_at_info(self):
+        conn = MySQLConnection({
+            'host': 'localhost', 'port': 3306, 'user': 'test', 'password': 'test',
+        })
+        conn.get_server_info = MagicMock(return_value='11.4.10-MariaDB-log')
+
+        with patch('tap_mysql.connection._REPORTED_SESSION_ENGINE_SELECTIONS', set()), \
+                patch('tap_mysql.connection.LOGGER') as logger, \
+                patch('tap_mysql.connection.run_sql'):
+            run_session_sqls(conn)
+            run_session_sqls(conn)
+
+        logger.info.assert_called_once_with(
+            'Using %s source engine (%s)',
+            'mariadb',
+            'detected',
+        )
+        logger.debug.assert_called_once_with(
+            'Using %s source engine (%s)',
+            'mariadb',
+            'detected',
+        )
+
+    def test_explicit_engine_selects_defaults_without_server_detection(self):
+        base_config = {'host': 'localhost', 'port': 3306, 'user': 'test', 'password': 'test'}
+        cases = (
+            ('mysql', '11.4.10-MariaDB-log', DEFAULT_SESSION_SQLS),
+            (
+                'mariadb',
+                '8.0.39',
+                [*DEFAULT_SESSION_SQLS, MARIADB_MAX_STATEMENT_TIME_SQL],
+            ),
+        )
+
+        for configured_engine, server_info, expected_sqls in cases:
+            with self.subTest(configured_engine=configured_engine):
+                conn = MySQLConnection({**base_config, 'engine': configured_engine})
+                conn.get_server_info = MagicMock(return_value=server_info)
+                with patch('tap_mysql.connection.run_sql') as run_sql:
+                    run_session_sqls(conn)
+
+                self.assertEqual(
+                    [args.args[1] for args in run_sql.call_args_list],
+                    expected_sqls,
+                )
+                conn.get_server_info.assert_not_called()
+
+    def test_connection_does_not_mutate_config_or_materialize_an_engine(self):
+        config = {'host': 'localhost', 'port': 3306, 'user': 'test', 'password': 'test'}
+        original = dict(config)
+        first = MySQLConnection(config)
+        second = MySQLConnection(config)
+        first.get_server_info = MagicMock(return_value='11.4.10-MariaDB-log')
+        second.get_server_info = MagicMock(return_value='11.4.10-MariaDB-log')
+
+        with patch('tap_mysql.connection.run_sql') as run_sql:
+            run_session_sqls(first)
+            run_session_sqls(second)
+
+        self.assertEqual(config, original)
+        self.assertEqual(
+            [args.args[1] for args in run_sql.call_args_list],
+            [
+                *DEFAULT_SESSION_SQLS,
+                MARIADB_MAX_STATEMENT_TIME_SQL,
+                *DEFAULT_SESSION_SQLS,
+                MARIADB_MAX_STATEMENT_TIME_SQL,
+            ],
+        )
+        first.get_server_info.assert_called_once_with()
+        second.get_server_info.assert_called_once_with()
+
+    def test_custom_session_sqls_extend_and_override_mariadb_defaults(self):
+        custom_session_sqls = ['SET @@session.time_zone="+1:00"']
+        conn = MySQLConnection({
+            'host': 'localhost',
+            'port': 3306,
+            'user': 'test',
+            'password': 'test',
+            'session_sqls': custom_session_sqls,
+        })
+        conn.get_server_info = MagicMock(return_value='11.4.10-MariaDB-log')
+
+        self.assertEqual(conn.session_sqls, custom_session_sqls)
+        with patch('tap_mysql.connection.run_sql') as run_sql:
+            run_session_sqls(conn)
+        self.assertEqual(
+            [args.args[1] for args in run_sql.call_args_list],
+            [
+                *DEFAULT_SESSION_SQLS,
+                MARIADB_MAX_STATEMENT_TIME_SQL,
+                *custom_session_sqls,
+            ],
+        )
+        conn.get_server_info.assert_called_once_with()
 
     def test_gtid_reconnect_and_non_network_errors_remain_driver_handled(self):
         for use_gtid, error_code in [(True, 2006), (True, 2013), (False, 1142)]:

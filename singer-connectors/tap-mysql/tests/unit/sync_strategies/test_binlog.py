@@ -1016,10 +1016,14 @@ class TestBinlogSyncStrategy(TestCase):
         state = {
             'bookmarks': {
                 'my_db-stream1': {
-                    'version': 1
+                    'version': 1,
+                    'gtid': '0-123-555',
+                    'gtid_complete': True,
                 },
                 'my_db-stream2': {
-                    'version': 1
+                    'version': 1,
+                    'gtid': '0-123-555',
+                    'gtid_complete': True,
                 }
             }
         }

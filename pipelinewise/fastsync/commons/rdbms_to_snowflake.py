@@ -226,6 +226,9 @@ def _export_full_source(run: _FullSyncRun) -> None:
 
 
 def _plan_full_iceberg_export(run: _FullSyncRun) -> None:
+    resolved_engine = run.source_adapter.resolved_source_engine(run.source)
+    if run.attempt is not None:
+        iceberg_routes.validate_recovery_source_engine(run.attempt, resolved_engine)
     snowflake_types = run.source.map_column_types_to_target(run.table)
     run.snowflake_columns = snowflake_types.get('columns', [])
     run.primary_key = snowflake_types.get('primary_key')
@@ -254,6 +257,7 @@ def _plan_full_iceberg_export(run: _FullSyncRun) -> None:
         run.bookmark,
         recovery_identity=run.recovery_identity,
         staging_config=run.staging_config,
+        resolved_source_engine=resolved_engine,
     )
     run.publisher.plan_full_sync(run.attempt, run.spec)
 

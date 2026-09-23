@@ -155,10 +155,10 @@ hours before fire time, and ``"1d6h"`` is valid too.
 
 For ``tap-mysql`` sources, data-diff uses ``db_conn.engine`` when it is set. If
 it is omitted, data-diff infers MariaDB or MySQL from the connected server's
-handshake. This fallback applies only to data-diff; Singer ``tap-mysql`` and
-FastSync continue to default an omitted engine to ``mysql``. Set
-``engine: mariadb`` explicitly for MariaDB, especially with GTID, managed
-Iceberg v3 JSON aliases, or proxies that hide the server identity.
+handshake. Singer, FullSync, and PartialSync use the same fallback for all
+source-specific behaviour, including session defaults, GTID handling, and
+managed Iceberg v3 JSON aliases. Set ``engine`` explicitly for proxies that hide
+the server identity.
 
 Choosing a frequency and window
 '''''''''''''''''''''''''''''''

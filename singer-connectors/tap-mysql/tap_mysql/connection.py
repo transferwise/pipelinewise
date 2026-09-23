@@ -14,11 +14,57 @@ CONNECT_TIMEOUT_SECONDS = 30
 
 MARIADB_ENGINE = 'mariadb'
 MYSQL_ENGINE = 'mysql'
+_REPORTED_SESSION_ENGINE_SELECTIONS = set()
+
+MYSQL_BINLOG_DISCONNECT_CONTROL_PREFIX = 'PIPELINEWISE_CONTROL:'
+MYSQL_BINLOG_DISCONNECT_MARKER = {
+    'type': 'PIPELINEWISE_CONTROL',
+    'component': 'tap-mysql',
+    'event': 'binlog_stream_disconnected',
+    'version': 1,
+}
+
+
+class BinlogStreamDisconnectedError(RuntimeError):
+    """A file-position stream must restart from target-acknowledged state."""
+
 
 DEFAULT_SESSION_SQLS = ['SET @@session.time_zone="+0:00"',
                         'SET @@session.wait_timeout=28800',
                         'SET @@session.net_read_timeout=3600',
                         'SET @@session.innodb_lock_wait_timeout=3600']
+MARIADB_MAX_STATEMENT_TIME_SQL = 'SET @@session.max_statement_time=0'
+
+
+def resolve_source_engine(connection, configured_engine=None):
+    """Resolve and retain the configured or detected source engine."""
+    if configured_engine is None:
+        engine = connection.resolved_engine
+        if engine is None:
+            engine = MARIADB_ENGINE if 'mariadb' in connection.get_server_info().lower() else MYSQL_ENGINE
+            connection.resolved_engine = engine
+        engine_source = 'detected'
+    else:
+        engine = str(configured_engine).lower()
+        connection.resolved_engine = engine
+        engine_source = 'configured'
+
+    selection = (engine, engine_source)
+    if selection not in _REPORTED_SESSION_ENGINE_SELECTIONS:
+        LOGGER.info('Using %s source engine (%s)', engine, engine_source)
+        _REPORTED_SESSION_ENGINE_SELECTIONS.add(selection)
+    else:
+        LOGGER.debug('Using %s source engine (%s)', engine, engine_source)
+    return engine
+
+
+def default_session_sqls(connection, configured_engine=None):
+    """Return defaults compatible with the resolved source server."""
+    engine = resolve_source_engine(connection, configured_engine)
+    session_sqls = list(DEFAULT_SESSION_SQLS)
+    if engine == MARIADB_ENGINE:
+        session_sqls.append(MARIADB_MAX_STATEMENT_TIME_SQL)
+    return session_sqls
 
 
 @backoff.on_exception(backoff.expo,
@@ -33,7 +79,11 @@ def connect_with_backoff(connection):
 
 
 def run_session_sqls(connection):
-    session_sqls = connection.session_sqls
+    configured_session_sqls = connection.session_sqls
+    session_sqls = [
+        *default_session_sqls(connection, connection.configured_engine),
+        *(configured_session_sqls if isinstance(configured_session_sqls, list) else []),
+    ]
 
     warnings = []
     if session_sqls and isinstance(session_sqls, list):
@@ -145,7 +195,13 @@ class MySQLConnection(pymysql.connections.Connection):
             ssl_arg = ctx  # Assign the context to ssl_arg
             self.client_flag |= CLIENT.SSL
 
-        self.session_sqls = config.get("session_sqls", DEFAULT_SESSION_SQLS)
+        self.configured_engine = config.get('engine') if 'engine' in config else None
+        self.resolved_engine = (
+            str(self.configured_engine).lower()
+            if self.configured_engine is not None
+            else None
+        )
+        self.session_sqls = config.get('session_sqls', [])
 
     def __enter__(self):
         return self
@@ -171,7 +227,7 @@ def make_connection_wrapper(config):
             except pymysql.OperationalError as exc:
                 # The decoder's automatic file-position reconnect can skip unread rows or their table map.
                 if self._fail_on_disconnect and exc.args[0] in {2006, 2013}:
-                    raise RuntimeError(
+                    raise BinlogStreamDisconnectedError(
                         'Binlog connection lost; restart replication from the durable checkpoint.') from exc
                 raise
 

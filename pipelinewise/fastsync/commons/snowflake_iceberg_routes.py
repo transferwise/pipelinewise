@@ -25,6 +25,7 @@ from .snowflake_iceberg_recovery import (
     FINALIZATION_METADATA,
     FINALIZATION_S3_CLEANUP,
     FINALIZATION_STAGING_CLEANUP,
+    RecoveryManifestError,
     RetryableQueryHistoryRecoveryError,
 )
 from .snowflake_iceberg_versions import (
@@ -193,12 +194,14 @@ def fastsync_recovery_identity(
         'replica_user': source_config.get('replica_user'),
         'table': source_table,
     }
-    if engine in ('mysql', 'mariadb'):
+    if source_route == 'mysql_to_snowflake':
+        configured_session_sqls = source_config.get('session_sqls')
         source_identity.update({
             'charset': source_config.get('charset', DEFAULT_CHARSET),
-            'session_sqls': list(
-                source_config.get('session_sqls', DEFAULT_SESSION_SQLS)
-            ),
+            'session_sqls': [
+                *DEFAULT_SESSION_SQLS,
+                *(configured_session_sqls if isinstance(configured_session_sqls, list) else []),
+            ],
             'use_gtid': source_config.get('use_gtid', DEFAULT_USE_GTID),
         })
     elif engine == 'postgres':
@@ -268,6 +271,25 @@ def plan_staging_uploads(publisher, attempt, snowflake, file_parts):
     s3_keys = utils.get_expected_s3_keys(snowflake, file_parts)
     publisher.record_planned_uploads(attempt, s3_keys)
     return s3_keys
+
+
+def validate_recovery_source_engine(attempt, resolved_source_engine):
+    """Require the saved bookmark's engine before re-exporting source data."""
+    if resolved_source_engine is None:
+        return
+    saved_engine = attempt.manifest_payload.resolved_source_engine
+    if saved_engine is None:
+        raise RecoveryManifestError(
+            'Cannot re-export this Iceberg recovery attempt: its manifest has no saved '
+            'source engine and may predate engine binding. Finish this attempt with the '
+            'PipelineWise version and configuration that created it. Do not edit state '
+            'or delete recovery files to bypass this check.'
+        )
+    if saved_engine != resolved_source_engine:
+        raise RecoveryManifestError(
+            'Cannot re-export an Iceberg recovery attempt with a different source engine: '
+            f'saved={saved_engine!r}, current={resolved_source_engine!r}'
+        )
 
 
 def validate_recovery_source_spec(

@@ -1,7 +1,7 @@
 """Source-specific behavior used by shared RDBMS-to-Snowflake runners."""
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 
 ExportInspection = Callable[[], Tuple[List[str], int]]
@@ -30,6 +30,11 @@ class RdbmsSnowflakeSource(ABC):
     @abstractmethod
     def source_engine(self, args) -> str:
         """Return the source-engine component of recovery identity."""
+
+    def resolved_source_engine(self, source) -> Optional[str]:
+        """Return a detected engine to bind to the bookmark, when applicable."""
+        del source
+        return None
 
     @abstractmethod
     def bookmark_kwargs(self, args) -> Dict[str, str]:
@@ -74,7 +79,10 @@ class MySqlSnowflakeSource(RdbmsSnowflakeSource):
         return source
 
     def source_engine(self, args) -> str:
-        return args.tap.get('engine', 'mysql')
+        return args.tap.get('engine', 'auto')
+
+    def resolved_source_engine(self, source) -> str:
+        return source.source_engine
 
     def bookmark_kwargs(self, args) -> Dict[str, str]:
         del args

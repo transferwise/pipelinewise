@@ -473,11 +473,14 @@ class SnowflakeIcebergPublisher:
         *,
         recovery_identity: Dict[str, Any],
         staging_config: Optional[Dict[str, Any]] = None,
+        resolved_source_engine: Optional[str] = None,
     ) -> IcebergPublicationAttempt:
         """Persist a FullSync boundary and immutable publication decision."""
         payload_context = {}
         if staging_config is not None:
             payload_context['staging_config'] = dict(staging_config)
+        if resolved_source_engine is not None:
+            payload_context['resolved_source_engine'] = resolved_source_engine
         return self._prepare(
             'full',
             spec,
@@ -495,6 +498,7 @@ class SnowflakeIcebergPublisher:
         *,
         recovery_identity: Dict[str, Any],
         staging_config: Optional[Dict[str, Any]] = None,
+        resolved_source_engine: Optional[str] = None,
     ) -> IcebergPublicationAttempt:
         """Persist a PartialSync boundary, range evidence, and publication decision."""
         if not spec.primary_key:
@@ -502,6 +506,8 @@ class SnowflakeIcebergPublisher:
         payload_context = boundary.as_context()
         if staging_config is not None:
             payload_context['staging_config'] = dict(staging_config)
+        if resolved_source_engine is not None:
+            payload_context['resolved_source_engine'] = resolved_source_engine
         return self._prepare(
             'partial',
             spec,

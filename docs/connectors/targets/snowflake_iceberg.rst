@@ -140,7 +140,7 @@ Explicit v3 maps integer Singer fields to ``NUMBER(38,0)`` and approximate
 numeric fields to Iceberg ``DOUBLE``. The latter preserves 64-bit floating-point
 range instead of narrowing to Iceberg ``FLOAT``. Native and fixed-point
 ``NUMBER(precision, scale)`` mappings are unchanged. PostgreSQL
-``hstore`` maps to ``VARIANT`` on this route. For ``engine: mariadb``, a
+``hstore`` maps to ``VARIANT`` on this route. For MariaDB sources, a
 ``LONGTEXT`` column with MariaDB's exact generated ``JSON_VALID`` constraint is
 treated as the ``JSON`` alias and maps to ``VARIANT``; ordinary ``LONGTEXT`` and
 native routes remain strings. Object, array, string, number, Boolean, and null
@@ -296,6 +296,21 @@ state remains unchanged. Restart the same command without editing state, removin
 staging, or deleting either recovery file. Use the same generated runtime
 directory, tap ID, route, source table, target mapping, account/user/role,
 staging configuration, and transformation contract.
+
+Recovery from completed staging publishes and hands over the saved bookmark
+without reconnecting to the source. It does not recheck the source engine or
+physical server identity. Resolve pending recovery before replacing or
+repointing the source server, even when the replacement uses the same engine.
+
+For MySQL/MariaDB attempts that need re-export, a manifest without a saved source
+engine stops recovery. This can occur with manifests created before engine
+binding was introduced. Finish the attempt with the PipelineWise version and
+configuration that created it before upgrading. Changing only the charset
+cannot supply the missing engine evidence. If the original version or source is
+unavailable, stop affected replication and arrange a recovery plan after
+inspecting the publication state. Preserve the manifest, target pointer, state,
+and remaining staging evidence; do not delete recovery files or edit state to
+bypass the check.
 
 For CTAS and ``INSERT OVERWRITE``, PipelineWise polls query history every five
 seconds for up to 900 seconds by default. Set the positive integer

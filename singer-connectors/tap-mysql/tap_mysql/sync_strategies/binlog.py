@@ -43,6 +43,11 @@ LOGGER = singer.get_logger('tap_mysql')
 SDC_DELETED_AT = "_sdc_deleted_at"
 UPDATE_BOOKMARK_PERIOD = 1000
 BOOKMARK_KEYS = {'log_file', 'log_pos', 'version', 'gtid', 'gtid_complete'}
+CHECKPOINT_PROBE_LIMIT = 16
+CHECKPOINT_PROBE_MAX_EVENTS = 256
+BINLOG_START_POSITION = 4
+CHECKPOINT_SCAN_PAGE_SIZE = 10000
+CHECKPOINT_SCAN_LOG_INTERVAL = 100000
 
 MYSQL_TIMESTAMP_TYPES = {
     FIELD_TYPE.TIMESTAMP,
@@ -135,6 +140,12 @@ def verify_gtid_config(mysql_conn: MySQLConnection):
 
 
 def fetch_current_log_file_and_pos(mysql_conn):
+    result = _fetch_current_binlog_status(mysql_conn)
+
+    return tuple(result[0:2])
+
+
+def _fetch_current_binlog_status(mysql_conn):
     with connect_with_backoff(mysql_conn) as open_conn:
         with open_conn.cursor() as cur:
             try:
@@ -149,9 +160,20 @@ def fetch_current_log_file_and_pos(mysql_conn):
             if result is None:
                 raise Exception("MySQL binary logging is not enabled.")
 
-            current_log_file, current_log_pos = result[0:2]
+            return result
 
-            return current_log_file, current_log_pos
+
+def fetch_current_binlog_checkpoint(mysql_conn, engine):
+    """Sample file coordinates and the complete GTID history at the same MySQL boundary."""
+    status = _fetch_current_binlog_status(mysql_conn)
+    log_file, log_pos = status[0:2]
+    if engine == connection.MARIADB_ENGINE:
+        gtid = _find_gtid_by_binlog_coordinates(mysql_conn, log_file, log_pos)
+    else:
+        gtid = _normalize_gtid_position(status[4], engine) if len(status) > 4 and status[4] else None
+    if not gtid:
+        raise ValueError('Cannot rebuild a complete GTID checkpoint from the current binlog endpoint.')
+    return log_file, log_pos, gtid
 
 
 def fetch_current_gtid_pos(
@@ -455,6 +477,15 @@ def calculate_bookmark(mysql_conn, binlog_streams_map, state) -> Tuple[str, int]
             raise Exception("Unable to replicate binlog stream because no binary logs exist on the server.")
 
 
+def _binlog_text(value):
+    """Decode structural SHOW BINLOG fields while leaving arbitrary event payloads as bytes."""
+    return value.decode('ascii') if isinstance(value, bytes) else value
+
+
+def _binlog_name_matches(value, expected):
+    return value == expected or (isinstance(value, bytes) and value == expected.encode('utf-8'))
+
+
 def verify_binlog_checkpoint(mysql_conn, log_file, log_pos, require_transaction_boundary=False):
     """Require decode context, or a whole-transaction boundary when converting to GTID."""
     safe_events = {'gtid', 'rotate'}
@@ -462,36 +493,174 @@ def verify_binlog_checkpoint(mysql_conn, log_file, log_pos, require_transaction_
     if not require_transaction_boundary:
         safe_events.update({'table_map', 'anonymous_gtid', 'query', 'xid'})
         neutral_events.update({'annotate_rows', 'rows_query'})
+    probe_pos = log_pos
+    probed_events = 0
+    unsafe_event = None
     with connect_with_backoff(mysql_conn) as open_conn:
         with open_conn.cursor() as cursor:
-            try:
-                cursor.execute('SHOW BINLOG EVENTS IN %s FROM %s LIMIT 16', (log_file, log_pos))
-            except (pymysql.err.InternalError, pymysql.err.OperationalError) as exc:
-                if exc.args[0] != 1220:
-                    raise
-                raise ValueError(
-                    f'Cannot validate binlog bookmark {log_file}:{log_pos}: the server could not decode the event. '
-                    'Check the bookmark and source binlog integrity; perform a full resync if the checkpoint '
-                    f'cannot be recovered safely. Server error: {exc}') from exc
-            events = cursor.fetchall()
-            if not events and not require_transaction_boundary:
-                return
-            for event in events:
-                if event[4] == 0:
+            # Event Info contains original statement bytes and is not guaranteed to match the connection charset.
+            cursor.execute('SET character_set_results = binary')
+            while probed_events < CHECKPOINT_PROBE_MAX_EVENTS:
+                page_size = min(CHECKPOINT_PROBE_LIMIT, CHECKPOINT_PROBE_MAX_EVENTS - probed_events)
+                try:
+                    cursor.execute(
+                        f'SHOW BINLOG EVENTS IN %s FROM %s LIMIT {page_size + 1}', (log_file, probe_pos))
+                except (pymysql.err.InternalError, pymysql.err.OperationalError) as exc:
+                    if exc.args[0] != 1220:
+                        raise
+                    raise ValueError(
+                        f'Cannot validate binlog bookmark {log_file}:{log_pos}: the server could not decode the event. '
+                        'Check the bookmark and source binlog integrity; perform a full resync if the checkpoint '
+                        f'cannot be recovered safely. Server error: {exc}') from exc
+                events = cursor.fetchall()
+                for event in events[:page_size]:
+                    probed_events += 1
+                    # MariaDB 11.4 leaves End_log_pos zero by default. Pos and event order remain authoritative.
+                    event_type = _binlog_text(event[2]).lower()
+                    if event_type in safe_events:
+                        return
+                    if event_type not in neutral_events:
+                        unsafe_event = event_type
+                        break
+                if unsafe_event:
                     break
-                event_type = event[2].lower()
-                if event_type in safe_events:
+                if events and len(events) <= page_size:
                     return
-                if event_type not in neutral_events:
+                if not events:
+                    # An empty result is safe only at the exact current end of that file.
+                    cursor.execute('SHOW BINARY LOGS')
+                    if any(_binlog_name_matches(row[0], log_file) and row[1] == probe_pos
+                           for row in cursor.fetchall()):
+                        return
                     break
+                next_probe_pos = events[page_size][1]
+                if next_probe_pos <= probe_pos:
+                    raise InconclusiveBinlogCheckpointError(
+                        f'Binlog bookmark validation is inconclusive for {log_file}:{log_pos}: '
+                        f'the bounded probe did not advance beyond position {probe_pos}.')
+                probe_pos = next_probe_pos
             else:
-                # A newly rotated log can contain only headers; prove their end is the actual EOF.
-                end_pos = events[-1][4] if events else log_pos
-                cursor.execute('SHOW BINARY LOGS')
-                if any(row[0] == log_file and row[1] == end_pos for row in cursor.fetchall()):
-                    return
-    raise ValueError('The binlog bookmark is not a safe transaction boundary and may omit its TABLE_MAP; '
-                     'perform a full resync before resuming replication.')
+                raise InconclusiveBinlogCheckpointError(
+                    f'Binlog bookmark validation is inconclusive for {log_file}:{log_pos} after inspecting '
+                    f'{probed_events} neutral events; no safe or unsafe boundary was observed.')
+    message = ('The binlog bookmark is not a safe transaction boundary and may omit its TABLE_MAP; '
+               'perform a full resync before resuming replication.')
+    if unsafe_event and re.fullmatch(r'(?:write|update|delete)_rows(?:_v\d+)?', unsafe_event):
+        raise UnsafeBinlogCheckpointError(message)
+    raise ValueError(message)
+
+
+class UnsafeBinlogCheckpointError(ValueError):
+    """A legacy file checkpoint resumes at a row event without its table map."""
+
+
+class InconclusiveBinlogCheckpointError(ValueError):
+    """A bounded checkpoint probe found neither a safe nor an unsafe event."""
+
+
+def _binlog_info(event):
+    value = event[5]
+    return value.decode('utf-8', errors='backslashreplace') if isinstance(value, bytes) else value
+
+
+def _is_row_event_type(event_type):
+    return bool(re.fullmatch(r'(?:write|update|delete)_rows(?:_v\d+)?', event_type))
+
+
+def _observe_binlog_boundary(event, transaction_start, transaction_open, last_boundary):
+    event_pos = event[1]
+    event_type = _binlog_text(event[2]).lower()
+    if event_type in {'gtid', 'anonymous_gtid'}:
+        return event_pos, False, last_boundary
+    if event_type == 'xid':
+        return None, False, event_pos
+    if event_type == 'query':
+        query = _binlog_info(event).strip().upper()
+        if re.fullmatch(r'BEGIN(?:\s+WORK)?', query):
+            return transaction_start if transaction_start is not None else event_pos, True, last_boundary
+        if re.fullmatch(r'(?:COMMIT|ROLLBACK)(?:\s+WORK)?(?:\s*/\*.*\*/)?', query):
+            return None, False, event_pos
+        if not transaction_open:
+            return None, False, event_pos
+    if event_type in {'table_map', 'annotate_rows', 'rows_query'} or _is_row_event_type(event_type):
+        transaction_open = True
+    return transaction_start, transaction_open, last_boundary
+
+
+def find_binlog_transaction_start(mysql_conn, log_file, log_pos):
+    """Find a proven transaction boundary immediately before an unsafe row checkpoint."""
+    scan_pos = BINLOG_START_POSITION
+    scanned_events = 0
+    next_progress_log = CHECKPOINT_SCAN_LOG_INTERVAL
+    transaction_start = None
+    transaction_open = False
+    last_boundary = None
+
+    LOGGER.warning(
+        'Recovering legacy binlog bookmark %s:%s requires scanning that source binlog from its beginning; '
+        'large binlogs can take time and increase source load.', log_file, log_pos)
+
+    with connect_with_backoff(mysql_conn) as open_conn:
+        with open_conn.cursor() as cursor:
+            cursor.execute('SET character_set_results = binary')
+            while scan_pos <= log_pos:
+                cursor.execute(
+                    f'SHOW BINLOG EVENTS IN %s FROM %s LIMIT {CHECKPOINT_SCAN_PAGE_SIZE + 1}',
+                    (log_file, scan_pos))
+                events = cursor.fetchall()
+                if not events:
+                    break
+
+                advance_to = None
+                for event in events[:CHECKPOINT_SCAN_PAGE_SIZE]:
+                    scanned_events += 1
+                    event_pos = event[1]
+                    event_type = _binlog_text(event[2]).lower()
+                    if event_pos == log_pos:
+                        replay_pos = transaction_start if transaction_start is not None else last_boundary
+                        if _is_row_event_type(event_type) and replay_pos is not None and replay_pos < log_pos:
+                            LOGGER.info(
+                                'Recovered transaction boundary %s for legacy bookmark %s:%s after scanning %s '
+                                'binlog event(s).', replay_pos, log_file, log_pos, scanned_events)
+                            return replay_pos
+                        break
+                    if event_pos > log_pos:
+                        break
+                    transaction_start, transaction_open, last_boundary = _observe_binlog_boundary(
+                        event, transaction_start, transaction_open, last_boundary)
+                else:
+                    if len(events) > CHECKPOINT_SCAN_PAGE_SIZE:
+                        advance_to = events[CHECKPOINT_SCAN_PAGE_SIZE][1]
+
+                if advance_to is None:
+                    break
+                if advance_to <= scan_pos:
+                    break
+                scan_pos = advance_to
+                if scanned_events >= next_progress_log:
+                    LOGGER.info(
+                        'Scanned %s binlog event(s) through %s:%s while recovering legacy bookmark %s:%s.',
+                        scanned_events, log_file, scan_pos, log_file, log_pos)
+                    next_progress_log = (
+                        (scanned_events // CHECKPOINT_SCAN_LOG_INTERVAL) + 1
+                    ) * CHECKPOINT_SCAN_LOG_INTERVAL
+
+    raise ValueError(
+        f'Cannot prove a transaction boundary before legacy binlog bookmark {log_file}:{log_pos}; '
+        'perform a full resync before resuming replication.')
+
+
+def recover_legacy_binlog_checkpoint(mysql_conn, log_file, log_pos):
+    """Validate a file checkpoint, rewinding only a proven legacy row boundary."""
+    try:
+        verify_binlog_checkpoint(mysql_conn, log_file, log_pos)
+    except UnsafeBinlogCheckpointError:
+        replay_pos = find_binlog_transaction_start(mysql_conn, log_file, log_pos)
+        LOGGER.warning(
+            'Legacy binlog bookmark %s:%s points inside a row transaction; replaying from transaction boundary %s '
+            'while retaining per-stream durable bookmarks.', log_file, log_pos, replay_pos)
+        return replay_pos
+    return log_pos
 
 
 def update_bookmarks(
@@ -528,7 +697,7 @@ def update_bookmarks(
 
         # update gtid only if it's not null
         if gtid:
-            if previous.get('gtid'):
+            if previous.get('gtid') and previous.get('gtid_complete') is True:
                 engine = connection.MYSQL_ENGINE if ':' in gtid else connection.MARIADB_ENGINE
                 stream_gtid = merge_gtid_position(previous['gtid'], gtid, engine)
             else:
@@ -705,19 +874,35 @@ def _position_at_or_before(log_file, log_pos, other_file, other_pos):
     return current < other or (current == other and log_pos <= other_pos)
 
 
-def _event_already_bookmarked(bookmark, log_file, log_pos, transaction, engine):
+def _event_already_bookmarked(
+        bookmark, log_file, log_pos, transaction, engine, position_is_event_end=True):
     """Do not replay an advanced stream while catching up another stream."""
     if transaction is True:
         raise ValueError('GTID replication encountered a transaction without a GTID marker; perform a full resync.')
-    position = bookmark.get('gtid')
+    position = bookmark.get('gtid') if bookmark.get('gtid_complete') is True else None
     if position and transaction:
         if engine != connection.MARIADB_ENGINE:
             return Gtid(transaction.lower()) in GtidSet(position.lower())
         domain, _, sequence = transaction.split('-')
         return any(value.split('-')[0] == domain and int(value.split('-')[2]) >= int(sequence)
                    for value in position.split(','))
-    return bool(bookmark.get('log_file') and bookmark.get('log_pos') and _position_at_or_before(
-        log_file, log_pos, bookmark['log_file'], bookmark['log_pos']))
+    if not (bookmark.get('log_file') and bookmark.get('log_pos')):
+        return False
+    if (not position_is_event_end and log_file == bookmark['log_file']
+            and log_pos == bookmark['log_pos']):
+        # MariaDB 11.4 may leave an event's End_log_pos zero, so the decoder retains the preceding
+        # boundary. Equality does not prove that the current row was already acknowledged.
+        return False
+    return _position_at_or_before(log_file, log_pos, bookmark['log_file'], bookmark['log_pos'])
+
+
+def _event_has_end_position(event):
+    packet = getattr(event, 'packet', None)
+    return packet is None or bool(getattr(packet, 'log_pos', None))
+
+
+def _pending_gtid(checkpoint):
+    return checkpoint.pending if isinstance(checkpoint.pending, str) else None
 
 
 class _BinlogCheckpoint:
@@ -804,7 +989,8 @@ def _reject_unsupported_query(event, streams, bookmarks, reader, transaction, en
         candidates = [stream_id] if stream_id in streams else [
             candidate for candidate in streams if candidate.casefold() == stream_id.casefold()]
         if not any(not _event_already_bookmarked(
-                bookmarks.get(candidate, {}), reader.log_file, reader.log_pos, transaction, engine)
+                bookmarks.get(candidate, {}), reader.log_file, reader.log_pos, transaction, engine,
+                _event_has_end_position(event))
                    for candidate in candidates):
             return
     elif not any(common.get_database_name(entry['catalog_entry']) == schema for entry in streams.values()):
@@ -885,7 +1071,7 @@ def _run_binlog_sync(  # noqa: C901
         elif isinstance(binlog_event, QueryEvent):
             _reject_unsupported_query(
                 binlog_event, binlog_streams_map, initial_bookmarks, reader,
-                checkpoint.pending if checkpoint.use_gtid else None, config['engine'])
+                _pending_gtid(checkpoint), config['engine'])
         elif isinstance(binlog_event, NotImplementedEvent):
             if checkpoint.use_gtid and binlog_event.event_type == 34:
                 raise ValueError('GTID replication encountered an anonymous transaction; perform a full resync.')
@@ -905,7 +1091,8 @@ def _run_binlog_sync(  # noqa: C901
 
             if not catalog_entry or _event_already_bookmarked(
                     initial_bookmarks.get(tap_stream_id, {}), log_file, log_pos,
-                    checkpoint.pending if checkpoint.use_gtid else None, config['engine']):
+                    _pending_gtid(checkpoint), config['engine'],
+                    _event_has_end_position(binlog_event)):
                 events_skipped += 1
 
                 if events_skipped % UPDATE_BOOKMARK_PERIOD == 0:
@@ -1044,6 +1231,8 @@ def _run_binlog_sync(  # noqa: C901
                                  bookmark_log_pos,
                                  gtid_pos)
 
+    return bookmark_log_file, bookmark_log_pos
+
 
 def create_binlog_stream_reader(
         config: Dict,
@@ -1134,21 +1323,60 @@ def sync_binlog_stream(
         common.whitelist_bookmark_keys(BOOKMARK_KEYS, tap_stream_id, state)
 
     log_file = log_pos = gtid = None
+    end_log_file = end_log_pos = complete_endpoint_gtid = None
+    runtime_config = config
 
     if config['use_gtid']:
-        gtid = calculate_gtid_bookmark(mysql_conn, binlog_streams_map, state, config['engine'])
+        bookmarks = {
+            stream: state.get('bookmarks', {}).get(stream, {})
+            for stream in binlog_streams_map
+        }
+        legacy_streams = sorted(
+            stream for stream, bookmark in bookmarks.items()
+            if not bookmark.get('gtid') or bookmark.get('gtid_complete') is not True
+        )
+        if legacy_streams:
+            missing_coordinates = [
+                stream for stream in bookmarks
+                if not bookmarks[stream].get('log_file') or not bookmarks[stream].get('log_pos')
+            ]
+            if missing_coordinates:
+                raise ValueError(
+                    'Legacy GTID bookmarks require retained file/position coordinates for automatic migration; '
+                    f'missing coordinates: {", ".join(missing_coordinates)}. State was not changed.')
+            log_file, log_pos = calculate_bookmark(mysql_conn, binlog_streams_map, state)
+            log_pos = recover_legacy_binlog_checkpoint(mysql_conn, log_file, log_pos)
+            end_log_file, end_log_pos, complete_endpoint_gtid = fetch_current_binlog_checkpoint(
+                mysql_conn, config['engine'])
+            runtime_config = {**config, 'use_gtid': False}
+            LOGGER.info(
+                'Migrating legacy GTID bookmarks for %s stream(s) through file/position replay.',
+                len(legacy_streams))
+        else:
+            gtid = calculate_gtid_bookmark(mysql_conn, binlog_streams_map, state, config['engine'])
     else:
         log_file, log_pos = calculate_bookmark(mysql_conn, binlog_streams_map, state)
-        verify_binlog_checkpoint(mysql_conn, log_file, log_pos)
+        log_pos = recover_legacy_binlog_checkpoint(mysql_conn, log_file, log_pos)
 
     reader = None
 
     try:
-        reader = create_binlog_stream_reader(config, log_file, log_pos, gtid)
+        reader = create_binlog_stream_reader(runtime_config, log_file, log_pos, gtid)
 
-        end_log_file, end_log_pos = fetch_current_log_file_and_pos(mysql_conn)
+        if end_log_file is None:
+            end_log_file, end_log_pos = fetch_current_log_file_and_pos(mysql_conn)
         LOGGER.info('Current Master binlog file and pos: %s %s', end_log_file, end_log_pos)
-        _run_binlog_sync(mysql_conn, reader, binlog_streams_map, state, config, end_log_file, end_log_pos)
+        final_log_file, final_log_pos = _run_binlog_sync(
+            mysql_conn, reader, binlog_streams_map, state, runtime_config, end_log_file, end_log_pos)
+
+        if complete_endpoint_gtid:
+            started_at_endpoint = (log_file, log_pos) == (end_log_file, end_log_pos)
+            if not started_at_endpoint and (final_log_file, final_log_pos) != (end_log_file, end_log_pos):
+                raise RuntimeError(
+                    'Legacy GTID migration did not reach the sampled binlog endpoint. Durable state was retained; '
+                    'the next scheduled run will retry automatically.')
+            update_bookmarks(
+                state, binlog_streams_map, end_log_file, end_log_pos, complete_endpoint_gtid)
 
     finally:
         # BinLogStreamReader doesn't implement the `with` methods
