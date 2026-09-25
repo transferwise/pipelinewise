@@ -44,6 +44,11 @@ Configure the source before selecting LOG_BASED:
 Retain binlogs longer than the maximum expected outage. If PipelineWise's saved
 position is purged, the affected tables require a resync.
 
+Snowflake FastSync regex transformation conditions require MySQL ICU or MariaDB
+PCRE support. The export connection is checked before regex-based exports;
+legacy engines without that capability are rejected. See :ref:`transformations`
+for validation and rollout checks.
+
 
 Configuration
 -------------
@@ -191,6 +196,10 @@ Operational notes
   receiver's potentially newer position. Singer replays changes not yet present
   in the replica snapshot. Multi-channel replicas require an unambiguous source
   and are rejected rather than choosing an arbitrary channel.
+- Snowflake FullSync and PartialSync apply top-level :ref:`transformations` in
+  the source SELECT before CSV generation, including managed Iceberg v3.
+  Unsupported rules fail before export; transformed INCREMENTAL replication
+  keys are rejected because checkpoints require their raw values.
 - Snowflake Singer loading, FullSync, and PartialSync preserve line breaks,
   tabs, CSV punctuation, literal backslash sequences, and supplementary Unicode
   in string values. Singer connections use ``utf8mb4``. FastSync defaults to

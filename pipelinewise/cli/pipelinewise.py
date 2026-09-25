@@ -1823,11 +1823,8 @@ class PipelineWise:
 
             tap_ids.add(tap_yml['id'])
 
-            # If there is a fastsync component for this tap-target combo and transformations on json properties are
-            # configured then fail the validation.
-            # The reason being that at the time of writing this, transformations in Fastsync are done on the
-            # target side using mostly SQL UPDATE, and transformations on properties in json fields are not
-            # implemented due to the need of converting XPATH syntax to SQL which has been deemed as not worth it
+            # FastSync supports top-level transformations only; nested JSON paths
+            # remain unsupported regardless of where a route applies its rules.
             fastsync_capabilities = resolve_fastsync_capabilities(
                 tap_yml['type'],
                 targets[tap_yml['target']],

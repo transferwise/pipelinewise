@@ -20,6 +20,9 @@ Range semantics
 
 The start boundary is inclusive. An explicit end boundary is also inclusive.
 Choose a stable, comparable column and a range that can be verified independently.
+Source filtering precedes the source-side :ref:`transformations`, so masking a
+column never changes which source rows enter the export. Keep the boundary column
+untransformed: the target range predicate still uses the original boundary values.
 
 .. code-block:: bash
 
@@ -58,6 +61,9 @@ Native-table merge outcomes
    * - Compatible text column is narrower than ``VARCHAR(134217728)``
      - PipelineWise widens the target column before applying the merge.
      - Values are unchanged; the wider column definition applies to the table.
+   * - Existing column has an incompatible type, width, or precision
+     - PartialSync fails before export; no merge or state advancement.
+     - Unchanged.
    * - Target row absent from the source range
      - Deleted.
      - Unchanged.
@@ -68,10 +74,60 @@ source rows are always physically deleted from the selected target range.
 
 Snowflake commits schema changes independently from the merge transaction.
 PipelineWise therefore widens compatible native text columns and adds missing
-columns before starting DML. If the existing target type is not text, its width
-cannot be verified, or the target role cannot alter it, PartialSync fails before
-the merge and state advancement. Run a FullSync or alter the column to
-``VARCHAR(134217728)`` with an authorized role, then retry PartialSync.
+columns before starting DML. It checks all overlapping column types before
+export and again before the merge, even when no transformations are configured.
+Numeric precision and scale, binary width, and temporal precision must hold the
+mapped values; timestamp timezone types must match. Missing catalog dimensions
+fail validation rather than being guessed. Only compatible text widening is
+automatic.
+
+This can reject previously tolerated numeric, binary, or temporal differences
+between Singer and FastSync. The existing text-type check also rejects native
+PostgreSQL ``hstore`` stored as Singer ``VARIANT`` where FastSync maps it to
+``VARCHAR``. Use FullSync to recreate an incompatible target with its mapped
+types. A FullSync must cover the whole table: ``sync_start_from`` still
+selects PartialSync. If only a text-column widening lacks privileges, have an
+authorized role widen it to ``VARCHAR(134217728)`` and retry.
+
+
+Native compatibility report
+----------------------------
+
+Before deploying stricter type checks, run this report for each imported native
+Snowflake tap, using the installed PipelineWise Python environment:
+
+.. code-block:: bash
+
+   python -m pipelinewise.fastsync.partialsync.compatibility_report \
+     --tap-type tap-postgres \
+     --tap-dir ~/.pipelinewise/<target_id>/<tap_id> \
+     --target ~/.pipelinewise/<target_id>/config.json
+
+Use ``--tap-type tap-mysql`` for MySQL/MariaDB. By default, the report checks
+selected tables configured with ``sync_start_from``. It marks
+``drop_target_table: true`` tables as skipped because replacement does not reuse
+their existing column types. Add
+``--tables public.orders,public.customers`` to check other selected tables used
+by explicit PartialSync commands, or to check merge compatibility for a table
+normally configured for replacement.
+
+The report reads source and Snowflake metadata only. It does not export rows,
+run custom session SQL, alter columns, or change replication state/recovery.
+It uses FastSync's native source configuration, metadata query, and type mapping.
+JSON output lists all incompatible columns, compatible columns, columns that
+would widen, and columns that would be added. Missing targets and unsupported
+routes or Iceberg tables are reported separately.
+
+Exit status is 1 for incompatibilities or report errors, 2 for invalid input,
+and 0 otherwise. Inspect skipped entries: exit 0 is not proof that every table
+was checked. This is a metadata snapshot, not a check of transformations,
+publication privileges, primary keys, or pending recovery. Resolve incompatible
+types before deployment; runtime validation remains enabled.
+
+Errors identify the failed operation and exception type, with database error
+codes and a Snowflake query ID when available. Unexpected code errors also
+write sanitized code locations to stderr. Neither output includes raw exception
+messages, credentials, or source values; use the codes or query ID to investigate.
 
 
 Managed Iceberg v3 outcomes
@@ -109,7 +165,7 @@ reuses and deterministically replays that range after an ambiguous commit; it
 does not resolve a dynamic boundary again. State changes only after publication
 and finalization succeed. See :ref:`snowflake_iceberg_recovery`.
 
-After staging transformations, PipelineWise checks the canonical primary-key
+After loading the source-transformed CSV, PipelineWise checks the canonical primary-key
 projection for NULL components and duplicate composite-key groups before it
 starts the range transaction. It does not choose or deduplicate conflicting
 rows. An invalid staged attempt is kept for cleanup and re-export; if an attempt

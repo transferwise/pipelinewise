@@ -278,9 +278,10 @@ class TestFastSyncTapPostgres(TestCase):
         with self.assertRaisesRegex(
             RuntimeError,
             'PostgreSQL 11.2 or later.*server_version_num 110001',
-        ):
+        ) as error:
             FastSyncTapPostgres.get_connection(creds, prioritize_primary=True)
 
+        self.assertIsInstance(error.exception, tap_postgres.UnsupportedPostgresVersionError)
         connect_mock.return_value.close.assert_called_once_with()
 
     @patch('pipelinewise.fastsync.commons.tap_postgres.psycopg2.connect')

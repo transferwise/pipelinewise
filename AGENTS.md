@@ -120,6 +120,8 @@ severity; if there are no concerns, say so explicitly.
 
 - Branch from `master`; keep diffs task-scoped. Sign every commit with
   `git commit -S`; never create or push an unsigned commit.
+- Never include internal Jira names or issue keys (such as `AP-...`) in commit
+  messages, PR titles, or PR descriptions, even when the branch name has one.
 - Keep CHANGELOG entries concise and outcome-focused. Start each bullet with an
   action verb, state one user-visible result, and include implementation detail
   only when needed for compatibility, risk, or recovery.

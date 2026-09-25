@@ -277,7 +277,6 @@ def assert_iceberg_partial_sync_workflow(
         target.copy_to_table.side_effect = record(
             'target.copy', 0 if empty_export else 1
         )
-        target.obfuscate_columns.side_effect = record('obfuscate')
         publisher.prepare_partial_sync.side_effect = record('prepare', attempt)
         publisher.plan_partial_sync.side_effect = record('plan')
         publisher.record_uploaded.side_effect = record('record_uploaded')
@@ -469,9 +468,7 @@ def assert_iceberg_partial_sync_workflow(
             is_temporary=True,
             staging_table_name='PW_STAGE_123',
         )
-        target.obfuscate_columns.assert_called_once_with(
-            'foo_schema', 'foo', staging_table_name='PW_STAGE_123'
-        )
+        target.obfuscate_columns.assert_not_called()
         publisher.record_uploaded.assert_called_once_with(attempt, s3_keys)
         plan_staging_uploads_mock.assert_called_once_with(
             publisher, attempt, target, file_parts
@@ -504,7 +501,7 @@ def assert_iceberg_partial_sync_workflow(
             'record_staging_created'
         )
         assert timeline.index('plan_uploads') < timeline.index('record_uploaded')
-        assert timeline.index('obfuscate') < timeline.index('staging_evidence')
+        assert timeline.index('target.copy') < timeline.index('staging_evidence')
         assert timeline.index('record_staged') < timeline.index('publish')
 
     target.swap_tables.assert_not_called()
