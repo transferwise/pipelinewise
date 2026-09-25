@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 
 from pipelinewise.fastsync import mysql_to_snowflake, postgres_to_snowflake
 from pipelinewise.fastsync.commons.partial_sync_boundary import PartialSyncBoundary
+from pipelinewise.fastsync.commons.snowflake_iceberg_routes import validate_route_config
 from pipelinewise.fastsync.commons.transform_utils import TransformationType
 from pipelinewise.fastsync.partialsync import compatibility_report
 
@@ -129,8 +130,15 @@ def source_export(request):
     config['engine'] = engine
     route = postgres_to_snowflake if engine == 'postgres' else mysql_to_snowflake
     adapter = route._source_adapter()
-    args = Namespace(tap=config, target={}, transform={'transformations': []})
-    source = adapter.create(args, iceberg_requested=iceberg)
+    target = (
+        {'target_table_format': 'iceberg', 'iceberg_version': 3, 'data_flattening_max_level': 0}
+        if iceberg
+        else {'target_table_format': 'native'}
+    )
+    args = Namespace(tap=config, target=target, transform={'transformations': []})
+    # Validate the fixture target the way both runners do, so it cannot drift into a
+    # shape production would reject, and hand the adapter the version that came back.
+    source = adapter.create(args, validate_route_config(target))
     adapter.open(source)
     fixture = _SourceExport(
         source, adapter, engine, iceberg,

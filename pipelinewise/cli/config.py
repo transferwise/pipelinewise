@@ -404,12 +404,13 @@ class Config:
         if not capabilities.available:
             return
         transformation_config = {'transformations': cls.generate_transformations(tap)}
+        default_replication_method = utils.get_tap_default_replication_method(tap)
         for schema in tap.get('schemas', []):
             for table in schema.get('tables', []):
                 table_name = f'{schema["source_schema"]}.{table["table_name"]}'
                 try:
                     validate_source_transformation_config(table_name, transformation_config)
-                    if table.get('replication_method', utils.get_tap_default_replication_method(tap)) == 'INCREMENTAL':
+                    if table.get('replication_method', default_replication_method) == 'INCREMENTAL':
                         validate_bookmark_column(table_name, table.get('replication_key'), transformation_config)
                 except UnsupportedSourceTransformation as exc:
                     raise InvalidTransformationException(

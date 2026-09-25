@@ -207,7 +207,7 @@ def _recover_partial_attempt(run: _PartialSyncRun) -> bool:
 
 
 def _export_partial_source(run: _PartialSyncRun) -> bool:
-    run.source = run.source_adapter.create(run.args, run.iceberg_requested)
+    run.source = run.source_adapter.create(run.args, run.iceberg_version)
     try:
         run.source_adapter.open(run.source)
         ready = (

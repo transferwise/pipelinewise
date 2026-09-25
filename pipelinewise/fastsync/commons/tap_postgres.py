@@ -14,7 +14,7 @@ from typing import Callable, Dict, Optional
 
 from . import utils, split_gzip
 from .partial_sync_boundary import PartialSyncBoundary
-from .source_transformations import compile_source_select, validate_bookmark_column
+from .source_transformations import compile_source_select, quote_source_identifier, validate_bookmark_column
 from ...utils import safe_column_name
 
 LOGGER = logging.getLogger(__name__)
@@ -674,7 +674,9 @@ class FastSyncTapPostgres:
         for column in table_columns:
             target_type = self._mapped_column_type(column['data_type'], column.get('character_maximum_length'))
             columns.append(dict(column, target_type=target_type))
-        table_reference = '.'.join('"' + part.replace('"', '""') + '"' for part in table_name.split('.'))
+        table_reference = '.'.join(
+            quote_source_identifier(part, 'postgres') for part in table_name.split('.')
+        )
         return compile_source_select(
             table_name, table_reference, where_clause, columns,
             self.source_transformations, 'postgres', self.target_iceberg_version,

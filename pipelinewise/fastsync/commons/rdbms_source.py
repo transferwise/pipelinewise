@@ -23,9 +23,15 @@ class RdbmsSnowflakeSource(ABC):
         """Build the PostgreSQL source contract."""
         return PostgresSnowflakeSource(factory, type_mapper)
 
+    def _configure(self, source, args, iceberg_version: Optional[int]):
+        """Apply the transformation and Iceberg settings both routes share."""
+        source.source_transformations = args.transform
+        source.target_iceberg_version = iceberg_version
+        return source
+
     @abstractmethod
-    def create(self, args, iceberg_requested: bool):
-        """Create and configure a source connector."""
+    def create(self, args, iceberg_version: Optional[int]):
+        """Create and configure a source connector for the validated route version."""
 
     @abstractmethod
     def source_engine(self, args) -> str:
@@ -72,13 +78,9 @@ class MySqlSnowflakeSource(RdbmsSnowflakeSource):
     type_mapper: Callable[..., str]
     route_name = 'mysql_to_snowflake'
 
-    def create(self, args, iceberg_requested: bool):
-        source = self.factory(args.tap, self.type_mapper)
-        source.source_transformations = args.transform
-        source.target_iceberg_version = (
-            getattr(args, 'target', {}).get('iceberg_version', 3) if iceberg_requested else None
-        )
-        if iceberg_requested:
+    def create(self, args, iceberg_version: Optional[int]):
+        source = self._configure(self.factory(args.tap, self.type_mapper), args, iceberg_version)
+        if iceberg_version is not None:
             source.set_mariadb_json_aliases_enabled(True)
         return source
 
@@ -125,13 +127,9 @@ class PostgresSnowflakeSource(RdbmsSnowflakeSource):
     type_mapper: Callable[..., str]
     route_name = 'postgres_to_snowflake'
 
-    def create(self, args, iceberg_requested: bool):
-        source = self.factory(args.tap, self.type_mapper)
-        source.source_transformations = args.transform
-        source.target_iceberg_version = (
-            getattr(args, 'target', {}).get('iceberg_version', 3) if iceberg_requested else None
-        )
-        source.hstore_as_json = iceberg_requested
+    def create(self, args, iceberg_version: Optional[int]):
+        source = self._configure(self.factory(args.tap, self.type_mapper), args, iceberg_version)
+        source.hstore_as_json = iceberg_version is not None
         return source
 
     def source_engine(self, args) -> str:

@@ -33,7 +33,7 @@ def runtime_source(tap_type, config, connection):
     module = postgres_to_snowflake if tap_type == 'tap-postgres' else mysql_to_snowflake
     source = module._source_adapter().create(
         Namespace(tap=config, target={'target_table_format': 'native'}, transform=None),
-        iceberg_requested=False,
+        iceberg_version=None,
     )
     if tap_type == 'tap-mysql':
         with mock.patch.object(pymysql, 'connect', return_value=connection), \
@@ -98,8 +98,8 @@ def test_report_and_runtime_share_native_configuration_query_and_mapping(tap_typ
 def test_report_obeys_postgres_runtime_factory_mapping_flags():
     original_create = PostgresSnowflakeSource.create
 
-    def configure_mapping(adapter, args, iceberg_requested):
-        source = original_create(adapter, args, iceberg_requested)
+    def configure_mapping(adapter, args, iceberg_version):
+        source = original_create(adapter, args, iceberg_version)
         source.hstore_as_json = True
         return source
 
@@ -119,8 +119,8 @@ def test_report_obeys_postgres_runtime_factory_mapping_flags():
 def test_report_obeys_mysql_runtime_factory_flags_and_detected_mariadb_flavour():
     original_create = MySqlSnowflakeSource.create
 
-    def configure_mapping(adapter, args, iceberg_requested):
-        source = original_create(adapter, args, iceberg_requested)
+    def configure_mapping(adapter, args, iceberg_version):
+        source = original_create(adapter, args, iceberg_version)
         source.set_mariadb_json_aliases_enabled(True)
         return source
 

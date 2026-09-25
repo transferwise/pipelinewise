@@ -43,13 +43,12 @@ def _catalog_tables(properties):
     if not isinstance(streams, list):
         raise ReportInputError('Catalog streams must be a list')
     for stream in streams:
-        if not isinstance(stream, dict) or not isinstance(stream.get('metadata', []), list):
+        rows = stream.get('metadata', []) if isinstance(stream, dict) else None
+        if not isinstance(stream, dict) or not isinstance(rows, list):
             raise ReportInputError('Catalog streams must contain metadata lists')
-        if any(not isinstance(row, dict) or not isinstance(row.get('metadata', {}), dict)
-               for row in stream.get('metadata', [])):
+        if any(not isinstance(row, dict) or not isinstance(row.get('metadata', {}), dict) for row in rows):
             raise ReportInputError('Catalog metadata entries must be objects')
-        metadata = next((row.get('metadata', {}) for row in stream.get('metadata', [])
-                         if row.get('breadcrumb') == []), {})
+        metadata = next((row.get('metadata', {}) for row in rows if row.get('breadcrumb') == []), {})
         if not metadata.get('selected'):
             continue
         schema = metadata.get('schema-name') or metadata.get('database-name')
@@ -62,22 +61,32 @@ def _catalog_tables(properties):
     return available
 
 
-def selected_tables(properties, selection, requested=None):
+def _resolve_tables(available, selection, requested=None):
     """Resolve exact catalog identifiers without splitting hyphenated stream IDs."""
-    if not isinstance(selection, list) or any(
-        not isinstance(row, dict) or not isinstance(row.get('tap_stream_id'), str)
-        or not row['tap_stream_id']
-        or (row.get('sync_start_from') is not None and not isinstance(row['sync_start_from'], dict))
-        for row in selection
-    ):
+    if not isinstance(selection, list):
         raise ReportInputError('Selection entries require stream IDs and object boundaries')
-    bounded_streams = {row['tap_stream_id'].lower() for row in selection if row.get('sync_start_from')}
-    available = _catalog_tables(properties)
+    bounded_streams = set()
+    for row in selection:
+        boundary = row.get('sync_start_from') if isinstance(row, dict) else None
+        if (
+            not isinstance(row, dict)
+            or not isinstance(row.get('tap_stream_id'), str)
+            or not row['tap_stream_id']
+            or (boundary is not None and not isinstance(boundary, dict))
+        ):
+            raise ReportInputError('Selection entries require stream IDs and object boundaries')
+        if boundary:
+            bounded_streams.add(row['tap_stream_id'].lower())
     if requested is not None:
         if set(requested) - available.keys():
             raise ReportInputError('Requested report tables must be selected in properties.json')
         return sorted(set(requested))
     return sorted(table for table, stream_id in available.items() if stream_id in bounded_streams)
+
+
+def selected_tables(properties, selection, requested=None):
+    """Resolve report tables from the generated catalog and selection files."""
+    return _resolve_tables(_catalog_tables(properties), selection, requested)
 
 
 @contextmanager
@@ -113,7 +122,7 @@ def native_source(connection, tap_type, config, target):
     else:
         adapter = RdbmsSnowflakeSource.mysql(FastSyncTapMySql, mysql_type)
         config = {**config, 'engine': resolve_source_engine(connection, config.get('engine'))}
-    return adapter.create(argparse.Namespace(tap=config, target=target, transform=None), iceberg_requested=False)
+    return adapter.create(argparse.Namespace(tap=config, target=target, transform=None), iceberg_version=None)
 
 
 def mapped_source_columns(connection, source, table):
@@ -163,14 +172,14 @@ def build_report(tap_type, tap, target, properties, selection, tables=None, targ
         return [{'status': 'skipped', 'reason': 'Only tap-postgres/tap-mysql to Snowflake are supported'}]
     if target.get('target_table_format', tap.get('target_table_format', 'native')) != 'native':
         return [{'status': 'skipped', 'reason': 'Configured Iceberg targets are outside this native-only report'}]
-    requested_tables = selected_tables(properties, selection, tables)
+    catalog = _catalog_tables(properties)
+    requested_tables = _resolve_tables(catalog, selection, tables)
     if not requested_tables:
         return [{'status': 'skipped', 'reason': 'No selected sync_start_from tables; use --tables to select others'}]
     replacements = {
         row['tap_stream_id'].lower() for row in selection
         if (row.get('sync_start_from') or {}).get('drop_target_table') is True
     } if tables is None else set()
-    catalog = _catalog_tables(properties)
     results = []
     tables_to_check = []
     for table in requested_tables:

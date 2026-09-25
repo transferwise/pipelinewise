@@ -29,6 +29,12 @@ _INTEGER_SOURCE_TYPES = {
     'smallint', 'integer', 'bigint', 'int', 'tinyint', 'mediumint', 'smallserial', 'serial', 'bigserial',
     'bit varying', 'varbit',
 }
+# Minimum VARCHAR width each operation's output needs; anything absent imposes no minimum.
+_REQUIRED_VARCHAR_WIDTH = {
+    'HASH': 64,
+    'MASK-HIDDEN': 6,
+    **{f'HASH-SKIP-FIRST-{count}': 64 + count for count in range(1, 10)},
+}
 
 
 def _identifier(name, dialect):
@@ -36,6 +42,28 @@ def _identifier(name, dialect):
         raise UnsupportedSourceTransformation('Source transformation identifiers must be non-empty strings')
     quote = '"' if dialect == 'postgres' else '`'
     return quote + name.replace(quote, quote * 2) + quote
+
+
+def quote_source_identifier(name, dialect):
+    """Quote one source identifier exactly as the compiled projection quotes columns."""
+    return _identifier(name, dialect)
+
+
+def stream_name_for_table(table_name):
+    """Derive the tap stream name that transformation rules are matched against."""
+    return table_name.replace('.', '-', 1).lower()
+
+
+def _concat(dialect, *parts):
+    """Concatenate with the dialect's strict, NULL-propagating operator."""
+    if dialect == 'postgres':
+        return f'({" || ".join(parts)})'
+    return f'CONCAT({", ".join(parts)})'
+
+
+def _skip_count(transform):
+    """Read the trailing character count from a SKIP-style transformation name."""
+    return int(transform.rsplit('-', 1)[1])
 
 
 def _literal(value, dialect):
@@ -161,7 +189,7 @@ def _validate_pattern(pattern):
     return pattern
 
 
-def _portable_pattern(pattern, dialect):
+def portable_pattern(pattern, dialect):
     """Accept a common regex subset with explicit Snowflake match boundaries."""
     pattern = _validate_pattern(pattern)
     output, in_class, index = [], False, 0
@@ -200,13 +228,14 @@ def _condition(condition, columns, dialect):
     expression = _identifier(column['column_name'], dialect)
     if 'equals' in condition:
         return _equals(expression, column, condition['equals'], dialect)
-    if _kind(column) == 'number' and column['data_type'].lower() in _INTEGER_SOURCE_TYPES:
+    kind = _kind(column)
+    if kind == 'number' and column['data_type'].lower() in _INTEGER_SOURCE_TYPES:
         expression = f'({expression})::text' if dialect == 'postgres' else (
             f'CAST(({expression} + 0) AS CHAR CHARACTER SET utf8mb4)'
         )
-    elif _kind(column) != 'text':
+    elif kind != 'text':
         raise UnsupportedSourceTransformation('Regex conditions require a text column')
-    pattern = _literal(_portable_pattern(condition['regex_match'], dialect), dialect)
+    pattern = _literal(portable_pattern(condition['regex_match'], dialect), dialect)
     if dialect == 'postgres':
         return f'({expression} COLLATE "C" ~ {pattern})'
     return f'({expression} COLLATE utf8mb4_bin REGEXP {pattern})'
@@ -235,13 +264,12 @@ def _hash(expression, dialect):
 
 
 def _validate_transform(rule, column):
-    """Require a supported operation whose output fits the existing mapped type."""
-    try:
-        transform = TransformationType(rule['type']).value
-    except (ValueError, KeyError) as exc:
-        raise UnsupportedSourceTransformation('Unsupported source transformation type') from exc
-    if rule.get('field_paths') is not None:
-        raise UnsupportedSourceTransformation('Only top-level transformations are supported')
+    """Require a supported operation whose output fits the existing mapped type.
+
+    Rule shape and transformation type are already validated by _matching_rules,
+    which every caller runs before a rule reaches here.
+    """
+    transform = TransformationType(rule['type']).value
     target_type = column['target_type']
     base = target_type.split('(', 1)[0]
     if base not in _SUPPORTED_TYPES[transform]:
@@ -250,9 +278,7 @@ def _validate_transform(rule, column):
             f'for column {column["column_name"]!r}'
         )
     if base == 'VARCHAR':
-        required_width = 64 if transform == 'HASH' else 6 if transform == 'MASK-HIDDEN' else 0
-        if transform.startswith('HASH-SKIP-FIRST-'):
-            required_width = 64 + int(transform[-1])
+        required_width = _REQUIRED_VARCHAR_WIDTH.get(transform, 0)
         if int(target_type.partition('(')[2][:-1]) < required_width:
             raise UnsupportedSourceTransformation(
                 f'{transform} output requires VARCHAR({required_width}), but column '
@@ -285,17 +311,17 @@ def _transform(rule, column, dialect):
     if transform == 'HASH':
         return _hash(expression, dialect)
     if transform.startswith('HASH-SKIP-FIRST-'):
-        count = int(transform[-1])
+        count = _skip_count(transform)
         first = f'SUBSTRING({expression}, 1, {count})'
         hashed = _hash(f'SUBSTRING({expression}, {count + 1})', dialect)
-        return f'({first} || {hashed})' if dialect == 'postgres' else f'CONCAT({first}, {hashed})'
+        return _concat(dialect, first, hashed)
     if transform.startswith('MASK-STRING-SKIP-ENDS-'):
-        count = int(transform[-1])
+        count = _skip_count(transform)
         length = f'CHAR_LENGTH({expression})'
         first = f'SUBSTRING({expression}, 1, {count})'
         middle = f"REPEAT('*', {length} - {2 * count})"
         last = f'SUBSTRING({expression}, {length} - {count} + 1, {count})'
-        masked = f'({first} || {middle} || {last})' if dialect == 'postgres' else f'CONCAT({first}, {middle}, {last})'
+        masked = _concat(dialect, first, middle, last)
         return f"CASE WHEN {length} > {2 * count} THEN {masked} ELSE REPEAT('*', {length}) END"
     raise UnsupportedSourceTransformation(f'Unsupported transformation type for column {column["column_name"]!r}')
 
@@ -309,15 +335,11 @@ def _projection(columns, replacements, dialect):
 
 
 def _referenced_columns(rules, by_name):
+    """Collect every column a validated rule set reads or writes."""
     names = set()
     for rule in rules:
         names.add(_resolve(rule.get('field_id'), by_name)['column_name'])
-        conditions = rule.get('when')
-        if conditions is not None and not isinstance(conditions, list):
-            raise UnsupportedSourceTransformation('Transformation when must be a list')
-        for condition in conditions or []:
-            if not isinstance(condition, dict):
-                raise UnsupportedSourceTransformation('Transformation conditions must be objects')
+        for condition in rule.get('when') or []:
             names.add(_resolve(condition.get('column'), by_name)['column_name'])
     return names
 
@@ -328,7 +350,7 @@ def _matching_rules(table_name, transformation_config):
     transformations = transformation_config.get('transformations', [])
     if not isinstance(transformations, list):
         raise UnsupportedSourceTransformation('Transformations must be a list')
-    stream = table_name.replace('.', '-', 1).lower()
+    stream = stream_name_for_table(table_name)
     rules = []
     unconditional = set()
     for rule in transformations:
@@ -374,7 +396,7 @@ def _validate_condition_config(condition):
     if len(operators) != 1 or condition.keys() - {'column', 'equals', 'regex_match', 'safe_column'}:
         raise UnsupportedSourceTransformation('Each condition requires exactly one equals or regex_match operator')
     if 'regex_match' in condition:
-        _portable_pattern(condition['regex_match'], 'postgres')
+        portable_pattern(condition['regex_match'], 'postgres')
         return
     value = condition['equals']
     if isinstance(value, str):
@@ -436,11 +458,12 @@ def compile_source_select(
             raise UnsupportedSourceTransformation(f'Ambiguous case-insensitive column name {name!r}')
         by_name[name.upper()] = column
     referenced = _referenced_columns(rules, by_name)
-    columns = [
-        _mapped_column(column, iceberg_version) if column['column_name'] in referenced else column
-        for column in columns
-    ]
-    by_name = {column['column_name'].upper(): column for column in columns}
+    # Canonicalize mapped types for referenced columns only; dict order keeps the export column order.
+    by_name = {
+        key: _mapped_column(column, iceberg_version) if column['column_name'] in referenced else column
+        for key, column in by_name.items()
+    }
+    columns = list(by_name.values())
     base = {
         column['column_name']: (
             _base_expression(column, dialect) if column['column_name'] in referenced

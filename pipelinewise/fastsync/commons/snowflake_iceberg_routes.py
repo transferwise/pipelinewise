@@ -1,6 +1,7 @@
 """Shared route ordering for Snowflake Iceberg publication attempts."""
 
 from . import utils
+from .source_transformations import stream_name_for_table
 from .tap_mysql import (
     DEFAULT_CHARSET,
     DEFAULT_NET_WRITE_TIMEOUT_SQL,
@@ -244,7 +245,7 @@ def fastsync_recovery_identity(
 
 def _uses_source_transformations(transformation_config, source_table):
     """Invalidate retained raw staging only for affected or malformed rules."""
-    stream_name = source_table.replace('.', '-', 1).lower()
+    stream_name = stream_name_for_table(source_table)
     return any(
         not isinstance(rule, dict)
         or not isinstance(rule.get('tap_stream_name'), str)

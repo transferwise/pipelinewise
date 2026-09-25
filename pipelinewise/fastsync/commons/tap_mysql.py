@@ -17,6 +17,8 @@ from .partial_sync_boundary import PartialSyncBoundary
 from .source_transformations import (
     UnsupportedSourceTransformation,
     compile_source_select,
+    portable_pattern,
+    quote_source_identifier,
     requires_regex_support,
     validate_bookmark_column,
 )
@@ -117,6 +119,11 @@ class FastSyncTapMySql:
         Returns: bool
         """
         return self.source_engine == MARIADB_ENGINE
+
+    @property
+    def _source_dialect(self) -> str:
+        """Name the dialect that the projection compiler and the regex probe must agree on."""
+        return 'mariadb' if self.is_mariadb else 'mysql'
 
     @property
     def source_engine(self) -> str:
@@ -690,20 +697,25 @@ class FastSyncTapMySql:
             column['data_type'], column['column_type']
         )) for column in table_columns]
         table_dict = utils.tablename_to_dict(table_name)
+        dialect = self._source_dialect
         table_reference = '.'.join(
-            '`' + table_dict[key].replace('`', '``') + '`'
+            quote_source_identifier(table_dict[key], dialect)
             for key in ('schema_name', 'table_name')
         )
         projection = compile_source_select(
             table_name, table_reference, where_clause, columns,
-            self.source_transformations, 'mariadb' if self.is_mariadb else 'mysql', self.target_iceberg_version,
+            self.source_transformations, dialect, self.target_iceberg_version,
         )
         if requires_regex_support(table_name, self.source_transformations):
             self._validate_source_regex_support()
         return projection
 
     def _validate_source_regex_support(self):
-        """Check the export connection's regex engine without reading source rows."""
+        """Check the export connection's regex engine without reading source rows.
+
+        Probes with the compiler's own emitted boundary syntax so the certified
+        construct cannot drift from the one the export actually runs.
+        """
         if self._source_regex_verified:
             return
         message = (
@@ -715,7 +727,7 @@ class FastSyncTapMySql:
                 cursor.execute(
                     'SELECT CONVERT(%s USING utf8mb4) COLLATE utf8mb4_bin '
                     'REGEXP CONVERT(%s USING utf8mb4)',
-                    ('a', r'(?-x)\A(?:a)\z'),
+                    ('a', portable_pattern('a', self._source_dialect)),
                 )
                 result = cursor.fetchone()
         except pymysql.MySQLError as exc:

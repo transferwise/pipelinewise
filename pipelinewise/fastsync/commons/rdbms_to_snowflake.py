@@ -135,7 +135,7 @@ def _prepare_full_run(run: _FullSyncRun) -> bool:
             allow_missing=True,
         )
 
-    run.source = run.source_adapter.create(run.args, run.iceberg_requested)
+    run.source = run.source_adapter.create(run.args, run.iceberg_version)
     return _recover_full_attempt(run) if run.iceberg_requested else False
 
 

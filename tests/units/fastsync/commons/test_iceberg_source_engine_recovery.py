@@ -148,6 +148,7 @@ def test_reexport_rejects_missing_or_changed_engine_before_source_export(
             run = SimpleNamespace(
                 args=SimpleNamespace(tap={}, transform=None),
                 source_adapter=adapter,
+                iceberg_version=2,
                 iceberg_requested=True,
                 attempt=attempt,
                 table_name='source.ORDERS',
