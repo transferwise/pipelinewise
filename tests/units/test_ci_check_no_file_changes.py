@@ -1,3 +1,4 @@
+import ast
 import os
 import subprocess
 from pathlib import Path
@@ -230,7 +231,7 @@ def test_snowflake_e2e_matrix_contract():
     assert job['name'] == '${{ matrix.check_name }}'
     assert strategy['fail-fast'] is False
     assert 'max-parallel' not in strategy
-    assert len(shards) == 8
+    assert len(shards) == 10
 
     expected_shards = {
         'conversion': (
@@ -260,8 +261,8 @@ def test_snowflake_e2e_matrix_contract():
             'e2e_tests_05',
             (
                 'tests/end_to_end/target_snowflake/tap_mariadb/test_partial_sync_mariadb_to_sf.py',
-                'tests/end_to_end/target_snowflake/tap_postgres/test_defined_partial_sync_pg_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_with_split_large_files.py',
+                'tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py::TestIcebergV3MySQLToSnowflake::test_iceberg_replication_preserves_keys_and_supplementary_unicode',
             ),
         ),
         'pg-iceberg': (
@@ -269,7 +270,6 @@ def test_snowflake_e2e_matrix_contract():
             (
                 'tests/end_to_end/target_snowflake/tap_postgres/test_iceberg_v3_postgres_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf.py',
-                'tests/end_to_end/target_snowflake/tap_s3/test_replicate_s3_to_sf.py',
             ),
         ),
         'mariadb-iceberg': (
@@ -277,16 +277,18 @@ def test_snowflake_e2e_matrix_contract():
             (
                 'tests/end_to_end/target_snowflake/tap_mariadb/test_iceberg_v3_mariadb_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_mongodb/test_replicate_mongodb_to_sf.py',
+                'tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py::TestIcebergV3MySQLToSnowflake::test_fullsync_hands_over_to_singer_on_managed_iceberg_v3',
             ),
         ),
         'mysql-iceberg': (
             'e2e_tests_08',
             (
                 'tests/end_to_end/target_snowflake/test_source_transformation_exports.py',
-                'tests/end_to_end/target_snowflake/test_source_transformation_publication.py',
-                'tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py',
+                'tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py::TestIcebergV3MySQLToSnowflake::test_full_and_bounded_partial_sync_preserve_multiline_bytes',
+                'tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py::TestIcebergV3MySQLToSnowflake::test_partial_sync_merges_a_bounded_range_into_managed_iceberg_v3',
                 'tests/end_to_end/target_snowflake/tap_mysql/test_multiline_native_mysql_to_sf.py',
-                'tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_table_size_check.py',
+                'tests/end_to_end/target_snowflake/tap_postgres/test_defined_partial_sync_pg_to_sf.py',
+                'tests/end_to_end/target_snowflake/tap_s3/test_replicate_s3_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf_with_archive_load_files.py',
             ),
@@ -301,6 +303,22 @@ def test_snowflake_e2e_matrix_contract():
                 'tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_with_split_large_files.py',
             ),
         ),
+        'transformation-parity': (
+            'e2e_tests_10',
+            (
+                'tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_singer_and_fastsync_preserve_mapped_types_and_values',
+                'tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_existing_singer_semantic_differences_remain_explicit',
+                'tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_ambiguous_regex_is_rejected_before_export',
+                'tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_bit_varying_conditions_match_snowflake',
+            ),
+        ),
+        'transformation-privacy': (
+            'e2e_tests_11',
+            (
+                'tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_transformations_are_private_through_publication',
+                'tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_table_size_check.py',
+            ),
+        ),
     }
     actual_shards = {
         shard['shard']: (shard['check_name'], tuple(shard['test_paths'].split()))
@@ -308,10 +326,10 @@ def test_snowflake_e2e_matrix_contract():
     }
     assert actual_shards == expected_shards
 
-    configured_paths = [
-        test_path
+    configured_selectors = [
+        selector
         for _, test_paths in actual_shards.values()
-        for test_path in test_paths
+        for selector in test_paths
     ]
     expected_paths = {
         str(path.relative_to(REPOSITORY_ROOT))
@@ -325,8 +343,38 @@ def test_snowflake_e2e_matrix_contract():
             'tests/end_to_end/data_diff/test_postgres_to_snowflake.py',
         }
     )
-    assert len(configured_paths) == len(set(configured_paths))
-    assert set(configured_paths) == expected_paths
+    expected_tests = set()
+    tests_by_path = {}
+    for test_path in expected_paths:
+        module = ast.parse((REPOSITORY_ROOT / test_path).read_text(encoding='utf-8'))
+        test_ids = {
+            f'{test_path}::{node.name}'
+            for node in module.body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith('test_')
+        }
+        test_ids.update(
+            f'{test_path}::{node.name}::{method.name}'
+            for node in module.body
+            if isinstance(node, ast.ClassDef) and node.name.startswith('Test')
+            for method in node.body
+            if isinstance(method, (ast.FunctionDef, ast.AsyncFunctionDef)) and method.name.startswith('test_')
+        )
+        assert test_ids, test_path
+        tests_by_path[test_path] = test_ids
+        expected_tests.update(test_ids)
+
+    selected_tests = []
+    for selector in configured_selectors:
+        test_path, _, test_name = selector.partition('::')
+        assert test_path in expected_paths, selector
+        if test_name:
+            assert selector in tests_by_path[test_path], selector
+            selected_tests.append(selector)
+        else:
+            selected_tests.extend(tests_by_path[test_path])
+
+    assert len(selected_tests) == len(set(selected_tests))
+    assert set(selected_tests) == expected_tests
 
     commands = '\n'.join(step.get('run', '') for step in job['steps'])
     assert job['env']['E2E_TEST_PATHS'] == '${{ matrix.test_paths }}'
@@ -391,7 +439,7 @@ def test_required_e2e_status_contract():
 
     assert len(configured_names) == len(set(configured_names))
     assert expected_statuses == {
-        f'e2e_tests_{shard_number:02d}' for shard_number in range(1, 10)
+        f'e2e_tests_{shard_number:02d}' for shard_number in range(1, 12)
     }
     assert required_statuses == expected_statuses
     assert not {

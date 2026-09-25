@@ -34,7 +34,7 @@ step ran and report pass/skip/fail counts.
 ## E2E matrix
 
 These groups mirror `.github/workflows/e2e_tests.yml` in required-check order
-`e2e_tests_01` through `e2e_tests_09`; update both together. CI runs eight
+`e2e_tests_01` through `e2e_tests_11`; update both together. CI runs ten
 Snowflake groups concurrently on isolated runners; local groups share/reset
 fixtures/config and must run serially:
 
@@ -63,24 +63,25 @@ run_e2e \
 
 run_e2e \
   tests/end_to_end/target_snowflake/tap_mariadb/test_partial_sync_mariadb_to_sf.py \
-  tests/end_to_end/target_snowflake/tap_postgres/test_defined_partial_sync_pg_to_sf.py \
-  tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_with_split_large_files.py
+  tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_with_split_large_files.py \
+  tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py::TestIcebergV3MySQLToSnowflake::test_iceberg_replication_preserves_keys_and_supplementary_unicode
 
 run_e2e \
   tests/end_to_end/target_snowflake/tap_postgres/test_iceberg_v3_postgres_to_sf.py \
-  tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf.py \
-  tests/end_to_end/target_snowflake/tap_s3/test_replicate_s3_to_sf.py
+  tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf.py
 
 run_e2e \
   tests/end_to_end/target_snowflake/tap_mariadb/test_iceberg_v3_mariadb_to_sf.py \
-  tests/end_to_end/target_snowflake/tap_mongodb/test_replicate_mongodb_to_sf.py
+  tests/end_to_end/target_snowflake/tap_mongodb/test_replicate_mongodb_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py::TestIcebergV3MySQLToSnowflake::test_fullsync_hands_over_to_singer_on_managed_iceberg_v3
 
 run_e2e \
   tests/end_to_end/target_snowflake/test_source_transformation_exports.py \
-  tests/end_to_end/target_snowflake/test_source_transformation_publication.py \
-  tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py::TestIcebergV3MySQLToSnowflake::test_full_and_bounded_partial_sync_preserve_multiline_bytes \
+  tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py::TestIcebergV3MySQLToSnowflake::test_partial_sync_merges_a_bounded_range_into_managed_iceberg_v3 \
   tests/end_to_end/target_snowflake/tap_mysql/test_multiline_native_mysql_to_sf.py \
-  tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_table_size_check.py \
+  tests/end_to_end/target_snowflake/tap_postgres/test_defined_partial_sync_pg_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_s3/test_replicate_s3_to_sf.py \
   tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf.py \
   tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf_with_archive_load_files.py
 
@@ -90,9 +91,19 @@ run_e2e \
   tests/end_to_end/target_snowflake/tap_mariadb/test_multiline_native_mariadb_to_sf.py \
   tests/end_to_end/target_snowflake/tap_mariadb/test_defined_partial_sync_mariadb_to_sf.py \
   tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_with_split_large_files.py
+
+run_e2e \
+  tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_singer_and_fastsync_preserve_mapped_types_and_values \
+  tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_existing_singer_semantic_differences_remain_explicit \
+  tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_ambiguous_regex_is_rejected_before_export \
+  tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_bit_varying_conditions_match_snowflake
+
+run_e2e \
+  tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_transformations_are_private_through_publication \
+  tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_table_size_check.py
 ```
 
-Run all nine only for a full suite; otherwise run every affected group. MariaDB,
+Run all eleven only for a full suite; otherwise run every affected group. MariaDB,
 PostgreSQL, and genuine MySQL cover native and explicit v3.
 Do not infer one format from another. `SHOW PRIMARY KEYS` does not prove Iceberg
 identifier fields; compare raw-metadata `identifier-field-ids` with current
