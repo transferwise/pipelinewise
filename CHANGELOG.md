@@ -1,3 +1,11 @@
+Unreleased (2026-09-25)
+-----------------------
+
+**CI**
+
+- Rebalance Snowflake E2E tests across ten required parallel shards so slow
+  publication and MySQL Iceberg cases run concurrently without losing coverage
+
 0.92.0 (2026-09-25)
 -------------------
 

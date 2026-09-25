@@ -118,27 +118,28 @@ jobs:
             check_name: e2e_tests_05
             test_paths: >-
               tests/end_to_end/target_snowflake/tap_mariadb/test_partial_sync_mariadb_to_sf.py
-              tests/end_to_end/target_snowflake/tap_postgres/test_defined_partial_sync_pg_to_sf.py
               tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_with_split_large_files.py
+              tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py::TestIcebergV3MySQLToSnowflake::test_iceberg_replication_preserves_keys_and_supplementary_unicode
           - shard: pg-iceberg
             check_name: e2e_tests_06
             test_paths: >-
               tests/end_to_end/target_snowflake/tap_postgres/test_iceberg_v3_postgres_to_sf.py
               tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf.py
-              tests/end_to_end/target_snowflake/tap_s3/test_replicate_s3_to_sf.py
           - shard: mariadb-iceberg
             check_name: e2e_tests_07
             test_paths: >-
               tests/end_to_end/target_snowflake/tap_mariadb/test_iceberg_v3_mariadb_to_sf.py
               tests/end_to_end/target_snowflake/tap_mongodb/test_replicate_mongodb_to_sf.py
+              tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py::TestIcebergV3MySQLToSnowflake::test_fullsync_hands_over_to_singer_on_managed_iceberg_v3
           - shard: mysql-iceberg
             check_name: e2e_tests_08
             test_paths: >-
               tests/end_to_end/target_snowflake/test_source_transformation_exports.py
-              tests/end_to_end/target_snowflake/test_source_transformation_publication.py
-              tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py
+              tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py::TestIcebergV3MySQLToSnowflake::test_full_and_bounded_partial_sync_preserve_multiline_bytes
+              tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py::TestIcebergV3MySQLToSnowflake::test_partial_sync_merges_a_bounded_range_into_managed_iceberg_v3
               tests/end_to_end/target_snowflake/tap_mysql/test_multiline_native_mysql_to_sf.py
-              tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_table_size_check.py
+              tests/end_to_end/target_snowflake/tap_postgres/test_defined_partial_sync_pg_to_sf.py
+              tests/end_to_end/target_snowflake/tap_s3/test_replicate_s3_to_sf.py
               tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf.py
               tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf_with_archive_load_files.py
           - shard: mariadb-native
@@ -149,6 +150,18 @@ jobs:
               tests/end_to_end/target_snowflake/tap_mariadb/test_multiline_native_mariadb_to_sf.py
               tests/end_to_end/target_snowflake/tap_mariadb/test_defined_partial_sync_mariadb_to_sf.py
               tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_with_split_large_files.py
+          - shard: transformation-parity
+            check_name: e2e_tests_10
+            test_paths: >-
+              tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_singer_and_fastsync_preserve_mapped_types_and_values
+              tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_existing_singer_semantic_differences_remain_explicit
+              tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_ambiguous_regex_is_rejected_before_export
+              tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_bit_varying_conditions_match_snowflake
+          - shard: transformation-privacy
+            check_name: e2e_tests_11
+            test_paths: >-
+              tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_transformations_are_private_through_publication
+              tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_table_size_check.py
     env:
       E2E_TEST_PATHS: ${{ matrix.test_paths }}
       PIPELINEWISE_E2E_NAMESPACE: >-
