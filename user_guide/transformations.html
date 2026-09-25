@@ -92,6 +92,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#supported-routes">Supported routes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#automatic-selection-and-handover">Automatic selection and handover</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#snowflake-iceberg-publication">Snowflake Iceberg publication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#snowflake-source-side-transformations">Snowflake source-side transformations</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#snowflake-string-widths">Snowflake string widths</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#explicit-fullsync">Explicit FullSync</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#configured-partialsync">Configured PartialSync</a></li>
@@ -230,6 +231,7 @@
 <li class="toctree-l1"><a class="reference internal" href="partial_sync.html">PartialSync behaviour</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="partial_sync.html#range-semantics">Range semantics</a></li>
 <li class="toctree-l2"><a class="reference internal" href="partial_sync.html#native-table-merge-outcomes">Native-table merge outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="partial_sync.html#native-compatibility-report">Native compatibility report</a></li>
 <li class="toctree-l2"><a class="reference internal" href="partial_sync.html#managed-iceberg-v3-outcomes">Managed Iceberg v3 outcomes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="partial_sync.html#visual-examples">Visual examples</a></li>
 <li class="toctree-l2"><a class="reference internal" href="partial_sync.html#safety-and-validation">Safety and validation</a></li>
@@ -243,9 +245,11 @@
 </li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Load-time transformations</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#transformation-types">Transformation types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mapped-column-types">Mapped column types</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#configuration">Configuration</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#nested-json-fields">Nested JSON fields</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#conditions">Conditions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#snowflake-fastsync-semantics">Snowflake FastSync semantics</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#validation-and-rollout">Validation and rollout</a></li>
 </ul>
 </li>
@@ -373,10 +377,21 @@
              
   <section id="load-time-transformations">
 <span id="transformations"></span><h1>Load-time transformations<a class="headerlink" href="#load-time-transformations" title="Link to this heading"></a></h1>
-<p>PipelineWise can transform selected fields between the tap and target. Use this
-boundary to prevent sensitive source values from reaching the warehouse or
-external staging. Perform joins, aggregations, and analytical modelling after
-ingestion.</p>
+<p>PipelineWise can transform selected fields during ingestion. PostgreSQL and
+MySQL/MariaDB FastSync to Snowflake apply top-level transformations in the source
+<code class="docutils literal notranslate"><span class="pre">SELECT</span></code>, before CSV generation, for both FullSync and PartialSync and both
+native and managed Iceberg v3 targets. Local export files, S3 staging, archived
+load files, and Snowflake staging therefore receive only the configured output.
+There is no subsequent Snowflake transformation <code class="docutils literal notranslate"><span class="pre">UPDATE</span></code> on these routes.</p>
+<p>Conditional rules intentionally retain the value when their conditions do not
+match; columns without transformations are unchanged. Configure rules accordingly
+before treating them as a security boundary. Other FastSync routes retain their
+existing target-side transformation behaviour. Singer applies transformations
+between the tap and target. Perform joins, aggregations, and analytical modelling
+after ingestion.</p>
+<p>Source-side masking uses source database CPU instead of Snowflake update work.
+Measure that load when scheduling bulk exports; a 64-character hash can increase
+the size of a short input even though raw values no longer need to be transferred.</p>
 <section id="transformation-types">
 <h2>Transformation types<a class="headerlink" href="#transformation-types" title="Link to this heading"></a></h2>
 <table class="docutils align-default" id="id1" style="width: 100%">
@@ -426,6 +441,48 @@ ingestion.</p>
 <p>For <code class="docutils literal notranslate"><span class="pre">MASK-STRING-SKIP-ENDS-n</span></code>, values no longer than <code class="docutils literal notranslate"><span class="pre">2</span> <span class="pre">*</span> <span class="pre">n</span></code> are fully
 masked.</p>
 </section>
+<section id="mapped-column-types">
+<h2>Mapped column types<a class="headerlink" href="#mapped-column-types" title="Link to this heading"></a></h2>
+<p>Transformations do not choose or change the target column type. FastSync uses
+its existing source-to-Snowflake mappings; Singer uses its existing schema
+mappings. Managed Iceberg uses the selected version’s canonical physical types.
+FastSync validates each rule against that mapped type before export:</p>
+<table class="docutils align-default" id="id2">
+<caption><span class="caption-text">Snowflake FastSync type support</span><a class="headerlink" href="#id2" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 38.0%" />
+<col style="width: 62.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Mapped type</p></th>
+<th class="head"><p>Supported transformations</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">VARCHAR</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">SET-NULL</span></code>, <code class="docutils literal notranslate"><span class="pre">HASH</span></code>, <code class="docutils literal notranslate"><span class="pre">HASH-SKIP-FIRST-n</span></code>, <code class="docutils literal notranslate"><span class="pre">MASK-HIDDEN</span></code>,
+<code class="docutils literal notranslate"><span class="pre">MASK-STRING-SKIP-ENDS-n</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">NUMBER</span></code>, <code class="docutils literal notranslate"><span class="pre">FLOAT</span></code> / Iceberg <code class="docutils literal notranslate"><span class="pre">DOUBLE</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">SET-NULL</span></code>, <code class="docutils literal notranslate"><span class="pre">MASK-NUMBER</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">DATE</span></code>, <code class="docutils literal notranslate"><span class="pre">TIMESTAMP_NTZ</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">SET-NULL</span></code>, <code class="docutils literal notranslate"><span class="pre">MASK-DATE</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">BOOLEAN</span></code>, <code class="docutils literal notranslate"><span class="pre">TIME</span></code>, <code class="docutils literal notranslate"><span class="pre">BINARY</span></code>, <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">SET-NULL</span></code></p></td>
+</tr>
+</tbody>
+</table>
+<p>For example, MySQL <code class="docutils literal notranslate"><span class="pre">VARBINARY</span></code> maps to <code class="docutils literal notranslate"><span class="pre">BINARY</span></code>, so hashing it is rejected;
+it is not silently remapped to text. Fixed-size string outputs must fit the
+mapped width. Unknown mapped types and unsupported combinations fail before
+CSV creation. Correct the configuration rather than relying on an implicit cast.</p>
+<p>Existing native PartialSync columns must also accept the mapped values without
+changing type family or losing width or precision. Compatible narrow text
+columns still widen automatically. Iceberg retains its stricter canonical
+type and recovery checks. See <a class="reference internal" href="partial_sync.html#partial-sync-cases"><span class="std std-ref">PartialSync behaviour</span></a>.</p>
+</section>
 <section id="configuration">
 <h2>Configuration<a class="headerlink" href="#configuration" title="Link to this heading"></a></h2>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tables</span><span class="p">:</span>
@@ -470,16 +527,109 @@ those routes, transform only top-level columns or omit the nested condition.</p>
 subject to the FastSync-route restriction above. Multiple entries use logical
 AND.</p>
 </section>
+<section id="snowflake-fastsync-semantics">
+<h2>Snowflake FastSync semantics<a class="headerlink" href="#snowflake-fastsync-semantics" title="Link to this heading"></a></h2>
+<p>Source-side execution preserves the existing Snowflake FastSync order:</p>
+<ol class="arabic simple">
+<li><p>Conditional transformations run individually in configuration order. Each
+condition sees the result of preceding conditional transformations.</p></li>
+<li><p>Unconditional transformations then run together against that resulting row,
+regardless of their position among the conditional rules in the configuration.</p></li>
+</ol>
+<p>This differs from Singer’s sequential configuration order. Avoid depending on
+the difference in tables that switch between FastSync and Singer.</p>
+<p>Other existing Singer differences also remain: <code class="docutils literal notranslate"><span class="pre">HASH-SKIP-FIRST-n</span></code> slices
+the hash input by UTF-8 bytes rather than characters; regex conditions search
+within the string; and equality conditions with <code class="docutils literal notranslate"><span class="pre">0</span></code>, <code class="docutils literal notranslate"><span class="pre">false</span></code>, or <code class="docutils literal notranslate"><span class="pre">null</span></code>
+are ignored and do not trigger a rule on their own. For PostgreSQL JSON
+object/array schemas, Singer can load a
+transformed <code class="docutils literal notranslate"><span class="pre">None</span></code> as JSON <code class="docutils literal notranslate"><span class="pre">null</span></code> rather than FastSync’s SQL <code class="docutils literal notranslate"><span class="pre">NULL</span></code>.
+These differences are tested explicitly; matching column types alone does not
+guarantee identical transformation results.</p>
+<p>String operations count characters, not UTF-8 bytes. Hashes remain hexadecimal
+SHA-256. <code class="docutils literal notranslate"><span class="pre">NULL</span></code> and empty strings stay distinct; <code class="docutils literal notranslate"><span class="pre">MASK-HIDDEN</span></code> and
+<code class="docutils literal notranslate"><span class="pre">MASK-NUMBER</span></code> replace even <code class="docutils literal notranslate"><span class="pre">NULL</span></code> with their configured constant. Date masking
+retains the time and fractional seconds. Existing export normalization, including
+MySQL/MariaDB NUL removal and invalid-date handling, happens before transformation.</p>
+<p>Equality comparisons are case-sensitive and preserve trailing spaces. Regex
+conditions accept text and integer columns; equality requires matching string,
+numeric, or Boolean values, or <code class="docutils literal notranslate"><span class="pre">NULL</span></code>. Implicit date/string/numeric coercions
+and floating-point regex rendering are rejected.</p>
+<p>Regex conditions match the whole string, are case-sensitive, and <code class="docutils literal notranslate"><span class="pre">.</span></code> does not match
+a newline. Source execution accepts a portable regex subset: literals, character
+ranges, groups, alternation, ordinary repetitions, and bounded repetitions up to
+255. Engine-specific constructs such as lookarounds, backreferences, inline flags,
+locale character classes, and character-class set operators such as <code class="docutils literal notranslate"><span class="pre">[a&amp;&amp;b]</span></code>
+are rejected rather than delegated to a different regex engine with potentially
+different results.
+Backslashes in equality values or regex patterns are also rejected: the previous
+Snowflake SQL literals interpreted them as escapes, so treating them literally
+could change which rows are masked. Use an equivalent unambiguous condition
+(for example, <code class="docutils literal notranslate"><span class="pre">[.]</span></code> for a literal dot) and verify its intended matches.</p>
+<p>Unknown or ambiguous columns, nested paths, incompatible types, unsupported
+condition coercions, and duplicate unconditional assignments to one column fail
+before an export file is opened. There is no fallback to exporting raw values or
+running the transformation after loading. Correct the rule or source schema and
+retry; do not disable the transformation to bypass this guard.
+Managed-Iceberg runs validate the projection before creating a new recovery
+attempt, so a rejected rule does not leave a manifest blocking its correction.
+Existing recovery attempts still require their original transformation configuration.</p>
+<p>PartialSync still selects its inclusive range against original source values,
+before transformations. Bookmarks and target range predicates remain unchanged.
+Use an untransformed boundary column so the source and target ranges remain
+comparable; hashing or masking that column does not translate the target range.</p>
+<p>FastSync rejects transformations on an <code class="docutils literal notranslate"><span class="pre">INCREMENTAL</span></code> replication-key column
+before querying its maximum: resuming requires the original value in local state
+and recovery manifests, which would bypass the transformation boundary. Choose
+a non-sensitive, untransformed replication key or another replication method.
+Range arguments and dynamic-boundary results remain operational metadata and
+can appear in logs/recovery manifests; do not use sensitive values as boundaries.</p>
+</section>
 <section id="validation-and-rollout">
 <span id="transformation-validation"></span><h2>Validation and rollout<a class="headerlink" href="#validation-and-rollout" title="Link to this heading"></a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">import_config</span></code> checks transformation names, field existence, and type
-compatibility. Runtime validation repeats the check so a later source-schema
-change fails instead of emitting an unprotected value.</p>
+<p><code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">validate</span></code> checks source-side rule syntax, portable regexes,
+duplicate unconditional rules, and transformed INCREMENTAL keys without
+connecting to databases. <code class="docutils literal notranslate"><span class="pre">import_config</span></code> repeats those checks before discovery
+and validates fields against the Singer catalog. FastSync checks mapped column
+types and source capabilities at runtime; passing offline validation does not
+prove that an existing target is compatible. See <a class="reference internal" href="partial_sync.html#partial-sync-cases"><span class="std std-ref">PartialSync behaviour</span></a>.</p>
+<p>MySQL/MariaDB regex conditions require ICU/PCRE support. FastSync checks the
+export connection with a literal-only query before using regex conditions;
+unsupported engines fail before CSV creation. The result is reused only for
+that connection. Equality-only or unconditional rules do not run this probe.</p>
 <p>Transformation changes affect newly extracted records only. To update historical
 target values, perform a controlled resync and verify that temporary files,
 staging tables, logs, and rejected records do not expose the original value.</p>
 <p>Test deterministic output, <code class="docutils literal notranslate"><span class="pre">NULL</span></code> handling, nested paths, conditional misses,
 and schema changes before relying on a transformation as a security boundary.</p>
+<p>Before upgrading to source-side execution, complete pending managed-Iceberg
+recovery for transformed streams with the previous version. Retained attempts
+from target-side execution are rejected because their staging may contain raw
+values. They block replication; they do not automatically restart from scratch.
+Do not delete recovery manifests to bypass this check. Include pending recovery
+in the deployment handover to the on-call operator.</p>
+<p>The upgrade does not rewrite or remove historical staging/archive files. Treat
+pre-upgrade FastSync exports as potentially containing unmasked source values.
+Review access, retention, retained object versions, and rollback needs separately;
+do not assume a successful resync removes old files.</p>
+<p>On the first representative bulk exports, compare source CPU, replica lag, and
+export duration with the previous baseline. Include wide columns and tables with
+many conditional rules; small development benchmarks do not establish production
+capacity.</p>
+<p>Optional monitoring can count unexpected output shapes without logging values.
+For a column whose final, unconditional transformation is <code class="docutils literal notranslate"><span class="pre">HASH</span></code>:</p>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">SELECT</span><span class="w"> </span><span class="k">COALESCE</span><span class="p">(</span><span class="n">COUNT_IF</span><span class="p">(</span>
+<span class="w">           </span><span class="ss">"EMAIL"</span><span class="w"> </span><span class="k">IS</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span>
+<span class="w">           </span><span class="k">AND</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="n">REGEXP_LIKE</span><span class="p">(</span><span class="ss">"EMAIL"</span><span class="p">,</span><span class="w"> </span><span class="s1">'[0-9a-f]{64}'</span><span class="p">,</span><span class="w"> </span><span class="s1">'c'</span><span class="p">)</span>
+<span class="w">       </span><span class="p">),</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">unexpected_hash_values</span>
+<span class="w">  </span><span class="k">FROM</span><span class="w"> </span><span class="n">replicated_schema</span><span class="p">.</span><span class="n">customers</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>This permits SQL NULL and checks lowercase hexadecimal SHA-256 shape only; it
+does not prove the correct input was hashed. Do not apply it unchanged to
+conditional hashes, prefix-preserving hashes, or columns with later rules.
+Keep deterministic transformation tests as the correctness check; do not restore
+the old UPDATE, which would transform values twice.</p>
 </section>
 </section>
 

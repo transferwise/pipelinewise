@@ -92,6 +92,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#supported-routes">Supported routes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#automatic-selection-and-handover">Automatic selection and handover</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#snowflake-iceberg-publication">Snowflake Iceberg publication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#snowflake-source-side-transformations">Snowflake source-side transformations</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#snowflake-string-widths">Snowflake string widths</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#explicit-fullsync">Explicit FullSync</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#configured-partialsync">Configured PartialSync</a></li>
@@ -230,6 +231,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/partial_sync.html">PartialSync behaviour</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#range-semantics">Range semantics</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#native-table-merge-outcomes">Native-table merge outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#native-compatibility-report">Native compatibility report</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#managed-iceberg-v3-outcomes">Managed Iceberg v3 outcomes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#visual-examples">Visual examples</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#safety-and-validation">Safety and validation</a></li>
@@ -243,9 +245,11 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/transformations.html">Load-time transformations</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/transformations.html#transformation-types">Transformation types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/transformations.html#mapped-column-types">Mapped column types</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/transformations.html#configuration">Configuration</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/transformations.html#nested-json-fields">Nested JSON fields</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/transformations.html#conditions">Conditions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/transformations.html#snowflake-fastsync-semantics">Snowflake FastSync semantics</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/transformations.html#validation-and-rollout">Validation and rollout</a></li>
 </ul>
 </li>
@@ -417,6 +421,10 @@ managed Iceberg v3</p></td>
 </div>
 <p>Retain binlogs longer than the maximum expected outage. If PipelineWise’s saved
 position is purged, the affected tables require a resync.</p>
+<p>Snowflake FastSync regex transformation conditions require MySQL ICU or MariaDB
+PCRE support. The export connection is checked before regex-based exports;
+legacy engines without that capability are rejected. See <a class="reference internal" href="../../user_guide/transformations.html#transformations"><span class="std std-ref">Load-time transformations</span></a>
+for validation and rollout checks.</p>
 </section>
 <section id="configuration">
 <h2>Configuration<a class="headerlink" href="#configuration" title="Link to this heading"></a></h2>
@@ -577,6 +585,10 @@ the captured bookmark in the Singer portion of the same run.</p></li>
 receiver’s potentially newer position. Singer replays changes not yet present
 in the replica snapshot. Multi-channel replicas require an unambiguous source
 and are rejected rather than choosing an arbitrary channel.</p></li>
+<li><p>Snowflake FullSync and PartialSync apply top-level <a class="reference internal" href="../../user_guide/transformations.html#transformations"><span class="std std-ref">Load-time transformations</span></a> in
+the source SELECT before CSV generation, including managed Iceberg v3.
+Unsupported rules fail before export; transformed INCREMENTAL replication
+keys are rejected because checkpoints require their raw values.</p></li>
 <li><p>Snowflake Singer loading, FullSync, and PartialSync preserve line breaks,
 tabs, CSV punctuation, literal backslash sequences, and supplementary Unicode
 in string values. Singer connections use <code class="docutils literal notranslate"><span class="pre">utf8mb4</span></code>. FastSync defaults to

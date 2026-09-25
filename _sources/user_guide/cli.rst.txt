@@ -95,7 +95,9 @@ Review :ref:`connector_support` before enabling a template.
    pipelinewise validate --dir <project>
 
 Checks YAML syntax, required fields, connector types, schema mapping, and tap
-target references. It does not connect to a source or target.
+target references. PostgreSQL/MySQL-to-Snowflake routes also validate source-side
+transformation syntax and reject transformed INCREMENTAL keys. It does not
+connect to a source or target or verify live column types.
 
 
 .. _cli_import_config:

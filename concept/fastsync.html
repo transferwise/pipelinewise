@@ -92,6 +92,7 @@
 <li class="toctree-l2"><a class="reference internal" href="#supported-routes">Supported routes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#automatic-selection-and-handover">Automatic selection and handover</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#snowflake-iceberg-publication">Snowflake Iceberg publication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#snowflake-source-side-transformations">Snowflake source-side transformations</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#snowflake-string-widths">Snowflake string widths</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#explicit-fullsync">Explicit FullSync</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#configured-partialsync">Configured PartialSync</a></li>
@@ -230,6 +231,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/partial_sync.html">PartialSync behaviour</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/partial_sync.html#range-semantics">Range semantics</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/partial_sync.html#native-table-merge-outcomes">Native-table merge outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/partial_sync.html#native-compatibility-report">Native compatibility report</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/partial_sync.html#managed-iceberg-v3-outcomes">Managed Iceberg v3 outcomes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/partial_sync.html#visual-examples">Visual examples</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/partial_sync.html#safety-and-validation">Safety and validation</a></li>
@@ -243,9 +245,11 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/transformations.html">Load-time transformations</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/transformations.html#transformation-types">Transformation types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/transformations.html#mapped-column-types">Mapped column types</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/transformations.html#configuration">Configuration</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/transformations.html#nested-json-fields">Nested JSON fields</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/transformations.html#conditions">Conditions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/transformations.html#snowflake-fastsync-semantics">Snowflake FastSync semantics</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/transformations.html#validation-and-rollout">Validation and rollout</a></li>
 </ul>
 </li>
@@ -492,6 +496,16 @@ FastSync availability and its zero-flattening requirement are specific to these
 routes. A compatible Singer-only source such as Salesforce can load managed v3
 through <code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code> without gaining a FastSync component; it retains
 its normal flattening setting and sends <code class="docutils literal notranslate"><span class="pre">FULL_TABLE</span></code> streams through Singer.</p>
+</section>
+<section id="snowflake-source-side-transformations">
+<h2>Snowflake source-side transformations<a class="headerlink" href="#snowflake-source-side-transformations" title="Link to this heading"></a></h2>
+<p>PostgreSQL and MySQL/MariaDB FullSync and PartialSync apply configured top-level
+transformations in the source <code class="docutils literal notranslate"><span class="pre">SELECT</span></code>, before generating CSV. Native and
+managed Iceberg v3 staging, S3 uploads, and archived load files contain only the
+configured transformed output. Unsupported rules fail before export rather than
+falling back to Snowflake updates. Source range selection and replication
+bookmarks remain unchanged. See <a class="reference internal" href="../user_guide/transformations.html#transformations"><span class="std std-ref">Load-time transformations</span></a> for execution order,
+conditional rules, supported SQL semantics, and upgrade recovery requirements.</p>
 </section>
 <section id="snowflake-string-widths">
 <h2>Snowflake string widths<a class="headerlink" href="#snowflake-string-widths" title="Link to this heading"></a></h2>

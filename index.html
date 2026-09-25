@@ -91,6 +91,7 @@
 <li class="toctree-l2"><a class="reference internal" href="concept/fastsync.html#supported-routes">Supported routes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="concept/fastsync.html#automatic-selection-and-handover">Automatic selection and handover</a></li>
 <li class="toctree-l2"><a class="reference internal" href="concept/fastsync.html#snowflake-iceberg-publication">Snowflake Iceberg publication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="concept/fastsync.html#snowflake-source-side-transformations">Snowflake source-side transformations</a></li>
 <li class="toctree-l2"><a class="reference internal" href="concept/fastsync.html#snowflake-string-widths">Snowflake string widths</a></li>
 <li class="toctree-l2"><a class="reference internal" href="concept/fastsync.html#explicit-fullsync">Explicit FullSync</a></li>
 <li class="toctree-l2"><a class="reference internal" href="concept/fastsync.html#configured-partialsync">Configured PartialSync</a></li>
@@ -229,6 +230,7 @@
 <li class="toctree-l1"><a class="reference internal" href="user_guide/partial_sync.html">PartialSync behaviour</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="user_guide/partial_sync.html#range-semantics">Range semantics</a></li>
 <li class="toctree-l2"><a class="reference internal" href="user_guide/partial_sync.html#native-table-merge-outcomes">Native-table merge outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/partial_sync.html#native-compatibility-report">Native compatibility report</a></li>
 <li class="toctree-l2"><a class="reference internal" href="user_guide/partial_sync.html#managed-iceberg-v3-outcomes">Managed Iceberg v3 outcomes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="user_guide/partial_sync.html#visual-examples">Visual examples</a></li>
 <li class="toctree-l2"><a class="reference internal" href="user_guide/partial_sync.html#safety-and-validation">Safety and validation</a></li>
@@ -242,9 +244,11 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/transformations.html">Load-time transformations</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="user_guide/transformations.html#transformation-types">Transformation types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/transformations.html#mapped-column-types">Mapped column types</a></li>
 <li class="toctree-l2"><a class="reference internal" href="user_guide/transformations.html#configuration">Configuration</a></li>
 <li class="toctree-l2"><a class="reference internal" href="user_guide/transformations.html#nested-json-fields">Nested JSON fields</a></li>
 <li class="toctree-l2"><a class="reference internal" href="user_guide/transformations.html#conditions">Conditions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/transformations.html#snowflake-fastsync-semantics">Snowflake FastSync semantics</a></li>
 <li class="toctree-l2"><a class="reference internal" href="user_guide/transformations.html#validation-and-rollout">Validation and rollout</a></li>
 </ul>
 </li>
@@ -484,6 +488,7 @@ remediation.</p></td>
 <li class="toctree-l2"><a class="reference internal" href="concept/fastsync.html#supported-routes">Supported routes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="concept/fastsync.html#automatic-selection-and-handover">Automatic selection and handover</a></li>
 <li class="toctree-l2"><a class="reference internal" href="concept/fastsync.html#snowflake-iceberg-publication">Snowflake Iceberg publication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="concept/fastsync.html#snowflake-source-side-transformations">Snowflake source-side transformations</a></li>
 <li class="toctree-l2"><a class="reference internal" href="concept/fastsync.html#snowflake-string-widths">Snowflake string widths</a></li>
 <li class="toctree-l2"><a class="reference internal" href="concept/fastsync.html#explicit-fullsync">Explicit FullSync</a></li>
 <li class="toctree-l2"><a class="reference internal" href="concept/fastsync.html#configured-partialsync">Configured PartialSync</a></li>
@@ -581,6 +586,7 @@ remediation.</p></td>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/partial_sync.html">PartialSync behaviour</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="user_guide/partial_sync.html#range-semantics">Range semantics</a></li>
 <li class="toctree-l2"><a class="reference internal" href="user_guide/partial_sync.html#native-table-merge-outcomes">Native-table merge outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/partial_sync.html#native-compatibility-report">Native compatibility report</a></li>
 <li class="toctree-l2"><a class="reference internal" href="user_guide/partial_sync.html#managed-iceberg-v3-outcomes">Managed Iceberg v3 outcomes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="user_guide/partial_sync.html#visual-examples">Visual examples</a></li>
 <li class="toctree-l2"><a class="reference internal" href="user_guide/partial_sync.html#safety-and-validation">Safety and validation</a></li>
@@ -594,9 +600,11 @@ remediation.</p></td>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/transformations.html">Load-time transformations</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="user_guide/transformations.html#transformation-types">Transformation types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/transformations.html#mapped-column-types">Mapped column types</a></li>
 <li class="toctree-l2"><a class="reference internal" href="user_guide/transformations.html#configuration">Configuration</a></li>
 <li class="toctree-l2"><a class="reference internal" href="user_guide/transformations.html#nested-json-fields">Nested JSON fields</a></li>
 <li class="toctree-l2"><a class="reference internal" href="user_guide/transformations.html#conditions">Conditions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/transformations.html#snowflake-fastsync-semantics">Snowflake FastSync semantics</a></li>
 <li class="toctree-l2"><a class="reference internal" href="user_guide/transformations.html#validation-and-rollout">Validation and rollout</a></li>
 </ul>
 </li>

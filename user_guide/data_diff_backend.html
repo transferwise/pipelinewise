@@ -184,7 +184,7 @@ const runMermaid = async (rerun) => {
                                     // Apply zoom to the now-rendered diagram, matching
                                     // the decoration visible diagrams receive.
                                     if (true) {
-                                        addZoomToSvgs(d3.selectAll(".mermaid[data-zoom-id=id-031ba276-343d-459a-b419-d233931588ea]").select(function() {
+                                        addZoomToSvgs(d3.selectAll(".mermaid[data-zoom-id=id-c32966a6-dce5-4b6a-b1a9-f315ac0dae77]").select(function() {
                                             return this.querySelector("svg");
                                         }));
                                     }
@@ -210,7 +210,7 @@ const runMermaid = async (rerun) => {
     if (true) {
         const mermaids_to_add_zoom = 1 === -1 ? mermaids_active.length : 1;
         if(mermaids_to_add_zoom > 0) {
-            var svgs = d3.selectAll(".mermaid[data-zoom-id=id-031ba276-343d-459a-b419-d233931588ea]").select(function() {
+            var svgs = d3.selectAll(".mermaid[data-zoom-id=id-c32966a6-dce5-4b6a-b1a9-f315ac0dae77]").select(function() {
                 return this.querySelector("svg");
             });
             // Wait until every active (visible) diagram has rendered. Deferred
@@ -451,6 +451,7 @@ window.runMermaid = runMermaid;</script>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#supported-routes">Supported routes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#automatic-selection-and-handover">Automatic selection and handover</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#snowflake-iceberg-publication">Snowflake Iceberg publication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#snowflake-source-side-transformations">Snowflake source-side transformations</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#snowflake-string-widths">Snowflake string widths</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#explicit-fullsync">Explicit FullSync</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#configured-partialsync">Configured PartialSync</a></li>
@@ -589,6 +590,7 @@ window.runMermaid = runMermaid;</script>
 <li class="toctree-l1"><a class="reference internal" href="partial_sync.html">PartialSync behaviour</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="partial_sync.html#range-semantics">Range semantics</a></li>
 <li class="toctree-l2"><a class="reference internal" href="partial_sync.html#native-table-merge-outcomes">Native-table merge outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="partial_sync.html#native-compatibility-report">Native compatibility report</a></li>
 <li class="toctree-l2"><a class="reference internal" href="partial_sync.html#managed-iceberg-v3-outcomes">Managed Iceberg v3 outcomes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="partial_sync.html#visual-examples">Visual examples</a></li>
 <li class="toctree-l2"><a class="reference internal" href="partial_sync.html#safety-and-validation">Safety and validation</a></li>
@@ -602,9 +604,11 @@ window.runMermaid = runMermaid;</script>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="transformations.html">Load-time transformations</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="transformations.html#transformation-types">Transformation types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="transformations.html#mapped-column-types">Mapped column types</a></li>
 <li class="toctree-l2"><a class="reference internal" href="transformations.html#configuration">Configuration</a></li>
 <li class="toctree-l2"><a class="reference internal" href="transformations.html#nested-json-fields">Nested JSON fields</a></li>
 <li class="toctree-l2"><a class="reference internal" href="transformations.html#conditions">Conditions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="transformations.html#snowflake-fastsync-semantics">Snowflake FastSync semantics</a></li>
 <li class="toctree-l2"><a class="reference internal" href="transformations.html#validation-and-rollout">Validation and rollout</a></li>
 </ul>
 </li>
@@ -764,7 +768,7 @@ credentials when separate roles are not required.</p>
 <section id="schema">
 <h2>Schema<a class="headerlink" href="#schema" title="Link to this heading"></a></h2>
 <figure class="align-center" id="id1">
-<pre data-zoom-id="id-031ba276-343d-459a-b419-d233931588ea" class="mermaid">
+<pre data-zoom-id="id-c32966a6-dce5-4b6a-b1a9-f315ac0dae77" class="mermaid">
         %%{init: {&quot;er&quot;: {&quot;diagramPadding&quot;: 8, &quot;entityPadding&quot;: 8}}}%%
 erDiagram
     direction LR

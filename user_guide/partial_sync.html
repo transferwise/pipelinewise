@@ -92,6 +92,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#supported-routes">Supported routes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#automatic-selection-and-handover">Automatic selection and handover</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#snowflake-iceberg-publication">Snowflake Iceberg publication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#snowflake-source-side-transformations">Snowflake source-side transformations</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#snowflake-string-widths">Snowflake string widths</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#explicit-fullsync">Explicit FullSync</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#configured-partialsync">Configured PartialSync</a></li>
@@ -230,6 +231,7 @@
 <li class="toctree-l1 current"><a class="current reference internal" href="#">PartialSync behaviour</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#range-semantics">Range semantics</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#native-table-merge-outcomes">Native-table merge outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#native-compatibility-report">Native compatibility report</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#managed-iceberg-v3-outcomes">Managed Iceberg v3 outcomes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#visual-examples">Visual examples</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#safety-and-validation">Safety and validation</a></li>
@@ -243,9 +245,11 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="transformations.html">Load-time transformations</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="transformations.html#transformation-types">Transformation types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="transformations.html#mapped-column-types">Mapped column types</a></li>
 <li class="toctree-l2"><a class="reference internal" href="transformations.html#configuration">Configuration</a></li>
 <li class="toctree-l2"><a class="reference internal" href="transformations.html#nested-json-fields">Nested JSON fields</a></li>
 <li class="toctree-l2"><a class="reference internal" href="transformations.html#conditions">Conditions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="transformations.html#snowflake-fastsync-semantics">Snowflake FastSync semantics</a></li>
 <li class="toctree-l2"><a class="reference internal" href="transformations.html#validation-and-rollout">Validation and rollout</a></li>
 </ul>
 </li>
@@ -385,7 +389,10 @@ retains it. See <a class="reference internal" href="resync.html#resync-postgres-
 <section id="range-semantics">
 <h2>Range semantics<a class="headerlink" href="#range-semantics" title="Link to this heading"></a></h2>
 <p>The start boundary is inclusive. An explicit end boundary is also inclusive.
-Choose a stable, comparable column and a range that can be verified independently.</p>
+Choose a stable, comparable column and a range that can be verified independently.
+Source filtering precedes the source-side <a class="reference internal" href="transformations.html#transformations"><span class="std std-ref">Load-time transformations</span></a>, so masking a
+column never changes which source rows enter the export. Keep the boundary column
+untransformed: the target range predicate still uses the original boundary values.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pipelinewise<span class="w"> </span>partial_sync_table<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--tap<span class="w"> </span>&lt;tap_id&gt;<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--target<span class="w"> </span>snowflake<span class="w"> </span><span class="se">\</span>
@@ -429,7 +436,11 @@ and can hand ongoing replication over from that position after the merge.</p>
 <td><p>PipelineWise widens the target column before applying the merge.</p></td>
 <td><p>Values are unchanged; the wider column definition applies to the table.</p></td>
 </tr>
-<tr class="row-even"><td><p>Target row absent from the source range</p></td>
+<tr class="row-even"><td><p>Existing column has an incompatible type, width, or precision</p></td>
+<td><p>PartialSync fails before export; no merge or state advancement.</p></td>
+<td><p>Unchanged.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Target row absent from the source range</p></td>
 <td><p>Deleted.</p></td>
 <td><p>Unchanged.</p></td>
 </tr>
@@ -440,10 +451,52 @@ and can hand ongoing replication over from that position after the merge.</p>
 source rows are always physically deleted from the selected target range.</p>
 <p>Snowflake commits schema changes independently from the merge transaction.
 PipelineWise therefore widens compatible native text columns and adds missing
-columns before starting DML. If the existing target type is not text, its width
-cannot be verified, or the target role cannot alter it, PartialSync fails before
-the merge and state advancement. Run a FullSync or alter the column to
-<code class="docutils literal notranslate"><span class="pre">VARCHAR(134217728)</span></code> with an authorized role, then retry PartialSync.</p>
+columns before starting DML. It checks all overlapping column types before
+export and again before the merge, even when no transformations are configured.
+Numeric precision and scale, binary width, and temporal precision must hold the
+mapped values; timestamp timezone types must match. Missing catalog dimensions
+fail validation rather than being guessed. Only compatible text widening is
+automatic.</p>
+<p>This can reject previously tolerated numeric, binary, or temporal differences
+between Singer and FastSync. The existing text-type check also rejects native
+PostgreSQL <code class="docutils literal notranslate"><span class="pre">hstore</span></code> stored as Singer <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> where FastSync maps it to
+<code class="docutils literal notranslate"><span class="pre">VARCHAR</span></code>. Use FullSync to recreate an incompatible target with its mapped
+types. A FullSync must cover the whole table: <code class="docutils literal notranslate"><span class="pre">sync_start_from</span></code> still
+selects PartialSync. If only a text-column widening lacks privileges, have an
+authorized role widen it to <code class="docutils literal notranslate"><span class="pre">VARCHAR(134217728)</span></code> and retry.</p>
+</section>
+<section id="native-compatibility-report">
+<h2>Native compatibility report<a class="headerlink" href="#native-compatibility-report" title="Link to this heading"></a></h2>
+<p>Before deploying stricter type checks, run this report for each imported native
+Snowflake tap, using the installed PipelineWise Python environment:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>pipelinewise.fastsync.partialsync.compatibility_report<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--tap-type<span class="w"> </span>tap-postgres<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--tap-dir<span class="w"> </span>~/.pipelinewise/&lt;target_id&gt;/&lt;tap_id&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--target<span class="w"> </span>~/.pipelinewise/&lt;target_id&gt;/config.json
+</pre></div>
+</div>
+<p>Use <code class="docutils literal notranslate"><span class="pre">--tap-type</span> <span class="pre">tap-mysql</span></code> for MySQL/MariaDB. By default, the report checks
+selected tables configured with <code class="docutils literal notranslate"><span class="pre">sync_start_from</span></code>. It marks
+<code class="docutils literal notranslate"><span class="pre">drop_target_table:</span> <span class="pre">true</span></code> tables as skipped because replacement does not reuse
+their existing column types. Add
+<code class="docutils literal notranslate"><span class="pre">--tables</span> <span class="pre">public.orders,public.customers</span></code> to check other selected tables used
+by explicit PartialSync commands, or to check merge compatibility for a table
+normally configured for replacement.</p>
+<p>The report reads source and Snowflake metadata only. It does not export rows,
+run custom session SQL, alter columns, or change replication state/recovery.
+It uses FastSync’s native source configuration, metadata query, and type mapping.
+JSON output lists all incompatible columns, compatible columns, columns that
+would widen, and columns that would be added. Missing targets and unsupported
+routes or Iceberg tables are reported separately.</p>
+<p>Exit status is 1 for incompatibilities or report errors, 2 for invalid input,
+and 0 otherwise. Inspect skipped entries: exit 0 is not proof that every table
+was checked. This is a metadata snapshot, not a check of transformations,
+publication privileges, primary keys, or pending recovery. Resolve incompatible
+types before deployment; runtime validation remains enabled.</p>
+<p>Errors identify the failed operation and exception type, with database error
+codes and a Snowflake query ID when available. Unexpected code errors also
+write sanitized code locations to stderr. Neither output includes raw exception
+messages, credentials, or source values; use the codes or query ID to investigate.</p>
 </section>
 <section id="managed-iceberg-v3-outcomes">
 <h2>Managed Iceberg v3 outcomes<a class="headerlink" href="#managed-iceberg-v3-outcomes" title="Link to this heading"></a></h2>
@@ -489,7 +542,7 @@ ambiguous and preserves its evidence.</p></td>
 reuses and deterministically replays that range after an ambiguous commit; it
 does not resolve a dynamic boundary again. State changes only after publication
 and finalization succeed. See <a class="reference internal" href="../connectors/targets/snowflake_iceberg.html#snowflake-iceberg-recovery"><span class="std std-ref">Concurrency and recovery</span></a>.</p>
-<p>After staging transformations, PipelineWise checks the canonical primary-key
+<p>After loading the source-transformed CSV, PipelineWise checks the canonical primary-key
 projection for NULL components and duplicate composite-key groups before it
 starts the range transaction. It does not choose or deduplicate conflicting
 rows. An invalid staged attempt is kept for cleanup and re-export; if an attempt
