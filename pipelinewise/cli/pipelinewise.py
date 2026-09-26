@@ -41,6 +41,7 @@ from .errors import (
 from pipelinewise.fastsync.commons.tap_postgres import FastSyncTapPostgres
 from pipelinewise.fastsync.commons import utils as fastsync_utils
 from pipelinewise.cli.multiprocess import Process
+from pipelinewise.data_diff.coverage import FAILED_STATUSES
 from pipelinewise.data_diff.repository import DataDiffRepository
 from pipelinewise.data_diff.runner import rerun_failed_check, run_due_checks
 from pipelinewise.data_diff.runtime import RuntimeConnectorConfigLoader
@@ -65,6 +66,11 @@ MYSQL_BINLOG_RETRY_PENDING_ENV = 'PIPELINEWISE_MYSQL_BINLOG_RETRY_PENDING'
 
 def _persist_singer_state(path: str, state: str) -> None:
     fastsync_utils.save_dict_to_json(path, json.loads(state), log_level=logging.DEBUG)
+
+
+def _iso(value) -> str:
+    """Render an optional timestamp for a table cell; unset shows as blank."""
+    return value.isoformat() if value is not None else ''
 
 
 def _is_retryable_mysql_disconnect(
@@ -2007,8 +2013,8 @@ class PipelineWise:
                 summary['status'],
                 summary.get('slot_status') or '',
                 # A check that could not be scheduled has no window to report.
-                summary['window_start'].isoformat() if summary['window_start'] else '',
-                summary['window_end'].isoformat() if summary['window_end'] else '',
+                _iso(summary['window_start']),
+                _iso(summary['window_end']),
                 str(summary.get('run_id') or ''),
                 summary.get('error') or '',
             ]
@@ -2068,7 +2074,7 @@ class PipelineWise:
         failures = [
             summary
             for summary in summaries
-            if summary['status'] in ('FAIL', 'ERROR')
+            if summary['status'] in FAILED_STATUSES
         ]
 
         for summary in failures:
@@ -2130,10 +2136,8 @@ class PipelineWise:
                 'yes' if check['initial_full_scan'] else 'no',
                 'yes' if check['historical_scan_pending'] else 'no',
                 check.get('verified_status') or '',
-                check['verified_start'].isoformat()
-                if check.get('verified_start') else '',
-                check['verified_end'].isoformat()
-                if check.get('verified_end') else '',
+                _iso(check.get('verified_start')),
+                _iso(check.get('verified_end')),
             ]
             for check in checks
         ]
@@ -2184,8 +2188,8 @@ class PipelineWise:
                 [[
                     summary['check']['full_check_name'], summary['status'],
                     summary['attempt'],
-                    summary['window_start'].isoformat() if summary['window_start'] is not None else '',
-                    summary['window_end'].isoformat(), str(self.args.run_id),
+                    _iso(summary['window_start']),
+                    _iso(summary['window_end']), str(self.args.run_id),
                     str(summary['run_id']), self.args.remediation_ref,
                     summary.get('error') or '',
                 ]],

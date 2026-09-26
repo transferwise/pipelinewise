@@ -19,6 +19,7 @@ from pipelinewise.data_diff.engine import (
     MySQLAdapter,
     PostgresAdapter,
     SnowflakeAdapter,
+    _ordered_results,
     build_metric_query,
     canonical_value,
     connect_source,
@@ -79,6 +80,13 @@ class RunAdapter(FakeAdapter):
 
     def close(self):
         self.connection.close()
+
+
+def test_final_results_require_every_declared_check():
+    with pytest.raises(KeyError, match='row_count'):
+        _ordered_results({}, ('row_count',))
+
+    assert _ordered_results({}, ('row_count',), allow_missing=True) == []
 
 
 def test_metric_query_is_half_open_parameterized_and_quotes_identifiers():

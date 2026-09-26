@@ -70,6 +70,13 @@ def _canonical_number(value) -> str:
     return format(number.normalize(), "f")
 
 
+def _as_utc(value: datetime) -> datetime:
+    """Read a naive driver timestamp as UTC and convert an aware one to UTC."""
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
 def canonical_value(value):
     """Convert driver-specific values into stable JSON comparison values."""
     if value is None or isinstance(value, (str, bool)):
@@ -77,8 +84,7 @@ def canonical_value(value):
     if isinstance(value, (Decimal, float, int)):
         return _canonical_number(value)
     if isinstance(value, datetime):
-        aware = value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
-        return aware.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+        return _as_utc(value).isoformat().replace("+00:00", "Z")
     if isinstance(value, (date, time)):
         return value.isoformat()
     if isinstance(value, bytes):
@@ -199,7 +205,7 @@ class DatabaseAdapter:
             return None
         if not isinstance(value, datetime):
             raise DataDiffExecutionError("The minimum comparison timestamp is not a valid datetime")
-        return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+        return _as_utc(value)
 
     def execute_metrics(self, sql: str, params: tuple, checks: tuple) -> MetricQueryResult:
         """Execute one aggregate query and canonicalize its values."""

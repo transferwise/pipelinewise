@@ -11,6 +11,7 @@ from typing import Callable
 
 from croniter import croniter
 
+from .coverage import FAILED_STATUSES
 from .engine import HistoricalWindowNotReady, run_check
 from .repository import RunLeaseLostError
 
@@ -56,9 +57,14 @@ def window_for_slot(check: dict, scheduled_for: datetime) -> tuple:
     return scheduled_for, window_start, window_end
 
 
-def due_slots(check: dict, now: datetime, latest_scheduled_for: datetime = None) -> list:
+def due_slots(
+    check: dict,
+    now: datetime,
+    latest_scheduled_for: datetime = None,
+    current_slot: datetime = None,
+) -> list:
     """Return the oldest unobserved slots, capped to protect source databases."""
-    current = scheduled_slot(now, check["frequency"])
+    current = current_slot or scheduled_slot(now, check["frequency"])
     if latest_scheduled_for is None or latest_scheduled_for >= current:
         return [current]
     slots = []
@@ -112,7 +118,8 @@ def execute_started_run(
     window_end: datetime,
 ) -> dict:
     """Execute and persist one already-created scheduled or remediation attempt."""
-    recorded = {"preflight_id": None}
+    # Seeded complete, so every reader can index it without a fallback.
+    recorded = {"preflight_id": None, "window_start": window_start}
 
     def _record(preflight):
         # Called by run_check before either aggregate executes.
@@ -139,7 +146,7 @@ def execute_started_run(
             'status': 'SKIPPED',
             'slot_status': exc.status,
             'scheduled_for': scheduled_for,
-            'window_start': recorded.get('window_start', window_start),
+            'window_start': recorded['window_start'],
             'window_end': window_end,
             'attempt': run['attempt'],
             'trigger_type': run['trigger_type'],
@@ -186,7 +193,7 @@ def _execute_and_persist(
             error = "; ".join(
                 result.get("error") or f"{result['check_type']} {result['status']}"
                 for result in results
-                if result["status"] in ("FAIL", "ERROR")
+                if result["status"] in FAILED_STATUSES
             ) or None
             backend.finish_run(
                 run["run_id"], status, results, preflight_id=preflight_id
@@ -196,7 +203,7 @@ def _execute_and_persist(
             "run_id": run["run_id"],
             "status": status,
             "scheduled_for": scheduled_for,
-            "window_start": recorded.get("window_start", window_start),
+            "window_start": recorded["window_start"],
             "window_end": window_end,
             "results": results,
             "preflight": preflight,
@@ -239,7 +246,7 @@ def _execute_and_persist(
             "run_id": run["run_id"],
             "status": "ERROR",
             "scheduled_for": scheduled_for,
-            "window_start": recorded.get("window_start", window_start),
+            "window_start": recorded["window_start"],
             "window_end": window_end,
             "error": str(exc),
             "attempt": run["attempt"],
@@ -313,20 +320,24 @@ def _finish_failed_run(backend, check: dict, run: dict, preflight_id, error: str
     )
 
 
-def _retry_failed_windows(backend, connection_config_loader, check, current_slot):
-    """Retry saved failed windows once per cron interval before the new windows."""
-    for original in backend.list_retryable_runs(check["check_id"], current_slot, limit=MAX_BACKFILL_WINDOWS):
-        run = backend.start_run(
-            check, original["scheduled_for"], original["window_start"], original["window_end"],
-            retry_before=current_slot,
-        )
-        if run.get('status') == 'SKIPPED':
-            yield {'check': check, 'scheduled_for': original['scheduled_for'], **run}
-        else:
-            yield execute_started_run(
-                backend, connection_config_loader, check, run,
-                original["scheduled_for"], run["window_start"], run["window_end"],
-            )
+def _start_and_execute(
+    backend, connection_config_loader, check, scheduled_for,
+    window_start, window_end, *, allow_window_fallback=False, **start_kwargs,
+) -> dict:
+    """Execute one slot, or report why the repository declined to start it."""
+    run = backend.start_run(check, scheduled_for, window_start, window_end, **start_kwargs)
+    if run.get('status') == 'SKIPPED':
+        return {'check': check, 'scheduled_for': scheduled_for, **run}
+    if allow_window_fallback:
+        window_start = run.get('window_start', window_start)
+        window_end = run.get('window_end', window_end)
+    else:
+        window_start = run['window_start']
+        window_end = run['window_end']
+    return execute_started_run(
+        backend, connection_config_loader, check, run, scheduled_for,
+        window_start, window_end,
+    )
 
 
 def _run_due_check(backend, connection_config_loader, check, now, force):
@@ -336,18 +347,22 @@ def _run_due_check(backend, connection_config_loader, check, now, force):
         LOGGER.warning('Expired %s abandoned run(s) for %s', expired, check['full_check_name'])
     latest = backend.latest_scheduled_for(check['check_id'])
     current_slot = scheduled_slot(now, check['frequency'])
-    slots = due_slots(check, now, latest)
-    yield from _retry_failed_windows(backend, connection_config_loader, check, current_slot)
+    # Read the due slots before the retries, which insert rows of their own.
+    slots = due_slots(check, now, latest, current_slot)
+    retryable = backend.list_retryable_runs(
+        check['check_id'], current_slot, limit=MAX_BACKFILL_WINDOWS
+    )
+    for original in retryable:
+        yield _start_and_execute(
+            backend, connection_config_loader, check, original['scheduled_for'],
+            original['window_start'], original['window_end'], retry_before=current_slot,
+        )
     for scheduled_for in slots:
         _, window_start, window_end = window_for_slot(check, scheduled_for)
-        run = backend.start_run(check, scheduled_for, window_start, window_end, force=force)
-        if run.get('status') == 'SKIPPED':
-            yield {'check': check, 'scheduled_for': scheduled_for, **run}
-        else:
-            yield execute_started_run(
-                backend, connection_config_loader, check, run, scheduled_for,
-                run.get('window_start', window_start), run.get('window_end', window_end),
-            )
+        yield _start_and_execute(
+            backend, connection_config_loader, check, scheduled_for,
+            window_start, window_end, allow_window_fallback=True, force=force,
+        )
 
 
 def run_due_checks(

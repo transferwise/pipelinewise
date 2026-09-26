@@ -13,7 +13,12 @@ branch_labels = None
 depends_on = None
 
 SCHEMA = "public"
-WINDOW_TABLES = ("dd_run_attempts", "dd_run_slot_state")
+# Statuses each table may carry while its window start is still unresolved. An
+# attempt can be mid-flight or deferred; a slot only ever records a failed one.
+UNRESOLVED_WINDOW_STATUSES = {
+    "dd_run_attempts": "'RUNNING', 'ERROR', 'DEFERRED'",
+    "dd_run_slot_state": "'ERROR'",
+}
 WATERMARK_TABLES = ("dd_watermark_state", "dd_watermark_events")
 
 
@@ -31,8 +36,7 @@ def _set_attempt_statuses(statuses):
 
 def upgrade():
     _set_attempt_statuses("'RUNNING', 'PASS', 'FAIL', 'ERROR', 'DEFERRED'")
-    for table in WINDOW_TABLES:
-        unresolved_statuses = "'RUNNING', 'ERROR', 'DEFERRED'" if table == "dd_run_attempts" else "'ERROR'"
+    for table, unresolved_statuses in UNRESOLVED_WINDOW_STATUSES.items():
         op.execute(f"ALTER TABLE {SCHEMA}.{table} ALTER COLUMN window_start DROP NOT NULL")
         op.execute(
             f"ALTER TABLE {SCHEMA}.{table} "
@@ -105,7 +109,7 @@ def downgrade():
         for column in ("verified_start", "verified_end"):
             op.execute(f"COMMENT ON COLUMN {SCHEMA}.{table}.{column} IS NULL")
 
-    for table in WINDOW_TABLES:
+    for table in UNRESOLVED_WINDOW_STATUSES:
         op.execute(f"ALTER TABLE {SCHEMA}.{table} DROP CONSTRAINT ck_{table}_resolved_window")
         op.execute(f"ALTER TABLE {SCHEMA}.{table} ALTER COLUMN window_start SET NOT NULL")
         op.execute(f"COMMENT ON COLUMN {SCHEMA}.{table}.window_start IS NULL")

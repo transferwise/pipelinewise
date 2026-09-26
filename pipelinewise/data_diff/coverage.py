@@ -1,14 +1,26 @@
 """Derive contiguous timestamp coverage from immutable check attempts."""
 
 
-TERMINAL_STATUSES = {"PASS", "FAIL", "ERROR"}
+# DEFERRED is terminal but says nothing about the data, so it never moves coverage.
+# Kept as ordered tuples because both are also rendered into SQL IN lists.
+CONCLUSIVE_STATUSES = ("PASS", "FAIL", "ERROR")
+FAILED_STATUSES = ("FAIL", "ERROR")
+
+COVERAGE_FIELDS = (
+    "verified_start",
+    "verified_end",
+    "furthest_observed_end",
+    "verified_status",
+    "blocking_run_id",
+    "reason",
+)
 
 
 def _effective_attempts(runs: list) -> list:
-    """Return the highest terminal attempt for each scheduled definition slot."""
+    """Return the highest conclusive attempt for each scheduled definition slot."""
     latest = {}
     for run in runs:
-        if run["status"] not in TERMINAL_STATUSES:
+        if run["status"] not in CONCLUSIVE_STATUSES:
             continue
         slot = run["scheduled_for"]
         current = latest.get(slot)

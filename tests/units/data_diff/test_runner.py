@@ -54,11 +54,14 @@ class FakeBackend:
         self.expired.append((check_id, stale_before))
         return 0
 
-    def start_run(self, *_args, **_kwargs):
+    def start_run(self, _check, _scheduled_for, window_start, window_end, **_kwargs):
         return {
             "run_id": uuid4(),
             "attempt": 1,
             "trigger_type": "SCHEDULED",
+            # Echoed back like the repository does, which resolves a historical start.
+            "window_start": window_start,
+            "window_end": window_end,
         } if self.start else {
             'status': 'SKIPPED', 'slot_status': 'PASS', 'error': 'This cron slot has already been attempted',
             'window_start': None, 'window_end': None,
@@ -79,6 +82,13 @@ class FakeBackend:
 
     def set_run_window_start(self, run_id, start):
         self.window_starts.append((run_id, start))
+
+
+class HistoricalBackend(FakeBackend):
+    """Backend whose attempt has no resolved historical comparison start yet."""
+
+    def start_run(self, *args, **kwargs):
+        return {**super().start_run(*args, **kwargs), 'window_start': None}
 
 
 def _connection_configs(_check):
@@ -136,21 +146,53 @@ def test_run_persists_preflight_and_results(mock_run):
 
 
 @patch("pipelinewise.data_diff.runner.run_check")
+def test_scheduled_run_keeps_check_fields_and_falls_back_to_computed_window(mock_run):
+    mock_run.side_effect = _fake_run_check(
+        PASS_PREFLIGHT, [{"check_type": "row_count", "status": "PASS"}], "PASS"
+    )
+    check = {**_check(), 'historical_scan_pending': True}
+
+    class LegacyBackend(FakeBackend):
+        def list_checks(self, **filters):
+            assert filters == {'target_id': None, 'tap_id': None}
+            return [self.check]
+
+        def start_run(self, *args, **kwargs):
+            run = super().start_run(*args, **kwargs)
+            run.pop('window_start')
+            run.pop('window_end')
+            return run
+
+    summary, = run_due_checks(
+        LegacyBackend(check), _connection_configs,
+        now=datetime(2026, 7, 22, 13, 1, tzinfo=timezone.utc),
+    )
+
+    assert summary['status'] == 'PASS'
+    assert summary['check']['historical_scan_pending'] is True
+    assert mock_run.call_args.args[3:5] == (
+        datetime(2026, 7, 22, 12, tzinfo=timezone.utc),
+        datetime(2026, 7, 22, 13, tzinfo=timezone.utc),
+    )
+
+
+@patch("pipelinewise.data_diff.runner.run_check")
 def test_runner_uses_the_window_persisted_by_start_run(mock_run):
     mock_run.side_effect = _fake_run_check(
         {**PASS_PREFLIGHT, "status": "BLOCKED", "findings": ["No timestamp index"]}, [], None,
     )
 
-    class HistoricalBackend(FakeBackend):
-        def start_run(self, *_args, **_kwargs):
+    class RewoundBackend(HistoricalBackend):
+        """Persists an end earlier than the one the runner computed for this slot."""
+
+        def start_run(self, *args, **kwargs):
             return {
-                **super().start_run(*_args, **_kwargs),
-                "window_start": None,
+                **super().start_run(*args, **kwargs),
                 "window_end": datetime(2026, 7, 22, 12, tzinfo=timezone.utc),
             }
 
     summary = run_due_checks(
-        HistoricalBackend(_check()), _connection_configs,
+        RewoundBackend(_check()), _connection_configs,
         now=datetime(2026, 7, 22, 13, 1, tzinfo=timezone.utc),
     )[0]
 
@@ -164,10 +206,6 @@ def test_runner_uses_the_window_persisted_by_start_run(mock_run):
 @pytest.mark.parametrize('failure', ['connection', 'preflight', 'minimum', 'unsupported'])
 @patch('pipelinewise.data_diff.runner.run_check')
 def test_historical_failure_before_resolution_keeps_unknown_start(mock_run, failure):
-    class HistoricalBackend(FakeBackend):
-        def start_run(self, *_args, **_kwargs):
-            return {**super().start_run(*_args, **_kwargs), 'window_start': None}
-
     def load(check):
         if failure == 'connection':
             raise RuntimeError('Source connection failed')
@@ -199,10 +237,6 @@ def test_historical_failure_before_resolution_keeps_unknown_start(mock_run, fail
 
 @patch('pipelinewise.data_diff.runner.run_check')
 def test_both_empty_historical_run_is_deferred_without_coverage(mock_run):
-    class HistoricalBackend(FakeBackend):
-        def start_run(self, *_args, **_kwargs):
-            return {**super().start_run(*_args, **_kwargs), 'window_start': None}
-
     def execute(*_args, on_preflight, **_kwargs):
         on_preflight(PASS_PREFLIGHT)
         raise HistoricalWindowNotReady('Neither source nor target has settled timestamps')
@@ -323,10 +357,10 @@ def test_failed_window_retry_and_new_window_both_run(mock_run, retry_status):
             return [original]
 
         def start_run(self, check, slot, start, end, **kwargs):
-            run = super().start_run()
+            run = super().start_run(check, slot, start, end, **kwargs)
             if kwargs.get('retry_before') is not None:
                 assert slot == original['scheduled_for']
-                return {**run, 'attempt': 2, 'trigger_type': 'RETRY', 'window_start': start, 'window_end': end}
+                return {**run, 'attempt': 2, 'trigger_type': 'RETRY'}
             return run
 
     mock_run.side_effect = [
@@ -395,11 +429,14 @@ def test_remediation_reuses_exact_failed_definition_and_window(mock_run, previou
     backend = FakeBackend(check)
     backend.get_run = lambda _run_id: original
     backend.get_check_version = lambda _version_id: check
+    # Remediation either reuses the original window or carries a start a later
+    # attempt resolved, and reports whichever it persisted.
     backend.start_remediation_run = lambda _original, _reference: {
         "run_id": uuid4(),
         "attempt": 2,
         "trigger_type": "REMEDIATION",
-        **({"window_start": original["window_start"] + timedelta(minutes=10)} if previously_resolved else {}),
+        **({"window_start": original["window_start"] + timedelta(minutes=10)}
+           if previously_resolved else {}),
     }
 
     summary = rerun_failed_check(
@@ -508,7 +545,7 @@ def test_retry_failure_preserves_completed_summaries_and_later_checks(mock_run):
     def start(check, slot, start, end, **kwargs):
         if check['check_id'] == first['check_id'] and slot == current - timedelta(hours=1):
             raise RuntimeError('Could not start second retry')
-        return {**original_start(), 'window_start': start, 'window_end': end}
+        return original_start(check, slot, start, end, **kwargs)
 
     backend.start_run = start
     mock_run.side_effect = _fake_run_check(PASS_PREFLIGHT, [{'check_type': 'row_count', 'status': 'FAIL'}], 'FAIL')

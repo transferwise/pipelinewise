@@ -271,7 +271,7 @@ def test_ensure_schema_calls_alembic_migrate():
 @pytest.mark.parametrize('status', ['FAIL', 'ERROR'])
 def test_remediation_attempt_reuses_failed_window_and_links_original_run(status):
     cursor = Mock()
-    cursor.fetchall.return_value = [{"status": status, "max_attempt": 1}]
+    cursor.fetchall.return_value = [{"status": status, "attempt": 1}]
     repository = _repository_with_cursor(cursor)
     original_id = uuid4()
     check_id = uuid4()
@@ -436,7 +436,7 @@ def test_forced_same_slot_rerun_reuses_recorded_historical_bounds(status):
     historical_end = slot - timedelta(minutes=5)
     cursor.fetchall.return_value = [{
         "status": status,
-        "max_attempt": 1,
+        "attempt": 1,
         "window_start": None,
         "window_end": historical_end,
     }]
@@ -459,8 +459,8 @@ def test_forced_rerun_reuses_latest_resolved_bounds_after_unresolved_error():
     slot = datetime(2026, 7, 22, 13, tzinfo=timezone.utc)
     resolved_start = slot - timedelta(days=7)
     cursor.fetchall.return_value = [
-        {'status': 'FAIL', 'max_attempt': 2, 'window_start': resolved_start, 'window_end': slot},
-        {'status': 'ERROR', 'max_attempt': 1, 'window_start': None, 'window_end': slot},
+        {'status': 'FAIL', 'attempt': 2, 'window_start': resolved_start, 'window_end': slot},
+        {'status': 'ERROR', 'attempt': 1, 'window_start': None, 'window_end': slot},
     ]
     repository = _repository_with_cursor(cursor)
 
@@ -477,8 +477,8 @@ def test_remediation_of_unresolved_error_reuses_subsequently_resolved_window():
     slot = datetime(2026, 7, 22, 13, tzinfo=timezone.utc)
     resolved_start = slot - timedelta(days=7)
     cursor.fetchall.return_value = [
-        {'status': 'FAIL', 'max_attempt': 2, 'window_start': resolved_start, 'window_end': slot},
-        {'status': 'ERROR', 'max_attempt': 1, 'window_start': None, 'window_end': slot},
+        {'status': 'FAIL', 'attempt': 2, 'window_start': resolved_start, 'window_end': slot},
+        {'status': 'ERROR', 'attempt': 1, 'window_start': None, 'window_end': slot},
     ]
     repository = _repository_with_cursor(cursor)
     original = {
@@ -503,7 +503,7 @@ def test_remediation_preserves_unresolved_or_year_one_original_boundary(window_s
         'check_id': uuid4(), 'run_id': uuid4(), 'scheduled_for': slot, 'status': 'ERROR',
         'window_start': window_start, 'window_end': slot,
     }
-    cursor.fetchall.return_value = [{**original, 'max_attempt': 1}]
+    cursor.fetchall.return_value = [{**original, 'attempt': 1}]
     repository = _repository_with_cursor(cursor)
 
     run = repository.start_remediation_run(original, 'repair-reference')
@@ -519,7 +519,7 @@ def test_completed_attempt_is_not_retried_within_its_cron_slot(status):
     slot = datetime(2026, 7, 22, 13, tzinfo=timezone.utc)
     cursor.fetchall.return_value = [{
         "status": status,
-        "max_attempt": 1,
+        "attempt": 1,
         "window_start": None,
         "window_end": slot,
     }]
@@ -542,7 +542,7 @@ def test_completed_attempt_is_not_retried_within_its_cron_slot(status):
 @pytest.mark.parametrize('force', [False, True])
 def test_running_attempt_cannot_be_restarted(force):
     cursor = Mock()
-    cursor.fetchall.return_value = [{'status': 'RUNNING', 'max_attempt': 1}]
+    cursor.fetchall.return_value = [{'status': 'RUNNING', 'attempt': 1}]
     repository = _repository_with_cursor(cursor)
     slot = datetime(2026, 7, 22, 13, tzinfo=timezone.utc)
 
@@ -563,10 +563,10 @@ def test_cron_retry_preserves_failed_window_even_after_a_deferred_attempt(status
     slot = current - timedelta(hours=1)
     start = None if deferred else slot - timedelta(days=7)
     failed = {
-        'status': status, 'max_attempt': 1, 'window_start': start, 'window_end': slot,
+        'status': status, 'attempt': 1, 'window_start': start, 'window_end': slot,
         'attempted_at': current - timedelta(minutes=45),
     }
-    cursor.fetchall.return_value = ([{**failed, 'status': 'DEFERRED', 'max_attempt': 2}] if deferred else []) + [failed]
+    cursor.fetchall.return_value = ([{**failed, 'status': 'DEFERRED', 'attempt': 2}] if deferred else []) + [failed]
     repository = _repository_with_cursor(cursor)
 
     run = repository.start_run(
@@ -586,7 +586,7 @@ def test_cron_retry_rechecks_status_and_attempt_time_under_lock(status, same_int
     current = datetime(2026, 7, 22, 13, tzinfo=timezone.utc)
     slot = current - timedelta(hours=1)
     cursor.fetchall.return_value = [{
-        'status': status, 'max_attempt': 1, 'window_start': slot - timedelta(hours=1), 'window_end': slot,
+        'status': status, 'attempt': 1, 'window_start': slot - timedelta(hours=1), 'window_end': slot,
         'attempted_at': current if same_interval else current - timedelta(minutes=1),
     }]
     repository = _repository_with_cursor(cursor)
@@ -605,7 +605,7 @@ def test_cron_retry_does_not_repeat_the_current_failed_slot():
     cursor = Mock()
     current = datetime(2026, 7, 22, 13, tzinfo=timezone.utc)
     cursor.fetchall.return_value = [{
-        'status': 'FAIL', 'max_attempt': 1, 'attempted_at': current - timedelta(minutes=1),
+        'status': 'FAIL', 'attempt': 1, 'attempted_at': current - timedelta(minutes=1),
     }]
     repository = _repository_with_cursor(cursor)
 
@@ -619,8 +619,8 @@ def test_cron_retry_uses_latest_effective_status_after_manual_repair():
     cursor = Mock()
     current = datetime(2026, 7, 22, 13, tzinfo=timezone.utc)
     cursor.fetchall.return_value = [
-        {'status': 'PASS', 'max_attempt': 2, 'attempted_at': current - timedelta(minutes=2)},
-        {'status': 'ERROR', 'max_attempt': 1, 'attempted_at': current - timedelta(minutes=30)},
+        {'status': 'PASS', 'attempt': 2, 'attempted_at': current - timedelta(minutes=2)},
+        {'status': 'ERROR', 'attempt': 1, 'attempted_at': current - timedelta(minutes=30)},
     ]
     repository = _repository_with_cursor(cursor)
     slot = current - timedelta(hours=1)
@@ -660,7 +660,7 @@ def test_scheduled_and_remediation_attempts_lock_same_check_before_reading_attem
         'window_start': slot - timedelta(hours=1),
         'window_end': slot,
     }
-    cursor.fetchall.return_value = [{**original, 'max_attempt': 1}]
+    cursor.fetchall.return_value = [{**original, 'attempt': 1}]
     repository = _repository_with_cursor(cursor)
 
     repository.start_run({'check_id': check_id}, slot, original['window_start'], slot, force=True)
@@ -675,7 +675,7 @@ def test_scheduled_and_remediation_attempts_lock_same_check_before_reading_attem
 
 def test_remediation_cannot_overlap_running_attempt():
     cursor = Mock()
-    cursor.fetchall.return_value = [{'status': 'RUNNING', 'max_attempt': 2}]
+    cursor.fetchall.return_value = [{'status': 'RUNNING', 'attempt': 2}]
     repository = _repository_with_cursor(cursor)
     original = {
         'check_id': uuid4(),

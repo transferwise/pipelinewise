@@ -75,6 +75,27 @@ def _publish_preflight(on_preflight, preflight: dict) -> None:
         on_preflight(preflight)
 
 
+def _publish_window_start(on_window_start, window_start: datetime) -> None:
+    """Hand a just-resolved historical start to the caller so it is persisted."""
+    if on_window_start is not None:
+        on_window_start(window_start)
+
+
+def _ordered_results(results_by_type: dict, checks: tuple, *, allow_missing: bool = False) -> list:
+    """Return the recorded results in the definition's declared check order."""
+    if allow_missing:
+        return [results_by_type[item] for item in checks if item in results_by_type]
+    return [results_by_type[item] for item in checks]
+
+
+def _window_params(column: dict, window_start: datetime, window_end: datetime) -> tuple:
+    """Bind one side's half-open window to that side's timestamp type."""
+    return (
+        _utc_boundary(window_start, column["data_type"]),
+        _utc_boundary(window_end, column["data_type"]),
+    )
+
+
 def _metadata_preflight(check: dict, column_pairs: list) -> dict:
     payload = {
         "source_schema": check["source_schema"],
@@ -567,18 +588,14 @@ def run_check(
                 except HistoricalWindowNotReady:
                     if any(result["status"] != "PASS" for result in results_by_type.values()):
                         # Empty history cannot hide already established metadata failures.
-                        results = [results_by_type[item] for item in checks if item in results_by_type]
-                        return preflight, results, "ERROR"
+                        return preflight, _ordered_results(results_by_type, checks, allow_missing=True), "ERROR"
                     raise
-                if on_window_start is not None:
-                    on_window_start(window_start)
-            source_params = (
-                _utc_boundary(window_start, source_timestamp_column["data_type"]),
-                _utc_boundary(window_end, source_timestamp_column["data_type"]),
+                _publish_window_start(on_window_start, window_start)
+            source_params = _window_params(
+                source_timestamp_column, window_start, window_end
             )
-            target_params = (
-                _utc_boundary(window_start, target_timestamp_column["data_type"]),
-                _utc_boundary(window_end, target_timestamp_column["data_type"]),
+            target_params = _window_params(
+                target_timestamp_column, window_start, window_end
             )
 
             source_result = source.execute_metrics(
@@ -604,7 +621,7 @@ def run_check(
             preflight = _metadata_preflight(check, column_pairs)
             _publish_preflight(on_preflight, preflight)
 
-        results = [results_by_type[check_type] for check_type in checks]
+        results = _ordered_results(results_by_type, checks)
         statuses = {result["status"] for result in results}
         status = "ERROR" if "ERROR" in statuses else ("FAIL" if "FAIL" in statuses else "PASS")
         return preflight, results, status

@@ -10,23 +10,66 @@ import psycopg2.extensions
 
 from pipelinewise.backend_db import BackendDatabase
 
+from .adapters import SCHEMA_CHECK
 from .config import CheckDefinition
-from .coverage import advance_coverage, calculate_coverage, coverage_event_type
+from .coverage import (
+    CONCLUSIVE_STATUSES,
+    COVERAGE_FIELDS,
+    FAILED_STATUSES,
+    advance_coverage,
+    calculate_coverage,
+    coverage_event_type,
+)
 
 psycopg2.extensions.register_adapter(uuid.UUID, psycopg2.extras.UUID_adapter)
 
 
 SCHEMA = "public"
+INITIAL_FULL_SCAN_DEFAULT = True
 _HISTORICAL_SCAN_PENDING_SQL = f"""
     checks.is_current
-    AND COALESCE((checks.canonical_config->>'initial_full_scan')::boolean, TRUE)
-    AND jsonb_array_length(checks.checks - 'schema_compatibility') > 0
+    AND COALESCE(
+        (checks.canonical_config->>'initial_full_scan')::boolean,
+        {str(INITIAL_FULL_SCAN_DEFAULT).upper()}
+    )
+    AND jsonb_array_length(checks.checks - '{SCHEMA_CHECK}') > 0
     AND NOT EXISTS (
         SELECT 1 FROM {SCHEMA}.dd_run_attempts history
          WHERE history.check_id = checks.check_id
            AND history.trigger_type != 'REMEDIATION' AND history.status != 'DEFERRED'
     )
 """
+
+
+def _sql_status_list(statuses: Iterable) -> str:
+    """Render an ordered status sequence as a SQL IN list."""
+    return ", ".join(f"'{status}'" for status in statuses)
+
+
+_FAILED_STATUS_SQL = _sql_status_list(FAILED_STATUSES)
+
+
+def _has_data_checks(checks: Iterable) -> bool:
+    """Report whether any check reads table data rather than only metadata."""
+    return bool(set(checks) - {SCHEMA_CHECK})
+
+
+def _is_chronological_append(definition: dict, previous, existing_slot, has_later_slot) -> bool:
+    """Report whether one slot merely extends already-verified coverage in order.
+
+    ``advance_coverage`` only ever adds to an existing verified interval, so it needs
+    the newest slot, resolved bounds on both sides, and a start no earlier than the
+    verified start. Anything else has to be recomputed from the full slot history.
+    """
+    return bool(
+        previous
+        and existing_slot is None
+        and not has_later_slot
+        and definition["window_start"] is not None
+        and previous["verified_start"] is not None
+        and previous["verified_end"] is not None
+        and definition["window_start"] >= previous["verified_start"]
+    )
 
 
 class RunLeaseLostError(RuntimeError):
@@ -54,13 +97,16 @@ def _skipped_run(reason, previous=None, *, slot_status=None):
 
 
 def _retry_is_due(previous: list, scheduled_for: datetime, retry_before: datetime) -> bool:
-    """Keep deferred attempts from hiding a failure or permitting an early retry."""
-    effective = next((row for row in previous if row["status"] in ("PASS", "FAIL", "ERROR")), None)
-    return (
-        effective is not None
-        and effective["status"] in ("FAIL", "ERROR")
-        and scheduled_for < retry_before
-        and all(row["attempted_at"] < retry_before for row in previous)
+    """Keep deferred attempts from hiding a failure or permitting an early retry.
+
+    Mirrors the eligibility rule ``list_retryable_runs`` expresses in SQL, re-checked
+    here under the definition lock. Keep the two in step.
+    """
+    effective = next((row for row in previous if row["status"] in CONCLUSIVE_STATUSES), None)
+    if effective is None or effective["status"] not in FAILED_STATUSES:
+        return False
+    return scheduled_for < retry_before and all(
+        row["attempted_at"] < retry_before for row in previous
     )
 
 
@@ -297,19 +343,7 @@ class DataDiffRepository:
                 """,
                 params,
             )
-            checks = []
-            for raw_row in cursor.fetchall():
-                row = dict(raw_row)
-                canonical_config = row.get("canonical_config") or {}
-                row["source_compare_columns"] = canonical_config.get(
-                    "source_compare_columns", []
-                )
-                row["target_compare_columns"] = canonical_config.get(
-                    "target_compare_columns", []
-                )
-                row["initial_full_scan"] = canonical_config.get("initial_full_scan", True)
-                checks.append(row)
-            return checks
+            return [self._hydrate_check_row(raw_row) for raw_row in cursor.fetchall()]
 
     def get_check_version(self, check_id) -> dict:
         """Load one exact definition revision, including inactive history."""
@@ -336,16 +370,20 @@ class DataDiffRepository:
                 raise ValueError(
                     f"Data-diff check '{check_id}' does not exist"
                 )
-            row = dict(raw_row)
-            canonical_config = row.get("canonical_config") or {}
-            row["source_compare_columns"] = canonical_config.get(
-                "source_compare_columns", []
-            )
-            row["target_compare_columns"] = canonical_config.get(
-                "target_compare_columns", []
-            )
-            row["initial_full_scan"] = canonical_config.get("initial_full_scan", True)
-            return row
+            return self._hydrate_check_row(raw_row)
+
+    @staticmethod
+    def _hydrate_check_row(raw_row) -> dict:
+        """Lift definition fields stored only inside ``canonical_config`` onto the row."""
+        row = dict(raw_row)
+        canonical_config = row.get("canonical_config") or {}
+        row["source_compare_columns"] = canonical_config.get("source_compare_columns", [])
+        row["target_compare_columns"] = canonical_config.get("target_compare_columns", [])
+        # Absent means default: canonical_config omits the flag when it is unchanged.
+        row["initial_full_scan"] = canonical_config.get(
+            "initial_full_scan", INITIAL_FULL_SCAN_DEFAULT
+        )
+        return row
 
     def latest_scheduled_for(self, check_id):
         """Return the latest scheduled slot observed for one definition revision."""
@@ -388,7 +426,7 @@ class DataDiffRepository:
                         FROM {SCHEMA}.dd_run_attempts
                        WHERE check_id = slots.check_id AND scheduled_for = slots.scheduled_for
                   ) attempts ON TRUE
-                 WHERE slots.check_id = %s AND slots.status IN ('FAIL', 'ERROR')
+                 WHERE slots.check_id = %s AND slots.status IN ({_FAILED_STATUS_SQL})
                    AND slots.scheduled_for < %s AND attempts.attempted_at < %s
                    AND NOT attempts.is_running
                  ORDER BY attempts.attempted_at, slots.scheduled_for
@@ -397,6 +435,31 @@ class DataDiffRepository:
                 (check_id, retry_before, retry_before, limit),
             )
             return [dict(row) for row in cursor.fetchall()]
+
+    @staticmethod
+    def _lock_and_read_attempts(cursor, check_id, scheduled_for) -> list:
+        """Lock the definition, then read this slot's attempts newest first.
+
+        The lock spans the whole definition rather than one slot so that only the
+        first attempt of a check can claim the all-history baseline.
+        """
+        cursor.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (str(check_id),))
+        cursor.execute(
+            f"""
+            SELECT run_id, status, attempt, window_start, window_end,
+                   GREATEST(started_at, finished_at) AS attempted_at
+              FROM {SCHEMA}.dd_run_attempts
+             WHERE check_id = %s AND scheduled_for = %s
+             ORDER BY attempt DESC
+            """,
+            (check_id, scheduled_for),
+        )
+        return cursor.fetchall()
+
+    @staticmethod
+    def _next_attempt(previous: list) -> int:
+        """Return the next attempt number for a newest-first attempt list."""
+        return previous[0]["attempt"] + 1 if previous else 1
 
     def start_remediation_run(self, original_run: dict, remediation_reference: str) -> dict:
         """Create a linked attempt for the exact definition and window that failed."""
@@ -409,24 +472,12 @@ class DataDiffRepository:
             raise ValueError("A remediation reference is required")
 
         with self.cursor() as cursor:
-            lock_key = str(original_run['check_id'])
-            cursor.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (lock_key,))
-            cursor.execute(
-                f"""
-                SELECT status, attempt AS max_attempt, window_start, window_end
-                  FROM {SCHEMA}.dd_run_attempts
-                 WHERE check_id = %s AND scheduled_for = %s
-                 ORDER BY attempt DESC
-                """,
-                (
-                    original_run['check_id'],
-                    original_run["scheduled_for"],
-                ),
+            previous = self._lock_and_read_attempts(
+                cursor, original_run['check_id'], original_run["scheduled_for"]
             )
-            previous = cursor.fetchall()
             if any(row["status"] == "RUNNING" for row in previous):
                 raise ValueError("A data-diff attempt for this window is already running")
-            attempt = max((row["max_attempt"] for row in previous), default=0) + 1
+            attempt = self._next_attempt(previous)
             window_start = original_run['window_start']
             window_end = original_run['window_end']
             if window_start is None:
@@ -473,21 +524,9 @@ class DataDiffRepository:
     ) -> dict:
         """Return a started attempt or a SKIPPED outcome with the decline reason."""
         with self.cursor() as cursor:
-            # Serialize slots for this definition so only its first attempt can
-            # claim the all-history baseline.
-            lock_key = str(check['check_id'])
-            cursor.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (lock_key,))
-            cursor.execute(
-                f"""
-                SELECT run_id, status, attempt AS max_attempt, window_start, window_end,
-                       GREATEST(started_at, finished_at) AS attempted_at
-                  FROM {SCHEMA}.dd_run_attempts
-                 WHERE check_id = %s AND scheduled_for = %s
-                 ORDER BY attempt DESC
-                """,
-                (check["check_id"], scheduled_for),
+            previous = self._lock_and_read_attempts(
+                cursor, check["check_id"], scheduled_for
             )
-            previous = cursor.fetchall()
             running = next((row for row in previous if row['status'] == 'RUNNING'), None)
             if running:
                 return _skipped_run('An attempt for this cron slot is already running', running)
@@ -499,7 +538,7 @@ class DataDiffRepository:
                     )
             elif not force and previous:
                 return _skipped_run('This cron slot has already been attempted', previous[0])
-            attempt = max((row["max_attempt"] for row in previous), default=0) + 1
+            attempt = self._next_attempt(previous)
             if previous:
                 window_start = previous[0]["window_start"]
                 window_end = previous[0]["window_end"]
@@ -526,8 +565,8 @@ class DataDiffRepository:
                     )
                 if (
                     not history["has_previous_run"]
-                    and check.get("initial_full_scan", True)
-                    and set(check["checks"]) - {"schema_compatibility"}
+                    and check.get("initial_full_scan", INITIAL_FULL_SCAN_DEFAULT)
+                    and _has_data_checks(check["checks"])
                 ):
                     window_start = None
             trigger_type = "RETRY" if retry_before is not None else ("MANUAL" if force else "SCHEDULED")
@@ -677,16 +716,9 @@ class DataDiffRepository:
             cursor, definition
         )
 
-        data_checks_enabled = bool(set(definition["checks"]) - {"schema_compatibility"})
-        if (
-            slot_state_changed
-            and previous
-            and existing_slot is None
-            and not has_later_slot
-            and definition["window_start"] is not None
-            and previous["verified_start"] is not None
-            and previous["verified_end"] is not None
-            and definition["window_start"] >= previous["verified_start"]
+        data_checks_enabled = _has_data_checks(definition["checks"])
+        if slot_state_changed and _is_chronological_append(
+            definition, previous, existing_slot, has_later_slot
         ):
             coverage = advance_coverage(
                 previous,
@@ -694,13 +726,7 @@ class DataDiffRepository:
                 data_checks_enabled=data_checks_enabled,
             )
         elif not slot_state_changed and previous:
-            coverage = {
-                key: previous[key]
-                for key in (
-                    "verified_start", "verified_end", "furthest_observed_end",
-                    "verified_status", "blocking_run_id", "reason",
-                )
-            }
+            coverage = {key: previous[key] for key in COVERAGE_FIELDS}
         else:
             coverage = DataDiffRepository._recalculate_watermark(
                 cursor,
