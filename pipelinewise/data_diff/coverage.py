@@ -1,20 +1,32 @@
 """Derive contiguous timestamp coverage from immutable check attempts."""
 
 
-TERMINAL_STATUSES = {"PASS", "FAIL", "ERROR"}
+# DEFERRED is terminal but says nothing about the data, so it never moves coverage.
+# Kept as ordered tuples because both are also rendered into SQL IN lists.
+CONCLUSIVE_STATUSES = ("PASS", "FAIL", "ERROR")
+FAILED_STATUSES = ("FAIL", "ERROR")
+
+COVERAGE_FIELDS = (
+    "verified_start",
+    "verified_end",
+    "furthest_observed_end",
+    "verified_status",
+    "blocking_run_id",
+    "reason",
+)
 
 
 def _effective_attempts(runs: list) -> list:
-    """Return the highest terminal attempt for each scheduled definition slot."""
+    """Return the highest conclusive attempt for each scheduled definition slot."""
     latest = {}
     for run in runs:
-        if run["status"] not in TERMINAL_STATUSES:
+        if run["status"] not in CONCLUSIVE_STATUSES:
             continue
         slot = run["scheduled_for"]
         current = latest.get(slot)
         if current is None or int(run["attempt"]) > int(current["attempt"]):
             latest[slot] = run
-    return sorted(latest.values(), key=lambda item: (item["window_start"], item["window_end"]))
+    return sorted(latest.values(), key=lambda item: item["scheduled_for"])
 
 
 def calculate_coverage(runs: list, *, data_checks_enabled: bool = True) -> dict:
@@ -23,8 +35,19 @@ def calculate_coverage(runs: list, *, data_checks_enabled: bool = True) -> dict:
     if not effective:
         return {}
 
-    verified_start = min(run["window_start"] for run in effective)
     furthest_observed_end = max(run["window_end"] for run in effective)
+    unresolved = next((run for run in effective if run["window_start"] is None), None)
+    if unresolved:
+        return {
+            "verified_start": None,
+            "verified_end": None,
+            "furthest_observed_end": furthest_observed_end,
+            "verified_status": "BLOCKED",
+            "blocking_run_id": unresolved["run_id"],
+            "reason": f"Run {unresolved['run_id']} has not resolved its historical comparison start",
+        }
+
+    verified_start = min(run["window_start"] for run in effective)
     cursor = verified_start
     blocking_runs = sorted(
         (run for run in effective if run["status"] != "PASS"),
@@ -80,8 +103,8 @@ def calculate_coverage(runs: list, *, data_checks_enabled: bool = True) -> dict:
 def advance_coverage(previous: dict, run: dict, *, data_checks_enabled: bool = True) -> dict:
     """Apply one newly appended effective slot to materialized coverage state.
 
-    Definition revisions have fixed window offsets, so scheduled order is also
-    window-start order. Replacements and out-of-order slots use ``calculate_coverage``.
+    Rolling slots have fixed offsets. Replacements, out-of-order slots, and slots
+    starting before historical coverage use ``calculate_coverage`` instead.
     """
     if not previous:
         return calculate_coverage([run], data_checks_enabled=data_checks_enabled)
@@ -148,9 +171,9 @@ def coverage_event_type(previous: dict, current: dict) -> str:
         return "INITIALIZE"
     old_value = previous["verified_end"]
     new_value = current["verified_end"]
-    if new_value > old_value:
+    if new_value is not None and (old_value is None or new_value > old_value):
         return "ADVANCE"
-    if new_value < old_value:
+    if old_value is not None and (new_value is None or new_value < old_value):
         return "INVALIDATE"
     if current["verified_status"] == "BLOCKED":
         return "BLOCK"

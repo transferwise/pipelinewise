@@ -152,6 +152,7 @@ class CheckDefinition:
     window_start_seconds: int
     window_end_seconds: int
     statement_timeout_seconds: int
+    initial_full_scan: bool = True
 
     @property
     def canonical_config(self) -> dict:
@@ -161,6 +162,9 @@ class CheckDefinition:
         value["checks"] = list(self.checks)
         value["source_compare_columns"] = list(self.source_compare_columns)
         value["target_compare_columns"] = list(self.target_compare_columns)
+        # Preserve pre-option hashes for checks that use the default behavior.
+        if self.initial_full_scan:
+            value.pop("initial_full_scan")
         return value
 
     @property
@@ -253,6 +257,11 @@ def extract_check_definitions(
                     )
                     frequency = _validate_frequency(raw["frequency"], full_check_name)
                     window_start_seconds = parse_duration(raw["window_start"].lstrip("-"))
+                    initial_full_scan = raw.get("initial_full_scan", True)
+                    if not isinstance(initial_full_scan, bool):
+                        raise DataDiffConfigError(
+                            f"initial_full_scan must be a boolean in check '{full_check_name}'"
+                        )
                     definitions.append(
                         CheckDefinition(
                             full_check_name=full_check_name,
@@ -292,6 +301,7 @@ def extract_check_definitions(
                             statement_timeout_seconds=parse_duration(
                                 raw.get("statement_timeout", "5min")
                             ),
+                            initial_full_scan=initial_full_scan,
                         )
                     )
 

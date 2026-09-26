@@ -17,6 +17,8 @@ from pipelinewise.data_diff.runner import (
     run_due_checks,
     scheduled_slot,
 )
+from pipelinewise.data_diff.engine import HistoricalWindowNotReady
+from pipelinewise.data_diff.repository import RunLeaseLostError
 
 
 def _check():
@@ -43,6 +45,7 @@ class FakeBackend:
         self.preflights = []
         self.latest = latest
         self.expired = []
+        self.window_starts = []
 
     def list_checks(self, **_filters):
         return [self.check]
@@ -51,15 +54,24 @@ class FakeBackend:
         self.expired.append((check_id, stale_before))
         return 0
 
-    def start_run(self, *_args, **_kwargs):
+    def start_run(self, _check, _scheduled_for, window_start, window_end, **_kwargs):
         return {
             "run_id": uuid4(),
             "attempt": 1,
             "trigger_type": "SCHEDULED",
-        } if self.start else None
+            # Echoed back like the repository does, which resolves a historical start.
+            "window_start": window_start,
+            "window_end": window_end,
+        } if self.start else {
+            'status': 'SKIPPED', 'slot_status': 'PASS', 'error': 'This cron slot has already been attempted',
+            'window_start': None, 'window_end': None,
+        }
 
     def latest_scheduled_for(self, _check_id):
         return self.latest
+
+    def list_retryable_runs(self, _check_id, _retry_before, *, limit):
+        return []
 
     def record_preflight(self, _check_id, preflight):
         self.preflights.append(preflight)
@@ -67,6 +79,16 @@ class FakeBackend:
 
     def finish_run(self, *args, **kwargs):
         self.finished.append((args, kwargs))
+
+    def set_run_window_start(self, run_id, start):
+        self.window_starts.append((run_id, start))
+
+
+class HistoricalBackend(FakeBackend):
+    """Backend whose attempt has no resolved historical comparison start yet."""
+
+    def start_run(self, *args, **kwargs):
+        return {**super().start_run(*args, **kwargs), 'window_start': None}
 
 
 def _connection_configs(_check):
@@ -123,6 +145,187 @@ def test_run_persists_preflight_and_results(mock_run):
     assert backend.finished[0][0][1] == "PASS"
 
 
+@patch("pipelinewise.data_diff.runner.run_check")
+def test_scheduled_run_keeps_check_fields_and_falls_back_to_computed_window(mock_run):
+    mock_run.side_effect = _fake_run_check(
+        PASS_PREFLIGHT, [{"check_type": "row_count", "status": "PASS"}], "PASS"
+    )
+    check = {**_check(), 'historical_scan_pending': True}
+
+    class LegacyBackend(FakeBackend):
+        def list_checks(self, **filters):
+            assert filters == {'target_id': None, 'tap_id': None}
+            return [self.check]
+
+        def start_run(self, *args, **kwargs):
+            run = super().start_run(*args, **kwargs)
+            run.pop('window_start')
+            run.pop('window_end')
+            return run
+
+    summary, = run_due_checks(
+        LegacyBackend(check), _connection_configs,
+        now=datetime(2026, 7, 22, 13, 1, tzinfo=timezone.utc),
+    )
+
+    assert summary['status'] == 'PASS'
+    assert summary['check']['historical_scan_pending'] is True
+    assert mock_run.call_args.args[3:5] == (
+        datetime(2026, 7, 22, 12, tzinfo=timezone.utc),
+        datetime(2026, 7, 22, 13, tzinfo=timezone.utc),
+    )
+
+
+@patch("pipelinewise.data_diff.runner.run_check")
+def test_runner_uses_the_window_persisted_by_start_run(mock_run):
+    mock_run.side_effect = _fake_run_check(
+        {**PASS_PREFLIGHT, "status": "BLOCKED", "findings": ["No timestamp index"]}, [], None,
+    )
+
+    class RewoundBackend(HistoricalBackend):
+        """Persists an end earlier than the one the runner computed for this slot."""
+
+        def start_run(self, *args, **kwargs):
+            return {
+                **super().start_run(*args, **kwargs),
+                "window_end": datetime(2026, 7, 22, 12, tzinfo=timezone.utc),
+            }
+
+    summary = run_due_checks(
+        RewoundBackend(_check()), _connection_configs,
+        now=datetime(2026, 7, 22, 13, 1, tzinfo=timezone.utc),
+    )[0]
+
+    assert summary["window_start"] is None
+    assert summary["window_end"] == datetime(2026, 7, 22, 12, tzinfo=timezone.utc)
+    assert mock_run.call_args.args[3:5] == (
+        None, summary["window_end"],
+    )
+
+
+@pytest.mark.parametrize('failure', ['connection', 'preflight', 'minimum', 'unsupported'])
+@patch('pipelinewise.data_diff.runner.run_check')
+def test_historical_failure_before_resolution_keeps_unknown_start(mock_run, failure):
+    def load(check):
+        if failure == 'connection':
+            raise RuntimeError('Source connection failed')
+        return _connection_configs(check)
+
+    def execute(*_args, on_preflight, **_kwargs):
+        if failure == 'preflight':
+            preflight = {**PASS_PREFLIGHT, 'status': 'BLOCKED', 'findings': ['No timestamp index']}
+            on_preflight(preflight)
+            return preflight, [], None
+        on_preflight(PASS_PREFLIGHT)
+        if failure == 'minimum':
+            raise RuntimeError('Minimum timestamp query timed out')
+        return PASS_PREFLIGHT, [{'check_type': 'row_checksum', 'status': 'ERROR',
+                                 'error': 'Unsupported comparison type'}], 'ERROR'
+
+    mock_run.side_effect = execute
+    backend = HistoricalBackend(_check())
+    summary, = run_due_checks(
+        backend, load, now=datetime(2026, 7, 22, 13, 1, tzinfo=timezone.utc),
+    )
+
+    assert summary['status'] == 'ERROR'
+    assert summary['window_start'] is None
+    assert summary['error']
+    assert backend.window_starts == []
+    assert backend.finished[0][0][1] == 'ERROR'
+
+
+@patch('pipelinewise.data_diff.runner.run_check')
+def test_both_empty_historical_run_is_deferred_without_coverage(mock_run):
+    def execute(*_args, on_preflight, **_kwargs):
+        on_preflight(PASS_PREFLIGHT)
+        raise HistoricalWindowNotReady('Neither source nor target has settled timestamps')
+
+    mock_run.side_effect = execute
+    backend = HistoricalBackend(_check())
+    summary, = run_due_checks(
+        backend, _connection_configs, now=datetime(2026, 7, 22, 13, 1, tzinfo=timezone.utc),
+    )
+
+    assert summary['status'] == 'DEFERRED'
+    assert summary['window_start'] is None
+    assert backend.window_starts == []
+    assert backend.finished[0][0][1:3] == ('DEFERRED', [])
+    assert backend.finished[0][1]['error'] == summary['error']
+
+
+@pytest.mark.parametrize("query_fails", [False, True])
+@patch("pipelinewise.data_diff.runner.run_check")
+def test_resolved_historical_start_is_saved_and_reported_even_when_query_fails(mock_run, query_fails):
+    start = datetime(2026, 7, 1, tzinfo=timezone.utc)
+    backend = FakeBackend(_check())
+
+    def execute(*_args, on_preflight, on_window_start):
+        on_preflight(PASS_PREFLIGHT)
+        on_window_start(start)
+        assert backend.window_starts[0][1] == start
+        if query_fails:
+            raise RuntimeError("Statement timed out")
+        return PASS_PREFLIGHT, [{"check_type": "row_count", "status": "PASS"}], "PASS"
+
+    mock_run.side_effect = execute
+    summary, = run_due_checks(
+        backend, _connection_configs, now=datetime(2026, 7, 22, 13, 1, tzinfo=timezone.utc),
+    )
+
+    assert summary["status"] == ("ERROR" if query_fails else "PASS")
+    assert summary["window_start"] == start
+    assert backend.window_starts == [(summary["run_id"], start)]
+
+
+@patch("pipelinewise.data_diff.runner.run_check")
+def test_run_summary_includes_result_errors_without_metric_values(mock_run):
+    reason = (
+        "row_checksum column 'status' has incompatible source and target types "
+        "(missing, missing)"
+    )
+    results = [
+        {
+            "check_type": "row_count", "status": "FAIL",
+            "source_value": 100, "target_value": 99, "error": None,
+        },
+        {"check_type": "row_checksum", "status": "ERROR", "error": reason},
+    ]
+    mock_run.side_effect = _fake_run_check(PASS_PREFLIGHT, results, "ERROR")
+    backend = FakeBackend(_check())
+
+    summary = run_due_checks(
+        backend,
+        _connection_configs,
+        now=datetime(2026, 7, 22, 13, 1, tzinfo=timezone.utc),
+    )[0]
+
+    assert summary["error"] == f"row_count FAIL; {reason}"
+    assert summary["results"] == results
+    assert backend.finished[0][0][1:3] == ("ERROR", results)
+
+
+@patch("pipelinewise.data_diff.runner.run_check")
+def test_run_summary_includes_blocked_preflight_reason(mock_run):
+    preflight = {
+        **PASS_PREFLIGHT,
+        "status": "BLOCKED",
+        "findings": ["No usable source timestamp index"],
+    }
+    mock_run.side_effect = _fake_run_check(preflight, [], None)
+    backend = FakeBackend(_check())
+
+    summary = run_due_checks(
+        backend,
+        _connection_configs,
+        now=datetime(2026, 7, 22, 13, 1, tzinfo=timezone.utc),
+    )[0]
+
+    assert summary["status"] == "ERROR"
+    assert summary["error"] == "No usable source timestamp index"
+    assert backend.finished[0][1]["error"] == summary["error"]
+
+
 def test_completed_slot_is_reported_as_skipped():
     summaries = run_due_checks(
         FakeBackend(_check(), start=False),
@@ -130,6 +333,66 @@ def test_completed_slot_is_reported_as_skipped():
         now=datetime(2026, 7, 22, 13, 1, tzinfo=timezone.utc),
     )
     assert summaries[0]["status"] == "SKIPPED"
+    assert summaries[0]["window_start"] is None
+    assert summaries[0]["window_end"] is None
+    assert summaries[0]['slot_status'] == 'PASS'
+    assert summaries[0]['error'] == 'This cron slot has already been attempted'
+
+
+@pytest.mark.parametrize('retry_status', ['PASS', 'FAIL', 'ERROR'])
+@patch('pipelinewise.data_diff.runner.run_check')
+def test_failed_window_retry_and_new_window_both_run(mock_run, retry_status):
+    current = datetime(2026, 7, 22, 13, tzinfo=timezone.utc)
+    original = {
+        'scheduled_for': current - timedelta(hours=1),
+        'window_start': current - timedelta(days=7),
+        'window_end': current - timedelta(hours=1),
+    }
+
+    class RetryBackend(FakeBackend):
+        def list_retryable_runs(self, check_id, retry_before, *, limit):
+            assert check_id == self.check['check_id']
+            assert retry_before == current
+            assert limit == 24
+            return [original]
+
+        def start_run(self, check, slot, start, end, **kwargs):
+            run = super().start_run(check, slot, start, end, **kwargs)
+            if kwargs.get('retry_before') is not None:
+                assert slot == original['scheduled_for']
+                return {**run, 'attempt': 2, 'trigger_type': 'RETRY'}
+            return run
+
+    mock_run.side_effect = [
+        (PASS_PREFLIGHT, [{'check_type': 'row_count', 'status': retry_status}], retry_status),
+        (PASS_PREFLIGHT, [{'check_type': 'row_count', 'status': 'PASS'}], 'PASS'),
+    ]
+    backend = RetryBackend(_check(), latest=original['scheduled_for'])
+    summaries = run_due_checks(backend, _connection_configs, now=current + timedelta(minutes=1))
+
+    assert [summary['status'] for summary in summaries] == [retry_status, 'PASS']
+    assert [summary['trigger_type'] for summary in summaries] == ['RETRY', 'SCHEDULED']
+    assert mock_run.call_args_list[0].args[3:5] == (original['window_start'], original['window_end'])
+    assert mock_run.call_args_list[1].args[3:5] == (current - timedelta(hours=1), current)
+    assert len(backend.finished) == 2
+
+
+@patch('pipelinewise.data_diff.runner.run_check')
+def test_retry_candidate_resolved_by_another_worker_is_skipped(mock_run):
+    current = datetime(2026, 7, 22, 13, tzinfo=timezone.utc)
+
+    class ResolvedBackend(FakeBackend):
+        def list_retryable_runs(self, _check_id, _retry_before, *, limit):
+            return [{'scheduled_for': current - timedelta(hours=1), 'window_start': None, 'window_end': current}]
+
+    summaries = run_due_checks(
+        ResolvedBackend(_check(), start=False, latest=current), _connection_configs,
+        now=current + timedelta(minutes=1),
+    )
+
+    assert [summary['status'] for summary in summaries] == ['SKIPPED', 'SKIPPED']
+    assert all(summary['slot_status'] == 'PASS' for summary in summaries)
+    mock_run.assert_not_called()
 
 
 def test_due_slots_backfills_oldest_missing_windows_in_order():
@@ -146,8 +409,9 @@ def test_due_slots_backfills_oldest_missing_windows_in_order():
     ]
 
 
+@pytest.mark.parametrize("previously_resolved", [False, True])
 @patch("pipelinewise.data_diff.runner.run_check")
-def test_remediation_reuses_exact_failed_definition_and_window(mock_run):
+def test_remediation_reuses_exact_failed_definition_and_window(mock_run, previously_resolved):
     mock_run.side_effect = _fake_run_check(
         {**PASS_PREFLIGHT, "query_fingerprint": "b" * 64},
         [{"check_type": "row_count", "status": "PASS"}],
@@ -165,10 +429,14 @@ def test_remediation_reuses_exact_failed_definition_and_window(mock_run):
     backend = FakeBackend(check)
     backend.get_run = lambda _run_id: original
     backend.get_check_version = lambda _version_id: check
+    # Remediation either reuses the original window or carries a start a later
+    # attempt resolved, and reports whichever it persisted.
     backend.start_remediation_run = lambda _original, _reference: {
         "run_id": uuid4(),
         "attempt": 2,
         "trigger_type": "REMEDIATION",
+        **({"window_start": original["window_start"] + timedelta(minutes=10)}
+           if previously_resolved else {}),
     }
 
     summary = rerun_failed_check(
@@ -180,14 +448,17 @@ def test_remediation_reuses_exact_failed_definition_and_window(mock_run):
 
     assert summary["status"] == "PASS"
     assert summary["attempt"] == 2
-    assert summary["window_start"] == original["window_start"]
+    expected_start = original["window_start"]
+    if previously_resolved:
+        expected_start += timedelta(minutes=10)
+    assert summary["window_start"] == expected_start
     assert summary["window_end"] == original["window_end"]
     (call_args, call_kwargs) = mock_run.call_args
     assert call_args == (
         check,
         {"dbname": "source"},
         {"dbname": "target"},
-        original["window_start"],
+        expected_start,
         original["window_end"],
     )
     assert callable(call_kwargs["on_preflight"])
@@ -229,6 +500,101 @@ def test_an_unschedulable_check_does_not_abort_the_batch():
     failure = next(s for s in summaries if s["status"] == "ERROR")
     assert failure["window_start"] is None
     assert "columns" in failure["error"]
+
+
+@pytest.mark.parametrize(
+    'operation', ['expire_stale_running_attempts', 'latest_scheduled_for', 'start_run', 'finish_run'],
+)
+@patch('pipelinewise.data_diff.runner.run_check')
+def test_repository_failure_is_reported_and_later_checks_continue(mock_run, operation):
+    first, broken, last = _check(), _check(), _check()
+    backend = FakeBackend(first)
+    backend.list_checks = lambda **_filters: [first, broken, last]
+    original = getattr(backend, operation)
+    calls = []
+
+    def fail_middle(*args, **kwargs):
+        calls.append(args)
+        if len(calls) == 2 or (operation == 'finish_run' and len(calls) == 3):
+            raise RuntimeError('Backend write failed')
+        return original(*args, **kwargs)
+
+    setattr(backend, operation, fail_middle)
+    mock_run.side_effect = _fake_run_check(PASS_PREFLIGHT, [{'check_type': 'row_count', 'status': 'PASS'}], 'PASS')
+    summaries = run_due_checks(backend, _connection_configs, now=datetime(2026, 7, 22, 13, 1, tzinfo=timezone.utc))
+
+    assert [summary['check']['check_id'] for summary in summaries] == [
+        first['check_id'], broken['check_id'], last['check_id'],
+    ]
+    assert [summary['status'] for summary in summaries] == ['PASS', 'ERROR', 'PASS']
+    assert summaries[1]['error'] == 'Backend write failed'
+
+
+@patch('pipelinewise.data_diff.runner.run_check')
+def test_retry_failure_preserves_completed_summaries_and_later_checks(mock_run):
+    current = datetime(2026, 7, 22, 13, tzinfo=timezone.utc)
+    first, last = _check(), _check()
+    backend = FakeBackend(first, latest=current)
+    backend.list_checks = lambda **_filters: [first, last]
+    backend.list_retryable_runs = lambda check_id, *_args, **_kwargs: [
+        {'scheduled_for': current - timedelta(hours=hours), 'window_start': None, 'window_end': current}
+        for hours in (2, 1)
+    ] if check_id == first['check_id'] else []
+    original_start = backend.start_run
+
+    def start(check, slot, start, end, **kwargs):
+        if check['check_id'] == first['check_id'] and slot == current - timedelta(hours=1):
+            raise RuntimeError('Could not start second retry')
+        return original_start(check, slot, start, end, **kwargs)
+
+    backend.start_run = start
+    mock_run.side_effect = _fake_run_check(PASS_PREFLIGHT, [{'check_type': 'row_count', 'status': 'FAIL'}], 'FAIL')
+    summaries = run_due_checks(backend, _connection_configs, now=current + timedelta(minutes=1))
+
+    assert [summary['status'] for summary in summaries] == ['FAIL', 'ERROR', 'FAIL']
+    assert summaries[0]['scheduled_for'] == current - timedelta(hours=2)
+    assert summaries[1]['error'] == 'Could not start second retry'
+    assert summaries[2]['check']['check_id'] == last['check_id']
+
+
+@pytest.mark.parametrize('outcome', ['PASS', 'ERROR', 'DEFERRED'])
+@patch('pipelinewise.data_diff.runner.run_check')
+def test_lease_loss_discards_late_outcome_without_finishing_again(mock_run, outcome):
+    backend = FakeBackend(_check())
+    calls = []
+
+    def finish(run_id, *_args, **_kwargs):
+        calls.append(run_id)
+        raise RunLeaseLostError(run_id, 'ERROR')
+
+    backend.finish_run = finish
+    if outcome == 'DEFERRED':
+        mock_run.side_effect = HistoricalWindowNotReady('Both sides empty')
+    elif outcome == 'ERROR':
+        mock_run.side_effect = RuntimeError('Source unavailable')
+    else:
+        mock_run.side_effect = _fake_run_check(PASS_PREFLIGHT, [{'check_type': 'row_count', 'status': 'PASS'}], 'PASS')
+    summary, = run_due_checks(backend, _connection_configs, now=datetime(2026, 7, 22, 13, 1, tzinfo=timezone.utc))
+
+    assert summary['status'] == 'SKIPPED'
+    assert summary['slot_status'] == 'ERROR'
+    assert 'Late results were discarded' in summary['error']
+    assert calls == [summary['run_id']]
+
+
+@pytest.mark.parametrize('interruption', [KeyboardInterrupt, SystemExit])
+@patch('pipelinewise.data_diff.runner.run_check')
+def test_lease_loss_does_not_swallow_interruption(mock_run, interruption):
+    backend = FakeBackend(_check())
+
+    def finish(run_id, *_args, **_kwargs):
+        raise RunLeaseLostError(run_id, 'ERROR')
+
+    backend.finish_run = finish
+    mock_run.side_effect = interruption()
+
+    with pytest.raises(interruption):
+        run_due_checks(backend, _connection_configs, now=datetime(2026, 7, 22, 13, 1, tzinfo=timezone.utc))
 
 
 @patch("pipelinewise.data_diff.runner.run_check")
@@ -319,7 +685,7 @@ execute_started_run(
     {{"check_id": "c", "full_check_name": "t/p/s/tbl", "statement_timeout_seconds": 60}},
     {{"run_id": "r", "attempt": 1, "trigger_type": "SCHEDULED"}},
     datetime(2026, 7, 22, 12, tzinfo=timezone.utc),
-    datetime(2026, 7, 22, 11, tzinfo=timezone.utc),
+    None,
     datetime(2026, 7, 22, 12, tzinfo=timezone.utc),
 )
 """
@@ -342,7 +708,7 @@ def test_a_real_sigterm_marks_the_run_terminal_before_the_process_dies(tmp_path)
 
     # Killed by SIGTERM, exactly as the sender intended.
     assert completed.returncode == -signal.SIGTERM, completed.stderr
-    # And the attempt was recorded terminal first, so its slot stays retryable.
+    # Record the terminal outcome before exit so coverage can be remediated.
     assert outfile.exists(), f"finish_run never ran: {completed.stderr}"
     status, error = outfile.read_text().split("|", 1)
     assert status == "ERROR"

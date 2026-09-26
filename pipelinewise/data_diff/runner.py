@@ -11,7 +11,9 @@ from typing import Callable
 
 from croniter import croniter
 
-from .engine import run_check
+from .coverage import FAILED_STATUSES
+from .engine import HistoricalWindowNotReady, run_check
+from .repository import RunLeaseLostError
 
 
 LOGGER = logging.getLogger(__name__)
@@ -55,9 +57,14 @@ def window_for_slot(check: dict, scheduled_for: datetime) -> tuple:
     return scheduled_for, window_start, window_end
 
 
-def due_slots(check: dict, now: datetime, latest_scheduled_for: datetime = None) -> list:
+def due_slots(
+    check: dict,
+    now: datetime,
+    latest_scheduled_for: datetime = None,
+    current_slot: datetime = None,
+) -> list:
     """Return the oldest unobserved slots, capped to protect source databases."""
-    current = scheduled_slot(now, check["frequency"])
+    current = current_slot or scheduled_slot(now, check["frequency"])
     if latest_scheduled_for is None or latest_scheduled_for >= current:
         return [current]
     slots = []
@@ -111,7 +118,8 @@ def execute_started_run(
     window_end: datetime,
 ) -> dict:
     """Execute and persist one already-created scheduled or remediation attempt."""
-    recorded = {"preflight_id": None}
+    # Seeded complete, so every reader can index it without a fallback.
+    recorded = {"preflight_id": None, "window_start": window_start}
 
     def _record(preflight):
         # Called by run_check before either aggregate executes.
@@ -119,12 +127,31 @@ def execute_started_run(
             check["check_id"], preflight
         )
 
-    with _terminating_signals_finish_run(backend, check, run, recorded):
-        return _execute_and_persist(
-            backend, connection_config_loader, check, run,
-            scheduled_for, window_start, window_end,
-            recorded=recorded, on_preflight=_record,
-        )
+    def _record_window_start(start):
+        backend.set_run_window_start(run["run_id"], start)
+        recorded["window_start"] = start
+
+    try:
+        with _terminating_signals_finish_run(backend, check, run, recorded):
+            return _execute_and_persist(
+                backend, connection_config_loader, check, run,
+                scheduled_for, window_start, window_end,
+                recorded=recorded, on_preflight=_record, on_window_start=_record_window_start,
+            )
+    except RunLeaseLostError as exc:
+        LOGGER.warning('%s', exc)
+        return {
+            'check': check,
+            'run_id': run['run_id'],
+            'status': 'SKIPPED',
+            'slot_status': exc.status,
+            'scheduled_for': scheduled_for,
+            'window_start': recorded['window_start'],
+            'window_end': window_end,
+            'attempt': run['attempt'],
+            'trigger_type': run['trigger_type'],
+            'error': str(exc),
+        }
 
 
 def _execute_and_persist(
@@ -138,6 +165,7 @@ def _execute_and_persist(
     *,
     recorded: dict,
     on_preflight,
+    on_window_start,
 ) -> dict:
     """Run the check and persist its outcome, converting failures to ERROR."""
     try:
@@ -148,15 +176,25 @@ def _execute_and_persist(
         preflight, results, status = run_check(
             check, source_config, target_config, window_start, window_end,
             on_preflight=on_preflight,
+            on_window_start=on_window_start,
         )
         preflight_id = recorded["preflight_id"]
         if preflight["status"] != "PASS":
-            error = preflight.get("error") or "; ".join(preflight.get("findings", []))
+            error = (
+                preflight.get("error")
+                or "; ".join(preflight.get("findings", []))
+                or f"Source preflight {preflight['status']}"
+            )
             backend.finish_run(
                 run["run_id"], "ERROR", [], preflight_id=preflight_id, error=error
             )
             status = "ERROR"
         else:
+            error = "; ".join(
+                result.get("error") or f"{result['check_type']} {result['status']}"
+                for result in results
+                if result["status"] in FAILED_STATUSES
+            ) or None
             backend.finish_run(
                 run["run_id"], status, results, preflight_id=preflight_id
             )
@@ -165,20 +203,41 @@ def _execute_and_persist(
             "run_id": run["run_id"],
             "status": status,
             "scheduled_for": scheduled_for,
-            "window_start": window_start,
+            "window_start": recorded["window_start"],
             "window_end": window_end,
             "results": results,
             "preflight": preflight,
+            "error": error,
+            "attempt": run["attempt"],
+            "trigger_type": run["trigger_type"],
+        }
+    except HistoricalWindowNotReady as exc:
+        backend.finish_run(
+            run["run_id"], "DEFERRED", [], preflight_id=recorded["preflight_id"], error=str(exc),
+        )
+        return {
+            "check": check,
+            "run_id": run["run_id"],
+            "status": "DEFERRED",
+            "scheduled_for": scheduled_for,
+            "window_start": None,
+            "window_end": window_end,
+            "error": str(exc),
             "attempt": run["attempt"],
             "trigger_type": run["trigger_type"],
         }
     except (KeyboardInterrupt, SystemExit) as exc:
         # Only for interpreter-raised cases, e.g. Ctrl-C with no handler installed.
         # Real signals are converted to a terminal ERROR by the handler above.
-        _finish_failed_run(
-            backend, check, run, recorded["preflight_id"],
-            f"Interrupted by {type(exc).__name__} before the check completed",
-        )
+        try:
+            _finish_failed_run(
+                backend, check, run, recorded["preflight_id"],
+                f"Interrupted by {type(exc).__name__} before the check completed",
+            )
+        except RunLeaseLostError:
+            pass
+        raise
+    except RunLeaseLostError:
         raise
     except Exception as exc:
         _finish_failed_run(backend, check, run, recorded["preflight_id"], str(exc))
@@ -187,7 +246,7 @@ def _execute_and_persist(
             "run_id": run["run_id"],
             "status": "ERROR",
             "scheduled_for": scheduled_for,
-            "window_start": window_start,
+            "window_start": recorded["window_start"],
             "window_end": window_end,
             "error": str(exc),
             "attempt": run["attempt"],
@@ -235,7 +294,7 @@ def _terminating_signals_finish_run(backend, check: dict, run: dict, recorded: d
 
 
 def _finish_failed_run(backend, check: dict, run: dict, preflight_id, error: str):
-    """Record a terminal ERROR so the slot is retryable and coverage sees it.
+    """Record a terminal ERROR for coverage and retry.
 
     A placeholder preflight is written only when no real one was recorded, which
     now means the failure happened before the preflight was even decided. Once a
@@ -261,6 +320,51 @@ def _finish_failed_run(backend, check: dict, run: dict, preflight_id, error: str
     )
 
 
+def _start_and_execute(
+    backend, connection_config_loader, check, scheduled_for,
+    window_start, window_end, *, allow_window_fallback=False, **start_kwargs,
+) -> dict:
+    """Execute one slot, or report why the repository declined to start it."""
+    run = backend.start_run(check, scheduled_for, window_start, window_end, **start_kwargs)
+    if run.get('status') == 'SKIPPED':
+        return {'check': check, 'scheduled_for': scheduled_for, **run}
+    if allow_window_fallback:
+        window_start = run.get('window_start', window_start)
+        window_end = run.get('window_end', window_end)
+    else:
+        window_start = run['window_start']
+        window_end = run['window_end']
+    return execute_started_run(
+        backend, connection_config_loader, check, run, scheduled_for,
+        window_start, window_end,
+    )
+
+
+def _run_due_check(backend, connection_config_loader, check, now, force):
+    """Yield completed summaries as each retry or scheduled slot is handled."""
+    expired = backend.expire_stale_running_attempts(check['check_id'], now - _stale_run_age(check))
+    if expired:
+        LOGGER.warning('Expired %s abandoned run(s) for %s', expired, check['full_check_name'])
+    latest = backend.latest_scheduled_for(check['check_id'])
+    current_slot = scheduled_slot(now, check['frequency'])
+    # Read the due slots before the retries, which insert rows of their own.
+    slots = due_slots(check, now, latest, current_slot)
+    retryable = backend.list_retryable_runs(
+        check['check_id'], current_slot, limit=MAX_BACKFILL_WINDOWS
+    )
+    for original in retryable:
+        yield _start_and_execute(
+            backend, connection_config_loader, check, original['scheduled_for'],
+            original['window_start'], original['window_end'], retry_before=current_slot,
+        )
+    for scheduled_for in slots:
+        _, window_start, window_end = window_for_slot(check, scheduled_for)
+        yield _start_and_execute(
+            backend, connection_config_loader, check, scheduled_for,
+            window_start, window_end, allow_window_fallback=True, force=force,
+        )
+
+
 def run_due_checks(
     backend,
     connection_config_loader: ConnectionConfigLoader,
@@ -278,25 +382,11 @@ def run_due_checks(
     for check in checks:
         if not _matches_check_filter(check, check_filter):
             continue
-        # Before the latest slot is read, not per due slot: a RUNNING row counts as
-        # observed, so leaving it would advance the scheduler past its own slot.
-        expired = backend.expire_stale_running_attempts(
-            check["check_id"], now - _stale_run_age(check)
-        )
-        if expired:
-            LOGGER.warning(
-                "Expired %s abandoned run(s) for %s",
-                expired,
-                check["full_check_name"],
-            )
-        latest = backend.latest_scheduled_for(check["check_id"])
         try:
-            slots = due_slots(check, now, latest)
+            summaries.extend(_run_due_check(backend, connection_config_loader, check, now, force))
         except Exception as exc:
-            # No run row exists yet, so this cannot be recorded against one. Report
-            # and continue: one broken definition must not stop the other checks.
             LOGGER.error(
-                "Cannot schedule data-diff check %s: %s",
+                "Cannot complete data-diff check %s: %s",
                 check["full_check_name"],
                 exc,
             )
@@ -309,29 +399,6 @@ def run_due_checks(
                     "window_end": None,
                     "error": str(exc),
                 }
-            )
-            continue
-        for scheduled_for in slots:
-            _, window_start, window_end = window_for_slot(check, scheduled_for)
-            run = backend.start_run(
-                check, scheduled_for, window_start, window_end, force=force
-            )
-            if run is None:
-                summaries.append(
-                    {
-                        "check": check,
-                        "status": "SKIPPED",
-                        "scheduled_for": scheduled_for,
-                        "window_start": window_start,
-                        "window_end": window_end,
-                    }
-                )
-                continue
-            summaries.append(
-                execute_started_run(
-                    backend, connection_config_loader, check, run,
-                    scheduled_for, window_start, window_end,
-                )
             )
     return summaries
 
@@ -348,5 +415,7 @@ def rerun_failed_check(
     run = backend.start_remediation_run(original, remediation_reference)
     return execute_started_run(
         backend, connection_config_loader, check, run,
-        original["scheduled_for"], original["window_start"], original["window_end"],
+        original["scheduled_for"],
+        run.get("window_start", original["window_start"]),
+        run.get("window_end", original["window_end"]),
     )

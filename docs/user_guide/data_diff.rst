@@ -26,6 +26,9 @@ Supported routes
     * - MySQL / MariaDB
       - Snowflake
 
+Snowflake targets support both native tables and PipelineWise-managed Iceberg v3
+tables, including the initial historical comparison.
+
 
 Check types
 -----------
@@ -144,6 +147,9 @@ inherited from ``data_diff_defaults`` — the table value wins when both exist.
 - ``window_start`` — Negative offset from fire time for the window start
 - ``window_end`` — Negative offset for the window end. Must be closer to fire time
   than ``window_start``. Default ``"0s"`` (fire time)
+- ``initial_full_scan`` — Whether the first data-check run of a new revision
+  compares shared history before ``window_end``. Default ``true``. Set ``false``
+  to use the configured rolling window from the first run
 - ``statement_timeout`` — Per-query timeout. Default ``"5min"``
 - ``key_column`` — Scalar key for integrity and range checks
 - ``timestamp_column`` — Column that defines the comparison window boundaries
@@ -166,10 +172,34 @@ Choosing a frequency and window
 Check infrequently, over a window that has already settled — the values above are
 the recommended starting point. Every check is an aggregate scan of both the
 source and the target, so frequency is a direct cost to the source database.
+
+By default, the first data-check run of each new revision reads
+``MIN(timestamp_column)`` on both source and target, considering only timestamps
+before the configured ``window_end`` cutoff. It compares from the later minimum,
+inclusive, to the cutoff, exclusive. For example, source history starting on
+January 1 and target history starting on January 5 are compared from January 5.
+Older rows on either side are intentionally excluded. NULL timestamps are excluded
+from both historical and rolling checks. If neither side has a non-NULL timestamp
+before the cutoff, the run is ``DEFERRED`` without verified coverage. The next
+cron slot tries historical discovery again with its new cutoff. If only one side
+has settled timestamps, the run records ``ERROR`` and identifies the missing side.
+Detected schema or comparison errors still produce ``ERROR`` when both sides
+have no settled timestamps.
+
+Set ``initial_full_scan: false`` in ``data_diff_defaults`` or on a table to use
+the configured rolling window from the first run. New scheduled windows after the
+initial scan use that rolling range. The historical scan may read most of the
+source table even with a timestamp index; schedule it off-peak and allow enough
+``statement_timeout``.
+Changing the timeout, schedule, or window creates a new definition revision and
+another initial scan. Previous runs and coverage remain available through
+``--include-versioned`` and backend history reports. Retries and remediation use
+the original revision's timeout; increasing the YAML timeout does not change an
+older run.
+
 ``window_end`` sets how long replication has to settle: too close to fire time and
-uncleared lag is reported as drift, producing a ``FAIL`` that resolves itself on
-the next run and trains people to ignore alerts. Raise it for taps that routinely
-lag further behind.
+uncleared lag is reported as drift, producing a ``FAIL`` that is retried at the
+next cron interval. Raise it for taps that routinely lag further behind.
 
 .. important::
 
@@ -223,7 +253,23 @@ explicitly selected tap absent from the project YAML are deactivated. Discovery
 and backend reconciliation failures retain the import summary and a non-zero
 exit so automation can report them.
 
+The import summary counts initial scans awaiting a first historical comparison
+among current checks for successfully imported taps. The count includes checks
+whose discovery was ``DEFERRED``. It excludes disabled full scans, schema-only
+checks, and scans already started. Failed scans are tracked as retries, not new
+initial scans. A failed backend reconciliation reports the count as unavailable.
+
+``list_data_diff_checks`` shows ``Full scan`` (the configured mode),
+``Initial scan pending`` (awaiting that first comparison), and ``Verified start``
+(the beginning of verified coverage). The JSON fields are ``initial_full_scan``,
+``historical_scan_pending``, and ``verified_start``. A pending scan has no verified
+coverage yet; a scan no longer pending may still have failed or be running.
+
 A mismatch exits non-zero and sends an alert. See :ref:`data_diff_alerts`.
+Results include the failure reason. Skipped checks show the existing slot status
+when available and explain why they did not run. Known bounds identify the
+existing or attempted window; they do not claim a new successful comparison.
+Bounds remain blank when no window is known.
 
 
 .. _data_diff_alerts:
@@ -242,23 +288,24 @@ configure:
 See :ref:`alerts` to configure the handlers. Alerts go to every configured handler,
 so the :ref:`victorops_alert_handler` limitations apply here too.
 
-One alert per failed check per window
-''''''''''''''''''''''''''''''''''''''
+One alert per failed attempt
+''''''''''''''''''''''''''''
 
 One invocation can evaluate several windows for the same table when it backfills
-missed slots. Each ``FAIL`` or ``ERROR`` produces its own alert naming the check, the
-window, and the run ID needed to remediate it:
+missed slots or retries failures. Each ``FAIL`` or ``ERROR`` produces its own alert
+naming the check, the window, the reason, and the run ID:
 
 .. code-block:: text
 
     data-diff FAIL snowflake/payments/public/transfers
       window  2026-07-29T10:00:00+00:00 → 2026-07-29T11:00:00+00:00
       run_id  2bd3e725-38fc-48c1-b565-b4f20e5bc7dd
+      reason  row_count FAIL
 
-``SKIPPED`` and ``PASS`` results are not alerted on. Failures are not batched or
-deduplicated, so a stalled tap alerts on every failing check and every backfilled
-window — up to 24 windows per check per invocation. Keeping ``frequency`` low is
-what keeps the volume sane.
+``SKIPPED``, ``DEFERRED``, and ``PASS`` results are not alerted on. Failures are not
+batched or deduplicated. An invocation can process up to 24 catch-up windows and
+24 retries per check, and each failed attempt sends an alert. Choose a frequency
+that allows replication to settle and keeps retry load manageable.
 
 Coverage and remediation
 ------------------------
@@ -273,17 +320,45 @@ for one definition revision:
     [12:00, 13:00) PASS  → stays 11:00
     rerun [11:00, 12:00) PASS → advances to 13:00
 
-A later pass cannot carry the watermark over an earlier gap. New definition revisions
-start independent coverage.
+A later pass cannot carry the watermark over an earlier gap. New definition
+revisions start independent coverage. With ``initial_full_scan: true``, the first
+run saves the later source/target minimum as its start before comparing data.
+Automatic retries, forced reruns, and remediation retain that saved interval,
+even if the oldest available rows later change. That run does not verify earlier
+rows or NULL timestamps. If the historical run fails, its next successful retry
+establishes historical coverage.
+When failure happens before its start is known, the stored start and verified
+interval remain NULL. The failed run still blocks coverage, even if later rolling
+checks pass. A retry discovers the start using the original cutoff, then
+preserves the resolved interval for subsequent attempts.
+With ``initial_full_scan: false``, coverage starts at the configured
+``window_start``. Existing revisions with recorded runs retain their normal
+schedule after upgrade; never-run revisions use the new historical default.
+
+At each new cron interval, PipelineWise checks the new rolling window and retries
+unresolved ``FAIL`` and ``ERROR`` windows for current definitions. Each retry
+retains the original window and definition and is recorded as a ``RETRY`` attempt.
+A failed window is retried at most once per cron interval. If an attempt spans
+several intervals, its next retry waits for the first interval after completion.
+Each invocation retries up to 24 failed windows per check; further eligible
+windows remain pending for the next invocation.
+
+``PASS`` windows are not automatically rerun. Use ``--force`` to rerun the current
+slot immediately, or remediation for a specific earlier window or superseded
+definition. An initial ``DEFERRED`` scan tries discovery at the next cron slot
+with its new cutoff. If a retry is ``DEFERRED``, its original failed window stays
+blocked and eligible for a later retry.
 
 An interrupted run is recorded as ``ERROR`` before the process exits, including on
-``SIGTERM`` and ``SIGINT``, so its slot stays retryable. A worker killed outright
-cannot do that, so every invocation first retires any attempt still ``RUNNING`` well
-past its query budget, across every slot and remediation attempts too. That sweep
-runs before scheduling because a ``RUNNING`` row makes its own slot look observed,
-which would otherwise advance the scheduler past the slot needing recovery.
+``SIGTERM`` and ``SIGINT``. A worker killed outright cannot do that, so each
+invocation retires stale ``RUNNING`` attempts before scheduling. These errors
+follow the same retry schedule. If an expired worker finishes later, its result
+is discarded and the recorded outcome is preserved. Its CLI result is ``SKIPPED``
+with the recorded status and reason. A failure to save one check's result is
+reported without stopping the remaining checks.
 
-After repairing a failed window, rerun its exact definition and time boundaries:
+To retry a repaired window immediately, rerun its exact definition and time
+boundaries:
 
 .. code-block:: bash
 
