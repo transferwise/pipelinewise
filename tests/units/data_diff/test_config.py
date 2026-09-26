@@ -1,5 +1,7 @@
+import hashlib
 import json
 
+from dataclasses import asdict
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -129,6 +131,49 @@ def test_extracts_deterministic_credential_free_definition(tmp_path):
     assert definition.target_compare_columns == ("STATUS", "AMOUNT")
     assert "password" not in json.dumps(definition.canonical_config)
     assert definition.config_hash == _definitions(_config(tmp_path))[0].config_hash
+
+
+def test_initial_full_scan_defaults_true_without_changing_legacy_hash(tmp_path):
+    definition = _definitions(_config(tmp_path))[0]
+    legacy_config = asdict(definition)
+    legacy_config.pop("full_check_name")
+    legacy_config.pop("initial_full_scan")
+    legacy_config["checks"] = list(definition.checks)
+    legacy_config["source_compare_columns"] = list(definition.source_compare_columns)
+    legacy_config["target_compare_columns"] = list(definition.target_compare_columns)
+
+    assert definition.initial_full_scan is True
+    assert definition.canonical_config == legacy_config
+    assert definition.config_hash == hashlib.sha256(
+        json.dumps(legacy_config, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
+def test_initial_full_scan_inherits_defaults_and_table_can_override(tmp_path):
+    config = _config(tmp_path)
+    baseline = _definitions(config)[0]
+    tap = config.targets["snowflake"]["taps"][0]
+    tap["data_diff_defaults"] = {"initial_full_scan": False}
+
+    inherited = _definitions(config)[0]
+    assert inherited.initial_full_scan is False
+    assert inherited.canonical_config["initial_full_scan"] is False
+    assert inherited.config_hash != baseline.config_hash
+
+    table = tap["schemas"][0]["tables"][0]
+    table["data_diff"]["initial_full_scan"] = True
+    overridden = _definitions(config)[0]
+    assert overridden.initial_full_scan is True
+    assert overridden.config_hash == baseline.config_hash
+
+
+def test_initial_full_scan_requires_boolean(tmp_path):
+    config = _config(tmp_path)
+    table = config.targets["snowflake"]["taps"][0]["schemas"][0]["tables"][0]
+    table["data_diff"]["initial_full_scan"] = "false"
+
+    with pytest.raises(DataDiffConfigError, match="initial_full_scan must be a boolean"):
+        _definitions(config)
 
 
 @pytest.mark.parametrize("source_type", ["tap-postgres", "tap-mysql"])

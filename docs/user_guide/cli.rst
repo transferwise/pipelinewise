@@ -133,6 +133,11 @@ its definitions are deactivated. The command prints its summary and exits
 non-zero when a selected tap or backend reconciliation fails. ``import`` remains
 a deprecated alias.
 
+The summary includes the number of initial data-diff scans pending for current
+checks on successfully imported taps. Deferred historical discovery remains
+pending; scans already started, retries, schema-only checks, and opted-out checks
+are excluded. The count is unavailable if backend reconciliation fails.
+
 .. warning::
 
    Removing or renaming a tap or target in project YAML makes
@@ -344,6 +349,12 @@ Data-diff
 Options include ``--output-format table|json`` and ``--include-versioned``.
 ``--tap`` requires ``--target``.
 
+The table includes ``Full scan`` for the configured mode, ``Initial scan pending``
+for checks awaiting their first historical comparison, and ``Verified start`` for
+the beginning of verified coverage. Deferred discovery remains pending; a failed
+or running scan is no longer pending to start. JSON exposes these as
+``initial_full_scan``, ``historical_scan_pending``, and ``verified_start``.
+
 
 .. _cli_run_data_diff_checks:
 
@@ -357,6 +368,16 @@ Options include ``--output-format table|json`` and ``--include-versioned``.
 
 ``--check`` selects a check name, logical key, or version ID. ``--force`` creates
 another attempt for the current UTC slot when a terminal attempt already exists.
+At the next cron interval, unresolved ``FAIL`` and ``ERROR`` windows are retried
+alongside the new scheduled window. Retries preserve their original bounds and
+definition; each window is retried at most once per interval, and an invocation
+retries up to 24 windows per check. A running attempt cannot be forced.
+``DEFERRED`` means neither side has settled history yet. An initial deferred scan
+tries discovery at the next slot without claiming coverage; a deferred retry
+keeps its original failed window blocked.
+Skipped checks include a reason and the existing slot status when available;
+known bounds identify the existing or attempted window without claiming a new
+successful comparison. Bounds are blank when no window is known.
 
 
 .. _cli_rerun_data_diff_check:

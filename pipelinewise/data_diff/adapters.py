@@ -184,6 +184,23 @@ class DatabaseAdapter:
         """Return the approximate row count of a table from catalog statistics."""
         raise NotImplementedError
 
+    def minimum_timestamp(self, schema: str, table: str, column: dict, cutoff: datetime):
+        """Read the earliest non-NULL timestamp before the settled cutoff in UTC."""
+        timestamp = self.quote(column["name"])
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                f"SELECT MIN({timestamp}) FROM {self.qualified_table(schema, table)} "
+                f"WHERE {timestamp} < %s",
+                (_utc_boundary(cutoff, column["data_type"]),),
+            )
+            row = cursor.fetchone()
+        value = next(iter(row.values())) if isinstance(row, dict) else row[0]
+        if value is None:
+            return None
+        if not isinstance(value, datetime):
+            raise DataDiffExecutionError("The minimum comparison timestamp is not a valid datetime")
+        return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+
     def execute_metrics(self, sql: str, params: tuple, checks: tuple) -> MetricQueryResult:
         """Execute one aggregate query and canonicalize its values."""
         started = perf_counter()

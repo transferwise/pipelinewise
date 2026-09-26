@@ -103,6 +103,7 @@ schemas:
         #  key_column: "id"
         #  timestamp_column: "last_update"
         #  compare_columns: ["status", "currency"]
+        #  initial_full_scan: false       # Optional: skip historical first run (default true)
         #  frequency: "0 */12 * * *"       # Optional table override
         #  window_start: "-27h"           # Optional table override
         #  window_end: "-3h"              # Optional table override

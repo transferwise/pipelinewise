@@ -44,9 +44,9 @@ credentials when separate roles are not required.
 Schema
 ------
 
-.. mermaid:: ../../pipelinewise/backend_db/migrations/versions/002_schema.erd.mmd
+.. mermaid:: ../../pipelinewise/backend_db/migrations/versions/003_schema.erd.mmd
    :align: center
-   :caption: Data-diff backend schema after migration 002
+   :caption: Data-diff backend schema after migration 003
    :zoom:
 
 The schema has two related paths. The first records definitions and execution
@@ -75,6 +75,23 @@ the highest terminal attempt for each scheduled slot, while
 observed window end. A new chronological slot updates that state directly. A
 replacement or out-of-order slot recalculates it from the slot-state rows
 without rescanning superseded attempts.
+
+Migration 003 allows an unknown historical ``window_start`` to be NULL. An
+unresolved historical error keeps the watermark ``BLOCKED``, with NULL
+``verified_start`` and ``verified_end`` and the failed run as ``blocking_run_id``.
+It remains visible in the failure reports below. A ``DEFERRED`` run records that
+neither side had settled history; it does not create or replace a slot or
+watermark entry. A deferred retry leaves the original failed slot blocked.
+Automatic retries use ``trigger_type = 'RETRY'``, retain the original
+``scheduled_for``, and increment ``attempt``. A successful retry updates the
+original slot and recalculates coverage while retaining previous attempts and
+results. ``rerun_of_run_id`` links manual remediation attempts.
+
+Run ``import_config`` to apply migrations before using the new code. Older
+versions cannot handle unresolved bounds or ``DEFERRED`` runs. Downgrade to 002
+is refused while such history exists; resolving the current watermark does not
+remove its historical events. Preserve a backend backup before upgrading if
+rollback to the older version may be needed.
 
 
 Reporting queries

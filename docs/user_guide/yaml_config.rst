@@ -167,6 +167,11 @@ Tap configuration
      - No
      - ``true``
      - Suppresses tap and data-diff alerts when ``false``.
+   * - ``data_diff_defaults.initial_full_scan``
+     - No
+     - ``true``
+     - Checks shared history on a new data-diff revision's first run; tables can
+       override it. See :ref:`data_diff`.
    * - ``slack_alert_channel``
      - No
      - Global channel
@@ -309,6 +314,9 @@ Schemas and tables
    * - ``data_diff``
      - No
      - Configures independent aggregate reconciliation. See :ref:`data_diff`.
+   * - ``data_diff.initial_full_scan``
+     - No
+     - Overrides the tap default; ``false`` starts with the configured window.
 
 Connector-specific schema or table mappings, such as ``s3_csv_mapping``, are
 documented on their connector page.

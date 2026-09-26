@@ -14,7 +14,7 @@ def _effective_attempts(runs: list) -> list:
         current = latest.get(slot)
         if current is None or int(run["attempt"]) > int(current["attempt"]):
             latest[slot] = run
-    return sorted(latest.values(), key=lambda item: (item["window_start"], item["window_end"]))
+    return sorted(latest.values(), key=lambda item: item["scheduled_for"])
 
 
 def calculate_coverage(runs: list, *, data_checks_enabled: bool = True) -> dict:
@@ -23,8 +23,19 @@ def calculate_coverage(runs: list, *, data_checks_enabled: bool = True) -> dict:
     if not effective:
         return {}
 
-    verified_start = min(run["window_start"] for run in effective)
     furthest_observed_end = max(run["window_end"] for run in effective)
+    unresolved = next((run for run in effective if run["window_start"] is None), None)
+    if unresolved:
+        return {
+            "verified_start": None,
+            "verified_end": None,
+            "furthest_observed_end": furthest_observed_end,
+            "verified_status": "BLOCKED",
+            "blocking_run_id": unresolved["run_id"],
+            "reason": f"Run {unresolved['run_id']} has not resolved its historical comparison start",
+        }
+
+    verified_start = min(run["window_start"] for run in effective)
     cursor = verified_start
     blocking_runs = sorted(
         (run for run in effective if run["status"] != "PASS"),
@@ -80,8 +91,8 @@ def calculate_coverage(runs: list, *, data_checks_enabled: bool = True) -> dict:
 def advance_coverage(previous: dict, run: dict, *, data_checks_enabled: bool = True) -> dict:
     """Apply one newly appended effective slot to materialized coverage state.
 
-    Definition revisions have fixed window offsets, so scheduled order is also
-    window-start order. Replacements and out-of-order slots use ``calculate_coverage``.
+    Rolling slots have fixed offsets. Replacements, out-of-order slots, and slots
+    starting before historical coverage use ``calculate_coverage`` instead.
     """
     if not previous:
         return calculate_coverage([run], data_checks_enabled=data_checks_enabled)
@@ -148,9 +159,9 @@ def coverage_event_type(previous: dict, current: dict) -> str:
         return "INITIALIZE"
     old_value = previous["verified_end"]
     new_value = current["verified_end"]
-    if new_value > old_value:
+    if new_value is not None and (old_value is None or new_value > old_value):
         return "ADVANCE"
-    if new_value < old_value:
+    if old_value is not None and (new_value is None or new_value < old_value):
         return "INVALIDATE"
     if current["verified_status"] == "BLOCKED":
         return "BLOCK"

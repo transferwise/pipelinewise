@@ -116,6 +116,9 @@
         "statement_timeout": {
           "type": "string",
           "minLength": 2
+        },
+        "initial_full_scan": {
+          "type": "boolean"
         }
       }
     },
@@ -177,6 +180,9 @@
         "statement_timeout": {
           "type": "string",
           "minLength": 2
+        },
+        "initial_full_scan": {
+          "type": "boolean"
         }
       },
       "required": ["checks", "key_column", "timestamp_column"],

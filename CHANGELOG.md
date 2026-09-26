@@ -1,5 +1,30 @@
-Unreleased (2026-09-25)
------------------------
+0.93.0 (2026-09-26)
+-------------------
+
+**Data-diff**
+
+- Include the failure reason in Slack alerts and CLI results, without exposing
+  aggregate values
+- Check shared history on the first data run by default, from the later
+  source/target minimum timestamp to the configured cutoff. Exclude older rows
+  and NULL timestamps; set ``initial_full_scan: false`` to use rolling windows
+- Retry failed and errored windows at the next cron interval, alongside new
+  windows. Keep the original definition and saved boundaries; retry at most once
+  per interval and process up to 24 failed windows per check per invocation
+- Preserve recorded outcomes when an expired worker finishes late, and keep
+  other checks running if one check fails to save its result
+- Explain skipped checks with their recorded status and reason
+- Show verified starts and initial scans awaiting their first comparison in check
+  listings, and count those scans after importing configuration
+
+Defer the initial scan when both sides have no settled data; report an error
+when only one side does. Failed history keeps coverage blocked until the failed
+window passes. Existing revisions with recorded runs keep rolling windows;
+never-run and new revisions use the historical default.
+
+Run ``import_config`` to apply backend migration 003 before running checks.
+Keep a backend backup for rollback: unresolved or deferred history prevents
+downgrade to migration 002, even after the current check recovers.
 
 **CI**
 

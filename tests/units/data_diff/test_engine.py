@@ -14,6 +14,7 @@ from pipelinewise.data_diff.engine import (
     MAX_SAFE_FULL_SCAN_ROWS,
     DatabaseAdapter,
     DataDiffExecutionError,
+    HistoricalWindowNotReady,
     MetricQueryResult,
     MySQLAdapter,
     PostgresAdapter,
@@ -45,12 +46,14 @@ class FakeAdapter(DatabaseAdapter):
 
 
 class RunAdapter(FakeAdapter):
-    def __init__(self, columns, values=None):
+    def __init__(self, columns, values=None, minimum=None):
         super().__init__(indexes=[])
         self.columns = columns
         self.values = values or {}
         self.connection = Mock()
         self.executed = []
+        self.minimum = minimum
+        self.minimum_queries = []
 
     def resolve_columns(self, _schema, _table, requested, *, allow_missing=False):
         resolved = {}
@@ -69,6 +72,10 @@ class RunAdapter(FakeAdapter):
             values={check: self.values[check] for check in checks},
             duration_seconds=0.25,
         )
+
+    def minimum_timestamp(self, schema, table, column, cutoff):
+        self.minimum_queries.append((schema, table, column, cutoff))
+        return self.minimum
 
     def close(self):
         self.connection.close()
@@ -97,6 +104,53 @@ def test_metric_query_is_half_open_parameterized_and_quotes_identifiers():
         'COUNT("select") - COUNT(DISTINCT "select") AS "duplicate_key_count"'
         in sql
     )
+
+
+@pytest.mark.parametrize("adapter_type", [PostgresAdapter, MySQLAdapter, SnowflakeAdapter])
+def test_metric_query_excludes_null_timestamps_for_every_adapter(adapter_type):
+    adapter = adapter_type(None, 30)
+    sql = build_metric_query(
+        adapter, "public", "payments", "id", "updated_at", ("row_count",),
+    )
+
+    timestamp = adapter.quote("updated_at")
+    assert f"{timestamp} < %s" in sql
+    assert "IS NULL" not in sql
+    assert f"{timestamp} >= %s" in sql
+    assert sql.count("%s") == 2
+
+
+@pytest.mark.parametrize("adapter_type", [PostgresAdapter, MySQLAdapter, SnowflakeAdapter])
+@pytest.mark.parametrize("as_dict", [False, True])
+def test_minimum_timestamp_is_parameterized_and_normalizes_driver_values(adapter_type, as_dict):
+    connection = MagicMock()
+    cursor = connection.cursor.return_value.__enter__.return_value
+    value = datetime(2026, 7, 1, 8, tzinfo=timezone(timedelta(hours=2)))
+    cursor.fetchone.return_value = {"MIN(timestamp)": value} if as_dict else (value,)
+    adapter = adapter_type(connection, 30)
+    cutoff = datetime(2026, 7, 22, 13, tzinfo=timezone.utc)
+    column = _column('updated"at', "timestamp without time zone")
+
+    minimum = adapter.minimum_timestamp("public", "payments", column, cutoff)
+
+    assert minimum == datetime(2026, 7, 1, 6, tzinfo=timezone.utc)
+    sql, params = cursor.execute.call_args.args
+    quoted = adapter.quote(column["name"])
+    assert f"SELECT MIN({quoted})" in sql
+    assert f"WHERE {quoted} < %s" in sql
+    assert params == (cutoff.replace(tzinfo=None),)
+
+
+@pytest.mark.parametrize("value", [None, datetime(2026, 7, 1, 6)])
+def test_minimum_timestamp_handles_empty_and_naive_results(value):
+    connection = MagicMock()
+    connection.cursor.return_value.__enter__.return_value.fetchone.return_value = (value,)
+    adapter = PostgresAdapter(connection, 30)
+    cutoff = datetime(2026, 7, 22, 13, tzinfo=timezone.utc)
+
+    result = adapter.minimum_timestamp("public", "payments", _column("ts", "timestamp"), cutoff)
+
+    assert result == (None if value is None else value.replace(tzinfo=timezone.utc))
 
 
 def _column(name, data_type, **metadata):
@@ -204,6 +258,14 @@ def test_checksum_rejects_approximate_and_missing_columns():
             )
         ])
 
+    missing = {"name": "status", "data_type": None, "missing": True}
+    with pytest.raises(UnsupportedComparisonError) as exc:
+        checksum_columns([("status", missing, missing)])
+    assert str(exc.value) == (
+        "row_checksum column 'status' has incompatible source and target types "
+        "(missing, missing)"
+    )
+
 
 def test_key_integrity_checks_require_zero_on_both_sides():
     assert metric_passes("row_count", "2", "2")
@@ -213,7 +275,8 @@ def test_key_integrity_checks_require_zero_on_both_sides():
     assert not metric_passes("duplicate_key_count", "0", "2")
 
 
-def test_schema_only_run_uses_metadata_without_executing_aggregate_query():
+@pytest.mark.parametrize("historical", [False, True])
+def test_schema_only_run_uses_metadata_without_executing_aggregate_query(historical):
     source = RunAdapter({
         "id": _column("id", "bigint", numeric_scale=0),
         "updated_at": _column("updated_at", "timestamp without time zone"),
@@ -237,7 +300,7 @@ def test_schema_only_run_uses_metadata_without_executing_aggregate_query():
         "target_compare_columns": ["STATUS"],
         "checks": ["schema_compatibility"],
     }
-    start = datetime(2026, 7, 22, 12, tzinfo=timezone.utc)
+    start = None if historical else datetime(2026, 7, 22, 12, tzinfo=timezone.utc)
     end = datetime(2026, 7, 22, 13, tzinfo=timezone.utc)
 
     with patch(
@@ -254,6 +317,254 @@ def test_schema_only_run_uses_metadata_without_executing_aggregate_query():
     assert "Metadata-only" in preflight["findings"][0]
     assert source.executed == []
     assert target.executed == []
+    assert source.minimum_queries == target.minimum_queries == []
+
+
+@pytest.mark.parametrize("historical", [False, True])
+@pytest.mark.parametrize("later_side", ["source", "target"])
+def test_run_check_binds_the_same_window_on_source_and_target(historical, later_side):
+    source = RunAdapter({
+        "id": _column("id", "bigint"),
+        "updated_at": _column("updated_at", "timestamp without time zone"),
+    }, values={"row_count": "2"})
+    target = RunAdapter({
+        "ID": _column("ID", "NUMBER"),
+        "UPDATED_AT": _column("UPDATED_AT", "TIMESTAMP_NTZ"),
+    }, values={"row_count": "2"})
+    check = {
+        "source_schema": "public", "source_table": "payments",
+        "target_schema": "PUBLIC", "target_table": "PAYMENTS",
+        "source_key_column": "id", "target_key_column": "ID",
+        "source_timestamp_column": "updated_at",
+        "target_timestamp_column": "UPDATED_AT",
+        "checks": ["row_count"],
+    }
+    regular_start = datetime(2026, 7, 22, 12, tzinfo=timezone.utc)
+    earlier_start = regular_start - timedelta(days=10)
+    overlap_start = regular_start - timedelta(days=7)
+    source.minimum = overlap_start if later_side == "source" else earlier_start
+    target.minimum = overlap_start if later_side == "target" else earlier_start
+    window_start = None if historical else regular_start
+    window_end = datetime(2026, 7, 22, 13, tzinfo=timezone.utc)
+    published = []
+    resolved = []
+
+    def record_preflight(preflight):
+        assert source.minimum_queries == target.minimum_queries == []
+        assert source.executed == target.executed == []
+        published.append(preflight)
+
+    def record_start(start):
+        assert len(published) == 1
+        assert source.executed == target.executed == []
+        resolved.append(start)
+
+    with patch(
+        "pipelinewise.data_diff.engine.connect_source", return_value=source,
+    ), patch(
+        "pipelinewise.data_diff.engine.connect_target", return_value=target,
+    ):
+        preflight, results, status = run_check(
+            check, {}, {}, window_start, window_end,
+            on_preflight=record_preflight, on_window_start=record_start,
+        )
+
+    assert preflight["status"] == status == "PASS"
+    assert published == [preflight]
+    assert results[0]["status"] == "PASS"
+    expected_start = overlap_start if historical else regular_start
+    expected_params = (expected_start.replace(tzinfo=None), window_end.replace(tzinfo=None))
+    assert resolved == ([overlap_start] if historical else [])
+    assert len(source.minimum_queries) == len(target.minimum_queries) == int(historical)
+    for sql, params, checks in (source.executed[0], target.executed[0]):
+        assert params == expected_params
+        assert checks == ("row_count",)
+        assert " < %s" in sql
+        assert " >= %s" in sql
+        assert "IS NULL" not in sql
+
+
+@pytest.mark.parametrize("empty_side", ["source", "target", "both"])
+@pytest.mark.parametrize("checks", [["row_count"], ["schema_compatibility", "row_count"]])
+def test_historical_scan_does_not_pass_without_timestamped_data_on_both_sides(empty_side, checks):
+    start = datetime(2026, 7, 1, tzinfo=timezone.utc)
+    end = datetime(2026, 7, 22, 13, tzinfo=timezone.utc)
+    columns = {"id": _column("id", "bigint"), "ts": _column("ts", "timestamp")}
+    source = RunAdapter(columns, minimum=None if empty_side in ("source", "both") else start)
+    target = RunAdapter(columns, minimum=None if empty_side in ("target", "both") else start)
+    check = {
+        "source_schema": "public", "source_table": "payments",
+        "target_schema": "public", "target_table": "payments",
+        "source_key_column": "id", "target_key_column": "id",
+        "source_timestamp_column": "ts", "target_timestamp_column": "ts",
+        "checks": checks,
+    }
+    expected_error = HistoricalWindowNotReady if empty_side == "both" else DataDiffExecutionError
+    with patch("pipelinewise.data_diff.engine.connect_source", return_value=source), patch(
+        "pipelinewise.data_diff.engine.connect_target", return_value=target,
+    ), pytest.raises(expected_error, match="non-NULL timestamp before the cutoff") as raised:
+        run_check(check, {}, {}, None, end)
+
+    assert type(raised.value) is expected_error
+    assert end.isoformat() in str(raised.value)
+    assert ("both source and target" if empty_side == "both" else f"{empty_side} has no") in str(raised.value)
+    assert source.executed == target.executed == []
+
+
+@pytest.mark.parametrize(
+    "checks,source_type,target_type,expected_results",
+    [
+        (["schema_compatibility", "row_count"], "text", "bigint", [("schema_compatibility", "FAIL")]),
+        (["row_checksum", "row_count"], "double precision", "double precision", [("row_checksum", "ERROR")]),
+    ],
+)
+def test_empty_history_keeps_known_metadata_failures(checks, source_type, target_type, expected_results):
+    columns = {"id": _column("id", "bigint"), "ts": _column("ts", "timestamp")}
+    source = RunAdapter({**columns, "value": _column("value", source_type)})
+    target = RunAdapter({**columns, "value": _column("value", target_type)})
+    check = {
+        "source_schema": "public", "source_table": "payments",
+        "target_schema": "public", "target_table": "payments",
+        "source_key_column": "id", "target_key_column": "id",
+        "source_timestamp_column": "ts", "target_timestamp_column": "ts",
+        "source_compare_columns": ["value"], "target_compare_columns": ["value"],
+        "checks": checks,
+    }
+    resolved = []
+    with patch("pipelinewise.data_diff.engine.connect_source", return_value=source), patch(
+        "pipelinewise.data_diff.engine.connect_target", return_value=target,
+    ):
+        preflight, results, status = run_check(
+            check, {}, {}, None, datetime(2026, 7, 22, 13, tzinfo=timezone.utc),
+            on_window_start=resolved.append,
+        )
+
+    assert preflight["status"] == "PASS"
+    assert status == "ERROR"
+    assert [(result["check_type"], result["status"]) for result in results] == expected_results
+    assert results[0]["error"]
+    assert resolved == []
+    assert len(source.minimum_queries) == len(target.minimum_queries) == 1
+    assert source.executed == target.executed == []
+
+
+def test_blocked_historical_preflight_does_not_read_minimum_timestamps():
+    columns = {"id": _column("id", "bigint"), "ts": _column("ts", "timestamp")}
+    source, target = RunAdapter(columns), RunAdapter(columns)
+    source._table_rows = 100_001
+    check = {
+        "source_schema": "public", "source_table": "payments",
+        "target_schema": "public", "target_table": "payments",
+        "source_key_column": "id", "target_key_column": "id",
+        "source_timestamp_column": "ts", "target_timestamp_column": "ts",
+        "checks": ["row_count"],
+    }
+    with patch("pipelinewise.data_diff.engine.connect_source", return_value=source), patch(
+        "pipelinewise.data_diff.engine.connect_target", return_value=target,
+    ):
+        preflight, results, status = run_check(
+            check, {}, {}, None,
+            datetime(2026, 7, 22, 13, tzinfo=timezone.utc),
+        )
+    assert preflight["status"] == "BLOCKED"
+    assert results == []
+    assert status is None
+    assert source.minimum_queries == target.minimum_queries == []
+
+
+@pytest.mark.parametrize("discover", [False, True])
+def test_year_one_is_a_real_historical_boundary_and_is_not_rediscovered(discover):
+    start = datetime.min.replace(tzinfo=timezone.utc)
+    end = datetime(2026, 7, 22, 13, tzinfo=timezone.utc)
+    columns = {"id": _column("id", "bigint"), "ts": _column("ts", "timestamp without time zone")}
+    source = RunAdapter(columns, {"row_count": "2"}, minimum=start)
+    target = RunAdapter(columns, {"row_count": "2"}, minimum=start)
+    check = {
+        "source_schema": "public", "source_table": "payments",
+        "target_schema": "public", "target_table": "payments",
+        "source_key_column": "id", "target_key_column": "id",
+        "source_timestamp_column": "ts", "target_timestamp_column": "ts",
+        "checks": ["row_count"],
+    }
+    resolved = []
+    with patch("pipelinewise.data_diff.engine.connect_source", return_value=source), patch(
+        "pipelinewise.data_diff.engine.connect_target", return_value=target,
+    ):
+        _preflight, _results, status = run_check(
+            check, {}, {}, None if discover else start, end, on_window_start=resolved.append,
+        )
+
+    assert status == "PASS"
+    assert resolved == ([start] if discover else [])
+    assert len(source.minimum_queries) == len(target.minimum_queries) == int(discover)
+    assert source.executed[0][1] == target.executed[0][1] == (
+        start.replace(tzinfo=None), end.replace(tzinfo=None),
+    )
+
+
+def test_unsupported_historical_metrics_do_not_discover_or_convert_window_bounds():
+    columns = {
+        "id": _column("id", "bigint"), "ts": _column("ts", "timestamp"),
+        "value": _column("value", "double precision"),
+    }
+    source, target = RunAdapter(columns), RunAdapter(columns)
+    check = {
+        "source_schema": "public", "source_table": "payments",
+        "target_schema": "public", "target_table": "payments",
+        "source_key_column": "id", "target_key_column": "id",
+        "source_timestamp_column": "ts", "target_timestamp_column": "ts",
+        "source_compare_columns": ["value"], "target_compare_columns": ["value"],
+        "checks": ["row_checksum"],
+    }
+    published = []
+    with patch("pipelinewise.data_diff.engine.connect_source", return_value=source), patch(
+        "pipelinewise.data_diff.engine.connect_target", return_value=target,
+    ), patch("pipelinewise.data_diff.engine._utc_boundary") as convert_boundary:
+        preflight, results, status = run_check(
+            check, {}, {}, None, datetime(2026, 7, 22, 13, tzinfo=timezone.utc),
+            on_preflight=published.append,
+        )
+
+    assert status == "ERROR"
+    assert results[0]["status"] == "ERROR"
+    assert "unsupported type family" in results[0]["error"]
+    assert published == [preflight]
+    assert source.minimum_queries == target.minimum_queries == []
+    assert source.executed == target.executed == []
+    convert_boundary.assert_not_called()
+
+
+@pytest.mark.parametrize("failing_side", ["source", "target"])
+def test_historical_minimum_failure_keeps_the_start_unresolved_and_closes_connections(failing_side):
+    columns = {"id": _column("id", "bigint"), "ts": _column("ts", "timestamp")}
+    start = datetime(2026, 7, 1, tzinfo=timezone.utc)
+    source = RunAdapter(columns, minimum=start)
+    target = RunAdapter(columns, minimum=start)
+    failing = source if failing_side == "source" else target
+    failing.minimum_timestamp = Mock(side_effect=DataDiffExecutionError("MIN query timed out"))
+    check = {
+        "source_schema": "public", "source_table": "payments",
+        "target_schema": "public", "target_table": "payments",
+        "source_key_column": "id", "target_key_column": "id",
+        "source_timestamp_column": "ts", "target_timestamp_column": "ts",
+        "checks": ["row_count"],
+    }
+    published, resolved = [], []
+    with patch("pipelinewise.data_diff.engine.connect_source", return_value=source), patch(
+        "pipelinewise.data_diff.engine.connect_target", return_value=target,
+    ), pytest.raises(DataDiffExecutionError, match="MIN query timed out"):
+        run_check(
+            check, {}, {}, None, datetime(2026, 7, 22, 13, tzinfo=timezone.utc),
+            on_preflight=published.append, on_window_start=resolved.append,
+        )
+
+    assert len(published) == 1
+    assert published[0]["status"] == "PASS"
+    assert resolved == []
+    assert source.executed == target.executed == []
+    source.connection.rollback.assert_called_once()
+    source.connection.close.assert_called_once()
+    target.connection.close.assert_called_once()
 
 
 def test_run_check_closes_source_when_target_connect_fails():

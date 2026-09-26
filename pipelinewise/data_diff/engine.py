@@ -44,6 +44,7 @@ from .credentials import pem_to_der
 
 # Symbols re-exported from .adapters for use by callers and tests.
 __all__ = [
+    "HistoricalWindowNotReady",
     "TIMESTAMP_TYPES",
     "DatabaseAdapter",
     "MetricQueryResult",
@@ -56,6 +57,10 @@ __all__ = [
     "preflight_source",
     "run_check",
 ]
+
+
+class HistoricalWindowNotReady(DataDiffExecutionError):
+    """Neither side has a settled timestamp from which to compare history."""
 
 
 def _publish_preflight(on_preflight, preflight: dict) -> None:
@@ -102,7 +107,7 @@ def build_metric_query(
     *,
     checksum_columns_for_query: list = None,
 ) -> str:
-    """Build a parameterized, half-open aggregate query."""
+    """Build a parameterized aggregate query over a half-open timestamp window."""
     key = adapter.quote(key_column)
     expressions = []
     for check in checks:
@@ -111,15 +116,39 @@ def build_metric_query(
         else:
             expression = METRIC_EXPRESSIONS[check].format(key=key)
         expressions.append(f"{expression} AS {adapter.quote(check)}")
-    predicates = [
-        f"{adapter.quote(timestamp_column)} >= %s",
-        f"{adapter.quote(timestamp_column)} < %s",
-    ]
+    timestamp = adapter.quote(timestamp_column)
+    predicates = [f"{timestamp} >= %s", f"{timestamp} < %s"]
     return (
         f"SELECT {', '.join(expressions)} "
         f"FROM {adapter.qualified_table(schema, table)} "
         f"WHERE {' AND '.join(predicates)}"
     )
+
+
+def _historical_window_start(source, target, check, source_column, target_column, window_end):
+    """Use the later minimum so the initial scan compares only shared history."""
+    minima = [
+        adapter.minimum_timestamp(
+            check[f"{side}_schema"], check[f"{side}_table"], column, window_end,
+        )
+        for side, adapter, column in (
+            ("source", source, source_column),
+            ("target", target, target_column),
+        )
+    ]
+    missing_sides = [side for side, value in zip(("source", "target"), minima) if value is None]
+    cutoff = window_end.isoformat()
+    if len(missing_sides) == 2:
+        raise HistoricalWindowNotReady(
+            f"Historical comparison is pending: both source and target have no "
+            f"non-NULL timestamp before the cutoff {cutoff}"
+        )
+    if missing_sides:
+        raise DataDiffExecutionError(
+            f"Historical comparison cannot start: {missing_sides[0]} has no "
+            f"non-NULL timestamp before the cutoff {cutoff}"
+        )
+    return max(minima)
 
 
 def preflight_source(
@@ -400,15 +429,18 @@ def run_check(
     check: dict,
     source_config: dict,
     target_config: dict,
-    window_start: datetime,
+    window_start: datetime | None,
     window_end: datetime,
     on_preflight=None,
+    on_window_start=None,
 ) -> tuple:
-    """Preflight and execute one bounded aggregate query on each side.
+    """Preflight and execute one aggregate query on each side.
 
     ``on_preflight`` is invoked with the preflight dict as soon as it is decided
     and before either aggregate runs, so the caller can persist it while the
     source is still untouched. Its return value is ignored.
+    A ``None`` start discovers shared history after preflight. ``on_window_start``
+    persists the discovered start before comparison.
     """
     source = connect_source(check, source_config)
     try:
@@ -505,15 +537,6 @@ def run_check(
                     "error": str(exc),
                 }
 
-        source_params = (
-            _utc_boundary(window_start, source_timestamp_column["data_type"]),
-            _utc_boundary(window_end, source_timestamp_column["data_type"]),
-        )
-        target_params = (
-            _utc_boundary(window_start, target_timestamp_column["data_type"]),
-            _utc_boundary(window_end, target_timestamp_column["data_type"]),
-        )
-
         if metric_checks:
             metric_checks = tuple(metric_checks)
             source_sql = build_metric_query(
@@ -529,11 +552,34 @@ def run_check(
             )
             preflight = preflight_source(
                 source, check["source_schema"], check["source_table"],
-                source_timestamp_column["name"], source_sql, source_params,
+                source_timestamp_column["name"], source_sql, (window_start, window_end),
             )
             _publish_preflight(on_preflight, preflight)
             if preflight["status"] != "PASS":
                 return preflight, [], None
+
+            if window_start is None:
+                try:
+                    window_start = _historical_window_start(
+                        source, target, check, source_timestamp_column,
+                        target_timestamp_column, window_end,
+                    )
+                except HistoricalWindowNotReady:
+                    if any(result["status"] != "PASS" for result in results_by_type.values()):
+                        # Empty history cannot hide already established metadata failures.
+                        results = [results_by_type[item] for item in checks if item in results_by_type]
+                        return preflight, results, "ERROR"
+                    raise
+                if on_window_start is not None:
+                    on_window_start(window_start)
+            source_params = (
+                _utc_boundary(window_start, source_timestamp_column["data_type"]),
+                _utc_boundary(window_end, source_timestamp_column["data_type"]),
+            )
+            target_params = (
+                _utc_boundary(window_start, target_timestamp_column["data_type"]),
+                _utc_boundary(window_end, target_timestamp_column["data_type"]),
+            )
 
             source_result = source.execute_metrics(
                 source_sql, source_params, metric_checks
