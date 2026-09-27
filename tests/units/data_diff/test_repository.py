@@ -207,7 +207,7 @@ def test_list_checks_exposes_compare_columns_from_version_snapshot():
 
     assert checks[0]["source_compare_columns"] == ["status", "amount"]
     assert checks[0]["target_compare_columns"] == ["STATUS", "AMOUNT"]
-    assert checks[0]["initial_full_scan"] is True
+    assert checks[0]["initial_full_scan"] is False
     assert "LEFT JOIN public.dd_watermark_state coverage" in cursor.last_sql
     assert "coverage.verified_start" in cursor.last_sql
     assert "coverage.verified_end" in cursor.last_sql
@@ -226,11 +226,11 @@ def test_get_check_version_restores_initial_full_scan_from_snapshot():
     check_id = uuid4()
     cursor.fetchone.return_value = {
         "check_id": check_id,
-        "canonical_config": {"initial_full_scan": False},
+        "canonical_config": {"initial_full_scan": True},
     }
     repository = _repository_with_cursor(cursor)
 
-    assert repository.get_check_version(check_id)["initial_full_scan"] is False
+    assert repository.get_check_version(check_id)["initial_full_scan"] is True
 
 
 def test_schema_migration_never_drops_shared_schema():
@@ -321,7 +321,10 @@ def test_first_scheduled_attempt_has_unresolved_historical_start():
     slot = datetime(2026, 7, 22, 13, tzinfo=timezone.utc)
     normal_start = slot - timedelta(hours=1)
 
-    run = repository.start_run({"check_id": check_id, "checks": ["row_count"]}, slot, normal_start, slot)
+    run = repository.start_run(
+        {"check_id": check_id, "checks": ["row_count"], "initial_full_scan": True},
+        slot, normal_start, slot,
+    )
 
     assert run["window_start"] is None
     assert run["window_end"] == slot
@@ -334,7 +337,7 @@ def test_first_scheduled_attempt_has_unresolved_historical_start():
     )
 
 
-def test_first_scheduled_attempt_uses_bounded_window_when_full_scan_disabled():
+def test_first_scheduled_attempt_uses_bounded_window_by_default():
     cursor = Mock()
     cursor.fetchall.return_value = []
     cursor.fetchone.return_value = {"has_previous_run": False, "has_pending_historical_run": False}
@@ -343,7 +346,7 @@ def test_first_scheduled_attempt_uses_bounded_window_when_full_scan_disabled():
     normal_start = slot - timedelta(hours=1)
 
     run = repository.start_run(
-        {"check_id": uuid4(), "initial_full_scan": False},
+        {"check_id": uuid4(), "checks": ["row_count"]},
         slot, normal_start, slot,
     )
 
@@ -417,7 +420,7 @@ def test_waiting_slot_still_discovers_history_after_earlier_attempt_is_deferred(
         {'has_previous_run': False, 'has_pending_historical_run': False},
     ]
     repository = _repository_with_cursor(cursor)
-    check = {'check_id': uuid4(), 'checks': ['row_count']}
+    check = {'check_id': uuid4(), 'checks': ['row_count'], 'initial_full_scan': True}
     slot = datetime(2026, 7, 22, 13, tzinfo=timezone.utc)
     start = slot - timedelta(hours=1)
 

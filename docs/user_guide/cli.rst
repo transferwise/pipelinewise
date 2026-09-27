@@ -131,7 +131,7 @@ An explicitly selected tap missing from YAML has its definitions deactivated.
 
 The summary counts pending initial scans for current checks on successfully
 imported taps. It includes ``DEFERRED`` scans. It excludes scans already
-started, retries, schema-only checks, and checks with ``initial_full_scan: false``.
+started, retries, schema-only checks, and rolling-window checks.
 The count is unavailable if the backend update fails.
 
 A tap or backend failure appears in the summary and exits non-zero. ``import``

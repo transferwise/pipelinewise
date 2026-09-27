@@ -168,8 +168,8 @@ Tap configuration
      - Suppresses tap and data-diff alerts when ``false``.
    * - ``data_diff_defaults.initial_full_scan``
      - No
-     - ``true``
-     - Checks shared history on the first data run. Tables can override this.
+     - ``false``
+     - Set ``true`` to check shared history on the first data run. Tables can override this.
        See :ref:`data_diff_initial_scan`.
    * - ``slack_alert_channel``
      - No
@@ -315,7 +315,7 @@ Schemas and tables
      - Compares source and target data on its own schedule. See :ref:`data_diff`.
    * - ``data_diff.initial_full_scan``
      - No
-     - Overrides the tap default. Set ``false`` to start with rolling windows.
+     - Overrides the tap default. Set ``true`` to scan shared history first.
 
 Connector-specific schema or table mappings, such as ``s3_csv_mapping``, are
 documented on their connector page.

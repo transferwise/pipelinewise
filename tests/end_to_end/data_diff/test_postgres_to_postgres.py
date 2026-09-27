@@ -161,6 +161,7 @@ class TestPostgresToPostgresDataDiff:
         assert definition['is_current']
         assert definition['target_type'] == 'target-postgres'
         assert definition['frequency'] == '0 * * * *'
+        assert definition['initial_full_scan'] is True
         assert definition['window_start_seconds'] == 86400
         assert set(definition['checks']) == EXPECTED_CHECKS
         assert 'password' not in json.dumps(definition['canonical_config']).lower()
@@ -539,8 +540,8 @@ class TestPostgresToPostgresDataDiff:
             initial_full_scan=False,
         )
         assert bounded_definition.canonical_config == {
-            **definition['canonical_config'],
-            'initial_full_scan': False,
+            key: value for key, value in definition['canonical_config'].items()
+            if key != 'initial_full_scan'
         }
         with DataDiffRepository.from_backend_config(
             self._backend_config()
@@ -596,7 +597,7 @@ class TestPostgresToPostgresDataDiff:
                 'unchanged': 0,
                 'superseded': 0,
                 'deactivated': 0,
-                'historical_scans_pending': 2,
+                'historical_scans_pending': 0,
             }
             stats = repository.sync_definitions(
                 [changed_failed, successful],
@@ -605,15 +606,16 @@ class TestPostgresToPostgresDataDiff:
             )
             inventory = {check['tap_id']: check for check in repository.list_checks(include_versioned=True)}
             assert inventory['deleted']['historical_scan_pending'] is False
-            assert inventory['failed']['historical_scan_pending'] is True
-            assert inventory['successful']['historical_scan_pending'] is True
+            assert inventory['failed']['historical_scan_pending'] is False
+            assert inventory['successful']['historical_scan_pending'] is False
+            assert inventory['failed']['initial_full_scan'] is False
 
         assert stats == {
             'created': 1,
             'unchanged': 0,
             'superseded': 0,
             'deactivated': 1,
-            'historical_scans_pending': 1,
+            'historical_scans_pending': 0,
         }
         assert self.run_backend_query(
             """
@@ -634,6 +636,7 @@ class TestPostgresToPostgresDataDiff:
         definition = replace(
             _repository_definition('historical_coverage', 'recent_table'),
             window_start_seconds=86400,
+            initial_full_scan=True,
         )
         slot = self.run_backend_query("SELECT date_trunc('hour', CURRENT_TIMESTAMP)")[0][0]
         historical_start = slot - timedelta(minutes=30)
@@ -664,7 +667,7 @@ class TestPostgresToPostgresDataDiff:
     def test_unresolved_historical_error_blocks_coverage_until_remediation(self, swept):
         """Keep unknown bounds visible through failure, later passes and recovery."""
         self.e2e.setup_pipelinewise_backend()
-        definition = _repository_definition('unresolved_history', 'history_table')
+        definition = replace(_repository_definition('unresolved_history', 'history_table'), initial_full_scan=True)
         slot = self.run_backend_query("SELECT date_trunc('hour', CURRENT_TIMESTAMP)")[0][0]
         with DataDiffRepository.from_backend_config(self._backend_config()) as repository:
             repository.sync_definitions([definition], selected_taps=[definition.tap_id])
@@ -705,7 +708,7 @@ class TestPostgresToPostgresDataDiff:
     def test_deferred_historical_scan_waits_for_the_next_slot_without_claiming_coverage(self):
         """A no-data deferral keeps first-run discovery pending without an error."""
         self.e2e.setup_pipelinewise_backend()
-        definition = _repository_definition('deferred_history', 'empty_table')
+        definition = replace(_repository_definition('deferred_history', 'empty_table'), initial_full_scan=True)
         slot = self.run_backend_query("SELECT date_trunc('hour', CURRENT_TIMESTAMP)")[0][0]
         with DataDiffRepository.from_backend_config(self._backend_config()) as repository:
             repository.sync_definitions([definition], selected_taps=[definition.tap_id])
@@ -781,7 +784,7 @@ class TestPostgresToPostgresDataDiff:
     def test_duplicate_completion_preserves_first_result_and_watermark(self):
         """Repeated completion cannot replace results or append another transition."""
         self.e2e.setup_pipelinewise_backend()
-        definition = _repository_definition('duplicate_completion', 'history_table')
+        definition = replace(_repository_definition('duplicate_completion', 'history_table'), initial_full_scan=True)
         slot = self.run_backend_query("SELECT date_trunc('hour', CURRENT_TIMESTAMP)")[0][0]
         with DataDiffRepository.from_backend_config(self._backend_config()) as repository:
             repository.sync_definitions([definition], selected_taps=[definition.tap_id])
@@ -806,7 +809,7 @@ class TestPostgresToPostgresDataDiff:
         """Exercise lease loss inside execution with real terminal database writes."""
         self.e2e.setup_pipelinewise_backend()
         definitions = [
-            _repository_definition('lease_loss_runner', table)
+            replace(_repository_definition('lease_loss_runner', table), initial_full_scan=True)
             for table in ('a_expired', 'b_next')
         ]
         slot = self.run_backend_query("SELECT date_trunc('hour', CURRENT_TIMESTAMP)")[0][0]
@@ -850,7 +853,7 @@ class TestPostgresToPostgresDataDiff:
     def test_historical_scan_inventory_uses_persisted_attempts(self, completed_status):
         """List only history still awaiting a first non-deferred attempt."""
         self.e2e.setup_pipelinewise_backend()
-        historical = _repository_definition('history_inventory', 'history_table')
+        historical = replace(_repository_definition('history_inventory', 'history_table'), initial_full_scan=True)
         definitions = [
             historical,
             replace(historical, full_check_name='history_inventory/opt_out', source_table='opt_out',
@@ -904,7 +907,7 @@ class TestPostgresToPostgresDataDiff:
     def test_failed_windows_retry_once_per_cron_slot_and_repair_watermark(self, failed_status):
         """Retry original historical bounds and retain failures until a retry passes."""
         self.e2e.setup_pipelinewise_backend()
-        definition = _repository_definition('scheduled_retry', 'history_table')
+        definition = replace(_repository_definition('scheduled_retry', 'history_table'), initial_full_scan=True)
         current_slot = self.run_backend_query("SELECT date_trunc('hour', CURRENT_TIMESTAMP)")[0][0]
         failed_slot = current_slot - timedelta(hours=1)
         historical_start = failed_slot - timedelta(days=7)
@@ -1006,7 +1009,7 @@ class TestPostgresToPostgresDataDiff:
     def test_deferred_retry_keeps_the_unresolved_error_until_next_cron_slot(self):
         """A retry finding empty history cannot clear its earlier coverage blocker."""
         self.e2e.setup_pipelinewise_backend()
-        definition = _repository_definition('deferred_retry', 'empty_table')
+        definition = replace(_repository_definition('deferred_retry', 'empty_table'), initial_full_scan=True)
         current_slot = self.run_backend_query("SELECT date_trunc('hour', CURRENT_TIMESTAMP)")[0][0]
         failed_slot = current_slot - timedelta(hours=1)
         with DataDiffRepository.from_backend_config(self._backend_config()) as repository:
@@ -1156,7 +1159,7 @@ class TestPostgresToPostgresDataDiff:
         migration_config.set_main_option('sqlalchemy.url', url.render_as_string(hide_password=False).replace('%', '%%'))
         migration_config.set_main_option('pipelinewise_application_user', backend['user'])
         resolved = replace(_repository_definition('migration_history', 'resolved_table'), initial_full_scan=False)
-        unresolved = _repository_definition('migration_history', 'unresolved_table')
+        unresolved = replace(_repository_definition('migration_history', 'unresolved_table'), initial_full_scan=True)
         slot = self.run_backend_query("SELECT date_trunc('hour', CURRENT_TIMESTAMP)")[0][0]
 
         with DataDiffRepository.from_backend_config(backend) as repository:

@@ -145,8 +145,8 @@ Field reference:
 - ``window_start`` — Negative offset from the scheduled time
 - ``window_end`` — Window end offset. Must be later than ``window_start`` and
   no later than the scheduled time. Default ``"0s"`` (the scheduled time)
-- ``initial_full_scan`` — Check shared history on the first data run. Default
-  ``true``. Set ``false`` to start with rolling windows
+- ``initial_full_scan`` — Check shared history on the first data run when
+  ``true``. Default ``false`` uses the configured rolling window
 - ``statement_timeout`` — Per-query timeout. Default ``"5min"``
 - ``key_column`` — Scalar key for integrity and range checks
 - ``timestamp_column`` — Column that defines the comparison window boundaries
@@ -189,7 +189,8 @@ The example uses ``"20min"``. The default is ``"5min"``. A timeout records
 Initial historical scan
 '''''''''''''''''''''''
 
-By default, the first data run checks shared history. PipelineWise reads
+Set ``initial_full_scan: true`` on the table or in ``data_diff_defaults`` to
+check shared history on the first data run. PipelineWise reads
 ``MIN(timestamp_column)`` on both sides, using only timestamps before the
 ``window_end`` cutoff. The comparison includes the later minimum and excludes
 the cutoff.
@@ -205,9 +206,8 @@ Historical and rolling data checks exclude NULL timestamps.
 - Schema or comparison errors still produce ``ERROR``, even if both sides are
   empty.
 
-Later scheduled windows use the configured rolling range. To use that range
-from the first run, set ``initial_full_scan: false`` in ``data_diff_defaults`` or
-on the table. Schema-only checks do not scan history.
+Later scheduled windows use the configured rolling range. Without the setting,
+the first run uses that range too. Schema-only checks do not scan history.
 
 An initial scan may read most of the table, even with an index. Schedule it
 off-peak and allow enough ``statement_timeout``.
@@ -217,8 +217,8 @@ With ``initial_full_scan: true``, it starts another historical scan. Earlier run
 keep their settings, including the retry timeout. Use ``--include-versioned`` to
 list earlier definitions. Backend reports retain their runs and coverage.
 
-After upgrade, revisions with recorded runs keep rolling windows. New and
-never-run revisions use the historical default.
+Checks without the setting keep their existing configuration hash and rolling
+windows. New and never-run revisions scan history only when explicitly enabled.
 
 
 CLI commands

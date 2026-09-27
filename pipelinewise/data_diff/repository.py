@@ -11,7 +11,7 @@ import psycopg2.extensions
 from pipelinewise.backend_db import BackendDatabase
 
 from .adapters import SCHEMA_CHECK
-from .config import CheckDefinition
+from .config import CheckDefinition, INITIAL_FULL_SCAN_DEFAULT
 from .coverage import (
     CONCLUSIVE_STATUSES,
     COVERAGE_FIELDS,
@@ -25,7 +25,6 @@ psycopg2.extensions.register_adapter(uuid.UUID, psycopg2.extras.UUID_adapter)
 
 
 SCHEMA = "public"
-INITIAL_FULL_SCAN_DEFAULT = True
 _HISTORICAL_SCAN_PENDING_SQL = f"""
     checks.is_current
     AND COALESCE(
