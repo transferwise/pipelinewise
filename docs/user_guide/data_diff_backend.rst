@@ -3,9 +3,8 @@
 Data-diff backend database
 ==========================
 
-Data-diff uses a PostgreSQL control-plane database to store check definitions,
-execution history, results, and coverage. It is independent of source and target
-connections and must not also serve as a replication target.
+Data-diff stores check definitions, run history, results, and coverage in
+PostgreSQL. Use a separate database from any replication target.
 
 See :ref:`data_diff` to define, schedule, and remediate data-diff checks.
 
@@ -27,18 +26,18 @@ Add ``backend_db`` to ``config.yml``:
       ddl_user: "pipelinewise_ddl"
       ddl_password: "<vault encrypted>"
 
-When PostgreSQL is also the replication target, give the backend its own service
-or database.
+The backend can share a PostgreSQL server with a target, but not its database.
+Use a separate service and storage for stronger isolation. Keep backend roles
+and credentials separate from replication roles.
 
 ``backend_db`` enables data-diff. Without it, ``import_config`` warns and ignores
-every ``data_diff`` block. Replication never reads the backend, so an outage pauses
-reconciliation only. However, ``import_config`` fails when it cannot persist check
-definitions.
+every ``data_diff`` block. A backend outage stops checks, not replication.
+``import_config`` fails if it cannot save check definitions.
 
-``ddl_user`` runs Alembic migrations and owns the schema. The application ``user``
-can therefore hold DML grants only. The migration grants ``user`` what it needs, so
-that role requires nothing beyond ``CONNECT``. Set ``ddl_user`` to the application
-credentials when separate roles are not required.
+``ddl_user`` runs migrations and owns the schema. Grant the application ``user``
+``CONNECT`` to the database. Migrations grant its table and sequence access.
+They do not grant ``DELETE`` or schema-changing privileges to a separate role.
+To share one role, set both credential pairs to that role.
 
 
 Schema
@@ -77,7 +76,8 @@ This shows the processing flow. The ERD shows the exact foreign keys.
 Automatic retries use ``trigger_type = 'RETRY'``. They keep ``scheduled_for`` and
 increment ``attempt``. A successful retry replaces the slot outcome and
 recalculates coverage. Earlier attempts and results remain in history.
-``rerun_of_run_id`` links manual remediation to its original run.
+Manual reruns use ``trigger_type = 'REMEDIATION'``. ``rerun_of_run_id`` links them
+to the original run.
 
 
 Migration 003
@@ -132,10 +132,9 @@ Watermark per table:
      ORDER BY d.target_id, d.tap_id,
               d.source_schema, d.source_table;
 
-Successful and failed check results per table per UTC day. Historical definition
-revisions and every attempt, including retries and remediation runs, are included.
-The result counts are per ``check_type``; terminal run-level errors without
-result rows are counted separately:
+Successful and failed check results per table per UTC day. Includes earlier
+definition revisions, retries, and manual reruns. Counts each ``check_type``
+result separately. Run-level errors without result rows have their own count:
 
 .. code-block:: sql
 
@@ -184,8 +183,8 @@ result rows are counted separately:
               check_date
      ORDER BY check_date DESC, full_check_name;
 
-Current unresolved failures, excluding superseded definitions. The query prefers
-each result's error. Otherwise, it uses the combined reason in
+Unresolved failures for current definitions only. The query uses each result's
+error when available. Otherwise, it uses the combined reason in
 ``dd_run_attempts.error``:
 
 .. code-block:: sql

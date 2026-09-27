@@ -92,9 +92,8 @@ Global configuration
      - Limits application-role connection attempts. The migration connection
        does not currently inherit this timeout.
 
-The backend is a control-plane database, not a replication target. Separate its
-service, database, runtime role, DDL role, credentials, and storage from every
-target. See :ref:`data_diff_backend`.
+Use a separate database and credentials for the backend and replication targets.
+See :ref:`data_diff_backend` for setup and isolation options.
 
 
 Tap configuration
@@ -313,7 +312,7 @@ Schemas and tables
      - Applies load-time field protection. See :ref:`transformations`.
    * - ``data_diff``
      - No
-     - Configures independent aggregate reconciliation. See :ref:`data_diff`.
+     - Compares source and target data on its own schedule. See :ref:`data_diff`.
    * - ``data_diff.initial_full_scan``
      - No
      - Overrides the tap default. Set ``false`` to start with rolling windows.

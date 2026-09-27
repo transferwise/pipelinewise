@@ -65,8 +65,8 @@ Command summary
      - Run due data-diff checks.
      - Persists attempts and coverage.
    * - ``rerun_data_diff_check``
-     - Re-run one failed immutable window.
-     - Persists a remediation attempt.
+     - Retry a failed window with its original settings and bounds.
+     - Saves a new attempt.
 
 
 Project lifecycle
@@ -389,8 +389,8 @@ bounds are blank. Skipping a check does not verify data.
      --run-id <uuid> \
      --remediation-ref <ticket_or_incident>
 
-Both options are required. The original attempt remains immutable. See
-:ref:`data_diff` for scheduling, coverage, and remediation semantics.
+Both options are required. The original attempt stays in history. See
+:ref:`data_diff_retries` for retry timing and saved window boundaries.
 
 
 Secrets

@@ -44,7 +44,7 @@ Check types
       - Database impact
     * - ``schema_compatibility``
       - Selected columns exist with compatible types on both sides
-      - All columns resolve
+      - All selected columns exist and have compatible types
       - Metadata only
     * - ``row_count``
       - ``COUNT(*)`` in the window
@@ -83,16 +83,15 @@ Check types
 
 .. attention::
 
-   - ``row_checksum`` is **probabilistic** — a mismatch identifies a window to investigate,
-     but does not expose which individual rows differ
-   - **JSON** and **VARIANT** columns have non-deterministic key ordering across
-     databases, making consistent hashing impossible
-   - **FLOAT** columns can differ due to IEEE 754 precision between database
-     engines (e.g., ``0.1 + 0.2`` producing different representations)
-   - Exact numeric columns are compared at the **wider** of the source and target
-     scales, so a target that truncated precision fails rather than passing
-   - Incompatible column types are recorded as ``ERROR`` (not ``FAIL``);
-     other check types in the same run still execute normally
+   - ``row_checksum`` is probabilistic. A mismatch identifies a window, not the
+     individual rows that differ.
+   - JSON/VARIANT and floating-point checksum columns are unsupported. They
+     produce ``ERROR``, not ``FAIL``. Cross-database ordering and numeric
+     representations can differ.
+   - Exact numeric checksums use the wider source/target scale to detect lost
+     precision. Both columns need known scales.
+   - Missing or incompatible checksum columns also produce ``ERROR``. Other
+     check types in the run still execute.
 
 
 Check configuration
@@ -139,14 +138,13 @@ Every table must resolve ``key_column``, ``timestamp_column``, ``checks``,
 ``frequency``, and ``window_start``. These can be set directly on the table or
 inherited from ``data_diff_defaults`` — the table value wins when both exist.
 
-**Field reference:**
+Field reference:
 
-- ``schema_version`` — Optional compatibility marker; the only accepted value is
-  ``1``. The current normalizer does not change behaviour based on this field.
-- ``frequency`` — Crontab expression of when to fire the check
-- ``window_start`` — Negative offset from fire time for the window start
-- ``window_end`` — Negative offset for the window end. Must be closer to fire time
-  than ``window_start``. Default ``"0s"`` (fire time)
+- ``schema_version`` — Optional. Only ``1`` is accepted
+- ``frequency`` — Cron schedule in UTC
+- ``window_start`` — Negative offset from the scheduled time
+- ``window_end`` — Window end offset. Must be later than ``window_start`` and
+  no later than the scheduled time. Default ``"0s"`` (the scheduled time)
 - ``initial_full_scan`` — Check shared history on the first data run. Default
   ``true``. Set ``false`` to start with rolling windows
 - ``statement_timeout`` — Per-query timeout. Default ``"5min"``
@@ -155,15 +153,12 @@ inherited from ``data_diff_defaults`` — the table value wins when both exist.
 - ``compare_columns`` — Required when ``row_checksum`` is selected. Must not have
   PipelineWise transformations
 
-Durations compose the units ``s``, ``min``, ``h``, ``d``, ``w``: ``"-15h"`` is 15
-hours before fire time, and ``"1d6h"`` is valid too.
+Durations use ``s``, ``min``, ``h``, ``d``, and ``w``. Units can be combined.
+For example, ``"-1d6h"`` means 30 hours before the scheduled time.
 
-For ``tap-mysql`` sources, data-diff uses ``db_conn.engine`` when it is set. If
-it is omitted, data-diff infers MariaDB or MySQL from the connected server's
-handshake. Singer, FullSync, and PartialSync use the same fallback for all
-source-specific behaviour, including session defaults, GTID handling, and
-managed Iceberg v3 JSON aliases. Set ``engine`` explicitly for proxies that hide
-the server identity.
+For MySQL/MariaDB sources, ``db_conn.engine`` overrides server detection. Set it
+explicitly if a proxy hides the server identity. See :ref:`tap-mysql` for
+connection settings.
 
 Choosing a frequency and window
 '''''''''''''''''''''''''''''''
@@ -181,8 +176,8 @@ Otherwise, replication lag can cause a ``FAIL``.
    checked every six hours leaves three hours unverified. Coverage stays
    ``BLOCKED`` at that gap even if every check passes.
 
-   The example checks a 12-hour window every six hours. This overlap also covers
-   one missed slot.
+   The tap defaults above check a 12-hour window every six hours. This overlap
+   covers one missed slot. The table override runs every 12 hours, with no overlap.
 
 Allow enough ``statement_timeout`` for the scan, especially with ``row_checksum``.
 The example uses ``"20min"``. The default is ``"5min"``. A timeout records
@@ -268,16 +263,8 @@ window. A skipped result does not verify data. Unknown bounds remain blank.
 Alerts
 ------
 
-Data-diff reuses the tap's alert configuration, so whichever team owns the
-replication owns its checks and their alerts. There is nothing separate to
-configure:
-
-* ``alert_handlers.slack.channel`` in ``config.yml`` receives every alert.
-* A tap's ``slack_alert_channel`` also receives the alerts for that tap's checks.
-* ``send_alert: False`` on a tap silences its checks along with its runs.
-
-See :ref:`alerts` to configure the handlers. Alerts go to every configured handler,
-so the :ref:`victorops_alert_handler` limitations apply here too.
+Data-diff uses the tap's replication alert settings. No separate configuration
+is needed. See :ref:`alerts` for handlers, routing, suppression, and limitations.
 
 One alert per failed attempt
 ''''''''''''''''''''''''''''
@@ -345,9 +332,9 @@ attempt. To retry an earlier window or superseded definition, use its run ID:
       --run-id "2bd3e725-38fc-48c1-b565-b4f20e5bc7dd" \
       --remediation-ref "AP-1234"
 
-The original run remains immutable. The rerun gets the next attempt number,
-``trigger_type = REMEDIATION``, and a ``rerun_of_run_id`` link. When it passes,
-the effective attempt for that scheduled slot changes and the watermark advances.
+The original run stays in history. The rerun gets the next attempt number and
+links to that run. A pass replaces the slot's failed outcome. The watermark then
+advances through contiguous successful windows.
 
 The backend retains every run attempt and coverage transition. See
 :ref:`data_diff_backend` for the schema, persistence model, and reporting queries.
@@ -370,37 +357,38 @@ Source safety
 
 - All scheduling and window boundaries are UTC.
 - Source queries use read-only transactions with timeouts.
-- No source rows or business values are stored — only aggregate metrics.
-- ``row_checksum`` adds CPU to the same aggregate scan; monitor during rollout.
+- The backend stores aggregates, not full source rows. ``min_key`` and
+  ``max_key`` retain actual key values. Restrict access to these results.
+- ``row_checksum`` adds CPU work. Monitor source load during rollout.
 
 Preflight
 '''''''''
 
-Before either aggregate query runs, a preflight returns ``BLOCKED`` when the source
-table exceeds the safe row limit **and** has no usable index leading with the
-timestamp column, since every window would then scan the whole table. A missing index
-on a small table is reported but not blocked.
+Before reading data, preflight returns ``BLOCKED`` when both conditions apply:
 
-Usable means a plain, valid, ready btree index the optimizer is allowed to choose.
-Partial, expression-based, still-building, hash and BRIN indexes cannot serve a
-timestamp range, and a MySQL ``INVISIBLE`` or MariaDB ``IGNORED`` index is one the
-planner refuses outright. All are recorded as evidence but none satisfies the check;
-those leading with the timestamp column are named in the findings, so a disabled index
-is distinguishable from a missing one.
+- The source table has more than 100,000 estimated rows.
+- No accepted index starts with ``timestamp_column``.
 
-Table size comes from catalog statistics, counting each partition once. A table with
-no statistics is sized from its physical pages using a deliberately dense packing
-estimate, so an unanalyzed large table blocks rather than slipping through. Running
-``ANALYZE`` on the source replaces the estimate with a real count.
+Tables at or below that limit can run without the index. PipelineWise reports
+the missing index but does not create one.
+
+Accepted indexes must start with the timestamp column:
+
+- PostgreSQL: a plain, valid, ready B-tree index. Partial, expression, hash,
+  BRIN, and still-building indexes do not satisfy this preflight policy.
+- MySQL/MariaDB: a BTREE index with no prefix length on the timestamp column.
+  ``INVISIBLE`` and ``IGNORED`` indexes do not satisfy the policy.
+
+Row counts come from catalog estimates, counting partitions once. PostgreSQL
+falls back to physical size when usable row estimates are missing. Refresh stale
+statistics with ``ANALYZE`` on PostgreSQL or ``ANALYZE TABLE`` on MySQL/MariaDB.
+These refresh estimates, not exact counts.
 
 .. note::
 
-   The preflight establishes that the table *can* be read by timestamp, not that the
-   optimizer will choose to. A window wide enough to select most of the table is still
-   planned as a sequential scan — correctly, since that is the cheaper plan for it.
-   Keep windows narrow relative to table size, and treat ``statement_timeout`` as the
-   real bound on source cost.
+   Preflight checks metadata, not the query plan. A wide window may still use a
+   full scan. Keep rolling windows narrow and set ``statement_timeout`` to limit
+   each query's duration.
 
-Each verdict is written to ``dd_preflight_log`` with the table size, the row limit, and
-the index verdict it decided from, so a ``PASS`` stays auditable after the table or
-the limit changes.
+For a blocked check, ask the DBA to add or enable an accepted index. Inspect
+``dd_preflight_log`` for the verdict, row estimate, limit, and index findings.
