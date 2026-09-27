@@ -3,29 +3,25 @@
 
 **Data-diff**
 
-- Include failure reasons in Slack alerts, CLI results, and backend run history
-  without exposing aggregate values
-- Check shared history on the first data run by default, from the later
-  source/target minimum timestamp to the configured cutoff. Exclude older rows
-  and NULL timestamps; set ``initial_full_scan: false`` to use rolling windows
-- Retry failed and errored windows at the next cron interval, alongside new
-  windows. Keep the original definition and saved boundaries; retry at most once
-  per interval and process up to 24 failed windows per check per invocation
-- Reject result and preflight writes from expired workers, preserving recorded
-  outcomes and audit evidence
-- Keep other checks running if one check fails to save its result
-- Explain skipped checks with their recorded status and reason
-- Show verified starts and initial scans awaiting their first comparison in check
-  listings, and count those scans after importing configuration
+- Show failure reasons in Slack, CLI results, and run history. Keep aggregate
+  values out of alerts
+- Check shared history on the first data run by default. Use the later
+  source/target minimum timestamp and the configured cutoff. Exclude older rows
+  and NULL timestamps. Set `initial_full_scan: false` to use rolling windows
+- Retry `FAIL` and `ERROR` windows at the next cron interval. Keep their original
+  definitions and bounds. Limit retries to once per window per interval and
+  24 windows per check per invocation
+- Protect results and preflight evidence from expired workers. Continue other
+  checks if one result cannot be saved
+- Show pending initial scans, verified starts, and reasons for skipped checks
 
-Defer the initial scan when both sides have no settled data; report an error
-when only one side does. Failed history keeps coverage blocked until the failed
-window passes. Existing revisions with recorded runs keep rolling windows;
-never-run and new revisions use the historical default.
+Existing check revisions with runs keep rolling windows. New and never-run
+revisions use the historical default. See the [data-diff guide](docs/user_guide/data_diff.rst)
+for empty-table handling and retry rules.
 
-Run ``import_config`` to apply backend migration 003 before running checks.
-Keep a backend backup for rollback: unresolved or deferred history prevents
-downgrade to migration 002, even after the current check recovers.
+Back up the backend before upgrading. Run `import_config` to apply migration 003.
+Unresolved or deferred run history blocks downgrade to 002, even after later
+checks pass.
 
 **CI**
 

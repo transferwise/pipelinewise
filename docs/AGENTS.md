@@ -26,15 +26,16 @@ Singer replication.
 
 ## Content
 
-- Write concise, authoritative, operations-first public docs for operators and
-  integration engineers; exclude Wise-only hosts, credentials, and runbooks.
-- Prefer short sentences and bullets. Lead with the supported behavior, required
-  action, or outcome; include implementation detail only when operators need it
-  to understand compatibility, risk, failure, or recovery.
-- Order: support, prerequisites/defaults, operational impact, failures,
-  diagnosis, recovery.
-- Separate defaults from examples and current support from future intent;
-  repeat only for standalone use or safety.
+- Follow the root writing rules. Use familiar words, active verbs, and one idea
+  per sentence. Split long sentences instead of adding clauses or semicolons.
+- Answer what happens, when, and what the operator should do. Keep paragraphs
+  short. Use a brief example for tricky window or retry behaviour.
+- Explain each rule in one place and link to it from CLI/config references.
+  Repeat only for standalone use or safety. Keep implementation detail only
+  when it helps diagnosis, compatibility, or recovery.
+- Order: support, defaults, operational impact, failures, diagnosis, recovery.
+  Separate defaults from examples and supported behaviour from future plans.
+- Exclude Wise-only hosts, credentials, and internal runbooks.
 
 ## RST
 

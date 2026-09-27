@@ -49,9 +49,8 @@ Schema
    :caption: Data-diff backend schema after migration 003
    :zoom:
 
-The schema has two related paths. The first records definitions and execution
-evidence. The second selects one terminal attempt per scheduled slot, folds those
-slot outcomes into the current watermark, and records every watermark transition:
+The first path stores definitions and run results. The second uses each slot's
+latest outcome to update the watermark and its history:
 
 .. code-block:: text
 
@@ -65,33 +64,39 @@ slot outcomes into the current watermark, and records every watermark transition
                 └── dd_watermark_state
                         └── dd_watermark_events
 
-The second path describes processing rather than foreign-key ownership; the ERD
-above shows the exact database relationships.
+This shows the processing flow. The ERD shows the exact foreign keys.
 
-PipelineWise keeps every attempt in ``dd_run_attempts`` and every watermark
-transition in ``dd_watermark_events``. ``dd_run_slot_state`` materializes only
-the highest terminal attempt for each scheduled slot, while
-``dd_watermark_state`` stores the current verified interval and the furthest
-observed window end. A new chronological slot updates that state directly. A
-replacement or out-of-order slot recalculates it from the slot-state rows
-without rescanning superseded attempts.
+- ``dd_run_attempts`` keeps every attempt.
+- ``dd_run_slot_state`` keeps the highest attempt number with ``PASS``, ``FAIL``,
+  or ``ERROR`` status per scheduled slot.
+- ``dd_watermark_state`` holds the verified interval and furthest observed end.
+  New chronological slots update it directly. Retries and older slots recalculate
+  it from ``dd_run_slot_state``.
+- ``dd_watermark_events`` keeps every watermark change.
 
-Migration 003 allows an unknown historical ``window_start`` to be NULL. An
-unresolved historical error keeps the watermark ``BLOCKED``, with NULL
-``verified_start`` and ``verified_end`` and the failed run as ``blocking_run_id``.
-It remains visible in the failure reports below. A ``DEFERRED`` run records that
-neither side had settled history; it does not create or replace a slot or
-watermark entry. A deferred retry leaves the original failed slot blocked.
-Automatic retries use ``trigger_type = 'RETRY'``, retain the original
-``scheduled_for``, and increment ``attempt``. A successful retry updates the
-original slot and recalculates coverage while retaining previous attempts and
-results. ``rerun_of_run_id`` links manual remediation attempts.
+Automatic retries use ``trigger_type = 'RETRY'``. They keep ``scheduled_for`` and
+increment ``attempt``. A successful retry replaces the slot outcome and
+recalculates coverage. Earlier attempts and results remain in history.
+``rerun_of_run_id`` links manual remediation to its original run.
 
-Run ``import_config`` to apply migrations before using the new code. Older
-versions cannot handle unresolved bounds or ``DEFERRED`` runs. Downgrade to 002
-is refused while such history exists; resolving the current watermark does not
-remove its historical events. Preserve a backend backup before upgrading if
-rollback to the older version may be needed.
+
+Migration 003
+'''''''''''''
+
+Back up the backend before upgrading. Run ``import_config`` to apply migrations
+before running checks.
+
+Migration 003 supports historical scans whose start is not yet known:
+
+- ``window_start`` can be NULL until the historical start is found.
+- An error with an unknown start records ``BLOCKED`` coverage. Both verified
+  bounds are NULL, and ``blocking_run_id`` identifies the failure.
+- ``DEFERRED`` means neither side had history before the cutoff. It changes no
+  slot or watermark state. A deferred retry leaves its failed slot blocked.
+
+Older versions cannot read this history. Downgrade to 002 is blocked while NULL
+bounds or ``DEFERRED`` attempts remain. Later successful runs do not erase those
+records. Keep the pre-upgrade backup if you may need to roll back.
 
 
 Reporting queries
@@ -179,10 +184,9 @@ result rows are counted separately:
               check_date
      ORDER BY check_date DESC, full_check_name;
 
-Current unresolved failures. Only current check-definition revisions are shown;
-failures belonging to superseded revisions are intentionally excluded.
-``dd_run_attempts.error`` retains the combined failure reason; a result-specific
-error takes precedence when present:
+Current unresolved failures, excluding superseded definitions. The query prefers
+each result's error. Otherwise, it uses the combined reason in
+``dd_run_attempts.error``:
 
 .. code-block:: sql
 
