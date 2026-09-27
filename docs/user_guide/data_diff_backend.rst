@@ -180,7 +180,9 @@ result rows are counted separately:
      ORDER BY check_date DESC, full_check_name;
 
 Current unresolved failures. Only current check-definition revisions are shown;
-failures belonging to superseded revisions are intentionally excluded:
+failures belonging to superseded revisions are intentionally excluded.
+``dd_run_attempts.error`` retains the combined failure reason; a result-specific
+error takes precedence when present:
 
 .. code-block:: sql
 

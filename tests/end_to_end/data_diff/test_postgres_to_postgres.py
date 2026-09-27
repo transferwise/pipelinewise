@@ -324,6 +324,9 @@ class TestPostgresToPostgresDataDiff:
         ) = failed_run
         assert failed_status == 'FAIL'
         assert failed_trigger == 'MANUAL'
+        assert self.run_backend_query(
+            f"SELECT error FROM public.dd_run_attempts WHERE run_id = '{failed_run_id}'"
+        ) == [('row_checksum FAIL',)]
 
         failed_results = self.run_backend_query(
             f"""
@@ -734,6 +737,7 @@ class TestPostgresToPostgresDataDiff:
         with repository.cursor() as cursor:
             for table, column, value in (
                 ('dd_run_attempts', 'run_id', run_id),
+                ('dd_preflight_log', 'check_id', check_id),
                 ('dd_run_results', 'run_id', run_id),
                 ('dd_run_slot_state', 'check_id', check_id),
                 ('dd_watermark_state', 'check_id', check_id),
@@ -743,7 +747,7 @@ class TestPostgresToPostgresDataDiff:
                 evidence[table] = [dict(row) for row in cursor.fetchall()]
         return evidence
 
-    @pytest.mark.parametrize('late_action', ['PASS', 'DEFERRED', 'resolve_start'])
+    @pytest.mark.parametrize('late_action', ['PASS', 'DEFERRED', 'resolve_start', 'preflight'])
     def test_expired_worker_cannot_change_results_or_watermark(self, late_action):
         """A worker that lost its lease cannot change the sweep's terminal evidence."""
         self.e2e.setup_pipelinewise_backend()
@@ -762,6 +766,10 @@ class TestPostgresToPostgresDataDiff:
             with pytest.raises(RunLeaseLostError) as failure:
                 if late_action == 'resolve_start':
                     repository.set_run_window_start(run['run_id'], slot - timedelta(days=7))
+                elif late_action == 'preflight':
+                    repository.record_preflight(run['run_id'], check['check_id'], {
+                        'status': 'PASS', 'query_fingerprint': '0' * 64,
+                    })
                 else:
                     results = [{'check_type': 'row_count', 'status': 'PASS'}] if late_action == 'PASS' else []
                     repository.finish_run(run['run_id'], late_action, results)

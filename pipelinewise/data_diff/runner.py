@@ -124,7 +124,7 @@ def execute_started_run(
     def _record(preflight):
         # Called by run_check before either aggregate executes.
         recorded["preflight_id"] = backend.record_preflight(
-            check["check_id"], preflight
+            run["run_id"], check["check_id"], preflight
         )
 
     def _record_window_start(start):
@@ -196,7 +196,7 @@ def _execute_and_persist(
                 if result["status"] in FAILED_STATUSES
             ) or None
             backend.finish_run(
-                run["run_id"], status, results, preflight_id=preflight_id
+                run["run_id"], status, results, preflight_id=preflight_id, error=error
             )
         return {
             "check": check,
@@ -303,6 +303,7 @@ def _finish_failed_run(backend, check: dict, run: dict, preflight_id, error: str
     """
     if preflight_id is None:
         preflight_id = backend.record_preflight(
+            run["run_id"],
             check["check_id"],
             {
                 "status": "ERROR",

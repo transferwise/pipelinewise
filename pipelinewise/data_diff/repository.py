@@ -616,10 +616,26 @@ class DataDiffRepository:
         row = cursor.fetchone()
         return row['status'] if row else 'MISSING'
 
-    def record_preflight(self, check_id, preflight: dict):
-        """Persist one immutable source-plan preflight attempt."""
+    def record_preflight(self, run_id, check_id, preflight: dict):
+        """Persist preflight evidence only while its run owns a live lease."""
         preflight_id = uuid.uuid4()
         with self.cursor() as cursor:
+            cursor.execute(
+                f"""
+                SELECT check_id, status, preflight_id
+                  FROM {SCHEMA}.dd_run_attempts
+                 WHERE run_id = %s
+                 FOR UPDATE
+                """,
+                (run_id,),
+            )
+            attempt = cursor.fetchone()
+            if attempt is None or attempt['status'] != 'RUNNING':
+                raise RunLeaseLostError(run_id, attempt['status'] if attempt else 'MISSING')
+            if attempt['check_id'] != check_id:
+                raise ValueError('Preflight check does not match its run')
+            if attempt['preflight_id'] is not None:
+                return attempt['preflight_id']
             cursor.execute(
                 f"""
                 INSERT INTO {SCHEMA}.dd_preflight_log(
@@ -638,6 +654,10 @@ class DataDiffRepository:
                     preflight.get("row_limit"),
                     preflight.get("has_leading_index"),
                 ),
+            )
+            cursor.execute(
+                f"UPDATE {SCHEMA}.dd_run_attempts SET preflight_id = %s WHERE run_id = %s",
+                (preflight_id, run_id),
             )
         return preflight_id
 

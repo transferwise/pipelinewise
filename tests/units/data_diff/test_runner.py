@@ -4,7 +4,7 @@ import sys
 
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from uuid import uuid4
 
 import pytest
@@ -73,7 +73,7 @@ class FakeBackend:
     def list_retryable_runs(self, _check_id, _retry_before, *, limit):
         return []
 
-    def record_preflight(self, _check_id, preflight):
+    def record_preflight(self, _run_id, _check_id, preflight):
         self.preflights.append(preflight)
         return uuid4()
 
@@ -303,6 +303,7 @@ def test_run_summary_includes_result_errors_without_metric_values(mock_run):
     assert summary["error"] == f"row_count FAIL; {reason}"
     assert summary["results"] == results
     assert backend.finished[0][0][1:3] == ("ERROR", results)
+    assert backend.finished[0][1]["error"] == summary["error"]
 
 
 @patch("pipelinewise.data_diff.runner.run_check")
@@ -582,6 +583,34 @@ def test_lease_loss_discards_late_outcome_without_finishing_again(mock_run, outc
     assert calls == [summary['run_id']]
 
 
+@pytest.mark.parametrize('path', ['callback', 'placeholder'])
+@patch('pipelinewise.data_diff.runner.run_check')
+def test_lease_loss_rejects_preflight_before_finishing(mock_run, path):
+    backend = FakeBackend(_check())
+
+    def lost_lease(run_id, *_args):
+        raise RunLeaseLostError(run_id, 'ERROR')
+
+    backend.record_preflight = Mock(side_effect=lost_lease)
+    backend.finish_run = Mock()
+    if path == 'callback':
+        def execute(*_args, on_preflight, **_kwargs):
+            on_preflight(PASS_PREFLIGHT)
+        mock_run.side_effect = execute
+    else:
+        mock_run.side_effect = RuntimeError('Source unavailable before preflight')
+
+    summary, = run_due_checks(
+        backend, _connection_configs,
+        now=datetime(2026, 7, 22, 13, 1, tzinfo=timezone.utc),
+    )
+
+    assert summary['status'] == 'SKIPPED'
+    assert summary['slot_status'] == 'ERROR'
+    backend.record_preflight.assert_called_once()
+    backend.finish_run.assert_not_called()
+
+
 @pytest.mark.parametrize('interruption', [KeyboardInterrupt, SystemExit])
 @patch('pipelinewise.data_diff.runner.run_check')
 def test_lease_loss_does_not_swallow_interruption(mock_run, interruption):
@@ -668,7 +697,7 @@ from datetime import datetime, timezone
 RECORDED = {{}}
 
 class Backend:
-    def record_preflight(self, _check_id, _preflight):
+    def record_preflight(self, _run_id, _check_id, _preflight):
         return "preflight-id"
     def finish_run(self, run_id, status, _results, preflight_id=None, error=None):
         with open({outfile!r}, "w") as handle:

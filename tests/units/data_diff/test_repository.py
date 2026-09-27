@@ -727,6 +727,56 @@ def test_historical_start_rejects_a_lost_lease(status):
     assert error.value.status == status
 
 
+def test_preflight_is_linked_to_its_running_attempt_under_lock():
+    run_id, check_id = uuid4(), uuid4()
+    cursor = Mock()
+    cursor.fetchone.return_value = {
+        'check_id': check_id, 'status': 'RUNNING', 'preflight_id': None,
+    }
+    repository = _repository_with_cursor(cursor)
+
+    preflight_id = repository.record_preflight(
+        run_id, check_id, {'status': 'PASS', 'query_fingerprint': '0' * 64},
+    )
+
+    statements = [call.args for call in cursor.execute.call_args_list]
+    assert 'FOR UPDATE' in statements[0][0]
+    assert statements[0][1] == (run_id,)
+    assert 'INSERT INTO public.dd_preflight_log' in statements[1][0]
+    assert 'SET preflight_id = %s' in statements[2][0]
+    assert statements[2][1] == (preflight_id, run_id)
+
+
+@pytest.mark.parametrize('status', ['PASS', 'FAIL', 'ERROR', 'DEFERRED'])
+def test_preflight_rejects_a_lost_lease_without_writing(status):
+    run_id, check_id = uuid4(), uuid4()
+    cursor = Mock()
+    cursor.fetchone.return_value = {
+        'check_id': check_id, 'status': status, 'preflight_id': None,
+    }
+    repository = _repository_with_cursor(cursor)
+
+    with pytest.raises(RunLeaseLostError) as error:
+        repository.record_preflight(
+            run_id, check_id, {'status': 'PASS', 'query_fingerprint': '0' * 64},
+        )
+
+    assert error.value.status == status
+    assert len(cursor.execute.call_args_list) == 1
+
+
+def test_preflight_reuses_evidence_already_linked_to_its_run():
+    run_id, check_id, preflight_id = uuid4(), uuid4(), uuid4()
+    cursor = Mock()
+    cursor.fetchone.return_value = {
+        'check_id': check_id, 'status': 'RUNNING', 'preflight_id': preflight_id,
+    }
+    repository = _repository_with_cursor(cursor)
+
+    assert repository.record_preflight(run_id, check_id, {'status': 'ERROR'}) == preflight_id
+    assert len(cursor.execute.call_args_list) == 1
+
+
 @pytest.mark.parametrize('status', ['PASS', 'FAIL', 'ERROR', 'DEFERRED'])
 def test_finish_run_rejects_a_lost_lease_before_writing_results_or_coverage(status):
     cursor = Mock()

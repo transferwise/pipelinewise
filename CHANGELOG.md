@@ -1,18 +1,19 @@
-0.93.0 (2026-09-26)
+0.93.0 (2026-09-27)
 -------------------
 
 **Data-diff**
 
-- Include the failure reason in Slack alerts and CLI results, without exposing
-  aggregate values
+- Include failure reasons in Slack alerts, CLI results, and backend run history
+  without exposing aggregate values
 - Check shared history on the first data run by default, from the later
   source/target minimum timestamp to the configured cutoff. Exclude older rows
   and NULL timestamps; set ``initial_full_scan: false`` to use rolling windows
 - Retry failed and errored windows at the next cron interval, alongside new
   windows. Keep the original definition and saved boundaries; retry at most once
   per interval and process up to 24 failed windows per check per invocation
-- Preserve recorded outcomes when an expired worker finishes late, and keep
-  other checks running if one check fails to save its result
+- Reject result and preflight writes from expired workers, preserving recorded
+  outcomes and audit evidence
+- Keep other checks running if one check fails to save its result
 - Explain skipped checks with their recorded status and reason
 - Show verified starts and initial scans awaiting their first comparison in check
   listings, and count those scans after importing configuration
