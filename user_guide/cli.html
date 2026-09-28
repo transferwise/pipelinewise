@@ -165,7 +165,10 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="data_diff_backend.html">Data-diff backend database</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="data_diff_backend.html#configuration">Configuration</a></li>
-<li class="toctree-l2"><a class="reference internal" href="data_diff_backend.html#schema">Schema</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data_diff_backend.html#schema">Schema</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="data_diff_backend.html#migration-003">Migration 003</a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="data_diff_backend.html#reporting-queries">Reporting queries</a></li>
 </ul>
 </li>
@@ -175,14 +178,17 @@
 <li class="toctree-l2"><a class="reference internal" href="data_diff.html#check-configuration">Check configuration</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="data_diff.html#tap-yaml">Tap YAML</a></li>
 <li class="toctree-l3"><a class="reference internal" href="data_diff.html#choosing-a-frequency-and-window">Choosing a frequency and window</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_diff.html#initial-historical-scan">Initial historical scan</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="data_diff.html#cli-commands">CLI commands</a></li>
 <li class="toctree-l2"><a class="reference internal" href="data_diff.html#alerts">Alerts</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="data_diff.html#one-alert-per-failed-check-per-window">One alert per failed check per window</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_diff.html#one-alert-per-failed-attempt">One alert per failed attempt</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="data_diff.html#coverage-and-remediation">Coverage and remediation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="data_diff.html#retries-and-manual-reruns">Retries and manual reruns</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_diff.html#interrupted-runs">Interrupted runs</a></li>
 <li class="toctree-l3"><a class="reference internal" href="data_diff.html#source-safety">Source safety</a></li>
 <li class="toctree-l3"><a class="reference internal" href="data_diff.html#preflight">Preflight</a></li>
 </ul>
@@ -456,8 +462,8 @@ reconciliation failure; automation must retain that exit status and the run log.
 <td><p>Persists attempts and coverage.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">rerun_data_diff_check</span></code></p></td>
-<td><p>Re-run one failed immutable window.</p></td>
-<td><p>Persists a remediation attempt.</p></td>
+<td><p>Retry a failed window with its original settings and bounds.</p></td>
+<td><p>Saves a new attempt.</p></td>
 </tr>
 </tbody>
 </table>
@@ -507,14 +513,16 @@ connect to a source or target or verify live column types.</p>
 </tr>
 </tbody>
 </table>
-<p>The command validates, connects to sources, performs discovery, and writes
-generated files below <code class="docutils literal notranslate"><span class="pre">~/.pipelinewise</span></code>. Data-diff definitions are reconciled
-for each tap only after its connector generation and discovery succeed. A failed
-tap retains its existing definitions while successful taps are reconciled. An
-explicitly selected tap missing from the project YAML is treated as removed, so
-its definitions are deactivated. The command prints its summary and exits
-non-zero when a selected tap or backend reconciliation fails. <code class="docutils literal notranslate"><span class="pre">import</span></code> remains
-a deprecated alias.</p>
+<p>The command validates config, discovers source tables, and writes runtime files
+below <code class="docutils literal notranslate"><span class="pre">~/.pipelinewise</span></code>. It updates each tap’s data-diff definitions after
+connector generation and discovery succeed. Failed taps keep their definitions.
+An explicitly selected tap missing from YAML has its definitions deactivated.</p>
+<p>The summary counts pending initial scans for current checks on successfully
+imported taps. It includes <code class="docutils literal notranslate"><span class="pre">DEFERRED</span></code> scans. It excludes scans already
+started, retries, schema-only checks, and rolling-window checks.
+The count is unavailable if the backend update fails.</p>
+<p>A tap or backend failure appears in the summary and exits non-zero. <code class="docutils literal notranslate"><span class="pre">import</span></code>
+is a deprecated alias.</p>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
 <p>Removing or renaming a tap or target in project YAML makes
@@ -682,6 +690,13 @@ rollback behaviour.</p>
 </div>
 <p>Options include <code class="docutils literal notranslate"><span class="pre">--output-format</span> <span class="pre">table|json</span></code> and <code class="docutils literal notranslate"><span class="pre">--include-versioned</span></code>.
 <code class="docutils literal notranslate"><span class="pre">--tap</span></code> requires <code class="docutils literal notranslate"><span class="pre">--target</span></code>.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">Full</span> <span class="pre">scan</span></code> (JSON: <code class="docutils literal notranslate"><span class="pre">initial_full_scan</span></code>): the configured scan mode.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Initial</span> <span class="pre">scan</span> <span class="pre">pending</span></code> (<code class="docutils literal notranslate"><span class="pre">historical_scan_pending</span></code>): awaiting the first
+historical comparison. Includes <code class="docutils literal notranslate"><span class="pre">DEFERRED</span></code> scans, but excludes running or
+failed scans. A pending scan has no verified coverage.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Verified</span> <span class="pre">start</span></code> (<code class="docutils literal notranslate"><span class="pre">verified_start</span></code>): the start of verified coverage.</p></li>
+</ul>
 </section>
 <section id="run-data-diff-checks">
 <span id="cli-run-data-diff-checks"></span><h3><code class="docutils literal notranslate"><span class="pre">run_data_diff_checks</span></code><a class="headerlink" href="#run-data-diff-checks" title="Link to this heading"></a></h3>
@@ -689,8 +704,15 @@ rollback behaviour.</p>
 pipelinewise<span class="w"> </span>run_data_diff_checks<span class="w"> </span>--all
 </pre></div>
 </div>
-<p><code class="docutils literal notranslate"><span class="pre">--check</span></code> selects a check name, logical key, or version ID. <code class="docutils literal notranslate"><span class="pre">--force</span></code> creates
-another attempt for the current UTC slot when a terminal attempt already exists.</p>
+<p><code class="docutils literal notranslate"><span class="pre">--check</span></code> selects a check name, logical key, or version ID. <code class="docutils literal notranslate"><span class="pre">--force</span></code> reruns
+the current UTC slot after its previous attempt finishes. It cannot replace a
+running attempt.</p>
+<p><code class="docutils literal notranslate"><span class="pre">FAIL</span></code> and <code class="docutils literal notranslate"><span class="pre">ERROR</span></code> windows retry at the next cron interval. See
+<a class="reference internal" href="data_diff.html#data-diff-retries"><span class="std std-ref">Retries and manual reruns</span></a> for saved boundaries and retry limits.
+<code class="docutils literal notranslate"><span class="pre">DEFERRED</span></code> means neither side has history before the cutoff. See
+<a class="reference internal" href="data_diff.html#data-diff-initial-scan"><span class="std std-ref">Initial historical scan</span></a> for empty-table handling.</p>
+<p>Skipped checks show a reason and any known slot status and window. Unknown
+bounds are blank. Skipping a check does not verify data.</p>
 </section>
 <section id="rerun-data-diff-check">
 <span id="cli-rerun-data-diff-check"></span><h3><code class="docutils literal notranslate"><span class="pre">rerun_data_diff_check</span></code><a class="headerlink" href="#rerun-data-diff-check" title="Link to this heading"></a></h3>
@@ -699,8 +721,8 @@ another attempt for the current UTC slot when a terminal attempt already exists.
 <span class="w">  </span>--remediation-ref<span class="w"> </span>&lt;ticket_or_incident&gt;
 </pre></div>
 </div>
-<p>Both options are required. The original attempt remains immutable. See
-<a class="reference internal" href="data_diff.html#data-diff"><span class="std std-ref">Data-diff checks</span></a> for scheduling, coverage, and remediation semantics.</p>
+<p>Both options are required. The original attempt stays in history. See
+<a class="reference internal" href="data_diff.html#data-diff-retries"><span class="std std-ref">Retries and manual reruns</span></a> for retry timing and saved window boundaries.</p>
 </section>
 </section>
 <section id="secrets">

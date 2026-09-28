@@ -184,7 +184,7 @@ const runMermaid = async (rerun) => {
                                     // Apply zoom to the now-rendered diagram, matching
                                     // the decoration visible diagrams receive.
                                     if (true) {
-                                        addZoomToSvgs(d3.selectAll(".mermaid[data-zoom-id=id-c5bd5bc6-d529-4ea8-ad84-9803183f50ab]").select(function() {
+                                        addZoomToSvgs(d3.selectAll(".mermaid[data-zoom-id=id-f081246d-b2f3-448d-ab19-85210b769b1b]").select(function() {
                                             return this.querySelector("svg");
                                         }));
                                     }
@@ -210,7 +210,7 @@ const runMermaid = async (rerun) => {
     if (true) {
         const mermaids_to_add_zoom = 1 === -1 ? mermaids_active.length : 1;
         if(mermaids_to_add_zoom > 0) {
-            var svgs = d3.selectAll(".mermaid[data-zoom-id=id-c5bd5bc6-d529-4ea8-ad84-9803183f50ab]").select(function() {
+            var svgs = d3.selectAll(".mermaid[data-zoom-id=id-f081246d-b2f3-448d-ab19-85210b769b1b]").select(function() {
                 return this.querySelector("svg");
             });
             // Wait until every active (visible) diagram has rendered. Deferred
@@ -524,7 +524,10 @@ window.runMermaid = runMermaid;</script>
 </li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Data-diff backend database</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#configuration">Configuration</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#schema">Schema</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#schema">Schema</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#migration-003">Migration 003</a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="#reporting-queries">Reporting queries</a></li>
 </ul>
 </li>
@@ -534,14 +537,17 @@ window.runMermaid = runMermaid;</script>
 <li class="toctree-l2"><a class="reference internal" href="data_diff.html#check-configuration">Check configuration</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="data_diff.html#tap-yaml">Tap YAML</a></li>
 <li class="toctree-l3"><a class="reference internal" href="data_diff.html#choosing-a-frequency-and-window">Choosing a frequency and window</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_diff.html#initial-historical-scan">Initial historical scan</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="data_diff.html#cli-commands">CLI commands</a></li>
 <li class="toctree-l2"><a class="reference internal" href="data_diff.html#alerts">Alerts</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="data_diff.html#one-alert-per-failed-check-per-window">One alert per failed check per window</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_diff.html#one-alert-per-failed-attempt">One alert per failed attempt</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="data_diff.html#coverage-and-remediation">Coverage and remediation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="data_diff.html#retries-and-manual-reruns">Retries and manual reruns</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_diff.html#interrupted-runs">Interrupted runs</a></li>
 <li class="toctree-l3"><a class="reference internal" href="data_diff.html#source-safety">Source safety</a></li>
 <li class="toctree-l3"><a class="reference internal" href="data_diff.html#preflight">Preflight</a></li>
 </ul>
@@ -736,9 +742,8 @@ window.runMermaid = runMermaid;</script>
              
   <section id="data-diff-backend-database">
 <span id="data-diff-backend"></span><h1>Data-diff backend database<a class="headerlink" href="#data-diff-backend-database" title="Link to this heading"></a></h1>
-<p>Data-diff uses a PostgreSQL control-plane database to store check definitions,
-execution history, results, and coverage. It is independent of source and target
-connections and must not also serve as a replication target.</p>
+<p>Data-diff stores check definitions, run history, results, and coverage in
+PostgreSQL. Use a separate database from any replication target.</p>
 <p>See <a class="reference internal" href="data_diff.html#data-diff"><span class="std std-ref">Data-diff checks</span></a> to define, schedule, and remediate data-diff checks.</p>
 <section id="configuration">
 <h2>Configuration<a class="headerlink" href="#configuration" title="Link to this heading"></a></h2>
@@ -754,21 +759,21 @@ connections and must not also serve as a replication target.</p>
 <span class="w">  </span><span class="nt">ddl_password</span><span class="p">:</span><span class="w"> </span><span class="s">"&lt;vault</span><span class="nv"> </span><span class="s">encrypted&gt;"</span>
 </pre></div>
 </div>
-<p>When PostgreSQL is also the replication target, give the backend its own service
-or database.</p>
+<p>The backend can share a PostgreSQL server with a target, but not its database.
+Use a separate service and storage for stronger isolation. Keep backend roles
+and credentials separate from replication roles.</p>
 <p><code class="docutils literal notranslate"><span class="pre">backend_db</span></code> enables data-diff. Without it, <code class="docutils literal notranslate"><span class="pre">import_config</span></code> warns and ignores
-every <code class="docutils literal notranslate"><span class="pre">data_diff</span></code> block. Replication never reads the backend, so an outage pauses
-reconciliation only. However, <code class="docutils literal notranslate"><span class="pre">import_config</span></code> fails when it cannot persist check
-definitions.</p>
-<p><code class="docutils literal notranslate"><span class="pre">ddl_user</span></code> runs Alembic migrations and owns the schema. The application <code class="docutils literal notranslate"><span class="pre">user</span></code>
-can therefore hold DML grants only. The migration grants <code class="docutils literal notranslate"><span class="pre">user</span></code> what it needs, so
-that role requires nothing beyond <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code>. Set <code class="docutils literal notranslate"><span class="pre">ddl_user</span></code> to the application
-credentials when separate roles are not required.</p>
+every <code class="docutils literal notranslate"><span class="pre">data_diff</span></code> block. A backend outage stops checks, not replication.
+<code class="docutils literal notranslate"><span class="pre">import_config</span></code> fails if it cannot save check definitions.</p>
+<p><code class="docutils literal notranslate"><span class="pre">ddl_user</span></code> runs migrations and owns the schema. Grant the application <code class="docutils literal notranslate"><span class="pre">user</span></code>
+<code class="docutils literal notranslate"><span class="pre">CONNECT</span></code> to the database. Migrations grant its table and sequence access.
+They do not grant <code class="docutils literal notranslate"><span class="pre">DELETE</span></code> or schema-changing privileges to a separate role.
+To share one role, set both credential pairs to that role.</p>
 </section>
 <section id="schema">
 <h2>Schema<a class="headerlink" href="#schema" title="Link to this heading"></a></h2>
 <figure class="align-center" id="id1">
-<pre data-zoom-id="id-c5bd5bc6-d529-4ea8-ad84-9803183f50ab" class="mermaid">
+<pre data-zoom-id="id-f081246d-b2f3-448d-ab19-85210b769b1b" class="mermaid">
         %%{init: {&quot;er&quot;: {&quot;diagramPadding&quot;: 8, &quot;entityPadding&quot;: 8}}}%%
 erDiagram
     direction LR
@@ -834,11 +839,11 @@ erDiagram
         UUID run_id PK
         UUID check_id FK
         TIMESTAMPTZ scheduled_for &quot;UQ with check_id and attempt&quot;
-        TIMESTAMPTZ window_start &quot;before window_end&quot;
+        TIMESTAMPTZ window_start &quot;nullable for unresolved RUNNING, ERROR, DEFERRED; before window_end&quot;
         TIMESTAMPTZ window_end
         INTEGER attempt &quot;UQ with check_id and scheduled_for&quot;
         TEXT trigger_type &quot;SCHEDULED, MANUAL, RETRY, or REMEDIATION&quot;
-        TEXT status &quot;RUNNING, PASS, FAIL, or ERROR&quot;
+        TEXT status &quot;RUNNING, PASS, FAIL, ERROR, or DEFERRED&quot;
         UUID rerun_of_run_id FK &quot;nullable self-reference&quot;
         TEXT remediation_reference &quot;nullable&quot;
         UUID preflight_id FK &quot;nullable&quot;
@@ -863,18 +868,18 @@ erDiagram
         TIMESTAMPTZ scheduled_for PK
         UUID run_id FK, UK
         INTEGER attempt &quot;greater than 0&quot;
-        TIMESTAMPTZ window_start &quot;before window_end&quot;
+        TIMESTAMPTZ window_start &quot;nullable for unresolved ERROR; before window_end&quot;
         TIMESTAMPTZ window_end
         TEXT status &quot;PASS, FAIL, or ERROR&quot;
     }
 
     dd_watermark_state[&quot;dd_watermark_state&lt;br/&gt;Mutable current verified interval and furthest&lt;br/&gt;observed window for each check definition&quot;] {
         UUID check_id PK, FK
-        TIMESTAMPTZ verified_start &quot;at most verified_end&quot;
-        TIMESTAMPTZ verified_end &quot;at most furthest_observed_end&quot;
+        TIMESTAMPTZ verified_start &quot;paired nullable while BLOCKED with blocking_run_id; at most verified_end&quot;
+        TIMESTAMPTZ verified_end &quot;paired nullable; at most furthest_observed_end&quot;
         TIMESTAMPTZ furthest_observed_end
         TEXT verified_status &quot;CONTIGUOUS or BLOCKED&quot;
-        UUID blocking_run_id FK &quot;nullable&quot;
+        UUID blocking_run_id FK &quot;required for unresolved bounds; otherwise nullable&quot;
         UUID last_evaluated_run_id FK
         TEXT event_type &quot;INITIALIZE, ADVANCE, INVALIDATE, BLOCK, or CONFIRM&quot;
         BIGINT state_version &quot;greater than 0&quot;
@@ -888,23 +893,22 @@ erDiagram
         UUID check_id FK
         UUID evaluated_run_id FK, UK
         TEXT event_type &quot;INITIALIZE, ADVANCE, INVALIDATE, BLOCK, or CONFIRM&quot;
-        TIMESTAMPTZ verified_start &quot;at most verified_end&quot;
+        TIMESTAMPTZ verified_start &quot;paired nullable while BLOCKED with blocking_run_id; at most verified_end&quot;
         TIMESTAMPTZ previous_verified_end &quot;nullable&quot;
-        TIMESTAMPTZ verified_end &quot;at most furthest_observed_end&quot;
+        TIMESTAMPTZ verified_end &quot;paired nullable; at most furthest_observed_end&quot;
         TIMESTAMPTZ furthest_observed_end
         TEXT verified_status &quot;CONTIGUOUS or BLOCKED&quot;
-        UUID blocking_run_id FK &quot;nullable&quot;
+        UUID blocking_run_id FK &quot;required for unresolved bounds; otherwise nullable&quot;
         TIMESTAMPTZ recorded_at
         TEXT reason
     }
 
     </pre><figcaption>
-<p><span class="caption-text">Data-diff backend schema after migration 002</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
+<p><span class="caption-text">Data-diff backend schema after migration 003</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
 </figcaption>
 </figure>
-<p>The schema has two related paths. The first records definitions and execution
-evidence. The second selects one terminal attempt per scheduled slot, folds those
-slot outcomes into the current watermark, and records every watermark transition:</p>
+<p>The first path stores definitions and run results. The second uses each slot’s
+latest outcome to update the watermark and its history:</p>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>dd_check_definitions
     ├── dd_preflight_log
     └── dd_run_attempts
@@ -916,15 +920,37 @@ dd_run_attempts
                     └── dd_watermark_events
 </pre></div>
 </div>
-<p>The second path describes processing rather than foreign-key ownership; the ERD
-above shows the exact database relationships.</p>
-<p>PipelineWise keeps every attempt in <code class="docutils literal notranslate"><span class="pre">dd_run_attempts</span></code> and every watermark
-transition in <code class="docutils literal notranslate"><span class="pre">dd_watermark_events</span></code>. <code class="docutils literal notranslate"><span class="pre">dd_run_slot_state</span></code> materializes only
-the highest terminal attempt for each scheduled slot, while
-<code class="docutils literal notranslate"><span class="pre">dd_watermark_state</span></code> stores the current verified interval and the furthest
-observed window end. A new chronological slot updates that state directly. A
-replacement or out-of-order slot recalculates it from the slot-state rows
-without rescanning superseded attempts.</p>
+<p>This shows the processing flow. The ERD shows the exact foreign keys.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">dd_run_attempts</span></code> keeps every attempt.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dd_run_slot_state</span></code> keeps the highest attempt number with <code class="docutils literal notranslate"><span class="pre">PASS</span></code>, <code class="docutils literal notranslate"><span class="pre">FAIL</span></code>,
+or <code class="docutils literal notranslate"><span class="pre">ERROR</span></code> status per scheduled slot.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dd_watermark_state</span></code> holds the verified interval and furthest observed end.
+New chronological slots update it directly. Retries and older slots recalculate
+it from <code class="docutils literal notranslate"><span class="pre">dd_run_slot_state</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dd_watermark_events</span></code> keeps every watermark change.</p></li>
+</ul>
+<p>Automatic retries use <code class="docutils literal notranslate"><span class="pre">trigger_type</span> <span class="pre">=</span> <span class="pre">'RETRY'</span></code>. They keep <code class="docutils literal notranslate"><span class="pre">scheduled_for</span></code> and
+increment <code class="docutils literal notranslate"><span class="pre">attempt</span></code>. A successful retry replaces the slot outcome and
+recalculates coverage. Earlier attempts and results remain in history.
+Manual reruns use <code class="docutils literal notranslate"><span class="pre">trigger_type</span> <span class="pre">=</span> <span class="pre">'REMEDIATION'</span></code>. <code class="docutils literal notranslate"><span class="pre">rerun_of_run_id</span></code> links them
+to the original run.</p>
+<section id="migration-003">
+<h3>Migration 003<a class="headerlink" href="#migration-003" title="Link to this heading"></a></h3>
+<p>Back up the backend before upgrading. Run <code class="docutils literal notranslate"><span class="pre">import_config</span></code> to apply migrations
+before running checks.</p>
+<p>Migration 003 supports historical scans whose start is not yet known:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">window_start</span></code> can be NULL until the historical start is found.</p></li>
+<li><p>An error with an unknown start records <code class="docutils literal notranslate"><span class="pre">BLOCKED</span></code> coverage. Both verified
+bounds are NULL, and <code class="docutils literal notranslate"><span class="pre">blocking_run_id</span></code> identifies the failure.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">DEFERRED</span></code> means neither side had history before the cutoff. It changes no
+slot or watermark state. A deferred retry leaves its failed slot blocked.</p></li>
+</ul>
+<p>Older versions cannot read this history. Downgrade to 002 is blocked while NULL
+bounds or <code class="docutils literal notranslate"><span class="pre">DEFERRED</span></code> attempts remain. Later successful runs do not erase those
+records. Keep the pre-upgrade backup if you may need to roll back.</p>
+</section>
 </section>
 <section id="reporting-queries">
 <h2>Reporting queries<a class="headerlink" href="#reporting-queries" title="Link to this heading"></a></h2>
@@ -955,10 +981,9 @@ without rescanning superseded attempts.</p>
 <span class="w">          </span><span class="n">d</span><span class="p">.</span><span class="n">source_schema</span><span class="p">,</span><span class="w"> </span><span class="n">d</span><span class="p">.</span><span class="n">source_table</span><span class="p">;</span>
 </pre></div>
 </div>
-<p>Successful and failed check results per table per UTC day. Historical definition
-revisions and every attempt, including retries and remediation runs, are included.
-The result counts are per <code class="docutils literal notranslate"><span class="pre">check_type</span></code>; terminal run-level errors without
-result rows are counted separately:</p>
+<p>Successful and failed check results per table per UTC day. Includes earlier
+definition revisions, retries, and manual reruns. Counts each <code class="docutils literal notranslate"><span class="pre">check_type</span></code>
+result separately. Run-level errors without result rows have their own count:</p>
 <div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">WITH</span><span class="w"> </span><span class="n">outcomes</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="p">(</span>
 <span class="w">    </span><span class="k">SELECT</span><span class="w"> </span><span class="n">d</span><span class="p">.</span><span class="n">full_check_name</span><span class="p">,</span>
 <span class="w">           </span><span class="n">d</span><span class="p">.</span><span class="n">source_database</span><span class="p">,</span>
@@ -1005,8 +1030,9 @@ result rows are counted separately:</p>
 <span class="w"> </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">check_date</span><span class="w"> </span><span class="k">DESC</span><span class="p">,</span><span class="w"> </span><span class="n">full_check_name</span><span class="p">;</span>
 </pre></div>
 </div>
-<p>Current unresolved failures. Only current check-definition revisions are shown;
-failures belonging to superseded revisions are intentionally excluded:</p>
+<p>Unresolved failures for current definitions only. The query uses each result’s
+error when available. Otherwise, it uses the combined reason in
+<code class="docutils literal notranslate"><span class="pre">dd_run_attempts.error</span></code>:</p>
 <div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">SELECT</span><span class="w"> </span><span class="n">d</span><span class="p">.</span><span class="n">full_check_name</span><span class="p">,</span>
 <span class="w">       </span><span class="n">d</span><span class="p">.</span><span class="n">revision</span><span class="p">,</span>
 <span class="w">       </span><span class="n">d</span><span class="p">.</span><span class="n">source_schema</span><span class="p">,</span>

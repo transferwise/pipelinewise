@@ -165,7 +165,10 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="data_diff_backend.html">Data-diff backend database</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="data_diff_backend.html#configuration">Configuration</a></li>
-<li class="toctree-l2"><a class="reference internal" href="data_diff_backend.html#schema">Schema</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data_diff_backend.html#schema">Schema</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="data_diff_backend.html#migration-003">Migration 003</a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="data_diff_backend.html#reporting-queries">Reporting queries</a></li>
 </ul>
 </li>
@@ -175,14 +178,17 @@
 <li class="toctree-l2"><a class="reference internal" href="#check-configuration">Check configuration</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#tap-yaml">Tap YAML</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#choosing-a-frequency-and-window">Choosing a frequency and window</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#initial-historical-scan">Initial historical scan</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#cli-commands">CLI commands</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#alerts">Alerts</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#one-alert-per-failed-check-per-window">One alert per failed check per window</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#one-alert-per-failed-attempt">One alert per failed attempt</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#coverage-and-remediation">Coverage and remediation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#retries-and-manual-reruns">Retries and manual reruns</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#interrupted-runs">Interrupted runs</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#source-safety">Source safety</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#preflight">Preflight</a></li>
 </ul>
@@ -377,9 +383,9 @@
              
   <section id="data-diff-checks">
 <span id="data-diff"></span><h1>Data-diff checks<a class="headerlink" href="#data-diff-checks" title="Link to this heading"></a></h1>
-<p>Data-diff performs bounded aggregate reconciliation between source tables and
-their PostgreSQL or Snowflake replicas. Checks are defined in the tap YAML and
-persisted as immutable versioned definitions in the backend database.</p>
+<p>Data-diff compares source tables with their PostgreSQL or Snowflake replicas.
+Define checks in the tap YAML. The backend stores each definition revision and
+its results.</p>
 <section id="supported-routes">
 <h2>Supported routes<a class="headerlink" href="#supported-routes" title="Link to this heading"></a></h2>
 <table class="docutils align-default">
@@ -407,6 +413,8 @@ persisted as immutable versioned definitions in the backend database.</p>
 </tr>
 </tbody>
 </table>
+<p>Snowflake supports native and PipelineWise-managed Iceberg v3 tables for all
+checks, including the initial historical scan.</p>
 </section>
 <section id="check-types">
 <h2>Check types<a class="headerlink" href="#check-types" title="Link to this heading"></a></h2>
@@ -428,7 +436,7 @@ persisted as immutable versioned definitions in the backend database.</p>
 <tbody>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">schema_compatibility</span></code></p></td>
 <td><p>Selected columns exist with compatible types on both sides</p></td>
-<td><p>All columns resolve</p></td>
+<td><p>All selected columns exist and have compatible types</p></td>
 <td><p>Metadata only</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">row_count</span></code></p></td>
@@ -484,16 +492,15 @@ persisted as immutable versioned definitions in the backend database.</p>
 <div class="admonition attention">
 <p class="admonition-title">Attention</p>
 <ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">row_checksum</span></code> is <strong>probabilistic</strong> — a mismatch identifies a window to investigate,
-but does not expose which individual rows differ</p></li>
-<li><p><strong>JSON</strong> and <strong>VARIANT</strong> columns have non-deterministic key ordering across
-databases, making consistent hashing impossible</p></li>
-<li><p><strong>FLOAT</strong> columns can differ due to IEEE 754 precision between database
-engines (e.g., <code class="docutils literal notranslate"><span class="pre">0.1</span> <span class="pre">+</span> <span class="pre">0.2</span></code> producing different representations)</p></li>
-<li><p>Exact numeric columns are compared at the <strong>wider</strong> of the source and target
-scales, so a target that truncated precision fails rather than passing</p></li>
-<li><p>Incompatible column types are recorded as <code class="docutils literal notranslate"><span class="pre">ERROR</span></code> (not <code class="docutils literal notranslate"><span class="pre">FAIL</span></code>);
-other check types in the same run still execute normally</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">row_checksum</span></code> is probabilistic. A mismatch identifies a window, not the
+individual rows that differ.</p></li>
+<li><p>JSON/VARIANT and floating-point checksum columns are unsupported. They
+produce <code class="docutils literal notranslate"><span class="pre">ERROR</span></code>, not <code class="docutils literal notranslate"><span class="pre">FAIL</span></code>. Cross-database ordering and numeric
+representations can differ.</p></li>
+<li><p>Exact numeric checksums use the wider source/target scale to detect lost
+precision. Both columns need known scales.</p></li>
+<li><p>Missing or incompatible checksum columns also produce <code class="docutils literal notranslate"><span class="pre">ERROR</span></code>. Other
+check types in the run still execute.</p></li>
 </ul>
 </div>
 </section>
@@ -535,53 +542,74 @@ before importing check definitions.</p>
 <p>Every table must resolve <code class="docutils literal notranslate"><span class="pre">key_column</span></code>, <code class="docutils literal notranslate"><span class="pre">timestamp_column</span></code>, <code class="docutils literal notranslate"><span class="pre">checks</span></code>,
 <code class="docutils literal notranslate"><span class="pre">frequency</span></code>, and <code class="docutils literal notranslate"><span class="pre">window_start</span></code>. These can be set directly on the table or
 inherited from <code class="docutils literal notranslate"><span class="pre">data_diff_defaults</span></code> — the table value wins when both exist.</p>
-<p><strong>Field reference:</strong></p>
+<p>Field reference:</p>
 <ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">schema_version</span></code> — Optional compatibility marker; the only accepted value is
-<code class="docutils literal notranslate"><span class="pre">1</span></code>. The current normalizer does not change behaviour based on this field.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">frequency</span></code> — Crontab expression of when to fire the check</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">window_start</span></code> — Negative offset from fire time for the window start</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">window_end</span></code> — Negative offset for the window end. Must be closer to fire time
-than <code class="docutils literal notranslate"><span class="pre">window_start</span></code>. Default <code class="docutils literal notranslate"><span class="pre">&quot;0s&quot;</span></code> (fire time)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">schema_version</span></code> — Optional. Only <code class="docutils literal notranslate"><span class="pre">1</span></code> is accepted</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">frequency</span></code> — Cron schedule in UTC</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">window_start</span></code> — Negative offset from the scheduled time</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">window_end</span></code> — Window end offset. Must be later than <code class="docutils literal notranslate"><span class="pre">window_start</span></code> and
+no later than the scheduled time. Default <code class="docutils literal notranslate"><span class="pre">&quot;0s&quot;</span></code> (the scheduled time)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">initial_full_scan</span></code> — Check shared history on the first data run when
+<code class="docutils literal notranslate"><span class="pre">true</span></code>. Default <code class="docutils literal notranslate"><span class="pre">false</span></code> uses the configured rolling window</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">statement_timeout</span></code> — Per-query timeout. Default <code class="docutils literal notranslate"><span class="pre">&quot;5min&quot;</span></code></p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">key_column</span></code> — Scalar key for integrity and range checks</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">timestamp_column</span></code> — Column that defines the comparison window boundaries</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">compare_columns</span></code> — Required when <code class="docutils literal notranslate"><span class="pre">row_checksum</span></code> is selected. Must not have
 PipelineWise transformations</p></li>
 </ul>
-<p>Durations compose the units <code class="docutils literal notranslate"><span class="pre">s</span></code>, <code class="docutils literal notranslate"><span class="pre">min</span></code>, <code class="docutils literal notranslate"><span class="pre">h</span></code>, <code class="docutils literal notranslate"><span class="pre">d</span></code>, <code class="docutils literal notranslate"><span class="pre">w</span></code>: <code class="docutils literal notranslate"><span class="pre">&quot;-15h&quot;</span></code> is 15
-hours before fire time, and <code class="docutils literal notranslate"><span class="pre">&quot;1d6h&quot;</span></code> is valid too.</p>
-<p>For <code class="docutils literal notranslate"><span class="pre">tap-mysql</span></code> sources, data-diff uses <code class="docutils literal notranslate"><span class="pre">db_conn.engine</span></code> when it is set. If
-it is omitted, data-diff infers MariaDB or MySQL from the connected server’s
-handshake. Singer, FullSync, and PartialSync use the same fallback for all
-source-specific behaviour, including session defaults, GTID handling, and
-managed Iceberg v3 JSON aliases. Set <code class="docutils literal notranslate"><span class="pre">engine</span></code> explicitly for proxies that hide
-the server identity.</p>
+<p>Durations use <code class="docutils literal notranslate"><span class="pre">s</span></code>, <code class="docutils literal notranslate"><span class="pre">min</span></code>, <code class="docutils literal notranslate"><span class="pre">h</span></code>, <code class="docutils literal notranslate"><span class="pre">d</span></code>, and <code class="docutils literal notranslate"><span class="pre">w</span></code>. Units can be combined.
+For example, <code class="docutils literal notranslate"><span class="pre">&quot;-1d6h&quot;</span></code> means 30 hours before the scheduled time.</p>
+<p>For MySQL/MariaDB sources, <code class="docutils literal notranslate"><span class="pre">db_conn.engine</span></code> overrides server detection. Set it
+explicitly if a proxy hides the server identity. See <a class="reference internal" href="../connectors/taps/mysql.html#tap-mysql"><span class="std std-ref">MariaDB and MySQL source</span></a> for
+connection settings.</p>
 </section>
 <section id="choosing-a-frequency-and-window">
 <h3>Choosing a frequency and window<a class="headerlink" href="#choosing-a-frequency-and-window" title="Link to this heading"></a></h3>
-<p>Check infrequently, over a window that has already settled — the values above are
-the recommended starting point. Every check is an aggregate scan of both the
-source and the target, so frequency is a direct cost to the source database.
-<code class="docutils literal notranslate"><span class="pre">window_end</span></code> sets how long replication has to settle: too close to fire time and
-uncleared lag is reported as drift, producing a <code class="docutils literal notranslate"><span class="pre">FAIL</span></code> that resolves itself on
-the next run and trains people to ignore alerts. Raise it for taps that routinely
-lag further behind.</p>
+<p>Use the example settings as a starting point. Each data check scans both tables,
+so frequent checks add source load.</p>
+<p>Leave enough time for replication to catch up before <code class="docutils literal notranslate"><span class="pre">window_end</span></code>. For example,
+<code class="docutils literal notranslate"><span class="pre">&quot;-3h&quot;</span></code> excludes the latest three hours. Use an earlier cutoff for slower taps.
+Otherwise, replication lag can cause a <code class="docutils literal notranslate"><span class="pre">FAIL</span></code>.</p>
 <div class="admonition important">
 <p class="admonition-title">Important</p>
-<p><strong>The window must be at least as wide as the cadence.</strong> Windows are positioned
-relative to fire time, so a narrower window leaves time no check ever examines,
-and those gaps block coverage permanently.</p>
-<p>Firing every 6 hours over a 3-hour window checks <code class="docutils literal notranslate"><span class="pre">[09:00,</span> <span class="pre">12:00)</span></code> then
-<code class="docutils literal notranslate"><span class="pre">[15:00,</span> <span class="pre">18:00)</span></code>: the 3 hours between are never verified, and coverage reports
-<code class="docutils literal notranslate"><span class="pre">BLOCKED</span></code> even though every check passed. The defaults are 12 hours wide on a
-6-hour cadence, so windows overlap and a skipped slot cannot open a gap — each row
-is checked twice, which is the cheaper mistake.</p>
+<p><strong>The window must cover at least the time between checks.</strong> A three-hour window
+checked every six hours leaves three hours unverified. Coverage stays
+<code class="docutils literal notranslate"><span class="pre">BLOCKED</span></code> at that gap even if every check passes.</p>
+<p>The tap defaults above check a 12-hour window every six hours. This overlap
+covers one missed slot. The table override runs every 12 hours, with no overlap.</p>
 </div>
-<p>Give <code class="docutils literal notranslate"><span class="pre">statement_timeout</span></code> room to match the window. The examples use <code class="docutils literal notranslate"><span class="pre">&quot;20min&quot;</span></code>
-rather than the <code class="docutils literal notranslate"><span class="pre">&quot;5min&quot;</span></code> default: a timeout is recorded as <code class="docutils literal notranslate"><span class="pre">ERROR</span></code>, which
-blocks coverage exactly as a real mismatch does. Raise it further for tables where
-<code class="docutils literal notranslate"><span class="pre">row_checksum</span></code> is selected.</p>
+<p>Allow enough <code class="docutils literal notranslate"><span class="pre">statement_timeout</span></code> for the scan, especially with <code class="docutils literal notranslate"><span class="pre">row_checksum</span></code>.
+The example uses <code class="docutils literal notranslate"><span class="pre">&quot;20min&quot;</span></code>. The default is <code class="docutils literal notranslate"><span class="pre">&quot;5min&quot;</span></code>. A timeout records
+<code class="docutils literal notranslate"><span class="pre">ERROR</span></code> and blocks coverage.</p>
+</section>
+<section id="initial-historical-scan">
+<span id="data-diff-initial-scan"></span><h3>Initial historical scan<a class="headerlink" href="#initial-historical-scan" title="Link to this heading"></a></h3>
+<p>Set <code class="docutils literal notranslate"><span class="pre">initial_full_scan:</span> <span class="pre">true</span></code> on the table or in <code class="docutils literal notranslate"><span class="pre">data_diff_defaults</span></code> to
+check shared history on the first data run. PipelineWise reads
+<code class="docutils literal notranslate"><span class="pre">MIN(timestamp_column)</span></code> on both sides, using only timestamps before the
+<code class="docutils literal notranslate"><span class="pre">window_end</span></code> cutoff. The comparison includes the later minimum and excludes
+the cutoff.</p>
+<p>For example, if source history starts on January 1 and target history starts on
+January 5, comparison starts on January 5. Older rows are excluded.
+Historical and rolling data checks exclude NULL timestamps.</p>
+<ul class="simple">
+<li><p>Neither side has timestamps before the cutoff: record <code class="docutils literal notranslate"><span class="pre">DEFERRED</span></code> with no
+verified coverage. Try again at the next cron slot with its new cutoff.</p></li>
+<li><p>Only one side has timestamps before the cutoff: record <code class="docutils literal notranslate"><span class="pre">ERROR</span></code> and name the
+missing side.</p></li>
+<li><p>Schema or comparison errors still produce <code class="docutils literal notranslate"><span class="pre">ERROR</span></code>, even if both sides are
+empty.</p></li>
+</ul>
+<p>Later scheduled windows use the configured rolling range. Without the setting,
+the first run uses that range too. Schema-only checks do not scan history.</p>
+<p>An initial scan may read most of the table, even with an index. Schedule it
+off-peak and allow enough <code class="docutils literal notranslate"><span class="pre">statement_timeout</span></code>.</p>
+<p>Changing the timeout, schedule, or window creates a new definition revision.
+With <code class="docutils literal notranslate"><span class="pre">initial_full_scan:</span> <span class="pre">true</span></code>, it starts another historical scan. Earlier runs
+keep their settings, including the retry timeout. Use <code class="docutils literal notranslate"><span class="pre">--include-versioned</span></code> to
+list earlier definitions. Backend reports retain their runs and coverage.</p>
+<p>Checks without the setting keep their existing configuration hash and rolling
+windows. New and never-run revisions scan history only when explicitly enabled.</p>
 </section>
 </section>
 <section id="cli-commands">
@@ -604,111 +632,127 @@ pipelinewise<span class="w"> </span>run_data_diff_checks<span class="w"> </span>
 pipelinewise<span class="w"> </span>rerun_data_diff_check<span class="w"> </span>--run-id<span class="w"> </span>&lt;uuid&gt;<span class="w"> </span>--remediation-ref<span class="w"> </span>&lt;ticket&gt;
 </pre></div>
 </div>
-<p><code class="docutils literal notranslate"><span class="pre">import_config</span></code> creates a new definition revision when config changes and
-deactivates removed ones; unchanged definitions are skipped. <code class="docutils literal notranslate"><span class="pre">--force</span></code> creates
-another attempt for the current slot, while <code class="docutils literal notranslate"><span class="pre">rerun_data_diff_check</span></code> repairs a
-historical one — see <a class="reference internal" href="#coverage-and-remediation">Coverage and remediation</a>.</p>
-<p>Definitions are reconciled independently for taps whose discovery succeeds. If
-another selected tap fails discovery, successful taps are still reconciled and
-the failed tap’s existing definitions remain unchanged. Definitions for an
-explicitly selected tap absent from the project YAML are deactivated. Discovery
-and backend reconciliation failures retain the import summary and a non-zero
-exit so automation can report them.</p>
-<p>A mismatch exits non-zero and sends an alert. See <a class="reference internal" href="#data-diff-alerts"><span class="std std-ref">Alerts</span></a>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">import_config</span></code> versions changed definitions and deactivates removed ones.
+It keeps unchanged definitions and reports pending initial scans. See
+<a class="reference internal" href="cli.html#cli-import-config"><span class="std std-ref">import_config</span></a> for import failures and the pending count.</p>
+<p><code class="docutils literal notranslate"><span class="pre">list_data_diff_checks</span></code> shows the scan mode, pending initial scans, and verified
+starts. See <a class="reference internal" href="cli.html#cli-list-data-diff-checks"><span class="std std-ref">list_data_diff_checks</span></a> for table and JSON fields.</p>
+<p><code class="docutils literal notranslate"><span class="pre">--force</span></code> reruns the current slot. <code class="docutils literal notranslate"><span class="pre">rerun_data_diff_check</span></code> retries a specific
+earlier run. See <a class="reference internal" href="#data-diff-retries"><span class="std std-ref">Retries and manual reruns</span></a> for timing and limits.</p>
+<p>Failed checks exit non-zero and include a reason. See <a class="reference internal" href="#data-diff-alerts"><span class="std std-ref">Alerts</span></a>.
+Skipped results explain why the check did not run and show any known status and
+window. A skipped result does not verify data. Unknown bounds remain blank.</p>
 </section>
 <section id="alerts">
 <span id="data-diff-alerts"></span><h2>Alerts<a class="headerlink" href="#alerts" title="Link to this heading"></a></h2>
-<p>Data-diff reuses the tap’s alert configuration, so whichever team owns the
-replication owns its checks and their alerts. There is nothing separate to
-configure:</p>
-<ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">alert_handlers.slack.channel</span></code> in <code class="docutils literal notranslate"><span class="pre">config.yml</span></code> receives every alert.</p></li>
-<li><p>A tap’s <code class="docutils literal notranslate"><span class="pre">slack_alert_channel</span></code> also receives the alerts for that tap’s checks.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">send_alert:</span> <span class="pre">False</span></code> on a tap silences its checks along with its runs.</p></li>
-</ul>
-<p>See <a class="reference internal" href="alerts.html#alerts"><span class="std std-ref">Alerts</span></a> to configure the handlers. Alerts go to every configured handler,
-so the <a class="reference internal" href="alerts.html#victorops-alert-handler"><span class="std std-ref">VictorOps</span></a> limitations apply here too.</p>
-<section id="one-alert-per-failed-check-per-window">
-<h3>One alert per failed check per window<a class="headerlink" href="#one-alert-per-failed-check-per-window" title="Link to this heading"></a></h3>
-<p>One invocation can evaluate several windows for the same table when it backfills
-missed slots. Each <code class="docutils literal notranslate"><span class="pre">FAIL</span></code> or <code class="docutils literal notranslate"><span class="pre">ERROR</span></code> produces its own alert naming the check, the
-window, and the run ID needed to remediate it:</p>
+<p>Data-diff uses the tap’s replication alert settings. No separate configuration
+is needed. See <a class="reference internal" href="alerts.html#alerts"><span class="std std-ref">Alerts</span></a> for handlers, routing, suppression, and limitations.</p>
+<section id="one-alert-per-failed-attempt">
+<h3>One alert per failed attempt<a class="headerlink" href="#one-alert-per-failed-attempt" title="Link to this heading"></a></h3>
+<p>Each <code class="docutils literal notranslate"><span class="pre">FAIL</span></code> or <code class="docutils literal notranslate"><span class="pre">ERROR</span></code> sends an alert with the check, window, reason, and run ID:</p>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>data-diff FAIL snowflake/payments/public/transfers
   window  2026-07-29T10:00:00+00:00 → 2026-07-29T11:00:00+00:00
   run_id  2bd3e725-38fc-48c1-b565-b4f20e5bc7dd
+  reason  row_count FAIL
 </pre></div>
 </div>
-<p><code class="docutils literal notranslate"><span class="pre">SKIPPED</span></code> and <code class="docutils literal notranslate"><span class="pre">PASS</span></code> results are not alerted on. Failures are not batched or
-deduplicated, so a stalled tap alerts on every failing check and every backfilled
-window — up to 24 windows per check per invocation. Keeping <code class="docutils literal notranslate"><span class="pre">frequency</span></code> low is
-what keeps the volume sane.</p>
+<p><code class="docutils literal notranslate"><span class="pre">SKIPPED</span></code>, <code class="docutils literal notranslate"><span class="pre">DEFERRED</span></code>, and <code class="docutils literal notranslate"><span class="pre">PASS</span></code> send no alert. Alerts exclude aggregate
+values. Failures are neither batched nor deduplicated. One invocation can process
+24 catch-up windows and 24 retries per check, so it may send several alerts.</p>
 </section>
 </section>
 <section id="coverage-and-remediation">
 <h2>Coverage and remediation<a class="headerlink" href="#coverage-and-remediation" title="Link to this heading"></a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">verified_end</span></code> is the end of the contiguous union of successful windows
-for one definition revision:</p>
+<p><code class="docutils literal notranslate"><span class="pre">verified_end</span></code> marks how far successful windows cover an unbroken range for
+one definition revision:</p>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>[10:00, 11:00) PASS  → verified_end = 11:00
 [11:00, 12:00) FAIL  → stays 11:00 (blocked)
 [12:00, 13:00) PASS  → stays 11:00
 rerun [11:00, 12:00) PASS → advances to 13:00
 </pre></div>
 </div>
-<p>A later pass cannot carry the watermark over an earlier gap. New definition revisions
-start independent coverage.</p>
-<p>An interrupted run is recorded as <code class="docutils literal notranslate"><span class="pre">ERROR</span></code> before the process exits, including on
-<code class="docutils literal notranslate"><span class="pre">SIGTERM</span></code> and <code class="docutils literal notranslate"><span class="pre">SIGINT</span></code>, so its slot stays retryable. A worker killed outright
-cannot do that, so every invocation first retires any attempt still <code class="docutils literal notranslate"><span class="pre">RUNNING</span></code> well
-past its query budget, across every slot and remediation attempts too. That sweep
-runs before scheduling because a <code class="docutils literal notranslate"><span class="pre">RUNNING</span></code> row makes its own slot look observed,
-which would otherwise advance the scheduler past the slot needing recovery.</p>
-<p>After repairing a failed window, rerun its exact definition and time boundaries:</p>
+<p>A later pass cannot cross an earlier failed window or gap. Each definition
+revision has separate coverage. Coverage starts at the saved historical minimum,
+or at <code class="docutils literal notranslate"><span class="pre">window_start</span></code> when <code class="docutils literal notranslate"><span class="pre">initial_full_scan:</span> <span class="pre">false</span></code>.</p>
+<p>The historical start is saved before comparison. Retries, forced reruns, and
+remediation keep that interval even if the oldest available rows change.
+If the start could not be found, it remains NULL and the failure blocks coverage.
+A retry finds the start using the original cutoff, then saves it for later
+attempts. A successful retry clears that historical failure.</p>
+<section id="retries-and-manual-reruns">
+<span id="data-diff-retries"></span><h3>Retries and manual reruns<a class="headerlink" href="#retries-and-manual-reruns" title="Link to this heading"></a></h3>
+<p>At the next cron interval, PipelineWise retries failed windows alongside new
+scheduled windows:</p>
+<ul class="simple">
+<li><p>Retry unresolved <code class="docutils literal notranslate"><span class="pre">FAIL</span></code> and <code class="docutils literal notranslate"><span class="pre">ERROR</span></code> windows for current definitions.
+Keep the original definition and saved bounds.</p></li>
+<li><p>Retry each window at most once per interval. If an attempt spans intervals,
+wait until the first interval after it finishes.</p></li>
+<li><p>Retry up to 24 failed windows per check per invocation. Further eligible
+windows wait for the next invocation.</p></li>
+<li><p>Leave <code class="docutils literal notranslate"><span class="pre">PASS</span></code> windows unchanged. A <code class="docutils literal notranslate"><span class="pre">DEFERRED</span></code> retry keeps the original
+failed window blocked and eligible for a later retry.</p></li>
+</ul>
+<p><code class="docutils literal notranslate"><span class="pre">--force</span></code> reruns the current slot immediately. It cannot replace a running
+attempt. To retry an earlier window or superseded definition, use its run ID:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pipelinewise<span class="w"> </span>rerun_data_diff_check<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--run-id<span class="w"> </span><span class="s2">"2bd3e725-38fc-48c1-b565-b4f20e5bc7dd"</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--remediation-ref<span class="w"> </span><span class="s2">"AP-1234"</span>
 </pre></div>
 </div>
-<p>The original run remains immutable. The rerun gets the next attempt number,
-<code class="docutils literal notranslate"><span class="pre">trigger_type</span> <span class="pre">=</span> <span class="pre">REMEDIATION</span></code>, and a <code class="docutils literal notranslate"><span class="pre">rerun_of_run_id</span></code> link. When it passes,
-the effective attempt for that scheduled slot changes and the watermark advances.</p>
+<p>The original run stays in history. The rerun gets the next attempt number and
+links to that run. A pass replaces the slot’s failed outcome. The watermark then
+advances through contiguous successful windows.</p>
 <p>The backend retains every run attempt and coverage transition. See
 <a class="reference internal" href="data_diff_backend.html#data-diff-backend"><span class="std std-ref">Data-diff backend database</span></a> for the schema, persistence model, and reporting queries.</p>
+</section>
+<section id="interrupted-runs">
+<h3>Interrupted runs<a class="headerlink" href="#interrupted-runs" title="Link to this heading"></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">SIGTERM</span></code> and <code class="docutils literal notranslate"><span class="pre">SIGINT</span></code> record <code class="docutils literal notranslate"><span class="pre">ERROR</span></code> before exit. After a hard kill, the
+next invocation expires stale <code class="docutils literal notranslate"><span class="pre">RUNNING</span></code> attempts before scheduling. Both cases
+follow the normal retry rules.</p>
+<p>Expired workers cannot write results or preflight evidence. Their CLI result is
+<code class="docutils literal notranslate"><span class="pre">SKIPPED</span></code> with the recorded status and reason. If saving one check fails,
+PipelineWise reports the error and continues with other checks.</p>
+</section>
 <section id="source-safety">
 <h3>Source safety<a class="headerlink" href="#source-safety" title="Link to this heading"></a></h3>
 <ul class="simple">
 <li><p>All scheduling and window boundaries are UTC.</p></li>
 <li><p>Source queries use read-only transactions with timeouts.</p></li>
-<li><p>No source rows or business values are stored — only aggregate metrics.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">row_checksum</span></code> adds CPU to the same aggregate scan; monitor during rollout.</p></li>
+<li><p>The backend stores aggregates, not full source rows. <code class="docutils literal notranslate"><span class="pre">min_key</span></code> and
+<code class="docutils literal notranslate"><span class="pre">max_key</span></code> retain actual key values. Restrict access to these results.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">row_checksum</span></code> adds CPU work. Monitor source load during rollout.</p></li>
 </ul>
 </section>
 <section id="preflight">
 <h3>Preflight<a class="headerlink" href="#preflight" title="Link to this heading"></a></h3>
-<p>Before either aggregate query runs, a preflight returns <code class="docutils literal notranslate"><span class="pre">BLOCKED</span></code> when the source
-table exceeds the safe row limit <strong>and</strong> has no usable index leading with the
-timestamp column, since every window would then scan the whole table. A missing index
-on a small table is reported but not blocked.</p>
-<p>Usable means a plain, valid, ready btree index the optimizer is allowed to choose.
-Partial, expression-based, still-building, hash and BRIN indexes cannot serve a
-timestamp range, and a MySQL <code class="docutils literal notranslate"><span class="pre">INVISIBLE</span></code> or MariaDB <code class="docutils literal notranslate"><span class="pre">IGNORED</span></code> index is one the
-planner refuses outright. All are recorded as evidence but none satisfies the check;
-those leading with the timestamp column are named in the findings, so a disabled index
-is distinguishable from a missing one.</p>
-<p>Table size comes from catalog statistics, counting each partition once. A table with
-no statistics is sized from its physical pages using a deliberately dense packing
-estimate, so an unanalyzed large table blocks rather than slipping through. Running
-<code class="docutils literal notranslate"><span class="pre">ANALYZE</span></code> on the source replaces the estimate with a real count.</p>
+<p>Before reading data, preflight returns <code class="docutils literal notranslate"><span class="pre">BLOCKED</span></code> when both conditions apply:</p>
+<ul class="simple">
+<li><p>The source table has more than 100,000 estimated rows.</p></li>
+<li><p>No accepted index starts with <code class="docutils literal notranslate"><span class="pre">timestamp_column</span></code>.</p></li>
+</ul>
+<p>Tables at or below that limit can run without the index. PipelineWise reports
+the missing index but does not create one.</p>
+<p>Accepted indexes must start with the timestamp column:</p>
+<ul class="simple">
+<li><p>PostgreSQL: a plain, valid, ready B-tree index. Partial, expression, hash,
+BRIN, and still-building indexes do not satisfy this preflight policy.</p></li>
+<li><p>MySQL/MariaDB: a BTREE index with no prefix length on the timestamp column.
+<code class="docutils literal notranslate"><span class="pre">INVISIBLE</span></code> and <code class="docutils literal notranslate"><span class="pre">IGNORED</span></code> indexes do not satisfy the policy.</p></li>
+</ul>
+<p>Row counts come from catalog estimates, counting partitions once. PostgreSQL
+falls back to physical size when usable row estimates are missing. Refresh stale
+statistics with <code class="docutils literal notranslate"><span class="pre">ANALYZE</span></code> on PostgreSQL or <code class="docutils literal notranslate"><span class="pre">ANALYZE</span> <span class="pre">TABLE</span></code> on MySQL/MariaDB.
+These refresh estimates, not exact counts.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>The preflight establishes that the table <em>can</em> be read by timestamp, not that the
-optimizer will choose to. A window wide enough to select most of the table is still
-planned as a sequential scan — correctly, since that is the cheaper plan for it.
-Keep windows narrow relative to table size, and treat <code class="docutils literal notranslate"><span class="pre">statement_timeout</span></code> as the
-real bound on source cost.</p>
+<p>Preflight checks metadata, not the query plan. A wide window may still use a
+full scan. Keep rolling windows narrow and set <code class="docutils literal notranslate"><span class="pre">statement_timeout</span></code> to limit
+each query’s duration.</p>
 </div>
-<p>Each verdict is written to <code class="docutils literal notranslate"><span class="pre">dd_preflight_log</span></code> with the table size, the row limit, and
-the index verdict it decided from, so a <code class="docutils literal notranslate"><span class="pre">PASS</span></code> stays auditable after the table or
-the limit changes.</p>
+<p>For a blocked check, ask the DBA to add or enable an accepted index. Inspect
+<code class="docutils literal notranslate"><span class="pre">dd_preflight_log</span></code> for the verdict, row estimate, limit, and index findings.</p>
 </section>
 </section>
 </section>

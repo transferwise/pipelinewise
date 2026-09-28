@@ -165,7 +165,10 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/data_diff_backend.html">Data-diff backend database</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/data_diff_backend.html#configuration">Configuration</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../user_guide/data_diff_backend.html#schema">Schema</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/data_diff_backend.html#schema">Schema</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/data_diff_backend.html#migration-003">Migration 003</a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/data_diff_backend.html#reporting-queries">Reporting queries</a></li>
 </ul>
 </li>
@@ -175,14 +178,17 @@
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/data_diff.html#check-configuration">Check configuration</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="../../user_guide/data_diff.html#tap-yaml">Tap YAML</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../user_guide/data_diff.html#choosing-a-frequency-and-window">Choosing a frequency and window</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/data_diff.html#initial-historical-scan">Initial historical scan</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/data_diff.html#cli-commands">CLI commands</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/data_diff.html#alerts">Alerts</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="../../user_guide/data_diff.html#one-alert-per-failed-check-per-window">One alert per failed check per window</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/data_diff.html#one-alert-per-failed-attempt">One alert per failed attempt</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/data_diff.html#coverage-and-remediation">Coverage and remediation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/data_diff.html#retries-and-manual-reruns">Retries and manual reruns</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/data_diff.html#interrupted-runs">Interrupted runs</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../user_guide/data_diff.html#source-safety">Source safety</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../user_guide/data_diff.html#preflight">Preflight</a></li>
 </ul>
@@ -403,9 +409,8 @@ target schema changes.</p>
 <section id="prerequisites">
 <h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading"></a></h2>
 <p>The target user needs to connect to the database and create or alter schemas,
-tables, and indexes used by its pipelines. Grant only the target schemas it owns;
-do not reuse the <a class="reference internal" href="../../user_guide/data_diff_backend.html#data-diff-backend"><span class="std std-ref">Data-diff backend database</span></a> database or role as a replication
-target.</p>
+tables, and indexes used by its pipelines. Grant access only to its target schemas.
+Use a separate database and role for the <a class="reference internal" href="../../user_guide/data_diff_backend.html#data-diff-backend"><span class="std std-ref">Data-diff backend database</span></a>.</p>
 </section>
 <section id="configuration">
 <h2>Configuration<a class="headerlink" href="#configuration" title="Link to this heading"></a></h2>

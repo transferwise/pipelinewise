@@ -165,7 +165,10 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="data_diff_backend.html">Data-diff backend database</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="data_diff_backend.html#configuration">Configuration</a></li>
-<li class="toctree-l2"><a class="reference internal" href="data_diff_backend.html#schema">Schema</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data_diff_backend.html#schema">Schema</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="data_diff_backend.html#migration-003">Migration 003</a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="data_diff_backend.html#reporting-queries">Reporting queries</a></li>
 </ul>
 </li>
@@ -175,14 +178,17 @@
 <li class="toctree-l2"><a class="reference internal" href="data_diff.html#check-configuration">Check configuration</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="data_diff.html#tap-yaml">Tap YAML</a></li>
 <li class="toctree-l3"><a class="reference internal" href="data_diff.html#choosing-a-frequency-and-window">Choosing a frequency and window</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_diff.html#initial-historical-scan">Initial historical scan</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="data_diff.html#cli-commands">CLI commands</a></li>
 <li class="toctree-l2"><a class="reference internal" href="data_diff.html#alerts">Alerts</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="data_diff.html#one-alert-per-failed-check-per-window">One alert per failed check per window</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_diff.html#one-alert-per-failed-attempt">One alert per failed attempt</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="data_diff.html#coverage-and-remediation">Coverage and remediation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="data_diff.html#retries-and-manual-reruns">Retries and manual reruns</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_diff.html#interrupted-runs">Interrupted runs</a></li>
 <li class="toctree-l3"><a class="reference internal" href="data_diff.html#source-safety">Source safety</a></li>
 <li class="toctree-l3"><a class="reference internal" href="data_diff.html#preflight">Preflight</a></li>
 </ul>
@@ -482,9 +488,8 @@ does not currently inherit this timeout.</p></td>
 </tr>
 </tbody>
 </table>
-<p>The backend is a control-plane database, not a replication target. Separate its
-service, database, runtime role, DDL role, credentials, and storage from every
-target. See <a class="reference internal" href="data_diff_backend.html#data-diff-backend"><span class="std std-ref">Data-diff backend database</span></a>.</p>
+<p>Use a separate database and credentials for the backend and replication targets.
+See <a class="reference internal" href="data_diff_backend.html#data-diff-backend"><span class="std std-ref">Data-diff backend database</span></a> for setup and isolation options.</p>
 </section>
 <section id="tap-configuration">
 <h2>Tap configuration<a class="headerlink" href="#tap-configuration" title="Link to this heading"></a></h2>
@@ -569,12 +574,18 @@ to 10 MB, and the maximum is 2500 MB. See <a class="reference internal" href="..
 <td><p><code class="docutils literal notranslate"><span class="pre">true</span></code></p></td>
 <td><p>Suppresses tap and data-diff alerts when <code class="docutils literal notranslate"><span class="pre">false</span></code>.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">slack_alert_channel</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">data_diff_defaults.initial_full_scan</span></code></p></td>
+<td><p>No</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">false</span></code></p></td>
+<td><p>Set <code class="docutils literal notranslate"><span class="pre">true</span></code> to check shared history on the first data run. Tables can override this.
+See <a class="reference internal" href="data_diff.html#data-diff-initial-scan"><span class="std std-ref">Initial historical scan</span></a>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">slack_alert_channel</span></code></p></td>
 <td><p>No</p></td>
 <td><p>Global channel</p></td>
 <td><p>Adds a tap-specific Slack destination; must start with <code class="docutils literal notranslate"><span class="pre">#</span></code>.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">add_metadata_columns</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">add_metadata_columns</span></code></p></td>
 <td><p>No</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">false</span></code></p></td>
 <td><p>Adds ingestion metadata to <a class="reference internal" href="../connectors/targets/s3_csv.html#target-s3-csv"><span class="std std-ref">S3 CSV target</span></a> output. PostgreSQL and
@@ -740,7 +751,11 @@ tap-level <code class="docutils literal notranslate"><span class="pre">paralleli
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">data_diff</span></code></p></td>
 <td><p>No</p></td>
-<td><p>Configures independent aggregate reconciliation. See <a class="reference internal" href="data_diff.html#data-diff"><span class="std std-ref">Data-diff checks</span></a>.</p></td>
+<td><p>Compares source and target data on its own schedule. See <a class="reference internal" href="data_diff.html#data-diff"><span class="std std-ref">Data-diff checks</span></a>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">data_diff.initial_full_scan</span></code></p></td>
+<td><p>No</p></td>
+<td><p>Overrides the tap default. Set <code class="docutils literal notranslate"><span class="pre">true</span></code> to scan shared history first.</p></td>
 </tr>
 </tbody>
 </table>
