@@ -41,6 +41,7 @@ from .errors import (
 from pipelinewise.fastsync.commons.tap_postgres import FastSyncTapPostgres
 from pipelinewise.fastsync.commons import utils as fastsync_utils
 from pipelinewise.cli.multiprocess import Process
+from pipelinewise.data_diff.coverage import FAILED_STATUSES
 from pipelinewise.data_diff.repository import DataDiffRepository
 from pipelinewise.data_diff.runner import rerun_failed_check, run_due_checks
 from pipelinewise.data_diff.runtime import RuntimeConnectorConfigLoader
@@ -65,6 +66,11 @@ MYSQL_BINLOG_RETRY_PENDING_ENV = 'PIPELINEWISE_MYSQL_BINLOG_RETRY_PENDING'
 
 def _persist_singer_state(path: str, state: str) -> None:
     fastsync_utils.save_dict_to_json(path, json.loads(state), log_level=logging.DEBUG)
+
+
+def _iso(value) -> str:
+    """Render an optional timestamp for a table cell; unset shows as blank."""
+    return value.isoformat() if value is not None else ''
 
 
 def _is_retryable_mysql_disconnect(
@@ -1938,6 +1944,7 @@ class PipelineWise:
         deleted_taps_count = self.cleanup_after_deleted_config(old_config)
 
         data_diff_sync_failed = False
+        historical_scans_pending = 'not configured'
         if config.global_config.get('backend_db'):
             try:
                 with DataDiffRepository.from_backend_config(
@@ -1950,10 +1957,12 @@ class PipelineWise:
                     )
             except Exception as exc:
                 data_diff_sync_failed = True
+                historical_scans_pending = 'unavailable'
                 self.logger.exception(
                     'Failed to reconcile data-diff definitions: %s', exc
                 )
             else:
+                historical_scans_pending = sync_stats['historical_scans_pending']
                 self.logger.info(
                     'Persisted data-diff definitions: %s',
                     sync_stats,
@@ -1973,6 +1982,7 @@ class PipelineWise:
                 Taps imported successfully     : %s
                 Taps deleted                   : %s
                 Taps failed to import          : %s
+                Initial data-diff scans pending: %s
                 Runtime                        : %s
             -------------------------------------------------------
             """,
@@ -1981,6 +1991,7 @@ class PipelineWise:
             total_taps - len(discover_excs),
             deleted_taps_count,
             str(discover_excs),
+            historical_scans_pending,
             end_time - start_time,
         )
         if discover_excs or data_diff_sync_failed:
@@ -2002,9 +2013,10 @@ class PipelineWise:
                 summary['status'],
                 summary.get('slot_status') or '',
                 # A check that could not be scheduled has no window to report.
-                summary['window_start'].isoformat() if summary['window_start'] else '',
-                summary['window_end'].isoformat() if summary['window_end'] else '',
-                str(summary.get('run_id', '')),
+                _iso(summary['window_start']),
+                _iso(summary['window_end']),
+                str(summary.get('run_id') or ''),
+                summary.get('error') or '',
             ]
             for summary in summaries
         ]
@@ -2014,7 +2026,7 @@ class PipelineWise:
                     rows,
                     headers=[
                         'Check', 'Status', 'Slot status', 'UTC start',
-                        'UTC end', 'Run ID',
+                        'UTC end', 'Run ID', 'Reason',
                     ],
                 )
             )
@@ -2062,7 +2074,7 @@ class PipelineWise:
         failures = [
             summary
             for summary in summaries
-            if summary['status'] in ('FAIL', 'ERROR')
+            if summary['status'] in FAILED_STATUSES
         ]
 
         for summary in failures:
@@ -2084,7 +2096,7 @@ class PipelineWise:
             if summary.get('run_id'):
                 message += f"\n  run_id  {summary['run_id']}"
             if summary.get('error'):
-                message += f"\n  error   {summary['error']}"
+                message += f"\n  reason  {summary['error']}"
             self.alert_sender.send_to_all_handlers(
                 message=message,
                 level=BaseAlertHandler.ERROR,
@@ -2121,9 +2133,11 @@ class PipelineWise:
                 check['frequency'],
                 check['window_start_seconds'],
                 check['window_end_seconds'],
+                'yes' if check['initial_full_scan'] else 'no',
+                'yes' if check['historical_scan_pending'] else 'no',
                 check.get('verified_status') or '',
-                check['verified_end'].isoformat()
-                if check.get('verified_end') else '',
+                _iso(check.get('verified_start')),
+                _iso(check.get('verified_end')),
             ]
             for check in checks
         ]
@@ -2134,7 +2148,8 @@ class PipelineWise:
                     'Check ID', 'Rev', 'Current', 'Target',
                     'Tap', 'Source table', 'Checks', 'Key', 'Timestamp',
                     'Compare columns', 'Frequency', 'Window start (s)',
-                    'Window end (s)', 'Verified status', 'Verified end',
+                    'Window end (s)', 'Full scan', 'Initial scan pending',
+                    'Verified status', 'Verified start', 'Verified end',
                 ],
             )
         )
@@ -2172,14 +2187,16 @@ class PipelineWise:
             tabulate(
                 [[
                     summary['check']['full_check_name'], summary['status'],
-                    summary['attempt'], summary['window_start'].isoformat(),
-                    summary['window_end'].isoformat(), str(self.args.run_id),
+                    summary['attempt'],
+                    _iso(summary['window_start']),
+                    _iso(summary['window_end']), str(self.args.run_id),
                     str(summary['run_id']), self.args.remediation_ref,
+                    summary.get('error') or '',
                 ]],
                 headers=[
                     'Check', 'Status', 'Attempt', 'UTC start', 'UTC end',
                     'Original run ID', 'Remediation run ID',
-                    'Remediation reference',
+                    'Remediation reference', 'Reason',
                 ],
             )
         )

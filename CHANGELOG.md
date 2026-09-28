@@ -1,5 +1,28 @@
-Unreleased (2026-09-25)
------------------------
+0.93.0 (2026-09-28)
+-------------------
+
+**Data-diff**
+
+- Show failure reasons in Slack, CLI results, and run history. Keep aggregate
+  values out of alerts
+- Use rolling windows from the first data run by default. Set
+  `initial_full_scan: true` to check shared history first. This starts at the
+  later source/target minimum before the cutoff and excludes NULL timestamps
+- Retry `FAIL` and `ERROR` windows at the next cron interval. Keep their original
+  definitions and bounds. Limit retries to once per window per interval and
+  process up to 24 retries and 24 scheduled windows per check per invocation
+- Protect results and preflight evidence from expired workers. Continue other
+  checks if one result cannot be saved
+- Show pending initial scans, verified starts, and reasons for skipped checks
+
+Existing checks without the setting keep their configuration hash and rolling
+windows. New checks scan history only when enabled. See the
+[data-diff guide](docs/user_guide/data_diff.rst) for empty-table handling and
+retry rules.
+
+Back up the backend before upgrading. Run `import_config` to apply migration 003.
+Unresolved or deferred run history blocks downgrade to 002, even after later
+checks pass.
 
 **CI**
 

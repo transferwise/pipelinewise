@@ -21,6 +21,7 @@ batch_size_rows: 20000
 stream_buffer_size: 0
 
 data_diff_defaults:
+  initial_full_scan: true
   frequency: "0 * * * *"
   window_start: "-1d"
   window_end: "0s"

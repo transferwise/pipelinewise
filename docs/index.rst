@@ -48,8 +48,8 @@ Core capabilities
    * - Load-time protection
      - Masks, hashes, or removes sensitive values before target loading.
    * - Data-diff
-     - Performs bounded aggregate reconciliation with auditable coverage and
-       remediation.
+     - Compares source and target data in time windows. Records results and
+       verified coverage.
    * - Configuration as code
      - Generates connector JSON, catalogs, and state from version-controlled YAML.
 
