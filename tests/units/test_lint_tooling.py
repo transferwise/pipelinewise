@@ -141,7 +141,12 @@ def test_root_ci_dependencies_and_policy_use_ruff():
             integration_dir = f'{test_dir}/integration'
             assert not any(fnmatch.fnmatchcase(unit_dir, pattern) for pattern in exclusions)
             if (REPOSITORY_ROOT / integration_dir).is_dir():
-                assert any(fnmatch.fnmatchcase(integration_dir, pattern) for pattern in exclusions)
+                if connector == 'tap-yugabyte':
+                    replay_test = f'{integration_dir}/test_interrupted_transaction.py'
+                    assert not any(fnmatch.fnmatchcase(integration_dir, pattern) for pattern in exclusions)
+                    assert not any(fnmatch.fnmatchcase(replay_test, pattern) for pattern in exclusions)
+                else:
+                    assert any(fnmatch.fnmatchcase(integration_dir, pattern) for pattern in exclusions)
         else:
             assert is_excluded
 

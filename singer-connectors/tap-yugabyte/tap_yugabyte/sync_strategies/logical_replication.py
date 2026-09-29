@@ -584,12 +584,17 @@ def _write_lsn_state(state, logical_streams, lsn):
 
 def sync_tables(conn_info, logical_streams, state, end_lsn, state_file, *, wal_progress_content=None):  # noqa: C901
     target_acknowledged_lsn = _minimum_acknowledged_lsn(state, logical_streams)
+    initial_stream_lsns = {
+        stream['tap_stream_id']: get_bookmark(state, stream['tap_stream_id'], 'lsn')
+        for stream in logical_streams
+    }
     start_lsn = target_acknowledged_lsn
     lsn_to_flush = None
     time_extracted = utils.now()
     slot = locate_replication_slot(conn_info)
-    lsn_last_processed = None
+    last_committed_lsn = None
     lsn_currently_processing = None
+    first_received_lsn = None
     lsn_processed_count = 0
     start_run_timestamp = datetime.datetime.now(datetime.UTC)
     max_run_seconds = conn_info['max_run_seconds']
@@ -636,7 +641,6 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file, *, wal_p
     poll_timestamp = datetime.datetime.now(datetime.UTC)
 
     wal_progress_message_seen = False
-    completed_wal_progress_lsn = None
     try:
         while True:
             # Disconnect when no data received for logical_poll_total_seconds
@@ -685,10 +689,9 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file, *, wal_p
                     message_payload=message_payload,
                 )
 
-                # When using wal2json with write-in-chunks, multiple messages can have the same lsn
-                # This is to ensure we only flush to lsn that has completed entirely
                 if lsn_currently_processing is None:
                     lsn_currently_processing = msg.data_start
+                    first_received_lsn = msg.data_start
                     LOGGER.info('First wal message received is %s', lsn_currently_processing)
 
                     # Flush wal up to the previous target acknowledgement, or the first LSN received.
@@ -699,24 +702,26 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file, *, wal_p
                     cur.send_feedback(write_lsn=lsn_to_flush, flush_lsn=lsn_to_flush, reply=True, force=True)
 
                 elif int(msg.data_start) > lsn_currently_processing:
-                    lsn_last_processed = lsn_currently_processing
                     lsn_currently_processing = msg.data_start
                     lsn_received_timestamp = datetime.datetime.now(datetime.UTC)
-                    lsn_processed_count = lsn_processed_count + 1
+
+                if message_payload.get('action') == 'C':
+                    last_committed_lsn = msg.data_start
+                    lsn_processed_count += 1
                     if lsn_processed_count >= UPDATE_BOOKMARK_PERIOD:
-                        LOGGER.debug('Updating bookmarks for all streams to lsn = %s', lsn_last_processed)
-                        state = _write_lsn_state(state, logical_streams, lsn_last_processed)
+                        LOGGER.debug('Updating bookmarks for all streams to lsn = %s', last_committed_lsn)
+                        state = _write_lsn_state(state, logical_streams,
+                                                 max(last_committed_lsn, target_acknowledged_lsn))
                         lsn_processed_count = 0
 
                 if wal_progress_message_seen and message_payload.get('action') == 'C':
-                    lsn_last_processed = msg.data_start
-                    completed_wal_progress_lsn = lsn_last_processed
                     wal_progress_message_seen = False
                     if break_at_end_lsn:
-                        LOGGER.info('Breaking - reached PipelineWise WAL progress message at %s', lsn_last_processed)
+                        LOGGER.info('Breaking - reached PipelineWise WAL progress message at %s', last_committed_lsn)
                         break
-                    LOGGER.info('Updating bookmarks at PipelineWise WAL progress message %s', lsn_last_processed)
-                    state = _write_lsn_state(state, logical_streams, lsn_last_processed)
+                    LOGGER.info('Updating bookmarks at PipelineWise WAL progress message %s', last_committed_lsn)
+                    state = _write_lsn_state(state, logical_streams,
+                                             max(last_committed_lsn, target_acknowledged_lsn))
             else:
                 try:
                     # Wait for a second unless a message arrives
@@ -729,13 +734,13 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file, *, wal_p
                 if lsn_currently_processing is None:
                     LOGGER.info('Waiting for first wal message')
                 else:
-                    LOGGER.info('Lastest wal message received was %s', lsn_last_processed)
+                    LOGGER.info('Latest committed wal message received was %s', last_committed_lsn)
                     target_acknowledged_lsn = _read_target_acknowledged_lsn(
                         state_file, logical_streams, target_acknowledged_lsn)
                     target_lsn_is_complete = (
-                        lsn_currently_processing > target_acknowledged_lsn
-                        or (completed_wal_progress_lsn is not None
-                            and completed_wal_progress_lsn >= target_acknowledged_lsn)
+                        first_received_lsn > target_acknowledged_lsn
+                        or (last_committed_lsn is not None
+                            and last_committed_lsn >= target_acknowledged_lsn)
                     )
                     if target_lsn_is_complete and target_acknowledged_lsn > lsn_to_flush:
                         lsn_to_flush = target_acknowledged_lsn
@@ -748,17 +753,10 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file, *, wal_p
         cur.close()
         conn.close()
     finally:
-        if lsn_last_processed:
-            if target_acknowledged_lsn > lsn_last_processed:
-                LOGGER.info('Current lsn_last_processed %s is older than target-acknowledged lsn %s',
-                            lsn_last_processed,
-                            target_acknowledged_lsn)
-                lsn_last_processed = target_acknowledged_lsn
-
-            LOGGER.info('Updating bookmarks for all streams to lsn = %s', lsn_last_processed)
-
-            state = _write_lsn_state(state, logical_streams, lsn_last_processed)
-        else:
-            singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
+        # Row bookmarks may include an incomplete transaction; only observed commits can advance them.
+        for stream_id, initial_lsn in initial_stream_lsns.items():
+            checkpoint_lsn = max(initial_lsn, last_committed_lsn or 0, target_acknowledged_lsn)
+            state = singer.write_bookmark(state, stream_id, 'lsn', checkpoint_lsn)
+        singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
 
     return state

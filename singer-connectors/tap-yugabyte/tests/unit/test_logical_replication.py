@@ -1521,7 +1521,7 @@ class TestLogicalReplicationFeedback(unittest.TestCase):
                     prefix='pipelinewise',
                     content='wal_progress:tap_id_value:current',
                 ),
-            ], 200),
+            ], 100),
             'foreign_tap': ([
                 self._message('B', 200),
                 self._message(
@@ -1532,7 +1532,7 @@ class TestLogicalReplicationFeedback(unittest.TestCase):
                     content='wal_progress:another_tap:current',
                 ),
                 self._message('C', 220),
-            ], 210),
+            ], 220),
             'non_transactional': ([
                 self._message('B', 200),
                 self._message(
@@ -1543,7 +1543,7 @@ class TestLogicalReplicationFeedback(unittest.TestCase):
                     content='wal_progress:tap_id_value:current',
                 ),
                 self._message('C', 220),
-            ], 210),
+            ], 220),
         }
 
         self.conn_info['break_at_end_lsn'] = True
@@ -1562,19 +1562,25 @@ class TestLogicalReplicationFeedback(unittest.TestCase):
         state = self._state({'foo-bar': 100})
         state_reader = mock_open(read_data=json.dumps(state))
         messages = [
+            self._message('B', 200),
             self._message('I', 200),
-            self._message('C', 300),
-            self._message('C', 400),
+            self._message('C', 201),
+            self._message('B', 300),
+            self._message('I', 300),
+            self._message('C', 301),
         ]
 
         with patch(
                 'tap_yugabyte.sync_strategies.logical_replication.UPDATE_BOOKMARK_PERIOD',
                 1):
-            feedback, error, termination, _ = self._run_sync(
+            feedback, error, termination, written_messages = self._run_sync(
                 state, messages, state_reader)
 
         self.assertIs(error, termination)
         self.assertEqual(self._expected_feedback(100), feedback)
+        self.assertEqual([201, 301, 301], [
+            message.args[0].value['bookmarks']['foo-bar']['lsn'] for message in written_messages
+        ])
 
     def test_feedback_advances_exactly_with_target_state(self):
         state = self._state({'foo-bar': 100})

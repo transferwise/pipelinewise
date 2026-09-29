@@ -10,10 +10,9 @@ from singer import get_logger
 
 LOGGER = get_logger()
 
-# How long to keep retrying a slot drop while YugabyteDB still reports it active
-# (ysql_cdc_active_replication_slot_window_ms, default 5 minutes, bounds the lag
-# between a consumer disconnecting and the slot's `active` flag clearing).
-_DROP_SLOT_RETRY_ATTEMPTS = 30
+# A disconnected slot can remain marked active for five minutes by default.
+# Allow an extra minute for the server to clear that flag before failing cleanup.
+_DROP_SLOT_RETRY_ATTEMPTS = 180
 _DROP_SLOT_RETRY_INTERVAL_SECONDS = 2
 
 
