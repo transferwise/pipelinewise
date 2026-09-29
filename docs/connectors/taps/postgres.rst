@@ -121,6 +121,11 @@ full template with ``pipelinewise init``.
 
 Snowflake Singer, FullSync, and PartialSync can target managed Iceberg v3 with
 explicit tap-level configuration. See :ref:`snowflake_iceberg`.
+Snowflake FullSync and PartialSync apply top-level :ref:`transformations` in the
+source SELECT before CSV generation, including managed Iceberg v3. Unsupported
+rules fail before export; transformed INCREMENTAL replication keys are rejected
+because checkpoints require their raw values.
+
 Snowflake Singer loading, FullSync, and PartialSync preserve line breaks, tabs,
 CSV punctuation, Unicode, and literal backslash sequences in string values.
 PostgreSQL ``hstore`` values map to Snowflake ``VARIANT`` only on that explicit

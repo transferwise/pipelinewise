@@ -3,9 +3,9 @@
 Data-diff checks
 ================
 
-Data-diff performs bounded aggregate reconciliation between source tables and
-their PostgreSQL or Snowflake replicas. Checks are defined in the tap YAML and
-persisted as immutable versioned definitions in the backend database.
+Data-diff compares source tables with their PostgreSQL or Snowflake replicas.
+Define checks in the tap YAML. The backend stores each definition revision and
+its results.
 
 
 Supported routes
@@ -26,6 +26,9 @@ Supported routes
     * - MySQL / MariaDB
       - Snowflake
 
+Snowflake supports native and PipelineWise-managed Iceberg v3 tables for all
+checks, including the initial historical scan.
+
 
 Check types
 -----------
@@ -41,7 +44,7 @@ Check types
       - Database impact
     * - ``schema_compatibility``
       - Selected columns exist with compatible types on both sides
-      - All columns resolve
+      - All selected columns exist and have compatible types
       - Metadata only
     * - ``row_count``
       - ``COUNT(*)`` in the window
@@ -80,16 +83,15 @@ Check types
 
 .. attention::
 
-   - ``row_checksum`` is **probabilistic** — a mismatch identifies a window to investigate,
-     but does not expose which individual rows differ
-   - **JSON** and **VARIANT** columns have non-deterministic key ordering across
-     databases, making consistent hashing impossible
-   - **FLOAT** columns can differ due to IEEE 754 precision between database
-     engines (e.g., ``0.1 + 0.2`` producing different representations)
-   - Exact numeric columns are compared at the **wider** of the source and target
-     scales, so a target that truncated precision fails rather than passing
-   - Incompatible column types are recorded as ``ERROR`` (not ``FAIL``);
-     other check types in the same run still execute normally
+   - ``row_checksum`` is probabilistic. A mismatch identifies a window, not the
+     individual rows that differ.
+   - JSON/VARIANT and floating-point checksum columns are unsupported. They
+     produce ``ERROR``, not ``FAIL``. Cross-database ordering and numeric
+     representations can differ.
+   - Exact numeric checksums use the wider source/target scale to detect lost
+     precision. Both columns need known scales.
+   - Missing or incompatible checksum columns also produce ``ERROR``. Other
+     check types in the run still execute.
 
 
 Check configuration
@@ -136,57 +138,87 @@ Every table must resolve ``key_column``, ``timestamp_column``, ``checks``,
 ``frequency``, and ``window_start``. These can be set directly on the table or
 inherited from ``data_diff_defaults`` — the table value wins when both exist.
 
-**Field reference:**
+Field reference:
 
-- ``schema_version`` — Optional compatibility marker; the only accepted value is
-  ``1``. The current normalizer does not change behaviour based on this field.
-- ``frequency`` — Crontab expression of when to fire the check
-- ``window_start`` — Negative offset from fire time for the window start
-- ``window_end`` — Negative offset for the window end. Must be closer to fire time
-  than ``window_start``. Default ``"0s"`` (fire time)
+- ``schema_version`` — Optional. Only ``1`` is accepted
+- ``frequency`` — Cron schedule in UTC
+- ``window_start`` — Negative offset from the scheduled time
+- ``window_end`` — Window end offset. Must be later than ``window_start`` and
+  no later than the scheduled time. Default ``"0s"`` (the scheduled time)
+- ``initial_full_scan`` — Check shared history on the first data run when
+  ``true``. Default ``false`` uses the configured rolling window
 - ``statement_timeout`` — Per-query timeout. Default ``"5min"``
 - ``key_column`` — Scalar key for integrity and range checks
 - ``timestamp_column`` — Column that defines the comparison window boundaries
 - ``compare_columns`` — Required when ``row_checksum`` is selected. Must not have
   PipelineWise transformations
 
-Durations compose the units ``s``, ``min``, ``h``, ``d``, ``w``: ``"-15h"`` is 15
-hours before fire time, and ``"1d6h"`` is valid too.
+Durations use ``s``, ``min``, ``h``, ``d``, and ``w``. Units can be combined.
+For example, ``"-1d6h"`` means 30 hours before the scheduled time.
 
-For ``tap-mysql`` sources, data-diff uses ``db_conn.engine`` when it is set. If
-it is omitted, data-diff infers MariaDB or MySQL from the connected server's
-handshake. This fallback applies only to data-diff; Singer ``tap-mysql`` and
-FastSync continue to default an omitted engine to ``mysql``. Set
-``engine: mariadb`` explicitly for MariaDB, especially with GTID, managed
-Iceberg v3 JSON aliases, or proxies that hide the server identity.
+For MySQL/MariaDB sources, ``db_conn.engine`` overrides server detection. Set it
+explicitly if a proxy hides the server identity. See :ref:`tap-mysql` for
+connection settings.
 
 Choosing a frequency and window
 '''''''''''''''''''''''''''''''
 
-Check infrequently, over a window that has already settled — the values above are
-the recommended starting point. Every check is an aggregate scan of both the
-source and the target, so frequency is a direct cost to the source database.
-``window_end`` sets how long replication has to settle: too close to fire time and
-uncleared lag is reported as drift, producing a ``FAIL`` that resolves itself on
-the next run and trains people to ignore alerts. Raise it for taps that routinely
-lag further behind.
+Use the example settings as a starting point. Each data check scans both tables,
+so frequent checks add source load.
+
+Leave enough time for replication to catch up before ``window_end``. For example,
+``"-3h"`` excludes the latest three hours. Use an earlier cutoff for slower taps.
+Otherwise, replication lag can cause a ``FAIL``.
 
 .. important::
 
-   **The window must be at least as wide as the cadence.** Windows are positioned
-   relative to fire time, so a narrower window leaves time no check ever examines,
-   and those gaps block coverage permanently.
+   **The window must cover at least the time between checks.** A three-hour window
+   checked every six hours leaves three hours unverified. Coverage stays
+   ``BLOCKED`` at that gap even if every check passes.
 
-   Firing every 6 hours over a 3-hour window checks ``[09:00, 12:00)`` then
-   ``[15:00, 18:00)``: the 3 hours between are never verified, and coverage reports
-   ``BLOCKED`` even though every check passed. The defaults are 12 hours wide on a
-   6-hour cadence, so windows overlap and a skipped slot cannot open a gap — each row
-   is checked twice, which is the cheaper mistake.
+   The tap defaults above check a 12-hour window every six hours. This overlap
+   covers one missed slot. The table override runs every 12 hours, with no overlap.
 
-Give ``statement_timeout`` room to match the window. The examples use ``"20min"``
-rather than the ``"5min"`` default: a timeout is recorded as ``ERROR``, which
-blocks coverage exactly as a real mismatch does. Raise it further for tables where
-``row_checksum`` is selected.
+Allow enough ``statement_timeout`` for the scan, especially with ``row_checksum``.
+The example uses ``"20min"``. The default is ``"5min"``. A timeout records
+``ERROR`` and blocks coverage.
+
+
+.. _data_diff_initial_scan:
+
+Initial historical scan
+'''''''''''''''''''''''
+
+Set ``initial_full_scan: true`` on the table or in ``data_diff_defaults`` to
+check shared history on the first data run. PipelineWise reads
+``MIN(timestamp_column)`` on both sides, using only timestamps before the
+``window_end`` cutoff. The comparison includes the later minimum and excludes
+the cutoff.
+
+For example, if source history starts on January 1 and target history starts on
+January 5, comparison starts on January 5. Older rows are excluded.
+Historical and rolling data checks exclude NULL timestamps.
+
+- Neither side has timestamps before the cutoff: record ``DEFERRED`` with no
+  verified coverage. Try again at the next cron slot with its new cutoff.
+- Only one side has timestamps before the cutoff: record ``ERROR`` and name the
+  missing side.
+- Schema or comparison errors still produce ``ERROR``, even if both sides are
+  empty.
+
+Later scheduled windows use the configured rolling range. Without the setting,
+the first run uses that range too. Schema-only checks do not scan history.
+
+An initial scan may read most of the table, even with an index. Schedule it
+off-peak and allow enough ``statement_timeout``.
+
+Changing the timeout, schedule, or window creates a new definition revision.
+With ``initial_full_scan: true``, it starts another historical scan. Earlier runs
+keep their settings, including the retry timeout. Use ``--include-versioned`` to
+list earlier definitions. Backend reports retain their runs and coverage.
+
+Checks without the setting keep their existing configuration hash and rolling
+windows. New and never-run revisions scan history only when explicitly enabled.
 
 
 CLI commands
@@ -211,19 +243,19 @@ CLI commands
     # Remediate a specific failed run; both arguments are required
     pipelinewise rerun_data_diff_check --run-id <uuid> --remediation-ref <ticket>
 
-``import_config`` creates a new definition revision when config changes and
-deactivates removed ones; unchanged definitions are skipped. ``--force`` creates
-another attempt for the current slot, while ``rerun_data_diff_check`` repairs a
-historical one — see `Coverage and remediation`_.
+``import_config`` versions changed definitions and deactivates removed ones.
+It keeps unchanged definitions and reports pending initial scans. See
+:ref:`cli_import_config` for import failures and the pending count.
 
-Definitions are reconciled independently for taps whose discovery succeeds. If
-another selected tap fails discovery, successful taps are still reconciled and
-the failed tap's existing definitions remain unchanged. Definitions for an
-explicitly selected tap absent from the project YAML are deactivated. Discovery
-and backend reconciliation failures retain the import summary and a non-zero
-exit so automation can report them.
+``list_data_diff_checks`` shows the scan mode, pending initial scans, and verified
+starts. See :ref:`cli_list_data_diff_checks` for table and JSON fields.
 
-A mismatch exits non-zero and sends an alert. See :ref:`data_diff_alerts`.
+``--force`` reruns the current slot. ``rerun_data_diff_check`` retries a specific
+earlier run. See :ref:`data_diff_retries` for timing and limits.
+
+Failed checks exit non-zero and include a reason. See :ref:`data_diff_alerts`.
+Skipped results explain why the check did not run and show any known status and
+window. A skipped result does not verify data. Unknown bounds remain blank.
 
 
 .. _data_diff_alerts:
@@ -231,40 +263,30 @@ A mismatch exits non-zero and sends an alert. See :ref:`data_diff_alerts`.
 Alerts
 ------
 
-Data-diff reuses the tap's alert configuration, so whichever team owns the
-replication owns its checks and their alerts. There is nothing separate to
-configure:
+Data-diff uses the tap's replication alert settings. No separate configuration
+is needed. See :ref:`alerts` for handlers, routing, suppression, and limitations.
 
-* ``alert_handlers.slack.channel`` in ``config.yml`` receives every alert.
-* A tap's ``slack_alert_channel`` also receives the alerts for that tap's checks.
-* ``send_alert: False`` on a tap silences its checks along with its runs.
+One alert per failed attempt
+''''''''''''''''''''''''''''
 
-See :ref:`alerts` to configure the handlers. Alerts go to every configured handler,
-so the :ref:`victorops_alert_handler` limitations apply here too.
-
-One alert per failed check per window
-''''''''''''''''''''''''''''''''''''''
-
-One invocation can evaluate several windows for the same table when it backfills
-missed slots. Each ``FAIL`` or ``ERROR`` produces its own alert naming the check, the
-window, and the run ID needed to remediate it:
+Each ``FAIL`` or ``ERROR`` sends an alert with the check, window, reason, and run ID:
 
 .. code-block:: text
 
     data-diff FAIL snowflake/payments/public/transfers
       window  2026-07-29T10:00:00+00:00 → 2026-07-29T11:00:00+00:00
       run_id  2bd3e725-38fc-48c1-b565-b4f20e5bc7dd
+      reason  row_count FAIL
 
-``SKIPPED`` and ``PASS`` results are not alerted on. Failures are not batched or
-deduplicated, so a stalled tap alerts on every failing check and every backfilled
-window — up to 24 windows per check per invocation. Keeping ``frequency`` low is
-what keeps the volume sane.
+``SKIPPED``, ``DEFERRED``, and ``PASS`` send no alert. Alerts exclude aggregate
+values. Failures are neither batched nor deduplicated. One invocation can process
+24 catch-up windows and 24 retries per check, so it may send several alerts.
 
 Coverage and remediation
 ------------------------
 
-``verified_end`` is the end of the contiguous union of successful windows
-for one definition revision:
+``verified_end`` marks how far successful windows cover an unbroken range for
+one definition revision:
 
 .. code-block:: text
 
@@ -273,17 +295,36 @@ for one definition revision:
     [12:00, 13:00) PASS  → stays 11:00
     rerun [11:00, 12:00) PASS → advances to 13:00
 
-A later pass cannot carry the watermark over an earlier gap. New definition revisions
-start independent coverage.
+A later pass cannot cross an earlier failed window or gap. Each definition
+revision has separate coverage. Coverage starts at the saved historical minimum,
+or at ``window_start`` when ``initial_full_scan: false``.
 
-An interrupted run is recorded as ``ERROR`` before the process exits, including on
-``SIGTERM`` and ``SIGINT``, so its slot stays retryable. A worker killed outright
-cannot do that, so every invocation first retires any attempt still ``RUNNING`` well
-past its query budget, across every slot and remediation attempts too. That sweep
-runs before scheduling because a ``RUNNING`` row makes its own slot look observed,
-which would otherwise advance the scheduler past the slot needing recovery.
+The historical start is saved before comparison. Retries, forced reruns, and
+remediation keep that interval even if the oldest available rows change.
+If the start could not be found, it remains NULL and the failure blocks coverage.
+A retry finds the start using the original cutoff, then saves it for later
+attempts. A successful retry clears that historical failure.
 
-After repairing a failed window, rerun its exact definition and time boundaries:
+
+.. _data_diff_retries:
+
+Retries and manual reruns
+'''''''''''''''''''''''''
+
+At the next cron interval, PipelineWise retries failed windows alongside new
+scheduled windows:
+
+- Retry unresolved ``FAIL`` and ``ERROR`` windows for current definitions.
+  Keep the original definition and saved bounds.
+- Retry each window at most once per interval. If an attempt spans intervals,
+  wait until the first interval after it finishes.
+- Retry up to 24 failed windows per check per invocation. Further eligible
+  windows wait for the next invocation.
+- Leave ``PASS`` windows unchanged. A ``DEFERRED`` retry keeps the original
+  failed window blocked and eligible for a later retry.
+
+``--force`` reruns the current slot immediately. It cannot replace a running
+attempt. To retry an earlier window or superseded definition, use its run ID:
 
 .. code-block:: bash
 
@@ -291,12 +332,24 @@ After repairing a failed window, rerun its exact definition and time boundaries:
       --run-id "2bd3e725-38fc-48c1-b565-b4f20e5bc7dd" \
       --remediation-ref "AP-1234"
 
-The original run remains immutable. The rerun gets the next attempt number,
-``trigger_type = REMEDIATION``, and a ``rerun_of_run_id`` link. When it passes,
-the effective attempt for that scheduled slot changes and the watermark advances.
+The original run stays in history. The rerun gets the next attempt number and
+links to that run. A pass replaces the slot's failed outcome. The watermark then
+advances through contiguous successful windows.
 
 The backend retains every run attempt and coverage transition. See
 :ref:`data_diff_backend` for the schema, persistence model, and reporting queries.
+
+
+Interrupted runs
+''''''''''''''''
+
+``SIGTERM`` and ``SIGINT`` record ``ERROR`` before exit. After a hard kill, the
+next invocation expires stale ``RUNNING`` attempts before scheduling. Both cases
+follow the normal retry rules.
+
+Expired workers cannot write results or preflight evidence. Their CLI result is
+``SKIPPED`` with the recorded status and reason. If saving one check fails,
+PipelineWise reports the error and continues with other checks.
 
 
 Source safety
@@ -304,37 +357,38 @@ Source safety
 
 - All scheduling and window boundaries are UTC.
 - Source queries use read-only transactions with timeouts.
-- No source rows or business values are stored — only aggregate metrics.
-- ``row_checksum`` adds CPU to the same aggregate scan; monitor during rollout.
+- The backend stores aggregates, not full source rows. ``min_key`` and
+  ``max_key`` retain actual key values. Restrict access to these results.
+- ``row_checksum`` adds CPU work. Monitor source load during rollout.
 
 Preflight
 '''''''''
 
-Before either aggregate query runs, a preflight returns ``BLOCKED`` when the source
-table exceeds the safe row limit **and** has no usable index leading with the
-timestamp column, since every window would then scan the whole table. A missing index
-on a small table is reported but not blocked.
+Before reading data, preflight returns ``BLOCKED`` when both conditions apply:
 
-Usable means a plain, valid, ready btree index the optimizer is allowed to choose.
-Partial, expression-based, still-building, hash and BRIN indexes cannot serve a
-timestamp range, and a MySQL ``INVISIBLE`` or MariaDB ``IGNORED`` index is one the
-planner refuses outright. All are recorded as evidence but none satisfies the check;
-those leading with the timestamp column are named in the findings, so a disabled index
-is distinguishable from a missing one.
+- The source table has more than 100,000 estimated rows.
+- No accepted index starts with ``timestamp_column``.
 
-Table size comes from catalog statistics, counting each partition once. A table with
-no statistics is sized from its physical pages using a deliberately dense packing
-estimate, so an unanalyzed large table blocks rather than slipping through. Running
-``ANALYZE`` on the source replaces the estimate with a real count.
+Tables at or below that limit can run without the index. PipelineWise reports
+the missing index but does not create one.
+
+Accepted indexes must start with the timestamp column:
+
+- PostgreSQL: a plain, valid, ready B-tree index. Partial, expression, hash,
+  BRIN, and still-building indexes do not satisfy this preflight policy.
+- MySQL/MariaDB: a BTREE index with no prefix length on the timestamp column.
+  ``INVISIBLE`` and ``IGNORED`` indexes do not satisfy the policy.
+
+Row counts come from catalog estimates, counting partitions once. PostgreSQL
+falls back to physical size when usable row estimates are missing. Refresh stale
+statistics with ``ANALYZE`` on PostgreSQL or ``ANALYZE TABLE`` on MySQL/MariaDB.
+These refresh estimates, not exact counts.
 
 .. note::
 
-   The preflight establishes that the table *can* be read by timestamp, not that the
-   optimizer will choose to. A window wide enough to select most of the table is still
-   planned as a sequential scan — correctly, since that is the cheaper plan for it.
-   Keep windows narrow relative to table size, and treat ``statement_timeout`` as the
-   real bound on source cost.
+   Preflight checks metadata, not the query plan. A wide window may still use a
+   full scan. Keep rolling windows narrow and set ``statement_timeout`` to limit
+   each query's duration.
 
-Each verdict is written to ``dd_preflight_log`` with the table size, the row limit, and
-the index verdict it decided from, so a ``PASS`` stays auditable after the table or
-the limit changes.
+For a blocked check, ask the DBA to add or enable an accepted index. Inspect
+``dd_preflight_log`` for the verdict, row estimate, limit, and index findings.

@@ -66,6 +66,27 @@ def capture_decoded_events(monkeypatch):
     return events
 
 
+def test_checkpoint_validation_is_binary_safe_for_event_info(mariadb_source):
+    connection = mariadb_source
+    log_file, log_pos = binlog.fetch_current_log_file_and_pos(connection)
+    with connect_with_backoff(connection) as source:
+        source.set_charset('latin1')
+        with source.cursor() as cursor:
+            cursor.execute(
+                'INSERT INTO boundary_rows VALUES (%s, %s)', (1, '\N{NO-BREAK SPACE}'))
+        source.commit()
+
+    with connect_with_backoff(connection) as source:
+        with source.cursor() as cursor:
+            cursor.execute('SET character_set_results = binary')
+            cursor.execute('SHOW BINLOG EVENTS IN %s FROM %s', (log_file, log_pos))
+            events = cursor.fetchall()
+    annotate_event = next(event for event in events if event[2].lower() == b'annotate_rows')
+    assert b'\xa0' in annotate_event[5]
+
+    binlog.verify_binlog_checkpoint(connection, log_file, annotate_event[1])
+
+
 @pytest.mark.parametrize('use_gtid', [False, True])
 def test_savepoint_does_not_acknowledge_an_uncommitted_transaction(mariadb_source, use_gtid, monkeypatch):
     connection = mariadb_source

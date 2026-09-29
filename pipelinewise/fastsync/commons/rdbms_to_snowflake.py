@@ -135,7 +135,7 @@ def _prepare_full_run(run: _FullSyncRun) -> bool:
             allow_missing=True,
         )
 
-    run.source = run.source_adapter.create(run.args, run.iceberg_requested)
+    run.source = run.source_adapter.create(run.args, run.iceberg_version)
     return _recover_full_attempt(run) if run.iceberg_requested else False
 
 
@@ -226,6 +226,9 @@ def _export_full_source(run: _FullSyncRun) -> None:
 
 
 def _plan_full_iceberg_export(run: _FullSyncRun) -> None:
+    resolved_engine = run.source_adapter.resolved_source_engine(run.source)
+    if run.attempt is not None:
+        iceberg_routes.validate_recovery_source_engine(run.attempt, resolved_engine)
     snowflake_types = run.source.map_column_types_to_target(run.table)
     run.snowflake_columns = snowflake_types.get('columns', [])
     run.primary_key = snowflake_types.get('primary_key')
@@ -242,6 +245,7 @@ def _plan_full_iceberg_export(run: _FullSyncRun) -> None:
         run.publisher.plan_full_sync(run.attempt, run.spec)
         return
 
+    run.source.validate_source_transformations(run.table)
     run.spec = current_spec
     run.bookmark = run.route_utils.get_bookmark_for_table(
         run.table,
@@ -254,6 +258,7 @@ def _plan_full_iceberg_export(run: _FullSyncRun) -> None:
         run.bookmark,
         recovery_identity=run.recovery_identity,
         staging_config=run.staging_config,
+        resolved_source_engine=resolved_engine,
     )
     run.publisher.plan_full_sync(run.attempt, run.spec)
 
@@ -339,11 +344,6 @@ def _stage_full_export(run: _FullSyncRun) -> None:
             run.snowflake.copy_to_archive(
                 s3_key, run.args.target.get('tap_id'), run.table
             )
-    run.snowflake.obfuscate_columns(
-        run.target_schema,
-        run.table,
-        **staging_options,
-    )
 
 
 def _publish_full_iceberg(run: _FullSyncRun) -> bool:

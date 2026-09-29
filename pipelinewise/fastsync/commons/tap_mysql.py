@@ -14,6 +14,14 @@ from pymysql import InterfaceError, OperationalError, Connection
 from ...utils import safe_column_name
 from . import split_gzip, utils
 from .partial_sync_boundary import PartialSyncBoundary
+from .source_transformations import (
+    UnsupportedSourceTransformation,
+    compile_source_select,
+    portable_pattern,
+    quote_source_identifier,
+    requires_regex_support,
+    validate_bookmark_column,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -22,12 +30,45 @@ DEFAULT_EXPORT_BATCH_ROWS = 50000
 MARIADB_ENGINE = 'mariadb'
 MYSQL_ENGINE = 'mysql'
 DEFAULT_USE_GTID = False
+DEFAULT_NET_WRITE_TIMEOUT_SQL = 'SET @@session.net_write_timeout=3600'
 DEFAULT_SESSION_SQLS = [
     'SET @@session.time_zone="+0:00"',
     'SET @@session.wait_timeout=28800',
     'SET @@session.net_read_timeout=3600',
+    DEFAULT_NET_WRITE_TIMEOUT_SQL,
     'SET @@session.innodb_lock_wait_timeout=3600',
 ]
+MARIADB_MAX_STATEMENT_TIME_SQL = 'SET @@session.max_statement_time=0'
+MYSQL_MAX_EXECUTION_TIME_SQL = 'SET @@session.max_execution_time=0'
+_REPORTED_SESSION_ENGINE_SELECTIONS = set()
+
+
+def resolve_source_engine(connection, configured_engine=None):
+    """Return the configured engine or detect it from the server handshake."""
+    if configured_engine is None:
+        engine = MARIADB_ENGINE if 'mariadb' in connection.get_server_info().lower() else MYSQL_ENGINE
+        engine_source = 'detected'
+    else:
+        engine = str(configured_engine).lower()
+        engine_source = 'configured'
+
+    selection = (engine, engine_source)
+    if selection not in _REPORTED_SESSION_ENGINE_SELECTIONS:
+        LOGGER.info('Using %s source engine (%s)', engine, engine_source)
+        _REPORTED_SESSION_ENGINE_SELECTIONS.add(selection)
+    else:
+        LOGGER.debug('Using %s source engine (%s)', engine, engine_source)
+    return engine
+
+
+def default_session_sqls(engine):
+    """Return default session SQL compatible with the resolved source engine."""
+    session_sqls = list(DEFAULT_SESSION_SQLS)
+    if engine == MARIADB_ENGINE:
+        session_sqls.append(MARIADB_MAX_STATEMENT_TIME_SQL)
+    elif engine == MYSQL_ENGINE:
+        session_sqls.append(MYSQL_MAX_EXECUTION_TIME_SQL)
+    return session_sqls
 
 
 def _create_csv_writer(output):
@@ -46,7 +87,9 @@ class FastSyncTapMySql:
     """
 
     def __init__(self, connection_config: dict, tap_type_to_target_type: Callable, target_quote=None):
-        self.connection_config = connection_config
+        self._configured_engine = connection_config.get('engine')
+        self._resolved_engine = None
+        self.connection_config = connection_config.copy()
         self.connection_config['charset'] = connection_config.get(
             'charset', DEFAULT_CHARSET
         )
@@ -54,20 +97,20 @@ class FastSyncTapMySql:
             'export_batch_rows', DEFAULT_EXPORT_BATCH_ROWS
         )
         self.connection_config['session_sqls'] = connection_config.get(
-            'session_sqls', DEFAULT_SESSION_SQLS
+            'session_sqls', []
         )
         self.connection_config['use_gtid'] = connection_config.get(
             'use_gtid', DEFAULT_USE_GTID
         )
-        self.connection_config['engine'] = connection_config.get(
-            'engine', MYSQL_ENGINE
-        )
         self.tap_type_to_target_type = tap_type_to_target_type
         self.target_quote = target_quote
+        self.source_transformations = None
+        self.target_iceberg_version = None
         self.conn = None
         self.conn_unbuffered = None
         self.is_replica = False
         self._mariadb_json_aliases_enabled = False
+        self._source_regex_verified = False
 
     @property
     def is_mariadb(self) -> bool:
@@ -75,14 +118,28 @@ class FastSyncTapMySql:
         Property method, to find if the engine is mariadb or not
         Returns: bool
         """
-        return self.connection_config['engine'] == MARIADB_ENGINE
+        return self.source_engine == MARIADB_ENGINE
+
+    @property
+    def _source_dialect(self) -> str:
+        """Name the dialect that the projection compiler and the regex probe must agree on."""
+        return 'mariadb' if self.is_mariadb else 'mysql'
+
+    @property
+    def source_engine(self) -> str:
+        """Return the resolved engine, with the legacy fallback before opening."""
+        if self._resolved_engine is not None:
+            return self._resolved_engine
+        if self._configured_engine is not None:
+            return str(self._configured_engine).lower()
+        return MYSQL_ENGINE
 
     @property
     def uses_mariadb_json_aliases(self) -> bool:
         """Return whether MariaDB JSON aliases should map to Iceberg VARIANT."""
         iceberg_version = self.connection_config.get('iceberg_version')
         return (
-            self.connection_config['engine'].lower() == MARIADB_ENGINE
+            self.is_mariadb
             and (
                 self._mariadb_json_aliases_enabled
                 or (
@@ -156,11 +213,17 @@ class FastSyncTapMySql:
             cursorclass=pymysql.cursors.DictCursor,
             ssl={'': True}
         )
+        if self._resolved_engine is None:
+            self._resolved_engine = resolve_source_engine(
+                self.conn, self._configured_engine
+            )
+            self.connection_config['engine'] = self._resolved_engine
         self.conn_unbuffered: Connection = pymysql.connect(
             **conn_params,
             cursorclass=pymysql.cursors.SSCursor,
             ssl={'': True}
         )
+        self._source_regex_verified = False
 
         # Set session variables by running a list of SQLs which is defined
         # in the optional session_sqls connection parameters
@@ -170,14 +233,27 @@ class FastSyncTapMySql:
         """
         Run list of SQLs from the "session_sqls" optional connection parameter
         """
-        session_sqls = self.connection_config.get('session_sqls', DEFAULT_SESSION_SQLS)
+        configured_session_sqls = self.connection_config.get('session_sqls')
+        session_sqls = [
+            (sql, sql in (MARIADB_MAX_STATEMENT_TIME_SQL, MYSQL_MAX_EXECUTION_TIME_SQL))
+            for sql in default_session_sqls(self.source_engine)
+        ]
+        session_sqls.extend((sql, False) for sql in (
+            configured_session_sqls if isinstance(configured_session_sqls, list) else []
+        ))
 
         warnings = []
-        if session_sqls and isinstance(session_sqls, list):
-            for sql in session_sqls:
+        for sql, optional_timeout in session_sqls:
+            for conn in (self.conn, self.conn_unbuffered):
                 try:
-                    self.query(sql)
-                    self.query(sql, self.conn_unbuffered)
+                    self._run_session_sql(conn, sql)
+                except pymysql.err.OperationalError as exc:
+                    if not optional_timeout or not exc.args or exc.args[0] != 1193:
+                        raise
+                    warnings.append(
+                        f'Built-in timeout not applied: {sql}; server does not support this variable. '
+                        'Check the configured source engine.'
+                    )
                 except pymysql.err.InternalError:
                     warnings.append(f'Could not set session variable: {sql}')
 
@@ -187,6 +263,12 @@ class FastSyncTapMySql:
             )
         for warning in warnings:
             LOGGER.warning(warning)
+
+    @staticmethod
+    def _run_session_sql(conn, sql):
+        """Initialize directly: query reconnects would recursively initialize sessions."""
+        with conn.cursor() as cursor:
+            cursor.execute(sql)
 
     def close_connections(self, silent=False):
         """
@@ -339,6 +421,7 @@ class FastSyncTapMySql:
         """
         Get the actual incremental key position in the table
         """
+        validate_bookmark_column(table, replication_key, self.source_transformations)
         result = self.query(
             f'SELECT MAX({replication_key}) AS key_value FROM {table}'
         )
@@ -382,7 +465,7 @@ class FastSyncTapMySql:
 
         return None
 
-    def get_table_columns(self, table_name, max_num=None, date_type='date'):
+    def get_table_columns(self, table_name, max_num=None, date_type='date', *, metadata_query=None):
         """
         Get MySQL table column details from information_schema
         """
@@ -465,31 +548,34 @@ class FastSyncTapMySql:
                                 END AS safe_sql_value{json_alias_projection},
                             ordinal_position
                     FROM {columns_relation}
-                    WHERE table_schema = '{schema_name}'
-                        AND table_name = '{table_name}') x
+                    WHERE table_schema = %s
+                        AND table_name = %s) x
                 ORDER BY
                         ordinal_position
             """  # noqa: E501
 
-        return self.query(sql)
+        # DATE_FORMAT tokens are literals, not PyMySQL parameter placeholders.
+        sql = sql.replace('%Y-%m-01', '%%Y-%%m-01')
+        query = self.query if metadata_query is None else metadata_query
+        return query(sql, params=(schema_name, table_name))
+
+    def map_table_columns(self, columns):
+        """Map already-read metadata without connections or primary-key queries."""
+        return [
+            '{} {}'.format(
+                safe_column_name(column.get('column_name'), self.target_quote),
+                self.tap_type_to_target_type(column.get('data_type'), column.get('column_type')),
+            )
+            for column in columns
+        ]
 
     def map_column_types_to_target(self, table_name):
         """
         Map MySQL column types to equivalent types in target
         """
         mysql_columns = self.get_table_columns(table_name)
-        mapped_columns = [
-            '{} {}'.format(
-                safe_column_name(pc.get('column_name'), self.target_quote),
-                self.tap_type_to_target_type(
-                    pc.get('data_type'), pc.get('column_type')
-                ),
-            )
-            for pc in mysql_columns
-        ]
-
         return {
-            'columns': mapped_columns,
+            'columns': self.map_table_columns(mysql_columns),
             'primary_key': self.get_primary_keys(table_name),
             'source_column_names': [
                 column.get('column_name') for column in mysql_columns
@@ -536,11 +622,12 @@ class FastSyncTapMySql:
 
         table_dict = utils.tablename_to_dict(table_name)
 
-        column_safe_sql_values = column_safe_sql_values + [
+        metadata_columns = [
             "CONVERT_TZ( NOW(),@@session.time_zone,'+00:00') AS `_SDC_EXTRACTED_AT`",
             "CONVERT_TZ( NOW(),@@session.time_zone,'+00:00') AS `_SDC_BATCHED_AT`",
             'null AS `_SDC_DELETED_AT`'
         ]
+        column_safe_sql_values += metadata_columns
 
         sql_template = """SELECT {}
         FROM `{}`.`{}` {}
@@ -562,6 +649,9 @@ class FastSyncTapMySql:
                 table_dict['table_name'],
                 where_clause,
             )
+            transformed = self._compile_source_projection(table_name, table_columns, where_clause)
+            if transformed is not None:
+                sql = f'SELECT _ppw_export.*, {",".join(metadata_columns)} FROM ({transformed}) AS _ppw_export'
             cur.execute(sql)
             gzip_splitter = split_gzip.open(
                 path,
@@ -598,6 +688,60 @@ class FastSyncTapMySql:
                 LOGGER.info(
                     'Exported total of %s rows from %s...', exported_rows, table_name
                 )
+
+    def _compile_source_projection(self, table_name, table_columns, where_clause=''):
+        """Share projection validation between recovery preflight and export."""
+        if self.source_transformations is None:
+            return None
+        columns = [dict(column, target_type=self.tap_type_to_target_type(
+            column['data_type'], column['column_type']
+        )) for column in table_columns]
+        table_dict = utils.tablename_to_dict(table_name)
+        dialect = self._source_dialect
+        table_reference = '.'.join(
+            quote_source_identifier(table_dict[key], dialect)
+            for key in ('schema_name', 'table_name')
+        )
+        projection = compile_source_select(
+            table_name, table_reference, where_clause, columns,
+            self.source_transformations, dialect, self.target_iceberg_version,
+        )
+        if requires_regex_support(table_name, self.source_transformations):
+            self._validate_source_regex_support()
+        return projection
+
+    def _validate_source_regex_support(self):
+        """Check the export connection's regex engine without reading source rows.
+
+        Probes with the compiler's own emitted boundary syntax so the certified
+        construct cannot drift from the one the export actually runs.
+        """
+        if self._source_regex_verified:
+            return
+        message = (
+            'Source regex conditions require MySQL ICU or MariaDB PCRE support. '
+            'The regex capability check failed; use a supported source server before retrying.'
+        )
+        try:
+            with self.conn_unbuffered.cursor() as cursor:
+                cursor.execute(
+                    'SELECT CONVERT(%s USING utf8mb4) COLLATE utf8mb4_bin '
+                    'REGEXP CONVERT(%s USING utf8mb4)',
+                    ('a', portable_pattern('a', self._source_dialect)),
+                )
+                result = cursor.fetchone()
+        except pymysql.MySQLError as exc:
+            if not exc.args or exc.args[0] not in (1064, 1139, 1305):
+                raise
+            raise UnsupportedSourceTransformation(message) from exc
+        if result != (1,):
+            raise UnsupportedSourceTransformation(message)
+        self._source_regex_verified = True
+
+    def validate_source_transformations(self, table_name):
+        """Reject invalid rules before binding a new Iceberg recovery attempt."""
+        if self.source_transformations is not None:
+            self._compile_source_projection(table_name, self.get_table_columns(table_name))
 
     def export_source_table_data(
             self, args: Namespace, tap_id: str,

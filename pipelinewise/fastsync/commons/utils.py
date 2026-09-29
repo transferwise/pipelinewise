@@ -412,8 +412,8 @@ def _fsync_directory(path):
         os.close(directory_descriptor)
 
 
-def save_dict_to_json(path, data):
-    LOGGER.info('Saving new state file to %s', path)
+def save_dict_to_json(path, data, *, log_level=logging.INFO):
+    LOGGER.log(log_level, 'Saving new state file to %s', path)
     path = os.path.realpath(path)
     directory = os.path.dirname(path)
     file_mode = stat.S_IMODE(os.stat(path).st_mode) if os.path.exists(path) else None

@@ -127,6 +127,7 @@ def assert_iceberg_partial_sync_workflow(
             end_value=None,
             end_is_unbounded=True,
             drop_target=drop_target,
+            resolved_source_engine='mysql',
         ),
         table_spec=None,
     )
@@ -140,7 +141,7 @@ def assert_iceberg_partial_sync_workflow(
     recovery_target = mock.Mock(name='recovery-target')
     staging_config = iceberg_routes.staging_config_identity(args.target)
     source_engine = (
-        args.tap.get('engine', 'mysql')
+        args.tap.get('engine', 'auto')
         if source_class_name == 'FastSyncTapMySql'
         else 'postgres'
     )
@@ -249,6 +250,7 @@ def assert_iceberg_partial_sync_workflow(
                 return_value=4,
             ):
         source = source_class_mock.return_value
+        source.source_engine = 'mysql'
         target = target_class_mock.return_value
         publisher = create_publisher_mock.return_value
         source.map_column_types_to_target.side_effect = record(
@@ -275,7 +277,6 @@ def assert_iceberg_partial_sync_workflow(
         target.copy_to_table.side_effect = record(
             'target.copy', 0 if empty_export else 1
         )
-        target.obfuscate_columns.side_effect = record('obfuscate')
         publisher.prepare_partial_sync.side_effect = record('prepare', attempt)
         publisher.plan_partial_sync.side_effect = record('plan')
         publisher.record_uploaded.side_effect = record('record_uploaded')
@@ -442,6 +443,7 @@ def assert_iceberg_partial_sync_workflow(
                 ),
                 recovery_identity=recovery_identity,
                 staging_config=staging_config,
+                resolved_source_engine='mysql' if source_class_name == 'FastSyncTapMySql' else None,
             )
         publisher.plan_partial_sync.assert_called_once_with(
             attempt, publication_spec
@@ -466,9 +468,7 @@ def assert_iceberg_partial_sync_workflow(
             is_temporary=True,
             staging_table_name='PW_STAGE_123',
         )
-        target.obfuscate_columns.assert_called_once_with(
-            'foo_schema', 'foo', staging_table_name='PW_STAGE_123'
-        )
+        target.obfuscate_columns.assert_not_called()
         publisher.record_uploaded.assert_called_once_with(attempt, s3_keys)
         plan_staging_uploads_mock.assert_called_once_with(
             publisher, attempt, target, file_parts
@@ -501,7 +501,7 @@ def assert_iceberg_partial_sync_workflow(
             'record_staging_created'
         )
         assert timeline.index('plan_uploads') < timeline.index('record_uploaded')
-        assert timeline.index('obfuscate') < timeline.index('staging_evidence')
+        assert timeline.index('target.copy') < timeline.index('staging_evidence')
         assert timeline.index('record_staged') < timeline.index('publish')
 
     target.swap_tables.assert_not_called()

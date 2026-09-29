@@ -682,3 +682,23 @@ class TestCommands:
             )
         assert os.path.isfile('test.log.failed')
         os.remove('test.log.failed')
+
+    def test_logged_command_drains_output_after_process_exit(self, tmp_path):
+        log_file = str(tmp_path / 'tail.log')
+        lines = []
+
+        def capture(line):
+            lines.append(line)
+            return line
+
+        with pytest.raises(commands.RunCommandException):
+            commands.run_command(
+                'for i in {1..1000}; do echo line-$i; done; '
+                'echo "logger_name=tap_mysql log_level=CRITICAL message=tail-marker"; exit 1',
+                log_file=log_file,
+                line_callback=capture,
+            )
+
+        assert lines[-1].endswith('message=tail-marker\n')
+        with open(f'{log_file}.failed', encoding='utf-8') as failed_log:
+            assert failed_log.readlines()[-1].endswith('message=tail-marker\n')

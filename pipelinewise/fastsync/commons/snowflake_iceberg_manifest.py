@@ -22,6 +22,7 @@ _PUBLICATION_FIELDS = frozenset({
     'publication_query_hash',
     'publication_query_type',
     'publication_submitted_at',
+    'resolved_source_engine',
     'replacement_metadata',
     'schema_evolution_applied',
     'staging_config',
@@ -48,6 +49,8 @@ def _invalid_payload() -> RecoveryManifestError:
 
 
 def _validate_publication_fields(value: Dict[str, Any]) -> None:
+    if 'resolved_source_engine' in value and value['resolved_source_engine'] not in ('mysql', 'mariadb'):
+        raise _invalid_payload()
     for name in ('staging_config', 'replacement_metadata'):
         if name in value and not isinstance(value[name], dict):
             raise _invalid_payload()
@@ -176,6 +179,7 @@ class FullSyncManifestPayload:
     publication_query_hash: Optional[str] = None
     publication_query_type: Optional[str] = None
     publication_submitted_at: Optional[float] = None
+    resolved_source_engine: Optional[str] = None
     extensions: Dict[str, Any] = field(default_factory=dict)
     present_fields: FrozenSet[str] = field(default_factory=frozenset)
 
@@ -190,6 +194,7 @@ class FullSyncManifestPayload:
             publication_query_hash=_field(value, 'publication_query_hash'),
             publication_query_type=_field(value, 'publication_query_type'),
             publication_submitted_at=_field(value, 'publication_submitted_at'),
+            resolved_source_engine=_field(value, 'resolved_source_engine'),
             extensions=_extensions(value, _PUBLICATION_FIELDS),
             present_fields=frozenset(value).intersection(_PUBLICATION_FIELDS),
         )
@@ -205,6 +210,7 @@ class FullSyncManifestPayload:
                 'publication_query_hash': self.publication_query_hash,
                 'publication_query_type': self.publication_query_type,
                 'publication_submitted_at': self.publication_submitted_at,
+                'resolved_source_engine': self.resolved_source_engine,
             },
             self.extensions,
         )
@@ -232,6 +238,7 @@ class PartialSyncManifestPayload(FullSyncManifestPayload):
             publication_query_hash=_field(value, 'publication_query_hash'),
             publication_query_type=_field(value, 'publication_query_type'),
             publication_submitted_at=_field(value, 'publication_submitted_at'),
+            resolved_source_engine=_field(value, 'resolved_source_engine'),
             extensions=_extensions(value, _PARTIAL_FIELDS),
             present_fields=frozenset(value).intersection(_PARTIAL_FIELDS),
             column_name=_field(value, 'column_name'),
@@ -253,6 +260,7 @@ class PartialSyncManifestPayload(FullSyncManifestPayload):
                 'publication_query_hash': self.publication_query_hash,
                 'publication_query_type': self.publication_query_type,
                 'publication_submitted_at': self.publication_submitted_at,
+                'resolved_source_engine': self.resolved_source_engine,
                 'column_name': self.column_name,
                 'start_value': self.start_value,
                 'end_value': self.end_value,

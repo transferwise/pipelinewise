@@ -1,4 +1,4 @@
-0.90.1 (2026-09-29)
+0.94.0 (2026-09-29)
 -------------------
 
 **tap-yugabyte**
@@ -58,74 +58,161 @@
   already has files at the shared install path from a prior `psycopg2-binary`
   install
 
-0.90.0 (2026-09-21)
+0.93.0 (2026-09-28)
 -------------------
 
-**Replication correctness**
+**Data-diff**
 
-- Keep MySQL and MariaDB file/position and GTID checkpoints behind incomplete
-  transactions so restarts retain table mappings and all rows; preserve
-  complete server/domain history for GTID restart and reconnect
-- Keep MariaDB savepoints inside their transaction until commit, and advance
-  past schema-filtered standalone transactions only at proven boundaries
-- Skip already acknowledged events per stream when restarting from a shared
-  binlog position, preventing replay from overwriting newer target rows
-- Process binlog row events at the sampled end position instead of skipping
-  the final event, and honour MariaDB file/position bookmarks without GTID
-- Delete the previous target identity when a MySQL or MariaDB primary-key value
-  changes during binlog replication
-- Preserve distinct composite and empty-string primary keys in Snowflake target
-  buffers, avoiding silent row loss and duplicate merge inputs
-- Withhold Snowflake target state until the corresponding streams are durable,
-  including the first checkpoint when per-stream flushing is enabled
-- Start Singer from the replica's applied primary-binlog coordinates after
-  FastSync, replaying changes missing from a lagging replica snapshot
-- Preserve supplementary Unicode through MySQL and MariaDB Singer, FullSync,
-  and PartialSync with an `utf8mb4` connection default and FastSync projection
-- Scope binlog column rediscovery to the affected schema and stream so another
-  table's ignored columns cannot suppress schema updates
-- Recognize MySQL's `geomcollection` type in Singer discovery and FastSync
-  mappings instead of silently omitting geometry-collection columns
-- Preserve MySQL and MariaDB TIME microseconds and signs in Singer records
+- Show failure reasons in Slack, CLI results, and run history. Keep aggregate
+  values out of alerts
+- Use rolling windows from the first data run by default. Set
+  `initial_full_scan: true` to check shared history first. This starts at the
+  later source/target minimum before the cutoff and excludes NULL timestamps
+- Retry `FAIL` and `ERROR` windows at the next cron interval. Keep their original
+  definitions and bounds. Limit retries to once per window per interval and
+  process up to 24 retries and 24 scheduled windows per check per invocation
+- Protect results and preflight evidence from expired workers. Continue other
+  checks if one result cannot be saved
+- Show pending initial scans, verified starts, and reasons for skipped checks
 
-**Compatibility and operations**
+Existing checks without the setting keep their configuration hash and rolling
+windows. New checks scan history only when enabled. See the
+[data-diff guide](docs/user_guide/data_diff.rst) for empty-table handling and
+retry rules.
 
-- Run the dev-project and GitHub E2E MySQL and MariaDB sources with
-  `binlog_row_metadata=FULL` while retaining mysql-replication 0.46, proving
-  current replication remains compatible ahead of a future decoder upgrade
-- Recheck ROW/FULL binlog settings on resumed replication and fail instead of
-  silently skipping events whose table metadata is unavailable
-- Require a one-time FullSync for existing MySQL/MariaDB GTID checkpoints that
-  lack the new complete-history marker; older checkpoints can omit source history
-- List every selected stream with missing or legacy GTIDs in startup errors
-  so operators can identify the required resync scope
-- Reject unsafe legacy row-event bookmarks with a resync requirement; reject
-  multi-channel replica coordinates, XA transactions, selected-table TRUNCATE,
-  and unsupported partial-JSON or compressed binlog events instead of
-  acknowledging lost data
+Back up the backend before upgrading. Run `import_config` to apply migration 003.
+Unresolved or deferred run history blocks downgrade to 002, even after later
+checks pass.
+
+**CI**
+
+- Rebalance Snowflake E2E tests across ten required parallel shards so slow
+  publication and MySQL Iceberg cases run concurrently without losing coverage
+
+0.92.0 (2026-09-25)
+-------------------
+
+**FastSync transformations**
+
+- Apply PostgreSQL and MySQL/MariaDB Snowflake FullSync and PartialSync
+  transformations in the source SELECT before CSV generation, so new export,
+  S3/archive, and staging files contain only the configured transformed output
+- Remove the corresponding Snowflake post-load transformation updates for
+  native and managed Iceberg v3 publication
+- Preserve conditional-first FastSync ordering, source export normalization,
+  output aliases and types, Unicode/NULL handling, and original range selection
+- Reject unsupported transformation or condition semantics before export
+  instead of falling back to transferring untransformed values
+- Validate source-side rule syntax and transformed replication keys during
+  configuration validation and import, before connecting to databases
+- Check source regex support on the export connection before creating CSV files
+- Reject ambiguous regex character classes that could bypass masking on MySQL
+- Validate transformations before creating Iceberg recovery attempts so rejected
+  rules can be corrected and retried
+- Preserve numeric conditions on PostgreSQL BIT VARYING columns
+- Validate each transformation against the existing mapped target type and
+  reject outputs that cannot fit, without changing the column's mapping
+- Check every existing native PartialSync column before export and merge;
+  reject type or precision loss while retaining compatible text widening
+- Add a read-only native PartialSync compatibility report for deployment checks
+- Reuse FastSync metadata queries and mappings in the report; distinguish invalid
+  input from execution errors and include sanitized diagnostic codes and locations
+- Test Singer, native FastSync, and Iceberg target types and transformation
+  results, and document existing differences between those paths
+- Reject transformed INCREMENTAL replication keys before reading their raw
+  maximum, preventing sensitive values from entering checkpoint files
+- Reject retained managed-Iceberg attempts for transformed streams created
+  under the previous target-side execution contract; finish recovery before
+  upgrading, and manage historical raw staging/archive files separately
+
+0.91.1 (2026-09-23)
+-------------------
+
+- Set MySQL and MariaDB ``net_write_timeout=3600`` for Singer, FullSync, and
+  PartialSync so source connections tolerate longer target stalls
+- Disable MySQL SELECT timeouts with ``max_execution_time=0``; keep MariaDB's
+  ``max_statement_time=0`` default
+- Warn and continue if the server lacks a built-in statement-timeout variable;
+  keep unknown-variable errors fatal for custom ``session_sqls``
+- Avoid recursive FastSync reconnects when session setup fails
+- Preserve pending Iceberg recovery when the default network write timeout changes
+- Wait 30 and 60 seconds between PipelineWise-managed binlog retries; keep the
+  cause and error code in retry warnings and the traceback on terminal disconnects
+
+0.91.0 (2026-09-22)
+-------------------
+
+**MySQL and MariaDB replication**
+
+- Checkpoint file/position and GTID replication only at complete transaction
+  boundaries
+- Keep MariaDB savepoints inside their transaction until commit
+- Advance filtered standalone transactions only at verified boundaries
+- Preserve complete multi-server and multi-domain GTID history and per-stream
+  replay positions across restarts; older versions cannot safely resume these
+  checkpoints
+- Process row events at the sampled endpoint and support MariaDB file/position
+  bookmarks without GTID
+- Support MariaDB 11.4 binlog events with a zero ``End_log_pos``
+- Handle non-UTF8 text in binlog metadata during bookmark validation
+- Remove the old target row when a primary key changes
+- Preserve composite and empty-string primary keys in Snowflake buffers
+- Emit Snowflake state only after the matching stream data is durable
+- Persist Singer state atomically and drain final process output before deciding
+  whether the run succeeded
+- Resume Singer after replica FastSync from the replica's applied primary
+  coordinates
+- Preserve supplementary Unicode in Singer, FullSync, and PartialSync with
+  ``utf8mb4``
+- Limit column rediscovery to the affected schema and stream
+- Replicate MySQL ``geomcollection`` columns through Singer and FastSync
+- Preserve signs and microseconds in MySQL and MariaDB ``TIME`` values
+- Use an explicit MySQL or MariaDB engine, or detect it when omitted,
+  consistently across Singer, FullSync, and PartialSync for session defaults,
+  GTID handling, status queries, and managed Iceberg v3 JSON aliases
+- Disable MariaDB statement timeouts by default
+- Run configured ``session_sqls`` after connector defaults so they can override
+  the defaults
+- Support current MySQL binary-log status statements with legacy syntax fallback
+
+**Recovery and compatibility**
+
+- Resume legacy file-position and GTID bookmarks from retained binlogs without
+  requiring FastSync; stop if usable file coordinates or binlogs are unavailable
+- Reduce source round trips and report progress while recovering unsafe legacy
+  bookmarks from retained binlogs
+- Inspect up to 256 neutral binlog events when validating a checkpoint; stop
+  without advancing state if the result remains inconclusive
+- Retry lost file-position binlog connections twice from target-acknowledged
+  state and retain all attempts in one terminal log; keep existing reconnects
+  for GTID and metadata connections
+- Recheck ROW/FULL binlog settings on resumed runs and stop when table metadata
+  is unavailable
+- Reject multi-channel replica coordinates, XA, selected-table ``TRUNCATE``,
+  partial-JSON, and compressed binlog events before state advances
 - Infer MariaDB GTIDs from file/position bookmarks only at verified transaction
-  boundaries, avoiding acknowledgements of partially consumed transactions
-- Accept MariaDB rotated-binlog headers, including header-only files at verified
-  EOF, without unnecessary resync demands
-- Report undecodable bookmarks and missing or anonymous GTID markers with
-  actionable recovery errors
-- Stop file/position binlog reads on connection loss so retries use durable
-  checkpoints rather than the decoder's potentially mid-transaction position;
-  retain retries for separate table-metadata connections
-- Retain complete GTID sets in state; older versions cannot reliably resume
-  multi-server or multi-domain checkpoints. Resolve pending managed-Iceberg
-  recovery with its original charset before adopting the new default
-- Support current MySQL binary-log status statements with legacy syntax
-  fallback; existing missing or corrupted target data still requires resync
+  boundaries
+- Accept MariaDB rotated-binlog headers and header-only files at verified EOF
+- Report invalid bookmarks and missing or anonymous transaction GTID markers
+  with recovery guidance
+- Stop managed-Iceberg restaging before re-export if the resolved MySQL or
+  MariaDB source engine differs from the persisted attempt
+- Explain how to recover older Iceberg attempts with no saved source engine
+  without deleting recovery evidence
+- Finish pending managed-Iceberg MySQL/MariaDB attempts with the previous version
+  before upgrading; the ``utf8mb4`` default, omitted ``engine``, and configured
+  ``session_sqls`` change recovery identity, and re-export requires a saved engine
+- Resync target data already missing or corrupted before this release; these
+  fixes prevent new omissions but do not repair existing data
 
-**Dependencies**
+**Dependencies and testing**
 
-- Update the Snowflake Python connector to 4.7.3 in core and target-snowflake,
-  PyMySQL to 1.1.3 in core and tap-mysql, and the target's Boto3 pin to 1.43.94
-- Update sqlparse to 0.6.0 to include denial-of-service fixes in PartialSync SQL
-  parsing and validation
-- Retain mysql-replication 0.46: newer releases require additional source-binlog
-  metadata for reliable type decoding, so that upgrade needs separate validation
+- Update the Snowflake connector to 4.7.3, PyMySQL to 1.1.3, and Boto3 to
+  1.43.94
+- Update sqlparse to 0.6.0 for PartialSync denial-of-service fixes
+- Retain mysql-replication 0.46 until newer releases are validated with full
+  source-binlog metadata
+- Test dev-project and GitHub E2E sources with ``binlog_row_metadata=FULL``
 
 0.89.0 (2026-09-18)
 -------------------

@@ -1,7 +1,7 @@
 """Source-specific behavior used by shared RDBMS-to-Snowflake runners."""
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 
 ExportInspection = Callable[[], Tuple[List[str], int]]
@@ -28,13 +28,24 @@ class RdbmsSnowflakeSource(ABC):
         """Build the YugabyteDB source contract."""
         return YugabyteSnowflakeSource(factory, type_mapper)
 
+    def _configure(self, source, args, iceberg_version: Optional[int]):
+        """Apply the transformation and Iceberg settings both routes share."""
+        source.source_transformations = args.transform
+        source.target_iceberg_version = iceberg_version
+        return source
+
     @abstractmethod
-    def create(self, args, iceberg_requested: bool):
-        """Create and configure a source connector."""
+    def create(self, args, iceberg_version: Optional[int]):
+        """Create and configure a source connector for the validated route version."""
 
     @abstractmethod
     def source_engine(self, args) -> str:
         """Return the source-engine component of recovery identity."""
+
+    def resolved_source_engine(self, source) -> Optional[str]:
+        """Return a detected engine to bind to the bookmark, when applicable."""
+        del source
+        return None
 
     @abstractmethod
     def bookmark_kwargs(self, args) -> Dict[str, str]:
@@ -72,14 +83,17 @@ class MySqlSnowflakeSource(RdbmsSnowflakeSource):
     type_mapper: Callable[..., str]
     route_name = 'mysql_to_snowflake'
 
-    def create(self, args, iceberg_requested: bool):
-        source = self.factory(args.tap, self.type_mapper)
-        if iceberg_requested:
+    def create(self, args, iceberg_version: Optional[int]):
+        source = self._configure(self.factory(args.tap, self.type_mapper), args, iceberg_version)
+        if iceberg_version is not None:
             source.set_mariadb_json_aliases_enabled(True)
         return source
 
     def source_engine(self, args) -> str:
-        return args.tap.get('engine', 'mysql')
+        return args.tap.get('engine', 'auto')
+
+    def resolved_source_engine(self, source) -> str:
+        return source.source_engine
 
     def bookmark_kwargs(self, args) -> Dict[str, str]:
         del args
@@ -118,9 +132,9 @@ class PostgresSnowflakeSource(RdbmsSnowflakeSource):
     type_mapper: Callable[..., str]
     route_name = 'postgres_to_snowflake'
 
-    def create(self, args, iceberg_requested: bool):
-        source = self.factory(args.tap, self.type_mapper)
-        source.hstore_as_json = iceberg_requested
+    def create(self, args, iceberg_version: Optional[int]):
+        source = self._configure(self.factory(args.tap, self.type_mapper), args, iceberg_version)
+        source.hstore_as_json = iceberg_version is not None
         return source
 
     def source_engine(self, args) -> str:

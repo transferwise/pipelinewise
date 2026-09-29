@@ -14,7 +14,7 @@ import psutil
 import pidfile
 
 from datetime import datetime
-from time import time
+from time import sleep, time
 from uuid import uuid4
 from typing import Dict, Optional, List, Any, NoReturn, Tuple
 from joblib import Parallel, delayed, parallel_backend
@@ -42,6 +42,7 @@ from pipelinewise.fastsync.commons.tap_postgres import FastSyncTapPostgres
 from pipelinewise.fastsync.commons.tap_yugabyte import FastSyncTapYugabyte
 from pipelinewise.fastsync.commons import utils as fastsync_utils
 from pipelinewise.cli.multiprocess import Process
+from pipelinewise.data_diff.coverage import FAILED_STATUSES
 from pipelinewise.data_diff.repository import DataDiffRepository
 from pipelinewise.data_diff.runner import rerun_failed_check, run_due_checks
 from pipelinewise.data_diff.runtime import RuntimeConnectorConfigLoader
@@ -51,6 +52,42 @@ from pipelinewise.data_diff.runtime import RuntimeConnectorConfigLoader
 FASTSYNC_PAIRS = fastsync_capability_policy.FASTSYNC_PAIRS
 ICEBERG_FASTSYNC_PAIRS = fastsync_capability_policy.ICEBERG_FASTSYNC_PAIRS
 PARTIAL_SYNC_PAIRS = fastsync_capability_policy.PARTIAL_SYNC_PAIRS
+
+MYSQL_BINLOG_DISCONNECT_MARKER = {
+    'type': 'PIPELINEWISE_CONTROL',
+    'component': 'tap-mysql',
+    'event': 'binlog_stream_disconnected',
+    'version': 1,
+}
+MYSQL_BINLOG_DISCONNECT_CONTROL_PREFIX = 'PIPELINEWISE_CONTROL:'
+MYSQL_BINLOG_DISCONNECT_RETRY_DELAYS_SECONDS = (30, 60)
+MYSQL_BINLOG_DISCONNECT_MAX_ATTEMPTS = len(MYSQL_BINLOG_DISCONNECT_RETRY_DELAYS_SECONDS) + 1
+MYSQL_BINLOG_RETRY_PENDING_ENV = 'PIPELINEWISE_MYSQL_BINLOG_RETRY_PENDING'
+
+
+def _persist_singer_state(path: str, state: str) -> None:
+    fastsync_utils.save_dict_to_json(path, json.loads(state), log_level=logging.DEBUG)
+
+
+def _iso(value) -> str:
+    """Render an optional timestamp for a table cell; unset shows as blank."""
+    return value.isoformat() if value is not None else ''
+
+
+def _is_retryable_mysql_disconnect(
+        tap_type: str,
+        line: str) -> bool:
+    if (
+        tap_type != ConnectorType.TAP_MYSQL.value
+        or MYSQL_BINLOG_DISCONNECT_CONTROL_PREFIX not in line
+    ):
+        return False
+    marker_text = line.rpartition(MYSQL_BINLOG_DISCONNECT_CONTROL_PREFIX)[2]
+    try:
+        marker = json.loads(marker_text)
+        return marker == MYSQL_BINLOG_DISCONNECT_MARKER and type(marker['version']) is int
+    except (ValueError, TypeError):
+        return False
 
 
 class PipelineWise:
@@ -1036,30 +1073,21 @@ class PipelineWise:
         """
         Generate and run piped shell command to sync tables using singer taps and targets
         """
-        # Build the piped executable command
-        command = commands.build_singer_command(
-            tap=tap,
-            target=target,
-            transform=transform,
-            stream_buffer_size=stream_buffer_size,
-            stream_buffer_log_file=self.tap_run_log_file,
-            profiling_mode=self.profiling_mode,
-            profiling_dir=self.profiling_dir,
-        )
-
         start = None
         state = None
+        retryable_disconnect = False
 
         def update_state_file(line: str) -> str:
+            nonlocal start, state, retryable_disconnect
+            if _is_retryable_mysql_disconnect(tap.type, line):
+                retryable_disconnect = True
+
             # Update state variable with latest state
             if utils.is_state_message(line):
                 # if it has been more than 2 seconds since we last updated the state file
                 # update it again with newly received state
-                nonlocal start, state
-
                 if start is None or time() - start >= 2:
-                    with open(tap.state, 'w', encoding='utf-8') as state_file:
-                        state_file.write(line)
+                    _persist_singer_state(tap.state, line)
 
                     # Update start time to be the current time.
                     start = time()
@@ -1078,18 +1106,59 @@ class PipelineWise:
             sys.stdout.write(line)
             return update_state_file(line)
 
-        # Run command with update_state_file as a callback to call for every stdout line
-        if self.extra_log:
-            commands.run_command(
-                command, self.tap_run_log_file, update_state_file_with_extra_log
+        line_callback = update_state_file_with_extra_log if self.extra_log else update_state_file
+
+        for attempt in range(1, MYSQL_BINLOG_DISCONNECT_MAX_ATTEMPTS + 1):
+            retryable_disconnect = False
+            # Rebuild on every attempt because the previous target can have persisted newer state.
+            command = commands.build_singer_command(
+                tap=tap,
+                target=target,
+                transform=transform,
+                stream_buffer_size=stream_buffer_size,
+                stream_buffer_log_file=self.tap_run_log_file,
+                profiling_mode=self.profiling_mode,
+                profiling_dir=self.profiling_dir,
             )
-        else:
-            commands.run_command(command, self.tap_run_log_file, update_state_file)
+            if tap.type == ConnectorType.TAP_MYSQL.value:
+                retry_pending = int(attempt < MYSQL_BINLOG_DISCONNECT_MAX_ATTEMPTS)
+                # The assignment applies only to the tap, not the remaining pipeline stages.
+                command = f'{MYSQL_BINLOG_RETRY_PENDING_ENV}={retry_pending} {command}'
+
+            try:
+                commands.run_command(command, self.tap_run_log_file, line_callback)
+                break
+            except commands.RunCommandException:
+                # The target emitted this state only after making the corresponding rows durable.
+                if retryable_disconnect and state is not None:
+                    _persist_singer_state(tap.state, state)
+
+                if not retryable_disconnect or attempt == MYSQL_BINLOG_DISCONNECT_MAX_ATTEMPTS:
+                    raise
+
+                retry_delay = MYSQL_BINLOG_DISCONNECT_RETRY_DELAYS_SECONDS[attempt - 1]
+                failed_log = commands.log_file_with_status(
+                    self.tap_run_log_file, commands.STATUS_FAILED)
+                if os.path.isfile(failed_log):
+                    running_log = commands.log_file_with_status(self.tap_run_log_file, commands.STATUS_RUNNING)
+                    os.replace(failed_log, running_log)
+                    with open(running_log, 'a', encoding='utf-8') as logfile:
+                        logfile.write(f'\nRetrying Singer pipeline: attempt {attempt + 1} '
+                                      f'of {MYSQL_BINLOG_DISCONNECT_MAX_ATTEMPTS} '
+                                      f'(waiting {retry_delay} seconds)\n')
+
+                self.logger.warning(
+                    'MySQL binlog connection lost; retrying the Singer pipeline from durable state in %s seconds '
+                    '(attempt %s of %s).',
+                    retry_delay,
+                    attempt + 1,
+                    MYSQL_BINLOG_DISCONNECT_MAX_ATTEMPTS,
+                )
+                sleep(retry_delay)
 
         # update the state file one last time to make sure it always has the last state message.
         if state is not None:
-            with open(tap.state, 'w', encoding='utf-8') as statefile:
-                statefile.write(state)
+            _persist_singer_state(tap.state, state)
 
     def run_tap_partialsync(self, tap: TapParams, target: TargetParams, transform: TransformParams):
         """Running the tap for partial sync table"""
@@ -1761,11 +1830,8 @@ class PipelineWise:
 
             tap_ids.add(tap_yml['id'])
 
-            # If there is a fastsync component for this tap-target combo and transformations on json properties are
-            # configured then fail the validation.
-            # The reason being that at the time of writing this, transformations in Fastsync are done on the
-            # target side using mostly SQL UPDATE, and transformations on properties in json fields are not
-            # implemented due to the need of converting XPATH syntax to SQL which has been deemed as not worth it
+            # FastSync supports top-level transformations only; nested JSON paths
+            # remain unsupported regardless of where a route applies its rules.
             fastsync_capabilities = resolve_fastsync_capabilities(
                 tap_yml['type'],
                 targets[tap_yml['target']],
@@ -1879,6 +1945,7 @@ class PipelineWise:
         deleted_taps_count = self.cleanup_after_deleted_config(old_config)
 
         data_diff_sync_failed = False
+        historical_scans_pending = 'not configured'
         if config.global_config.get('backend_db'):
             try:
                 with DataDiffRepository.from_backend_config(
@@ -1891,10 +1958,12 @@ class PipelineWise:
                     )
             except Exception as exc:
                 data_diff_sync_failed = True
+                historical_scans_pending = 'unavailable'
                 self.logger.exception(
                     'Failed to reconcile data-diff definitions: %s', exc
                 )
             else:
+                historical_scans_pending = sync_stats['historical_scans_pending']
                 self.logger.info(
                     'Persisted data-diff definitions: %s',
                     sync_stats,
@@ -1914,6 +1983,7 @@ class PipelineWise:
                 Taps imported successfully     : %s
                 Taps deleted                   : %s
                 Taps failed to import          : %s
+                Initial data-diff scans pending: %s
                 Runtime                        : %s
             -------------------------------------------------------
             """,
@@ -1922,6 +1992,7 @@ class PipelineWise:
             total_taps - len(discover_excs),
             deleted_taps_count,
             str(discover_excs),
+            historical_scans_pending,
             end_time - start_time,
         )
         if discover_excs or data_diff_sync_failed:
@@ -1943,9 +2014,10 @@ class PipelineWise:
                 summary['status'],
                 summary.get('slot_status') or '',
                 # A check that could not be scheduled has no window to report.
-                summary['window_start'].isoformat() if summary['window_start'] else '',
-                summary['window_end'].isoformat() if summary['window_end'] else '',
-                str(summary.get('run_id', '')),
+                _iso(summary['window_start']),
+                _iso(summary['window_end']),
+                str(summary.get('run_id') or ''),
+                summary.get('error') or '',
             ]
             for summary in summaries
         ]
@@ -1955,7 +2027,7 @@ class PipelineWise:
                     rows,
                     headers=[
                         'Check', 'Status', 'Slot status', 'UTC start',
-                        'UTC end', 'Run ID',
+                        'UTC end', 'Run ID', 'Reason',
                     ],
                 )
             )
@@ -2003,7 +2075,7 @@ class PipelineWise:
         failures = [
             summary
             for summary in summaries
-            if summary['status'] in ('FAIL', 'ERROR')
+            if summary['status'] in FAILED_STATUSES
         ]
 
         for summary in failures:
@@ -2025,7 +2097,7 @@ class PipelineWise:
             if summary.get('run_id'):
                 message += f"\n  run_id  {summary['run_id']}"
             if summary.get('error'):
-                message += f"\n  error   {summary['error']}"
+                message += f"\n  reason  {summary['error']}"
             self.alert_sender.send_to_all_handlers(
                 message=message,
                 level=BaseAlertHandler.ERROR,
@@ -2062,9 +2134,11 @@ class PipelineWise:
                 check['frequency'],
                 check['window_start_seconds'],
                 check['window_end_seconds'],
+                'yes' if check['initial_full_scan'] else 'no',
+                'yes' if check['historical_scan_pending'] else 'no',
                 check.get('verified_status') or '',
-                check['verified_end'].isoformat()
-                if check.get('verified_end') else '',
+                _iso(check.get('verified_start')),
+                _iso(check.get('verified_end')),
             ]
             for check in checks
         ]
@@ -2075,7 +2149,8 @@ class PipelineWise:
                     'Check ID', 'Rev', 'Current', 'Target',
                     'Tap', 'Source table', 'Checks', 'Key', 'Timestamp',
                     'Compare columns', 'Frequency', 'Window start (s)',
-                    'Window end (s)', 'Verified status', 'Verified end',
+                    'Window end (s)', 'Full scan', 'Initial scan pending',
+                    'Verified status', 'Verified start', 'Verified end',
                 ],
             )
         )
@@ -2113,14 +2188,16 @@ class PipelineWise:
             tabulate(
                 [[
                     summary['check']['full_check_name'], summary['status'],
-                    summary['attempt'], summary['window_start'].isoformat(),
-                    summary['window_end'].isoformat(), str(self.args.run_id),
+                    summary['attempt'],
+                    _iso(summary['window_start']),
+                    _iso(summary['window_end']), str(self.args.run_id),
                     str(summary['run_id']), self.args.remediation_ref,
+                    summary.get('error') or '',
                 ]],
                 headers=[
                     'Check', 'Status', 'Attempt', 'UTC start', 'UTC end',
                     'Original run ID', 'Remediation run ID',
-                    'Remediation reference',
+                    'Remediation reference', 'Reason',
                 ],
             )
         )

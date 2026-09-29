@@ -121,9 +121,13 @@ severity; if there are no concerns, say so explicitly.
 
 - Branch from `master`; keep diffs task-scoped. Sign every commit with
   `git commit -S`; never create or push an unsigned commit.
-- CHANGELOG bullets are atomic and outcome-focused: start with an action verb,
-  name the component and operational result, group related bullets, and include
-  implementation detail only to explain risk.
+- Never include internal Jira names or issue keys (such as `AP-...`) in commit
+  messages, PR titles, or PR descriptions, even when the branch name has one.
+- Write docs and CHANGELOG entries in plain language. Use short sentences with
+  one idea each. Lead with behaviour, defaults, or the action the operator needs.
+- Keep CHANGELOG entries to user-visible outcomes and upgrade steps. Start
+  bullets with action verbs. Put detailed rules and edge cases in linked docs.
+  Preserve exact limits, boundaries, and recovery requirements when shortening.
 - Before creating a PR or pushing to an open PR, compare the complete branch
   diff with the current CHANGELOG entry; do not proceed if the entry omits or
   misstates the diff or claims absent changes. Set that release to today's date
