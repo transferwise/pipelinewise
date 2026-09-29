@@ -196,6 +196,12 @@ advance.
 
 After an unexpected termination, restart the same tap without advancing
 state. Unacknowledged changes remain replayable while the slot exists.
+Checkpoints advance only after the tap consumes a transaction's commit record,
+including a committed PipelineWise WAL progress message. A completed transaction
+can checkpoint even if no later message arrives. If a transaction is interrupted,
+the tap retains the last consumed commit, or each stream's starting checkpoint
+when no commit was consumed, without regressing below a newer target acknowledgement.
+Restarting can therefore replay rows that the target already received.
 Resync only when the slot is unavailable, and monitor
 ``ysql_cdc_active_replication_slot_window_ms`` (default five minutes) when
 tearing down a tap: dropping a slot immediately after the last consumer

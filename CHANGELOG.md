@@ -1,8 +1,11 @@
-0.90.1 (2026-09-22)
+0.90.1 (2026-09-29)
 -------------------
 
 **tap-yugabyte**
 
+- Advance LOG_BASED checkpoints and WAL flush eligibility only after consuming commit
+  records; retain starting checkpoints when no commit is consumed and never regress
+  checkpoints below a newer target acknowledgement
 - Add FULL_TABLE replication, resuming an interrupted sync with parameterized
   primary-key keyset pagination instead of Postgres heap-specific `xmin`,
   since YugabyteDB's DocDB storage has no equivalent
