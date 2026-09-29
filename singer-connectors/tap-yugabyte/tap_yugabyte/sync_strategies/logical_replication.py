@@ -6,6 +6,7 @@ import copy
 import json
 import re
 import singer
+import sys
 import uuid
 import warnings
 
@@ -35,6 +36,46 @@ class ReplicationSlotNotFoundError(Exception):
 
 class UnsupportedPayloadKindError(Exception):
     """Custom exception when waljson payload is not insert, update nor delete"""
+
+
+class MalformedWALPayloadError(ValueError):
+    """A WAL payload cannot be safely included in a transaction checkpoint."""
+
+
+def _validate_wal_payload(message_payload, msg, conn_info, slot=None):
+    context = f"LSN {msg.data_start}, slot {slot or 'unknown'}, tap {conn_info.get('tap_id', 'unknown')}"
+    if not isinstance(message_payload, dict):
+        raise MalformedWALPayloadError(f'Invalid wal2json payload at {context}: expected a JSON object')
+    action = message_payload.get('action')
+    if not isinstance(action, str) or action not in {'I', 'U', 'D', 'B', 'C', 'M', 'T'}:
+        raise MalformedWALPayloadError(f'Invalid wal2json payload at {context}: missing or unsupported action')
+    if action in {'I', 'U', 'D'}:
+        for field in ('schema', 'table'):
+            if not isinstance(message_payload.get(field), str) or not message_payload[field]:
+                raise MalformedWALPayloadError(f'Invalid wal2json payload at {context}: missing or invalid {field}')
+        row_field = 'identity' if action == 'D' else 'columns'
+        columns = message_payload.get(row_field)
+        if not isinstance(columns, list) or not columns:
+            raise MalformedWALPayloadError(f'Invalid wal2json payload at {context}: missing or empty {row_field}')
+        if any(not isinstance(column, dict) or not isinstance(column.get('name'), str)
+               or not column['name'] or 'value' not in column for column in columns):
+            raise MalformedWALPayloadError(f'Invalid wal2json payload at {context}: invalid {row_field} entry')
+    return message_payload
+
+
+def _decode_wal_payload(msg, conn_info, slot=None):
+    context = f"LSN {msg.data_start}, slot {slot or 'unknown'}, tap {conn_info.get('tap_id', 'unknown')}"
+    try:
+        payload = msg.payload.decode('utf-8') if isinstance(msg.payload, bytes) else msg.payload
+        message_payload = json.loads(payload)
+    except (TypeError, ValueError) as exc:
+        # Preserve the decoding cause without retaining source record bytes in tracebacks.
+        if isinstance(exc, UnicodeDecodeError):
+            exc.object = b''
+        elif isinstance(exc, json.JSONDecodeError):
+            exc.doc = ''
+        raise MalformedWALPayloadError(f'Invalid wal2json payload at {context}: invalid JSON or UTF-8') from exc
+    return _validate_wal_payload(message_payload, msg, conn_info, slot)
 
 
 def fetch_current_lsn(conn_config):
@@ -360,12 +401,11 @@ def row_to_singer_message(stream, row, version, columns, time_extracted, md_map,
         time_extracted=time_extracted)
 
 
-def consume_message(streams, state, msg, time_extracted, conn_info, *, message_payload=None):
+def consume_message(streams, state, msg, time_extracted, conn_info, *, message_payload=None, slot=None):
     if message_payload is None:
-        try:
-            message_payload = json.loads(msg.payload)
-        except Exception:
-            return state
+        message_payload = _decode_wal_payload(msg, conn_info, slot)
+    else:
+        message_payload = _validate_wal_payload(message_payload, msg, conn_info, slot)
 
     lsn = msg.data_start
 
@@ -668,10 +708,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file, *, wal_p
                                 end_lsn)
                     break
 
-                try:
-                    message_payload = json.loads(msg.payload)
-                except (TypeError, ValueError):
-                    message_payload = {}
+                message_payload = _decode_wal_payload(msg, conn_info, slot)
 
                 if (wal_progress_content is not None
                         and message_payload.get('action') == 'M'
@@ -687,6 +724,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file, *, wal_p
                     time_extracted,
                     conn_info,
                     message_payload=message_payload,
+                    slot=slot,
                 )
 
                 if lsn_currently_processing is None:
@@ -749,14 +787,22 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file, *, wal_p
 
                 poll_timestamp = datetime.datetime.now(datetime.UTC)
 
-        # Close replication connection and cursor
-        cur.close()
-        conn.close()
     finally:
+        active_error = sys.exception()
+        close_error = None
+        for resource in (cur, conn):
+            try:
+                resource.close()
+            except Exception as exc:  # A close failure must not replace the replication failure.
+                LOGGER.warning('Unable to close replication resource: %s', type(exc).__name__)
+                if close_error is None:
+                    close_error = exc
         # Row bookmarks may include an incomplete transaction; only observed commits can advance them.
         for stream_id, initial_lsn in initial_stream_lsns.items():
             checkpoint_lsn = max(initial_lsn, last_committed_lsn or 0, target_acknowledged_lsn)
             state = singer.write_bookmark(state, stream_id, 'lsn', checkpoint_lsn)
         singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
+        if active_error is None and close_error is not None:
+            raise close_error
 
     return state

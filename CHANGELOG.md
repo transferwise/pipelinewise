@@ -3,6 +3,9 @@
 
 **tap-yugabyte**
 
+- Reject malformed LOG_BASED WAL payloads before consuming a commit, so invalid
+  JSON, UTF-8, missing row fields, or empty column/identity lists cannot advance
+  a checkpoint past missing rows
 - Advance LOG_BASED checkpoints and WAL flush eligibility only after consuming commit
   records; retain starting checkpoints when no commit is consumed and never regress
   checkpoints below a newer target acknowledgement

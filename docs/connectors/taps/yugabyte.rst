@@ -202,6 +202,15 @@ can checkpoint even if no later message arrives. If a transaction is interrupted
 the tap retains the last consumed commit, or each stream's starting checkpoint
 when no commit was consumed, without regressing below a newer target acknowledgement.
 Restarting can therefore replay rows that the target already received.
+If a WAL message contains invalid JSON, UTF-8, or an invalid wal2json row message
+shape, the tap fails at that message and retains the last complete transaction
+checkpoint. Its error identifies the LSN, replication slot, and tap without
+printing the row payload. Row messages require a schema, table, and nonempty
+columns (inserts and updates) or identity (deletes); each entry requires a name
+and a value, which may be null. Investigate the source or output plugin, then
+restart with the same state and slot after correcting the cause; do not manually
+advance the bookmark past the failed transaction.
+
 Resync only when the slot is unavailable, and monitor
 ``ysql_cdc_active_replication_slot_window_ms`` (default five minutes) when
 tearing down a tap: dropping a slot immediately after the last consumer

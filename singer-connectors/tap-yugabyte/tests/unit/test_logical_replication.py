@@ -145,15 +145,16 @@ class TestLogicalReplication(unittest.TestCase):
                                                                 'some_db',
                                                                 'some_tap')
 
-    def test_consume_with_message_payload_is_not_json_expect_same_state(self):
-        output = logical_replication.consume_message([],
-                                                     {},
-                                                     self.WalMessage(payload='this is an invalid json message',
-                                                                     data_start=None),
-                                                     None,
-                                                     {}
-                                                     )
-        self.assertDictEqual({}, output)
+    def test_consume_with_message_payload_is_not_json_raises(self):
+        state = {}
+        with self.assertRaises(logical_replication.MalformedWALPayloadError):
+            logical_replication.consume_message([],
+                                                state,
+                                                self.WalMessage(payload='this is an invalid json message',
+                                                                data_start=None),
+                                                None,
+                                                {})
+        self.assertDictEqual({}, state)
 
     @patch('tap_yugabyte.sync_strategies.logical_replication.singer.write_message')
     def test_consume_with_message_stream_in_payload_is_not_selected_expect_same_state(self, mocked_write_message):
@@ -1269,7 +1270,7 @@ class TestLogicalReplication(unittest.TestCase):
 
         class test_message:
             data_start = end_lsn + 1
-            payload = '{}'
+            payload = '{"action":"B"}'
 
         state = {'bookmarks': {'foo-bar': {'foo': 'bar', 'version': 'foo', 'lsn': lsn_committed}}}
         self.conn_info['break_at_end_lsn'] = False
@@ -1327,6 +1328,10 @@ class TestLogicalReplicationFeedback(unittest.TestCase):
         }
 
     def _message(self, action, lsn, **payload):
+        if action in {'I', 'U', 'D'}:
+            row_field = 'identity' if action == 'D' else 'columns'
+            payload = {'schema': 'public', 'table': 'foo_table',
+                       row_field: [{'name': 'id', 'value': 1}], **payload}
         return self.WalMessage(payload=json.dumps({'action': action, **payload}), data_start=lsn)
 
     @staticmethod
@@ -1414,15 +1419,15 @@ class TestLogicalReplicationFeedback(unittest.TestCase):
         self.assertIs(error, termination)
         self.assertEqual(self._expected_feedback(100), feedback)
 
-    def test_invalid_utf8_payload_is_skipped(self):
+    def test_invalid_utf8_payload_fails_without_advancing_feedback(self):
         state = self._state({'foo-bar': 100})
         state_reader = mock_open(read_data=json.dumps(state))
         messages = [self.WalMessage(payload=b'\x80\x81abc', data_start=200)]
 
         feedback, error, termination, _ = self._run_sync(state, messages, state_reader)
 
-        self.assertIs(error, termination)
-        self.assertEqual(self._expected_feedback(100), feedback)
+        self.assertIsInstance(error, logical_replication.MalformedWALPayloadError)
+        self.assertEqual([], feedback)
 
     def test_progress_message_advances_state_without_advancing_feedback(self):
         """The tap stops at its committed marker while feedback remains target-bounded."""
