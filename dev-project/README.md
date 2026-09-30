@@ -8,6 +8,7 @@ The local development environment comes with the following containers and compon
 * MariaDB test source database with test data (for tap-mysql)
 * MySQL 8 test source database with test data (for tap-mysql)
 * Postgres test source database with test data (for tap-postgres)
+* YugabyteDB test source database with test data (for tap-yugabyte)
 * MongoDB replicaSet test source database with test data (for tap-mongodb)
 * Postgres test target data warehouse (for target-postgres)
 * Dedicated Postgres operational database for PipelineWise data-diff state
@@ -76,6 +77,7 @@ Run any of the taps against the Postgres DWH, for example:
 ```sh
 $ pipelinewise run_tap --tap tap_mariadb --target target_postgres
 $ pipelinewise run_tap --tap tap_postgres --target target_postgres
+$ pipelinewise run_tap --tap tap_yugabyte --target target_postgres
 $ pipelinewise run_tap --tap tap_mongodb_to_pg --target target_postgres
 ```
 

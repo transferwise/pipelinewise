@@ -38,6 +38,8 @@ services:
     depends_on:
       pipelinewise-postgres-source:
         condition: service_healthy
+      pipelinewise-yugabyte-source:
+        condition: service_healthy
       pipelinewise-mysql-source:
         condition: service_healthy
       pipelinewise-oracle-mysql-source:
@@ -115,6 +117,28 @@ services:
       test:
         - CMD-SHELL
         - pg_isready -U ${TAP_POSTGRES_USER} -d ${TAP_POSTGRES_DB}
+      interval: 5s
+      timeout: 5s
+      retries: 15
+    networks:
+      - pipelinewise_network
+
+
+  pipelinewise-yugabyte-source:
+    image: yugabytedb/yugabyte:2026.1.1.1-b2
+    container_name: pipelinewise-yugabyte-source
+    command: >
+      bin/yugabyted start --background=false
+    ports:
+      - ${TAP_YUGABYTE_PORT_ON_HOST}:${TAP_YUGABYTE_PORT}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "bash",
+          "-c",
+          "bin/yugabyted status | grep -q 'Status.*Running'",
+        ]
       interval: 5s
       timeout: 5s
       retries: 15
