@@ -13,6 +13,7 @@ from typing import Callable, Dict, Optional, Tuple
 
 from . import utils, split_gzip
 from .partial_sync_boundary import PartialSyncBoundary
+from .source_transformations import compile_source_select, quote_source_identifier, validate_bookmark_column
 from ...utils import safe_column_name
 
 LOGGER = logging.getLogger(__name__)
@@ -53,6 +54,8 @@ class FastSyncTapYugabyte:
         self.connection_config = connection_config
         self.tap_type_to_target_type = tap_type_to_target_type
         self.target_quote = target_quote
+        self.source_transformations = None
+        self.target_iceberg_version = None
         self.hstore_as_json = False
         self.conn = None
         self.curr = None
@@ -376,6 +379,7 @@ class FastSyncTapYugabyte:
         """
         Get the actual incremental key position in the table
         """
+        validate_bookmark_column(table, replication_key, self.source_transformations)
         schema_name, table_name = table.split('.')
         result = self.query(
             f'SELECT MAX({replication_key}) AS key_value FROM {schema_name}."{table_name}"'
@@ -581,11 +585,12 @@ class FastSyncTapYugabyte:
 
                 schema_name, bare_table_name = full_table_name.split('.')
 
-                column_safe_sql_values = column_safe_sql_values + [
+                metadata_columns = [
                     "now() AT TIME ZONE 'UTC' AS _SDC_EXTRACTED_AT",
                     "now() AT TIME ZONE 'UTC' AS _SDC_BATCHED_AT",
                     'null _SDC_DELETED_AT'
                 ]
+                column_safe_sql_values += metadata_columns
 
                 if source_boundary is not None:
                     where_clause = self.curr.mogrify(
@@ -601,9 +606,17 @@ class FastSyncTapYugabyte:
                 else:
                     where_clause = ''
 
-                sql = f"""COPY (SELECT {','.join(column_safe_sql_values)}
-                FROM {schema_name}."{bare_table_name}"{where_clause}) TO STDOUT with CSV DELIMITER ','
-                """
+                select_sql = (
+                    f'SELECT {",".join(column_safe_sql_values)} '
+                    f'FROM {schema_name}."{bare_table_name}"{where_clause}'
+                )
+                transformed = self._compile_source_projection(full_table_name, table_columns, where_clause)
+                if transformed is not None:
+                    select_sql = (
+                        f'SELECT _ppw_export.*, {",".join(metadata_columns)} '
+                        f'FROM ({transformed}) AS _ppw_export'
+                    )
+                sql = f"COPY ({select_sql}) TO STDOUT with CSV DELIMITER ','"
 
                 LOGGER.info('Exporting data: %s', sql)
 
@@ -632,6 +645,30 @@ class FastSyncTapYugabyte:
                     exc,
                 )
                 time.sleep(_MISMATCHED_SCHEMA_RETRY_INTERVAL_SECONDS)
+
+    def _compile_source_projection(self, table_name, table_columns, where_clause=''):
+        if self.source_transformations is None:
+            return None
+        columns = []
+        for column in table_columns:
+            target_type = (
+                'VARIANT' if column['data_type'] == 'hstore' and self.hstore_as_json
+                else self.tap_type_to_target_type(column['data_type'])
+            )
+            if isinstance(target_type, list):
+                target_type = target_type[1 if column['character_maximum_length'] > 1 else 0]
+            columns.append(dict(column, target_type=target_type))
+        table_reference = '.'.join(
+            quote_source_identifier(part, 'postgres') for part in table_name.split('.')
+        )
+        return compile_source_select(
+            table_name, table_reference, where_clause, columns,
+            self.source_transformations, 'postgres', self.target_iceberg_version,
+        )
+
+    def validate_source_transformations(self, table_name):
+        if self.source_transformations is not None:
+            self._compile_source_projection(table_name, self.get_table_columns(table_name))
 
     def export_source_table_data(
             self, args: Namespace, tap_id: str,

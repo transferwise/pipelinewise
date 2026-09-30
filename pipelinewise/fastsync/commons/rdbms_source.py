@@ -178,9 +178,9 @@ class YugabyteSnowflakeSource(RdbmsSnowflakeSource):
     type_mapper: Callable[..., str]
     route_name = 'yugabyte_to_snowflake'
 
-    def create(self, args, iceberg_requested: bool):
-        source = self.factory(args.tap, self.type_mapper)
-        source.hstore_as_json = iceberg_requested
+    def create(self, args, iceberg_version: Optional[int]):
+        source = self._configure(self.factory(args.tap, self.type_mapper), args, iceberg_version)
+        source.hstore_as_json = iceberg_version is not None
         return source
 
     def source_engine(self, args) -> str:

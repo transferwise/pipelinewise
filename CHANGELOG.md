@@ -1,4 +1,4 @@
-0.94.0 (2026-09-29)
+0.94.0 (2026-09-30)
 -------------------
 
 **tap-yugabyte**
@@ -42,6 +42,9 @@
 - Add native PartialSync support (`partial-yugabyte-to-snowflake`) for
   bounded-range resyncs to Snowflake, reusing PostgreSQL's dialect-safe
   boundary predicate since YSQL follows PostgreSQL identifier-quoting rules
+- Apply configured transformations in the source `SELECT` for
+  `yugabyte-to-snowflake` FullSync and `partial-yugabyte-to-snowflake`
+  PartialSync, before CSV generation, as the PostgreSQL route does
 - Add `load_balance`/`topology_keys` `db_conn` options, forwarded to both
   LOG_BASED streaming and FastSync/PartialSync bulk connections, to enable
   YugabyteDB's native client-side load balancing

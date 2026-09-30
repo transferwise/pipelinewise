@@ -3,18 +3,23 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from pipelinewise.fastsync.commons import tap_mysql, tap_postgres
+from pipelinewise.fastsync.commons import tap_mysql, tap_postgres, tap_yugabyte
 from pipelinewise.fastsync.commons.partial_sync_boundary import PartialSyncBoundary
 from pipelinewise.fastsync.mysql_to_snowflake import tap_type_to_target_type as mysql_mapper
 from pipelinewise.fastsync.postgres_to_snowflake import tap_type_to_target_type as postgres_mapper
+from pipelinewise.fastsync.yugabyte_to_snowflake import tap_type_to_target_type as yugabyte_mapper
 
 
-@pytest.fixture(params=['postgres', 'mysql', 'mariadb'])
+@pytest.fixture(params=['postgres', 'yugabyte', 'mysql', 'mariadb'])
 def export_source(request):
     """Retain real route type mapping and mock only database/file I/O."""
     dialect = request.param
-    if dialect == 'postgres':
-        source = tap_postgres.FastSyncTapPostgres({}, postgres_mapper)
+    if dialect in ('postgres', 'yugabyte'):
+        source = (
+            tap_postgres.FastSyncTapPostgres({}, postgres_mapper)
+            if dialect == 'postgres'
+            else tap_yugabyte.FastSyncTapYugabyte({}, yugabyte_mapper)
+        )
         source.curr = MagicMock()
         source.curr.mogrify.return_value = ' WHERE "secret" >= \'a\''
         column = {
@@ -22,7 +27,7 @@ def export_source(request):
             'safe_sql_value': '"secret"', 'character_maximum_length': None,
             0: 'secret',
         }
-        module = tap_postgres
+        module = tap_postgres if dialect == 'postgres' else tap_yugabyte
         cursor = source.curr
     else:
         source = tap_mysql.FastSyncTapMySql({'engine': dialect}, mysql_mapper)
@@ -55,7 +60,7 @@ def test_transformed_select_is_used_before_export(export_source, tmp_path):
     assert compiler.call_args.args[0] == 'public.secrets'
     assert 'WHERE' in compiler.call_args.args[2]
     assert compiler.call_args.args[4] is source.source_transformations
-    execute = cursor.copy_expert if module is tap_postgres else cursor.execute
+    execute = cursor.copy_expert if module in (tap_postgres, tap_yugabyte) else cursor.execute
     sql = execute.call_args.args[0]
     assert f'FROM ({transformed}) AS _ppw_export' in sql
     assert '_SDC_DELETED_AT' in sql
@@ -78,6 +83,7 @@ def test_unsupported_transformation_never_opens_export_file(export_source, tmp_p
 def test_non_snowflake_sources_do_not_enable_projection():
     """The shared tap classes retain other targets' existing transformation path."""
     assert tap_postgres.FastSyncTapPostgres({}, postgres_mapper).source_transformations is None
+    assert tap_yugabyte.FastSyncTapYugabyte({}, yugabyte_mapper).source_transformations is None
     assert tap_mysql.FastSyncTapMySql({}, mysql_mapper).source_transformations is None
 
 
