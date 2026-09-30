@@ -12,6 +12,9 @@ from typing import Dict, Optional
 from joblib import Parallel, delayed, parallel_backend
 from jsonschema import Draft7Validator, FormatChecker
 from singer import get_logger
+from singer.decimal_support import (
+    decimal_sort_key, decimal_sql_type, is_decimal_schema, schema_has_decimals, validate_decimal_record,
+)
 from datetime import datetime, timedelta
 
 from target_snowflake import stream_utils
@@ -105,9 +108,11 @@ def persist_lines(config, lines, table_cache=None, file_format_type: FileFormatT
     schemas = {}
     key_properties = {}
     validators = {}
+    decimal_streams = {}
     records_to_load = {}
     row_count = {}
     stream_to_sync = {}
+    streams_with_decimal_evolution = set()
     total_row_count = {}
     batch_size_rows = config.get('batch_size_rows', DEFAULT_BATCH_SIZE_ROWS)
     batch_wait_limit_seconds = config.get('batch_wait_limit_seconds', None)
@@ -139,6 +144,8 @@ def persist_lines(config, lines, table_cache=None, file_format_type: FileFormatT
             stream = o['stream']
 
             stream_utils.adjust_timestamps_in_record(o['record'], schemas[stream])
+            if decimal_streams[stream]:
+                validate_decimal_record(o['record'], schemas[stream])
 
             # Validate record
             if config.get('validate_records'):
@@ -176,14 +183,23 @@ def persist_lines(config, lines, table_cache=None, file_format_type: FileFormatT
                 if 'column' in stream_archive_load_files_values:
                     incremental_key_column_name = stream_archive_load_files_values['column']
                     incremental_key_value = o['record'][incremental_key_column_name]
+                    comparison_value = incremental_key_value
                     min_value = stream_archive_load_files_values['min']
                     max_value = stream_archive_load_files_values['max']
+                    decimal_bookmark = is_decimal_schema(schemas[stream]['properties'].get(incremental_key_column_name))
+                    if decimal_bookmark:
+                        comparison_value = (
+                            decimal_sort_key(incremental_key_value) if incremental_key_value is not None else None
+                        )
+                        min_value = decimal_sort_key(min_value) if min_value is not None else None
+                        max_value = decimal_sort_key(max_value) if max_value is not None else None
 
-                    if min_value is None or min_value > incremental_key_value:
-                        stream_archive_load_files_values['min'] = incremental_key_value
+                    if not decimal_bookmark or comparison_value is not None:
+                        if min_value is None or min_value > comparison_value:
+                            stream_archive_load_files_values['min'] = incremental_key_value
 
-                    if max_value is None or max_value < incremental_key_value:
-                        stream_archive_load_files_values['max'] = incremental_key_value
+                        if max_value is None or max_value < comparison_value:
+                            stream_archive_load_files_values['max'] = incremental_key_value
 
             flush = False
             if row_count[stream] >= batch_size_rows:
@@ -232,6 +248,7 @@ def persist_lines(config, lines, table_cache=None, file_format_type: FileFormatT
 
                 schemas[stream] = new_schema
                 validators[stream] = Draft7Validator(schemas[stream], format_checker=FormatChecker())
+                decimal_streams[stream] = schema_has_decimals(schemas[stream])
 
                 # flush records from previous stream SCHEMA
                 # if same stream has been encountered again, it means the schema might have been altered
@@ -272,9 +289,14 @@ def persist_lines(config, lines, table_cache=None, file_format_type: FileFormatT
 
                 key_properties[stream] = o['key_properties']
 
+                if any(is_decimal_schema(schema) for schema in new_schema.get('properties', {}).values()):
+                    streams_with_decimal_evolution.add(stream)
+                # A later schema can remove its decimal marker. Its startup metadata
+                # remains stale after decimal DDL, so invalidate only that stream's cache.
+                stream_table_cache = None if stream in streams_with_decimal_evolution else table_cache
                 stream_to_sync[stream] = DbSync(config,
                                                 add_metadata_columns_to_schema(o),
-                                                table_cache,
+                                                stream_table_cache,
                                                 file_format_type)
 
                 if archive_load_files:
@@ -481,12 +503,21 @@ def flush_records(stream: str,
 def flush_record_group(stream, records, db_sync, update_column_names, temp_dir, no_compression,
                        archive_load_files):
     """Write and load records sharing one PATCH update-column signature."""
+    text_decimal_keys = [
+        name for name in db_sync.stream_schema_message.get('key_properties', [])
+        if is_decimal_schema(db_sync.flatten_schema.get(name))
+        and decimal_sql_type(
+            db_sync.flatten_schema[name], 'snowflake', is_key=True, source=db_sync.decimal_source(),
+        ).startswith('VARCHAR')
+    ]
+    format_options = {'key_properties': text_decimal_keys} if text_decimal_keys else {}
     filepath = db_sync.file_format.formatter.records_to_file(records,
                                                              db_sync.flatten_schema,
                                                              compression=not no_compression,
                                                              dest_dir=temp_dir,
                                                              data_flattening_max_level=
-                                                             db_sync.data_flattening_max_level)
+                                                             db_sync.data_flattening_max_level,
+                                                             **format_options)
 
     # Get file stats
     row_count = len(records)

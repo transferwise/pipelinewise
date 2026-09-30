@@ -94,6 +94,16 @@ class TestConfig:
             'pidfile': '/var/singer-connector/pipelinewise.pid',
         }
 
+    def test_postgres_snowflake_target_runtime_identifies_source_for_numeric_keys(self):
+        """Only the PostgreSQL to Snowflake route needs a source-specific key policy."""
+        config = Config(PIPELINEWISE_TEST_HOME)
+        postgres_tap = self._table_format_tap()
+        mysql_tap = self._table_format_tap(type='tap-mysql')
+
+        assert config.generate_inheritable_config(postgres_tap, 'target-snowflake')['source_tap_type'] == 'tap-postgres'
+        assert 'source_tap_type' not in config.generate_inheritable_config(postgres_tap, 'target-postgres')
+        assert 'source_tap_type' not in config.generate_inheritable_config(mysql_tap, 'target-snowflake')
+
     @staticmethod
     def _table_format_tap(**settings):
         return {
@@ -334,6 +344,8 @@ class TestConfig:
         assert 'iceberg_version' not in native_config
         assert iceberg_config['target_table_format'] == 'iceberg'
         assert iceberg_config['iceberg_version'] == 3
+        assert all(runtime['source_tap_type'] == 'tap-postgres'
+                   for runtime in (omitted_config, native_config, iceberg_config))
         assert 'target_table_format' not in main_taps['omitted_tap']
         assert 'iceberg_version' not in main_taps['omitted_tap']
         assert main_taps['native_tap']['target_table_format'] == 'native'
@@ -628,6 +640,7 @@ class TestConfig:
             'warehouse': 'MY_WAREHOUSE',
         }
         assert cli.utils.load_json(json_files['tap_config_json']) == {
+            'decimal_target': 'snowflake',
             'dbname': '<DB_NAME>',
             'host': '<HOST>',
             'port': 3306,
@@ -747,6 +760,7 @@ class TestConfig:
             'warehouse': 'MY_WAREHOUSE',
         }
         assert cli.utils.load_json(json_files['tap_config_json']) == {
+            'decimal_target': 'snowflake',
             'dbname': '<DB_NAME>',
             'host': '<HOST>',
             'port': 3306,

@@ -14,6 +14,7 @@ from pymysql import InterfaceError, OperationalError, Connection
 from ...utils import safe_column_name
 from . import split_gzip, utils
 from .partial_sync_boundary import PartialSyncBoundary
+from .source_numeric import decimal_text_expression, require_exact_decimal_boundary, warn_decimal_mapping
 from .source_transformations import (
     UnsupportedSourceTransformation,
     compile_source_select,
@@ -441,7 +442,7 @@ class FastSyncTapMySql:
             key_value = mysql_key_value.isoformat() + 'T00:00:00'
 
         elif isinstance(mysql_key_value, decimal.Decimal):
-            key_value = float(mysql_key_value)
+            key_value = str(mysql_key_value)
 
         return {
             'replication_key': replication_key,
@@ -559,28 +560,67 @@ class FastSyncTapMySql:
         query = self.query if metadata_query is None else metadata_query
         return query(sql, params=(schema_name, table_name))
 
-    def map_table_columns(self, columns):
+    def map_table_columns(self, columns, primary_keys=()):
         """Map already-read metadata without connections or primary-key queries."""
-        return [
-            '{} {}'.format(
-                safe_column_name(column.get('column_name'), self.target_quote),
-                self.tap_type_to_target_type(column.get('data_type'), column.get('column_type')),
-            )
-            for column in columns
-        ]
+        primary_keys = {str(name).strip('"`').upper() for name in (primary_keys or ())}
+        mapped = []
+        for column in columns:
+            name = safe_column_name(column.get('column_name'), self.target_quote)
+            target_type = self._mapped_column_type(column, is_key=column['column_name'].upper() in primary_keys)
+            if column.get('data_type') in ('decimal', 'numeric'):
+                declaration = column['column_type'].split(' unsigned')[0].split(' zerofill')[0]
+                warn_decimal_mapping(name, declaration, target_type)
+            mapped.append(f'{name} {target_type}')
+        return mapped
+
+    def _mapped_column_type(self, column, is_key=False):
+        kwargs = {'is_key': True} if is_key and column.get('data_type') in ('decimal', 'numeric') else {}
+        return self.tap_type_to_target_type(column.get('data_type'), column.get('column_type'), **kwargs)
+
+    def _decimal_key_projection(self, table_name, columns):
+        candidates = {
+            column['column_name'] for column in columns
+            if column.get('data_type') in ('decimal', 'numeric') and self._mapped_column_type(column) == 'FLOAT'
+        }
+        if not candidates:
+            return columns, ()
+        primary_keys = self.get_primary_keys(table_name) or ()
+        projected = []
+        for column in columns:
+            name = column['column_name']
+            if name in candidates and safe_column_name(name, self.target_quote) in primary_keys:
+                identifier = quote_source_identifier(name, 'mysql')
+                column = dict(column, safe_sql_value=f'{decimal_text_expression(identifier, "mysql")} AS {identifier}')
+            projected.append(column)
+        return projected, primary_keys
 
     def map_column_types_to_target(self, table_name):
         """
         Map MySQL column types to equivalent types in target
         """
         mysql_columns = self.get_table_columns(table_name)
-        return {
-            'columns': self.map_table_columns(mysql_columns),
-            'primary_key': self.get_primary_keys(table_name),
+        primary_keys = self.get_primary_keys(table_name)
+        mapped = {
+            'columns': self.map_table_columns(mysql_columns, primary_keys),
+            'primary_key': primary_keys,
             'source_column_names': [
                 column.get('column_name') for column in mysql_columns
             ],
         }
+        decimal_columns = [
+            column['column_name'].upper() for column in mysql_columns
+            if column.get('data_type') in ('decimal', 'numeric')
+        ]
+        if decimal_columns:
+            mapped['decimal_columns'] = decimal_columns
+        return mapped
+
+    def validate_partial_boundary(self, table_name, column_name):
+        """Check the source declaration when a range maps to FLOAT or text."""
+        for column in self.get_table_columns(table_name):
+            if column['column_name'] == column_name:
+                require_exact_decimal_boundary(column_name, column['data_type'])
+                return
 
     def copy_table(
             self,
@@ -605,6 +645,7 @@ class FastSyncTapMySql:
             split_file_max_chunks: Max number of chunks if `split_large_files` enabled. (Default: 20)
         """
         table_columns = self.get_table_columns(table_name, max_num, date_type)
+        table_columns, _ = self._decimal_key_projection(table_name, table_columns)
         column_safe_sql_values = [c.get('safe_sql_value') for c in table_columns]
 
         # If self.get_table_columns returns zero row then table not exist
@@ -693,8 +734,9 @@ class FastSyncTapMySql:
         """Share projection validation between recovery preflight and export."""
         if self.source_transformations is None:
             return None
-        columns = [dict(column, target_type=self.tap_type_to_target_type(
-            column['data_type'], column['column_type']
+        table_columns, primary_keys = self._decimal_key_projection(table_name, table_columns)
+        columns = [dict(column, target_type=self._mapped_column_type(
+            column, safe_column_name(column['column_name'], self.target_quote) in primary_keys,
         )) for column in table_columns]
         table_dict = utils.tablename_to_dict(table_name)
         dialect = self._source_dialect

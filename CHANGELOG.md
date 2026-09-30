@@ -1,3 +1,35 @@
+0.94.0 (2026-10-01)
+-------------------
+
+- Preserve declared decimal precision and scale from MariaDB, MySQL, and
+  PostgreSQL in Snowflake native, Snowflake managed Iceberg v3, and PostgreSQL
+  targets where supported, through Singer and supported FullSync/PartialSync routes
+- Version changed non-key decimal columns and retain their historical values.
+  Leave historical rows NULL in the new column until replicated again. Reject
+  automatic key-column and PartialSync range-column type changes before altering
+  the target
+- Keep columns and rows flowing when decimal declarations exceed target limits.
+  Use compatible numeric declarations or double precision with warnings; clamp
+  finite floating-point overflow. Store PostgreSQL numeric primary keys in Snowflake
+  as canonical text so bounded `NaN` keys remain loadable; keep other decimal keys
+  as text only when their numeric mapping would lose identity
+- Replay conservatively from legacy floating-point decimal bookmarks, then save
+  exact bookmarks. Correct PostgreSQL negative-scale metadata and prevent repeated
+  column versioning. Keep other source/target combinations unchanged
+- Bundle PipelineWise Singer with the main codebase and install it through the
+  existing Makefile and Docker workflows
+- Treat nonnumeric `equals` conditions on decimal fields as non-matches instead
+  of stopping the transformation process
+- Retry PostgreSQL logical replication without wal2json numeric string output
+  when the plugin rejects that option, independent of server message language
+
+Run `import_config` before resuming replication after upgrading to refresh the
+generated tap settings and decimal schemas. No backfill or resync is required
+for column versioning. FullSync retains its table-replacement behavior and removes
+historical column versions. Existing PostgreSQL numeric primary keys on Snowflake
+need FullSync when changing to the new text type. See the
+[decimal mapping rules](docs/user_guide/schema_changes.rst).
+
 0.93.0 (2026-09-28)
 -------------------
 

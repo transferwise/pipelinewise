@@ -48,6 +48,8 @@ def _discover_catalog(mysql_conn, config):
         if mariadb_json_aliases_enabled(config)
         else {}
     )
+    if config.get('decimal_target'):
+        discovery_options['decimal_target'] = config['decimal_target']
     return discover_catalog(
         mysql_conn, config.get('filter_dbs'), **discovery_options
     )
@@ -193,7 +195,8 @@ def get_non_binlog_streams(mysql_conn, catalog, config, state):
         # prioritize streams that have not been processed
         streams_to_sync = ordered_streams
 
-    return resolve_catalog(discovered, streams_to_sync)
+    options = {'decimal_target': config['decimal_target']} if config.get('decimal_target') else {}
+    return resolve_catalog(discovered, streams_to_sync, **options)
 
 
 def get_binlog_streams(mysql_conn, catalog, config, state):
@@ -209,7 +212,8 @@ def get_binlog_streams(mysql_conn, catalog, config, state):
         if replication_method == 'LOG_BASED' and not binlog_stream_requires_historical(stream, state):
             binlog_streams.append(stream)
 
-    return resolve_catalog(discovered, binlog_streams)
+    options = {'decimal_target': config['decimal_target']} if config.get('decimal_target') else {}
+    return resolve_catalog(discovered, binlog_streams, **options)
 
 
 def do_sync_incremental(mysql_conn, catalog_entry, state, columns):

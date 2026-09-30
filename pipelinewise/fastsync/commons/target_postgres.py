@@ -3,8 +3,10 @@ import psycopg2
 import psycopg2.extras
 import json
 import gzip
+import re
 
 from typing import List
+from singer.decimal_support import decimal_schema, decimal_sql_type
 
 from . import utils
 from .transform_utils import SQLFlavor, TransformationHelper
@@ -110,6 +112,7 @@ class FastSyncTargetPostgres:
         if sort_columns:
             columns.sort()
 
+        columns = self._compatible_decimal_columns(columns)
         sql_columns = ','.join(columns).lower()
         sql_primary_keys = ','.join(primary_key).lower() if primary_key else None
         sql = (
@@ -119,6 +122,29 @@ class FastSyncTargetPostgres:
         )
 
         self.query(sql)
+
+    def _compatible_decimal_columns(self, columns):
+        """Retain decimal values on targets predating signed and extended numeric scale."""
+        declarations = [re.fullmatch(r'(.+\s)(?:NUMERIC|DECIMAL)\((\d+),(-?\d+)\)', col, re.IGNORECASE)
+                        for col in columns]
+        special = [match for match in declarations if match and not 0 <= int(match[3]) <= int(match[2])]
+        if not special:
+            return columns
+        with self.open_connection() as connection:
+            version = connection.server_version
+        result = []
+        for column, match in zip(columns, declarations):
+            if match:
+                declaration = decimal_sql_type(
+                    decimal_schema(int(match[2]), int(match[3])), 'postgres', postgres_version=version,
+                )
+                replacement = match[1] + declaration
+                if replacement != column:
+                    LOGGER.warning('Using compatible decimal column %s on PostgreSQL %s', replacement, version)
+                result.append(replacement)
+            else:
+                result.append(column)
+        return result
 
     def copy_to_table(
         self,

@@ -93,7 +93,7 @@ define make_connector
 	@test ! -s $(2)setup.py ||\
 		(echo "Installing the package..."\
 		&& echo -e "$(YELLOW)"\
-		&& $(VENV_DIR)/$(1)/bin/python3 -m pip install --use-pep517 --upgrade -e $(2)\
+		&& $(VENV_DIR)/$(1)/bin/python3 -m pip install --use-pep517 --upgrade -e singer-connectors/singer-python -e $(2)\
 		&& echo -e "$(RESET_COLOR)"\
 		&& echo -n "Package installation completed..."\
 		&& echo -e "$(OK_MSG)")
@@ -114,7 +114,7 @@ define make_pipelinewise
 	@echo -e -n "$(YELLOW)"
 	@echo "Installing the package..."
 	@echo -e "$(YELLOW)"
-	@$(VENV_DIR)/$(1)/bin/python3 -m pip install --use-pep517 --upgrade -e $(2)$(PIP_ARGS)
+	@$(VENV_DIR)/$(1)/bin/python3 -m pip install --use-pep517 --upgrade -e singer-connectors/singer-python -e $(2)$(PIP_ARGS)
 	@echo -e "$(RESET_COLOR)"
 	@echo -n "Package installation completed..."
 	@echo -e "$(OK_MSG)"

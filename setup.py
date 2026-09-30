@@ -7,7 +7,7 @@ with open('README.md') as f:
 
 setup(name='pipelinewise',
       python_requires='==3.12.*',
-      version='0.93.0',
+      version='0.94.0',
       description='PipelineWise',
       long_description=LONG_DESCRIPTION,
       long_description_content_type='text/markdown',
@@ -31,7 +31,7 @@ setup(name='pipelinewise',
           'croniter==6.2.4',
           'SQLAlchemy==2.0.51',     # Alembic's engine; pinned rather than implicit
           'snowflake-connector-python==4.7.3',
-          'pipelinewise-singer-python==3.0.2',
+          'pipelinewise-singer-python==3.0.2+pipelinewise.0.94.0',
           'python-pidfile==3.0.0',
           'pymongo>=4.7,<4.18',
           'tzlocal>=2.0,<4.1',

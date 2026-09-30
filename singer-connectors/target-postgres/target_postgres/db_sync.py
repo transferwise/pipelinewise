@@ -6,9 +6,10 @@ import inflection
 import re
 import uuid
 import itertools
-import time
+from datetime import datetime, timedelta, timezone
 from collections.abc import MutableMapping
 from singer import get_logger
+from singer.decimal_support import decimal_key, decimal_sql_type, is_decimal_schema, postgres_numeric_scale
 
 
 def validate_config(config):
@@ -35,7 +36,9 @@ def validate_config(config):
     return errors
 
 
-def column_type(schema_property):
+def column_type(schema_property, postgres_version=None):
+    if is_decimal_schema(schema_property):
+        return decimal_sql_type(schema_property, 'postgres', postgres_version=postgres_version)
     property_type = schema_property['type']
     property_format = schema_property['format'] if 'format' in schema_property else None
     col_type = 'character varying'
@@ -78,8 +81,8 @@ def safe_column_name(name):
     return '"{}"'.format(name).lower()
 
 
-def column_clause(name, schema_property):
-    return '{} {}'.format(safe_column_name(name), column_type(schema_property))
+def column_clause(name, schema_property, postgres_version=None):
+    return '{} {}'.format(safe_column_name(name), column_type(schema_property, postgres_version))
 
 
 def flatten_key(k, parent_key, sep):
@@ -330,7 +333,10 @@ class DbSync:
             return None
         flatten = flatten_record(record, self.flatten_schema, max_level=self.data_flattening_max_level)
         try:
-            key_props = [str(flatten[p]) for p in self.stream_schema_message['key_properties']]
+            key_props = [
+                decimal_key(flatten[p]) if is_decimal_schema(self.flatten_schema.get(p)) else str(flatten[p])
+                for p in self.stream_schema_message['key_properties']
+            ]
         except Exception as exc:
             self.logger.info("Cannot find %s primary key(s) in record: %s",
                              self.stream_schema_message['key_properties'],
@@ -429,7 +435,8 @@ class DbSync:
         columns = [
             column_clause(
                 name,
-                schema
+                schema,
+                self.decimal_postgres_version()
             )
             for (name, schema) in self.flatten_schema.items()
         ]
@@ -520,7 +527,7 @@ class DbSync:
         )
 
     def get_table_columns(self, table_name):
-        return self.query("""SELECT column_name, data_type
+        return self.query("""SELECT column_name, data_type, numeric_precision, numeric_scale
       FROM information_schema.columns
       WHERE lower(table_name) = %s AND lower(table_schema) = %s""", (table_name.replace("\"", "").lower(),
                                                                      self.schema_name.lower()))
@@ -535,41 +542,92 @@ class DbSync:
         columns_to_add = [
             column_clause(
                 name,
-                properties_schema
+                properties_schema,
+                self.decimal_postgres_version()
             )
             for (name, properties_schema) in self.flatten_schema.items()
             if name.lower() not in columns_dict
         ]
 
-        for column in columns_to_add:
-            self.add_column(column, stream)
-
         columns_to_replace = [
             (safe_column_name(name), column_clause(
                 name,
-                properties_schema
+                properties_schema,
+                self.decimal_postgres_version()
             ))
             for (name, properties_schema) in self.flatten_schema.items()
             if name.lower() in columns_dict and
-            columns_dict[name.lower()]['data_type'].lower() != column_type(properties_schema).lower()
+            not self._column_type_matches(
+                columns_dict[name.lower()], properties_schema, self.decimal_postgres_version(),
+            )
         ]
 
-        for (column_name, column) in columns_to_replace:
-            self.version_column(column_name, stream)
+        primary_keys = {
+            safe_column_name(name) for name in stream_schema_message['key_properties']
+            if is_decimal_schema(self.flatten_schema.get(name))
+        }
+        if any(name in primary_keys for name, _ in columns_to_replace):
+            raise ValueError('Cannot version a primary-key column; recreate the table before changing its type')
+
+        for column in columns_to_add:
             self.add_column(column, stream)
+
+        existing_names = set(columns_dict) | {name.lower() for name in self.flatten_schema}
+        for (column_name, column) in columns_to_replace:
+            archived_name = self.version_column(column_name, stream, existing_names)
+            existing_names.add(archived_name)
+            self.add_column(column, stream)
+
+    def decimal_postgres_version(self):
+        """Probe server capabilities only for declarations introduced in PostgreSQL 15."""
+        if hasattr(self, '_decimal_postgres_version'):
+            return self._decimal_postgres_version
+        needs_version = any(
+            is_decimal_schema(schema) and schema['decimal']['scale'] is not None
+            and (schema['decimal']['scale'] < 0 or schema['decimal']['scale'] > schema['decimal']['precision'])
+            for schema in self.flatten_schema.values()
+        )
+        self._decimal_postgres_version = (
+            int(self.query('SHOW server_version_num')[0]['server_version_num']) if needs_version else None
+        )
+        return self._decimal_postgres_version
+
+    @staticmethod
+    def _column_type_matches(column, schema_property, postgres_version=None):
+        """Compare decimal dimensions without changing unrelated legacy type rules."""
+        expected = column_type(schema_property, postgres_version).lower()
+        current = column['data_type'].lower()
+        if is_decimal_schema(schema_property) and current in ('numeric', 'decimal'):
+            precision = column.get('numeric_precision')
+            scale = postgres_numeric_scale(column.get('numeric_scale'))
+            if precision is None and scale is None:
+                current = 'numeric'
+            elif precision is None or scale is None:
+                raise ValueError('PostgreSQL returned incomplete decimal precision and scale metadata')
+            else:
+                current = f'numeric({precision},{scale})'
+        return current == expected
 
     def drop_column(self, column_name, stream):
         drop_column = "ALTER TABLE {} DROP COLUMN {}".format(self.table_name(stream), column_name)
         self.logger.info('Dropping column: %s', drop_column)
         self.query(drop_column)
 
-    def version_column(self, column_name, stream):
-        version_column = "ALTER TABLE {} RENAME COLUMN {} TO \"{}_{}\"".format(self.table_name(stream, False),
-                                                                               column_name,
-                                                                               column_name.replace("\"", ""),
-                                                                               time.strftime("%Y%m%d_%H%M"))
+    def version_column(self, column_name, stream, existing_names=()):
+        version_time = datetime.now(timezone.utc)
+        base_name = column_name.replace('"', '').encode('utf-8')[:40].decode('utf-8', errors='ignore')
+        while True:
+            archived_name = f'{base_name}_{version_time.strftime("%Y%m%d_%H%M%S_%f")}'
+            if archived_name not in existing_names:
+                break
+            version_time += timedelta(microseconds=1)
+        version_column = (
+            f'ALTER TABLE {self.table_name(stream, False)} '
+            f'RENAME COLUMN {column_name} TO "{archived_name}"'
+        )
         self.logger.info('Versioning column: %s', version_column)
         self.query(version_column)
+        return archived_name
 
     def add_column(self, column, stream):
         add_column = "ALTER TABLE {} ADD COLUMN {}".format(self.table_name(stream), column)
@@ -577,6 +635,17 @@ class DbSync:
         self.query(add_column)
 
     def sync_table(self):
+        for name, schema in self.flatten_schema.items():
+            if is_decimal_schema(schema):
+                precision, scale = schema['decimal']['precision'], schema['decimal']['scale']
+                expected = 'NUMERIC' if precision is None else f'NUMERIC({precision},{scale})'
+                actual = column_type(schema, self.decimal_postgres_version())
+                if actual != expected:
+                    self.logger.warning(
+                        'Decimal fallback for %s.%s: source NUMERIC(%s,%s) maps to %s',
+                        self.stream_schema_message['stream'], name,
+                        precision, scale, actual,
+                    )
         stream_schema_message = self.stream_schema_message
         stream = stream_schema_message['stream']
         table_name = self.table_name(stream, without_schema=True)

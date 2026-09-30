@@ -183,8 +183,9 @@ Operational notes
   per-row delete images. FullSync that table to capture the resulting contents
   before resuming Singer.
 - The connector interprets ``TINYINT(1)`` as Boolean; other display widths are
-  integers. Snowflake bulk mappings use floating-point ``DECIMAL`` and Boolean
-  ``BIT`` values, so they do not preserve arbitrary decimal precision or
+  integers. ``DECIMAL(p,s)`` retains supported dimensions in Snowflake and PostgreSQL;
+  see :ref:`exact_decimal_mapping` for numeric fallback and column versioning.
+  Snowflake bulk mappings use Boolean ``BIT`` values and do not preserve
   multi-bit bitsets. MySQL ``TIME`` values outside a 24-hour clock cannot be
   represented by Snowflake ``TIME``.
 - The bundled decoder does not distinguish SQL ``NULL`` from JSON literal

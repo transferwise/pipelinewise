@@ -84,10 +84,15 @@ jobs:
           -e PIPELINEWISE_E2E_NAMESPACE=$PIPELINEWISE_E2E_NAMESPACE \
           pipelinewise pytest \
           tests/end_to_end/test_target_postgres.py \
+          tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_postgres \
           tests/end_to_end/test_postgres_stream_buffer_recovery.py \
           tests/end_to_end/data_diff/test_postgres_to_postgres.py \
           tests/end_to_end/data_diff/test_mysql_to_postgres.py \
           -vx --timer-top-n 10
+
+      - name: Run SQL source and PostgreSQL target decimal integrations
+        if: steps.check.outcome == 'failure'
+        run: docker exec pipelinewise bash scripts/test_decimal_connectors.sh postgres
 
   e2e_tests_snowflake:
     name: ${{ matrix.check_name }}
@@ -153,6 +158,10 @@ jobs:
           - shard: transformation-parity
             check_name: e2e_tests_10
             test_paths: >-
+              tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake
+              tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake
+              tests/end_to_end/test_numeric_replication.py::test_postgres_bounded_numeric_key_snowflake
+              tests/end_to_end/test_numeric_replication.py::test_mysql_bounded_decimal_key_snowflake
               tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_singer_and_fastsync_preserve_mapped_types_and_values
               tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_existing_singer_semantic_differences_remain_explicit
               tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_ambiguous_regex_is_rejected_before_export
@@ -245,3 +254,21 @@ jobs:
           -e TAP_S3_CSV_AWS_SECRET_ACCESS_KEY=$TAP_S3_CSV_AWS_SECRET_ACCESS_KEY \
           -e TAP_S3_CSV_BUCKET=$TAP_S3_CSV_BUCKET \
           pipelinewise pytest $E2E_TEST_PATHS -vx --timer-top-n 10
+
+      - name: Run Snowflake decimal connector integrations
+        if: steps.check.outcome == 'failure' && matrix.shard == 'transformation-parity'
+        run: |
+          docker exec \
+          -e TARGET_SNOWFLAKE_ACCOUNT \
+          -e TARGET_SNOWFLAKE_AWS_ACCESS_KEY \
+          -e TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY \
+          -e TARGET_SNOWFLAKE_DBNAME \
+          -e TARGET_SNOWFLAKE_FILE_FORMAT \
+          -e TARGET_SNOWFLAKE_PRIVATE_KEY=/opt/pipelinewise/.ssh/snowflake.pem \
+          -e TARGET_SNOWFLAKE_S3_BUCKET \
+          -e TARGET_SNOWFLAKE_S3_KEY_PREFIX \
+          -e TARGET_SNOWFLAKE_SCHEMA \
+          -e TARGET_SNOWFLAKE_STAGE \
+          -e TARGET_SNOWFLAKE_USER \
+          -e TARGET_SNOWFLAKE_WAREHOUSE \
+          pipelinewise bash scripts/test_decimal_connectors.sh snowflake

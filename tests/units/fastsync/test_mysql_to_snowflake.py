@@ -64,7 +64,7 @@ class MySqlToSnowflake(unittest.TestCase):
             ('mediumint', None): 'NUMBER',
             ('bigint', None): 'NUMBER',
             ('bit', None): 'BOOLEAN',
-            ('decimal', None): 'FLOAT',
+            ('decimal', 'decimal(18,2)'): 'NUMERIC(18,2)',
             ('double', None): 'FLOAT',
             ('float', None): 'FLOAT',
             ('bool', None): 'BOOLEAN',

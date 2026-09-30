@@ -1,12 +1,14 @@
 import logging
 import os
 import json
+import re
 import boto3
 import snowflake.connector
 
 from typing import List, Dict, Optional
 from snowflake.connector.encryption_util import SnowflakeEncryptionUtil
 from snowflake.connector.storage_client import SnowflakeFileEncryptionMaterial
+from singer.decimal_support import snowflake_float_expression
 
 from . import utils
 from .snowflake_sql_client import SnowflakeSqlClient
@@ -368,6 +370,7 @@ class FastSyncTargetSnowflake(SnowflakeSqlClient):
         is_temporary,
         skip_csv_header=False,
         staging_table_name=None,
+        columns=None,
     ):
         LOGGER.info('Loading %s into Snowflake...', s3_key)
         table_dict = utils.tablename_to_dict(table_name)
@@ -379,10 +382,23 @@ class FastSyncTargetSnowflake(SnowflakeSqlClient):
         inserts = 0
 
         stage = self.connection_config['stage']
+        source = f"'@{stage}/{s3_key}'"
+        if columns and any(re.search(r'\sFLOAT$', column, re.IGNORECASE) for column in columns):
+            source_columns = [
+                column for column in columns
+                if not column.startswith((utils.SDC_EXTRACTED_AT, utils.SDC_BATCHED_AT, utils.SDC_DELETED_AT))
+            ]
+            source_columns += ['TIMESTAMP_NTZ', 'TIMESTAMP_NTZ', 'VARCHAR']
+            expressions = [
+                snowflake_float_expression(f'${position}') if re.search(r'\sFLOAT$', column, re.IGNORECASE)
+                else f'${position}'
+                for position, column in enumerate(source_columns, start=1)
+            ]
+            source = f'(SELECT {", ".join(expressions)} FROM {source})'
         # Empty unquoted fields are the only SQL NULL representation. An empty
         # NULL_IF keeps literal source values such as ``\N`` intact.
         sql = (
-            f'COPY INTO {target_schema}."{target_table.upper()}" FROM \'@{stage}/{s3_key}\''
+            f'COPY INTO {target_schema}."{target_table.upper()}" FROM {source}'
             f' FILE_FORMAT = (type=CSV escape=NONE escape_unenclosed_field=\'\\x1e\''
             f' field_optionally_enclosed_by=\'\"\' null_if=() empty_field_as_null=TRUE'
             f' skip_header={int(skip_csv_header)}'

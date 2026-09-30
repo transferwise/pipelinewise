@@ -44,6 +44,7 @@ class _PartialSyncRun:
     boundary: Optional[PartialSyncBoundary] = None
     where_clause_sql: Optional[str] = None
     source_columns: Any = None
+    decimal_columns: Any = ()
     primary_keys: Any = None
     file_parts: List[str] = field(default_factory=list)
     size_bytes: int = 0
@@ -236,6 +237,7 @@ def _prepare_iceberg_partial_export(run: _PartialSyncRun) -> bool:
         iceberg_routes.validate_recovery_source_engine(run.attempt, resolved_engine)
     snowflake_types = run.source.map_column_types_to_target(run.table_name)
     run.source_columns = snowflake_types.get('columns', [])
+    run.decimal_columns = snowflake_types.get('decimal_columns', ())
     run.primary_keys = snowflake_types.get('primary_key')
     current_spec = iceberg_routes.create_spec(
         run.args,
@@ -286,6 +288,7 @@ def _prepare_iceberg_partial_export(run: _PartialSyncRun) -> bool:
         recovery_identity=run.recovery_identity,
         staging_config=run.staging_config,
         resolved_source_engine=resolved_engine,
+        decimal_columns=run.decimal_columns,
     )
     run.publisher.plan_partial_sync(run.attempt, run.spec)
     return True
@@ -298,6 +301,7 @@ def _prepare_native_partial_export(run: _PartialSyncRun) -> bool:
     start_value, end_value = boundary_values
     snowflake_types = run.source.map_column_types_to_target(run.table_name)
     run.source_columns = snowflake_types.get('columns', [])
+    run.decimal_columns = snowflake_types.get('decimal_columns', ())
     run.primary_keys = snowflake_types.get('primary_key')
     run.boundary = _resolved_boundary(
         run, snowflake_types, start_value, end_value
@@ -312,6 +316,9 @@ def _prepare_native_partial_export(run: _PartialSyncRun) -> bool:
         utils.diff_source_target_columns(
             {'sf_object': run.snowflake, 'schema': run.target_schema, 'table': run.target_table},
             run.source_columns,
+            primary_keys=run.primary_keys,
+            boundary_column=run.column_name,
+            decimal_columns=run.decimal_columns,
         )
 
     run.bookmark = common_utils.get_bookmark_for_table(
@@ -425,6 +432,7 @@ def _publish_partial_iceberg(run: _PartialSyncRun) -> bool:
         run.size_bytes,
         is_temporary=True,
         staging_table_name=run.attempt.staging_table,
+        columns=run.source_columns,
     )
     staged_row_count, staged_fingerprint = run.publisher.staging_evidence(
         run.attempt, run.spec, inserted_rows
@@ -459,6 +467,8 @@ def _publish_partial_native(run: _PartialSyncRun) -> bool:
         run.s3_key_pattern,
         run.size_bytes,
         run.where_clause_sql,
+        boundary_column=run.column_name,
+        decimal_columns=run.decimal_columns,
     )
     run.publication_status['attempted'] = True
     run.temp_created = False
@@ -514,9 +524,14 @@ def _resolved_boundary(
     start_value,
     end_value,
 ) -> PartialSyncBoundary:
-    return PartialSyncBoundary(
+    boundary = PartialSyncBoundary(
         run.column_name,
         start_value,
         end_value,
         drop_target=run.args.drop_target_table,
     ).resolved(_source_column_names(mapped_types))
+    column_index = _source_column_names(mapped_types).index(boundary.column_name)
+    data_type = mapped_types['columns'][column_index].rsplit(' ', 1)[-1].upper()
+    if not boundary.drop_target and data_type in ('FLOAT', 'VARCHAR(134217728)'):
+        run.source.validate_partial_boundary(run.table_name, boundary.column_name)
+    return boundary

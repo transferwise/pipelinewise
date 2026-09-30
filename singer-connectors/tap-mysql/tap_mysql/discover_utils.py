@@ -8,6 +8,7 @@ import pymysql
 from typing import Optional, Dict, Tuple, Set, List
 from singer import metadata, Schema, get_logger
 from singer.catalog import Catalog, CatalogEntry
+from singer.decimal_support import decimal_schema, decimal_sql_type, is_decimal_schema
 
 from tap_mysql.connection import connect_with_backoff, MySQLConnection
 from tap_mysql.sync_strategies import common
@@ -136,7 +137,8 @@ def discover_catalog(
         mysql_conn: MySQLConnection,
         dbs: str = None,
         tables: Optional[str] = None,
-        detect_json_aliases: bool = False):
+        detect_json_aliases: bool = False,
+        decimal_target: Optional[str] = None):
     """Returns a Catalog describing the structure of the database."""
 
     if dbs:
@@ -226,7 +228,7 @@ def discover_catalog(
                 (table_schema, table_name) = k
 
                 schema = Schema(type='object',
-                                properties={c.column_name: schema_for_column(c) for c in cols})
+                                properties={c.column_name: schema_for_column(c, decimal_target) for c in cols})
                 mdata = create_column_metadata(cols)
                 md_map = metadata.to_map(mdata)
 
@@ -277,7 +279,7 @@ def discover_catalog(
     return Catalog(entries)
 
 
-def schema_for_column(column):
+def schema_for_column(column, decimal_target=None):
     """Returns the Schema object for the given Column."""
 
     data_type = column.data_type.lower()
@@ -302,6 +304,10 @@ def schema_for_column(column):
         else:
             result.minimum = 0 - 2 ** (bits - 1)
             result.maximum = 2 ** (bits - 1) - 1
+
+    elif data_type == 'decimal' and decimal_target:
+        result = Schema.from_dict(decimal_schema(column.numeric_precision, column.numeric_scale))
+        result.inclusion = inclusion
 
     elif data_type in FLOAT_TYPES:
         result.type = ['null', 'number']
@@ -365,7 +371,7 @@ def create_column_metadata(cols: List[Column]):
     return metadata.to_list(mdata)
 
 
-def resolve_catalog(discovered_catalog, streams_to_sync):
+def resolve_catalog(discovered_catalog, streams_to_sync, decimal_target=None):
     result = Catalog(streams=[])
 
     # Iterate over the streams in the input catalog and match each one up
@@ -387,6 +393,11 @@ def resolve_catalog(discovered_catalog, streams_to_sync):
 
         # These are the columns we need to select
         columns = desired_columns(selected, discovered_table.schema)
+        if decimal_target:
+            for column in columns:
+                column_schema = discovered_table.schema.properties[column].to_dict()
+                if is_decimal_schema(column_schema):
+                    decimal_sql_type(column_schema, decimal_target)
 
         result.streams.append(CatalogEntry(
             tap_stream_id=catalog_entry.tap_stream_id,

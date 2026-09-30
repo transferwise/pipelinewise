@@ -306,7 +306,7 @@ class Config:
             extra_config_keys = {}
 
         # Generate tap config dict
-        tap_config = self.generate_tap_connection_config(tap, extra_config_keys)
+        tap_config = self.generate_tap_connection_config(tap, extra_config_keys, target.get('type'))
 
         # Generate tap selection
         tap_selection = {'selection': self.generate_selection(tap)}
@@ -315,7 +315,7 @@ class Config:
         tap_transformation = {'transformations': self.generate_transformations(tap)}
 
         # Generate tap inheritable_config dict
-        tap_inheritable_config = self.generate_inheritable_config(tap)
+        tap_inheritable_config = self.generate_inheritable_config(tap, target.get('type'))
 
         tap_dir = self.get_tap_dir(target.get('id'), tap.get('id'))
         self.logger.info('SAVING TAP JSONS to %s', tap_dir)
@@ -337,15 +337,21 @@ class Config:
         utils.save_json(tap_selection, tap_selection_path)
 
     @classmethod
-    def generate_tap_connection_config(cls, tap: Dict, extra_config_keys: Dict) -> Dict:
+    def generate_tap_connection_config(cls, tap: Dict, extra_config_keys: Dict, target_type=None) -> Dict:
         """
         Generate tap connection config which is a merged dictionary of db_connection and optional extra_keys
         Args:
             tap: tap config
             extra_config_keys:  extra keys to add to the db conn config
+            target_type: destination connector used to enable exact decimal transport
         Returns: Dictionary of tap connection config
         """
         tap_config = {**tap.get('db_conn'), **extra_config_keys}
+        tap_config.pop('decimal_target', None)
+        if tap.get('type') in ('tap-mysql', 'tap-postgres') and target_type in (
+            'target-snowflake', 'target-postgres',
+        ):
+            tap_config['decimal_target'] = target_type.removeprefix('target-')
         if (
             tap.get('type') == 'tap-mysql'
             and tap.get('target_table_format') == cls.TABLE_FORMAT_ICEBERG
@@ -449,7 +455,7 @@ class Config:
 
         return transformations
 
-    def generate_inheritable_config(self, tap: Dict) -> Dict:
+    def generate_inheritable_config(self, tap: Dict, target_type: str = None) -> Dict:
         """
         Generate the inheritable config which is the custom config that should be fed to the target at runtime
         Args:
@@ -489,6 +495,11 @@ class Config:
             {
                 'temp_dir': self.get_temp_dir(),
                 'tap_id': tap.get('id'),
+                # The Snowflake target needs the source family to keep PostgreSQL NaN keys lossless.
+                'source_tap_type': (
+                    'tap-postgres' if tap.get('type') == 'tap-postgres' and target_type == 'target-snowflake'
+                    else None
+                ),
                 'query_tag': json.dumps(
                     {
                         'ppw_component': tap.get('type'),

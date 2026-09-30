@@ -300,6 +300,22 @@ def test_float_conditions_use_export_text_instead_of_promoting_source_float_bits
     assert '= 0.3)' in sql
 
 
+def test_postgres_numeric_float_conditions_saturate_before_casting():
+    cols = [column(), column('amount', data_type='numeric', target_type='FLOAT')]
+    sql = compile_rules([rule(when=[{'column': 'amount', 'equals': 1}])], cols)
+    assert "::text IN ('NaN', 'Infinity', '-Infinity')" in sql
+    assert '> 1.7976931348623157e308::numeric' in sql
+    assert '< -1.7976931348623157e308::numeric' in sql
+    assert 'abs(("amount")) < 2.4703282292062328e-324::numeric' in sql
+
+
+def test_unreferenced_postgres_numeric_float_column_keeps_raw_export():
+    cols = [column(), column('amount', data_type='numeric', target_type='FLOAT')]
+    sql = compile_rules([rule()], cols)
+    assert 'double precision' not in sql
+    assert '1.7976931348623157e308' not in sql
+
+
 @pytest.mark.parametrize('kind', ['SET-NULL', 'HASH', 'MASK-DATE', 'MASK-NUMBER'])
 @pytest.mark.parametrize('when', [None, [{'column': 'secret', 'equals': 'condition-that-never-matches'}]])
 def test_masked_incremental_key_cannot_leak_through_bookmark(kind, when):

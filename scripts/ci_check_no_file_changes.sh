@@ -115,7 +115,7 @@ do
     echo "Searching for changes in dev-project configuration files"
 
   elif [[ ${CHECK} == "e2e" ]]; then
-    REGEX="(^\.github\/workflows\/e2e_tests\.yml$|^scripts\/ci_require_env\.sh$)"
+    REGEX="(^\.github\/workflows\/e2e_tests\.yml$|^scripts\/(ci_require_env|test_decimal_connectors)\.sh$)"
     echo "Searching for changes in end-to-end CI files"
 
   else

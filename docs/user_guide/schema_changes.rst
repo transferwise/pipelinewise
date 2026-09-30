@@ -65,3 +65,97 @@ Before a planned source change:
 After the change, verify the new target schema and representative values. Use
 :ref:`resync` only when its source and target cost is acceptable; a resync is not
 required merely because an old target column remains.
+
+
+.. _exact_decimal_mapping:
+
+Decimal mapping
+---------------
+
+MariaDB/MySQL ``DECIMAL(p,s)`` and PostgreSQL ``NUMERIC(p,s)`` retain their
+declared precision and scale where supported by Snowflake native, Snowflake managed
+Iceberg v3, and PostgreSQL targets. This applies to Singer and supported FullSync/PartialSync
+routes. Snowflake reports ``NUMERIC`` as its equivalent ``NUMBER`` type.
+Approximate ``FLOAT``, ``DOUBLE``, and ``REAL`` columns keep their existing mapping.
+Other sources and destination combinations keep their existing behavior.
+PostgreSQL numeric primary keys use canonical text on Snowflake so a ``NaN``
+key remains representable; other supported decimal columns use the mapping
+below.
+
+Run ``import_config`` after upgrading to refresh the generated tap configuration
+and catalogs before replication resumes. Decimal values and decimal replication
+bookmarks travel as exact strings within the Singer protocol. Their schema
+contains the original source precision and scale. Targets choose a compatible
+column type from those dimensions. Generic string and number schemas are unaffected.
+Quote precise decimal values in YAML transformation conditions so YAML does not
+parse them as floating-point numbers.
+
+Snowflake uses the original declaration when precision is at most 38 and scale
+is between zero and the lesser of precision and 37. Otherwise, PipelineWise
+first tries a numeric declaration that retains the values. For example,
+``NUMERIC(10,-2)`` becomes ``NUMERIC(12,0)``, and ``NUMERIC(2,4)`` becomes
+``NUMERIC(4,4)``. Larger definitions and unconstrained PostgreSQL ``NUMERIC``
+use ``FLOAT`` in native tables and ``DOUBLE`` in Iceberg tables. Warnings identify
+the column and chosen type. Both mappings use double precision. Finite values beyond
+FLOAT range are clamped to the largest finite value with the same sign. Very
+small values can round to zero. Explicit infinities and NaN remain floating-point
+special values on this fallback path.
+
+PostgreSQL also permits NaN in bounded numeric columns. PostgreSQL targets keep
+NaN. Snowflake fixed-point non-key columns represent ordinary NaN values as SQL
+``NULL``, retaining the row and column. Singer logs a warning for each affected
+column; FastSync applies the conversion during export. PostgreSQL numeric
+primary keys use canonical text in both Snowflake table formats, regardless of
+their declared precision and scale. This preserves ``NaN`` and distinct finite
+keys without relying on floating-point identity. MariaDB/MySQL decimal keys
+retain supported numeric mappings.
+PostgreSQL logical replication requests numeric string output from wal2json 2.6
+or later to preserve nonfinite values. Older plugins fall back with a warning
+and retain their existing conversion of these values to NULL. LOG_BASED tables
+with numeric primary keys need wal2json 2.6 or later if those keys can contain
+``NaN`` or infinity; an older plugin cannot recover an identity it emits as NULL.
+
+PostgreSQL retains supported declarations, including unconstrained ``NUMERIC``.
+Targets older than PostgreSQL 15 use unconstrained ``NUMERIC`` for negative scale
+or scale greater than precision. This preserves values without requiring syntax
+that the older server does not support.
+
+The mapping is computed before loading from the source declaration and target
+capabilities. It needs no fallback flag or history in ``properties.json`` or
+``state.json``. Source dimensions remain unchanged in the catalog even when the
+destination uses FLOAT. This upgrade is intended for roll-forward deployment.
+
+When a source non-key decimal type, precision, or scale changes, Singer targets and
+Snowflake PartialSync rename the old column and add the newly mapped column.
+Names use a UTC timestamp including microseconds, for example
+``AMOUNT_20260929_120000_123456``. Historical rows have ``NULL`` in the new column
+until those rows are replicated again. No resync or backfill is required.
+An unchanged effective mapping does not create another version. Native Snowflake
+readers can briefly see the original column name absent between rename and add.
+If interrupted there, an unchanged retry adds the replacement column and resumes.
+FastSync only authorizes this versioning for source decimal columns. A genuine
+source floating-point or integer column with a mismatched target numeric type
+remains incompatible and needs FullSync.
+
+Automatic versioning of primary-key columns is rejected before target schema
+changes. PartialSync also rejects versioning its range column, because empty
+values in the new column cannot identify historical rows in that range. Use
+FullSync to replace the table in either case. The range restriction also applies
+when Singer already versioned that column. A decimal range column that requires
+FLOAT or text fallback also needs FullSync, because its target ordering cannot
+represent the source range exactly. Newly created PostgreSQL numeric primary
+keys on Snowflake, and other decimal primary keys that would require FLOAT,
+use canonical, lossless text instead, preserving distinct row identities.
+Changing an existing key's type still requires FullSync.
+
+Legacy floating-point decimal bookmarks trigger a warning and conservative
+source-side replay from below the rounded boundary. Nonfinite boundaries request
+a full stream replay. Successful replication writes exact string bookmarks into
+the existing state field. No additional migration marker is stored. This avoids
+introducing skipped rows; it cannot restore data already missed by older runs.
+
+Iceberg PartialSync retains recognized historical column versions. FullSync
+keeps its existing full-table replacement behavior and recreates the current
+source schema, removing historical versions. Existing recovery manifests retain
+the planned archive names and expected historical column types so retries between
+rename and add do not rename twice and publication detects unexpected schema drift.

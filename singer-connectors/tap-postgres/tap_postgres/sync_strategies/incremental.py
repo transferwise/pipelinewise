@@ -6,6 +6,7 @@ import singer
 from singer import utils
 from functools import partial
 from singer import metrics
+from singer.decimal_support import decimal_bookmark, is_decimal_schema
 
 import tap_postgres.db as post_db
 
@@ -56,6 +57,21 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
     replication_key = md_map.get((), {}).get('replication-key')
     replication_key_value = singer.get_bookmark(state, stream['tap_stream_id'], 'replication_key_value')
     replication_key_sql_datatype = md_map.get(('properties', replication_key)).get('sql-datatype')
+    key_schema = stream.get('schema', {}).get('properties', {}).get(replication_key, {})
+    if replication_key_value is not None and is_decimal_schema(key_schema):
+        legacy_float = isinstance(replication_key_value, float)
+        try:
+            replication_key_value = decimal_bookmark(replication_key_value, key_schema)
+        except ValueError as exc:
+            raise ValueError(
+                f'Invalid decimal bookmark for stream {stream["tap_stream_id"]}, column {replication_key}'
+            ) from exc
+        if replication_key_value is None:
+            LOGGER.warning('Replaying the full stream %s because decimal bookmark column %s has a nonfinite boundary',
+                           stream['tap_stream_id'], replication_key)
+        elif legacy_float:
+            LOGGER.warning('Replaying a conservative decimal bookmark for stream %s, column %s',
+                           stream['tap_stream_id'], replication_key)
 
     hstore_available = post_db.hstore_available(conn_info)
     with metrics.record_counter(None) as counter:

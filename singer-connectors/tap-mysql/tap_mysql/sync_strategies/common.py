@@ -7,6 +7,7 @@ import singer
 import time
 
 from singer import metadata, utils, metrics
+from singer.decimal_support import decimal_to_string, is_decimal_schema
 
 from tap_mysql.stream_utils import get_key_properties
 
@@ -147,12 +148,16 @@ def format_mysql_time(value):
 def row_to_singer_record(catalog_entry, version, row, columns, time_extracted):
     row_to_persist = ()
     for idx, elem in enumerate(row):
-        property_type = catalog_entry.schema.properties[columns[idx]].type
-        property_format = catalog_entry.schema.properties[columns[idx]].format
+        property_schema = catalog_entry.schema.properties[columns[idx]]
+        property_type = property_schema.type
+        property_format = property_schema.format
 
         elem = parse_formatted_value(elem, property_format)
 
-        if isinstance(elem, datetime.datetime):
+        if is_decimal_schema(property_schema.to_dict()):
+            row_to_persist += (decimal_to_string(elem, property_schema.to_dict()),)
+
+        elif isinstance(elem, datetime.datetime):
             row_to_persist += (elem.isoformat() + '+00:00',)
 
         elif isinstance(elem, datetime.date):

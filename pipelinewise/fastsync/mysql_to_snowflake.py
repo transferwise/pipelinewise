@@ -12,6 +12,7 @@ from .commons import utils
 from .commons import rdbms_to_snowflake
 from .commons import snowflake_iceberg_routes as iceberg_routes
 from .commons.snowflake_types import SNOWFLAKE_MAX_VARCHAR
+from .commons.source_numeric import mysql_decimal_type
 from .commons.rdbms_source import RdbmsSnowflakeSource
 from .commons.tap_mysql import FastSyncTapMySql
 from .commons.target_snowflake import FastSyncTargetSnowflake
@@ -48,8 +49,10 @@ def _is_boolean_tinyint(mysql_column_type):
     )
 
 
-def tap_type_to_target_type(mysql_type, mysql_column_type):
+def tap_type_to_target_type(mysql_type, mysql_column_type, *, is_key=False):
     """Data type mapping from MySQL to Snowflake"""
+    if mysql_type in ('decimal', 'numeric'):
+        return mysql_decimal_type(mysql_column_type, 'snowflake', is_key=is_key)
     return {
         'char': SNOWFLAKE_MAX_VARCHAR,
         'varchar': SNOWFLAKE_MAX_VARCHAR,
@@ -79,7 +82,6 @@ def tap_type_to_target_type(mysql_type, mysql_column_type):
         'mediumint': 'NUMBER',
         'bigint': 'NUMBER',
         'bit': 'BOOLEAN',
-        'decimal': 'FLOAT',
         'double': 'FLOAT',
         'float': 'FLOAT',
         'bool': 'BOOLEAN',

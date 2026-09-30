@@ -139,7 +139,9 @@ than converting it silently.
 Explicit v3 maps integer Singer fields to ``NUMBER(38,0)`` and approximate
 numeric fields to Iceberg ``DOUBLE``. The latter preserves 64-bit floating-point
 range instead of narrowing to Iceberg ``FLOAT``. Native and fixed-point
-``NUMBER(precision, scale)`` mappings are unchanged. PostgreSQL
+``NUMBER(precision, scale)`` columns preserve supported MariaDB/MySQL and PostgreSQL
+decimal dimensions. PostgreSQL numeric primary keys use canonical text to retain
+``NaN`` identities. See :ref:`exact_decimal_mapping` for fallback and versioning. PostgreSQL
 ``hstore`` maps to ``VARIANT`` on this route. For MariaDB sources, a
 ``LONGTEXT`` column with MariaDB's exact generated ``JSON_VALID`` constraint is
 treated as the ``JSON`` alias and maps to ``VARIANT``; ordinary ``LONGTEXT`` and

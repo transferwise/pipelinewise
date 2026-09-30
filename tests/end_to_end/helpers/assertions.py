@@ -760,7 +760,7 @@ def assert_all_columns_exist(
         Converts list of columns with char separators to dictionary
 
         :param cols: list of ':' separated strings using the format of
-                     column_name:column_type:column_type_extra
+                     column_name:column_type:column_type_extra[:numeric_precision:numeric_scale]
         :return: Dictionary of columns where key is the column_name
         """
         cols_dict = {}
@@ -770,6 +770,11 @@ def assert_all_columns_exist(
                 'type': col_props[1],
                 'type_extra': col_props[2],
             }
+            if len(col_props) == 5 and col_props[1] in ('numeric', 'decimal', 'number'):
+                cols_dict[col_props[0]].update(
+                    numeric_precision=int(col_props[3]) if col_props[3] else None,
+                    numeric_scale=int(col_props[4]) if col_props[4] else None,
+                )
 
         return cols_dict
 
@@ -810,16 +815,9 @@ def assert_all_columns_exist(
             if column_type_mapper_fn is None:
                 continue
 
-            expected_target_column_type = (
-                column_type_mapper_fn(
-                    source_column_type_info['type'],
-                    source_column_type_info['type_extra'],
-                )
-                .replace(' NULL', '')
-                .lower()
+            expected_target_column_type, actual_target_column_type = _column_comparison_types(
+                source_column_type_info, target_column_type_info, column_type_mapper_fn,
             )
-
-            actual_target_column_type = target_column_type_info['type'].lower()
 
             if actual_target_column_type != expected_target_column_type:
                 raise Exception(
@@ -827,6 +825,23 @@ def assert_all_columns_exist(
                     f'Expected: {expected_target_column_type} '
                     f'Actual: {actual_target_column_type}'
                 )
+
+
+def _column_comparison_types(source, target, column_type_mapper_fn):
+    """Compare declared decimal dimensions while preserving other type checks."""
+    mapper_args = [source['type'], source['type_extra']]
+    is_decimal = source['type'] in ('numeric', 'decimal')
+    if is_decimal and 'numeric_precision' in source:
+        mapper_args.extend((source['numeric_precision'], source['numeric_scale']))
+    expected = column_type_mapper_fn(*mapper_args).replace(' NULL', '').lower()
+    actual = target['type'].lower()
+    if is_decimal:
+        expected = re.sub(r'^(decimal|number)\b', 'numeric', expected)
+        if actual in ('numeric', 'decimal', 'number'):
+            actual = 'numeric'
+            if target.get('numeric_precision') is not None:
+                actual += f'({target["numeric_precision"]},{target["numeric_scale"]})'
+    return expected, actual
 
 
 def assert_date_column_naive_in_target(

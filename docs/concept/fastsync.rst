@@ -6,6 +6,10 @@ FastSync
 FastSync bypasses Singer JSON for supported bulk transfers and uses native
 database export, staging, copy, and merge operations. It has two components:
 
+SQL-source decimals retain supported precision and scale in PostgreSQL and both
+Snowflake table formats. See :ref:`exact_decimal_mapping` for numeric fallback,
+PartialSync versioning, and FullSync replacement behavior.
+
 .. list-table::
    :header-rows: 1
    :widths: 22 38 40
