@@ -26,13 +26,16 @@ from pymysqlreplication.row_event import (
     TableMapEvent,
 )
 from singer import utils, Schema, metadata
+from singer.decimal_support import decimal_sql_type
 
 from tap_mysql import connection
 from tap_mysql.connection import connect_with_backoff, make_connection_wrapper, MySQLConnection
 from tap_mysql.discover_utils import (
+    Column,
     discover_catalog,
     desired_columns,
     mariadb_json_aliases_enabled,
+    schema_for_column,
     should_run_discovery,
 )
 from tap_mysql.stream_utils import write_schema_message
@@ -227,14 +230,18 @@ def json_bytes_to_string(data):
 def row_to_singer_record(catalog_entry, version, db_column_map, row, time_extracted):  # noqa: C901
     row_to_persist = {}
     for column_name, val in row.items():
-        property_type = catalog_entry.schema.properties[column_name].type
-        property_format = catalog_entry.schema.properties[column_name].format
+        property_schema = catalog_entry.schema.properties[column_name]
+        property_type = property_schema.type
+        property_format = property_schema.format
         db_column_type = db_column_map.get(column_name)
 
         if property_format == common.MARIADB_JSON_FORMAT:
             val = common.parse_mariadb_json_alias(val)
 
-        if isinstance(val, datetime.datetime):
+        if common.is_decimal_schema(property_schema.to_dict()):
+            row_to_persist[column_name] = common.decimal_to_string(val, property_schema.to_dict())
+
+        elif isinstance(val, datetime.datetime):
             if db_column_type in MYSQL_TIMESTAMP_TYPES:
                 # The mysql-replication library creates datetimes from TIMESTAMP columns using fromtimestamp which
                 # will use the local timezone thus we must set tzinfo accordingly See:
@@ -808,6 +815,75 @@ def generate_streams_map(binlog_streams):
     return stream_map
 
 
+def changed_decimal_columns(event, catalog_entry):
+    """Detect decimal dimensions from the row event's table-map metadata."""
+    changed = set()
+    for column in event.columns:
+        if not column.name or re.match(r'__dropped_col_\d+__', str(column.name)):
+            continue
+        schema = catalog_entry.schema.properties.get(column.name)
+        properties = schema.to_dict() if schema else {}
+        if column.type == FIELD_TYPE.NEWDECIMAL:
+            dimensions = {'precision': column.precision, 'scale': column.decimals}
+            if not common.is_decimal_schema(properties) or properties['decimal'] != dimensions:
+                changed.add(column.name)
+        elif common.is_decimal_schema(properties):
+            changed.add(column.name)
+    return changed
+
+
+def reconcile_binlog_decimal_schema(event, catalog_entry, previous_entry, decimal_target):
+    """Use the row's TABLE_MAP when live discovery describes a later table version."""
+    unresolved = changed_decimal_columns(event, catalog_entry)
+    if not unresolved:
+        return
+    LOGGER.warning('Using binlog type metadata for stream %s, columns %s after schema discovery did not converge',
+                   catalog_entry.tap_stream_id, ', '.join(sorted(unresolved)))
+    md_map = metadata.to_map(catalog_entry.metadata)
+    previous_metadata = metadata.to_map(previous_entry.metadata)
+    key_properties = md_map.get((), {}).get('table-key-properties', [])
+    event_types = {
+        FIELD_TYPE.NEWDECIMAL: 'decimal', FIELD_TYPE.TINY: 'tinyint', FIELD_TYPE.SHORT: 'smallint',
+        FIELD_TYPE.INT24: 'mediumint', FIELD_TYPE.LONG: 'int', FIELD_TYPE.LONGLONG: 'bigint',
+        FIELD_TYPE.FLOAT: 'float', FIELD_TYPE.DOUBLE: 'double', FIELD_TYPE.BIT: 'bit',
+        FIELD_TYPE.JSON: 'json', FIELD_TYPE.GEOMETRY: 'geometry', FIELD_TYPE.ENUM: 'enum',
+        FIELD_TYPE.TIMESTAMP: 'timestamp', FIELD_TYPE.TIMESTAMP2: 'timestamp',
+        FIELD_TYPE.DATETIME: 'datetime', FIELD_TYPE.DATETIME2: 'datetime',
+        FIELD_TYPE.TIME: 'time', FIELD_TYPE.TIME2: 'time', FIELD_TYPE.DATE: 'date',
+    }
+    for column in event.columns:
+        if column.name not in unresolved:
+            continue
+        data_type = event_types.get(column.type, 'varchar')
+        precision = getattr(column, 'precision', None)
+        scale = getattr(column, 'decimals', None)
+        column_type = f'decimal({precision},{scale})' if data_type == 'decimal' else data_type
+        if getattr(column, 'type_is_bool', False):
+            column_type = 'tinyint(1)'
+        if getattr(column, 'unsigned', False):
+            column_type += ' unsigned'
+        description = Column(
+            common.get_database_name(catalog_entry), catalog_entry.table, column.name, data_type,
+            None, precision, scale, column_type, 'PRI' if column.name in key_properties else '', False,
+        )
+        catalog_entry.schema.properties[column.name] = schema_for_column(description, decimal_target)
+        field_metadata = md_map.setdefault(
+            ('properties', column.name), dict(previous_metadata.get(('properties', column.name), {})),
+        )
+        field_metadata.update({'datatype': data_type, 'sql-datatype': column_type, 'selected-by-default': True})
+    catalog_entry.metadata = metadata.to_list(md_map)
+
+
+def retain_column_selection(previous_entry, discovered_entry):
+    """Keep excluded columns excluded when decimal-aware CDC refreshes discovery."""
+    previous = metadata.to_map(previous_entry.metadata)
+    discovered = metadata.to_map(discovered_entry.metadata)
+    for breadcrumb, values in previous.items():
+        if breadcrumb and breadcrumb in discovered and 'selected' in values:
+            discovered[breadcrumb]['selected'] = values['selected']
+    discovered_entry.metadata = metadata.to_list(discovered)
+
+
 def __get_diff_in_columns_list(
         binlog_event: Union[WriteRowsEvent, UpdateRowsEvent, DeleteRowsEvent],
         schema_properties: Set[str],
@@ -1104,6 +1180,9 @@ def _run_binlog_sync(  # noqa: C901
                 diff = __get_diff_in_columns_list(binlog_event,
                                                   catalog_entry.schema.properties.keys(),
                                                   ignored_columns.get(tap_stream_id, set()))
+                if config.get('decimal_target'):
+                    diff.update(changed_decimal_columns(binlog_event, catalog_entry))
+                    diff = {name for name in diff if common.property_is_selected(catalog_entry, name)}
 
                 # If there are additional cols in the event then run discovery if needed and update the catalog
                 if diff:
@@ -1127,12 +1206,19 @@ def _run_binlog_sync(  # noqa: C901
                             if mariadb_json_aliases_enabled(config)
                             else {}
                         )
+                        if config.get('decimal_target'):
+                            discovery_options['decimal_target'] = config['decimal_target']
                         new_catalog_entry = discover_catalog(
                             mysql_conn,
                             common.get_database_name(catalog_entry),
                             catalog_entry.table,
                             **discovery_options,
                         ).streams[0]
+                        if config.get('decimal_target'):
+                            reconcile_binlog_decimal_schema(
+                                binlog_event, new_catalog_entry, catalog_entry, config['decimal_target'],
+                            )
+                            retain_column_selection(catalog_entry, new_catalog_entry)
 
                         selected = {k for k, v in new_catalog_entry.schema.properties.items()
                                     if common.property_is_selected(new_catalog_entry, k)}
@@ -1150,6 +1236,10 @@ def _run_binlog_sync(  # noqa: C901
                         for col in cols:
                             if col not in new_columns:
                                 new_catalog_entry.schema.properties.pop(col, None)
+                            elif config.get('decimal_target'):
+                                column_schema = new_catalog_entry.schema.properties[col].to_dict()
+                                if common.is_decimal_schema(column_schema):
+                                    decimal_sql_type(column_schema, config['decimal_target'])
 
                         # Add the _sdc_deleted_at col
                         new_columns = add_automatic_properties(new_catalog_entry, list(new_columns))

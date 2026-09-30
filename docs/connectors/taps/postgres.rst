@@ -8,6 +8,11 @@ wal2json logical replication from PostgreSQL 11.2 or later. This source minimum
 applies to every Singer replication method and PipelineWise FullSync/PartialSync;
 it does not constrain PostgreSQL targets or the PipelineWise backend database.
 
+``NUMERIC(p,s)`` retains supported precision and scale in Snowflake and PostgreSQL
+targets. Snowflake stores PostgreSQL numeric primary keys as canonical text to
+preserve ``NaN`` identities. See :ref:`exact_decimal_mapping` for this key
+exception, numeric fallback, exact Singer transport, and column versioning.
+
 .. list-table:: Support
    :header-rows: 1
    :widths: 28 24 48
@@ -37,6 +42,10 @@ LOG_BASED replication also requires:
 - the `wal2json <https://github.com/eulerto/wal2json>`_ plugin with format
   version 2 support; and
 - permission to create and consume a logical replication slot.
+
+For LOG_BASED tables with numeric primary keys that can contain ``NaN`` or
+infinity, use wal2json 2.6 or later. Older versions convert these values to
+NULL before PipelineWise can preserve the key. See :ref:`exact_decimal_mapping`.
 
 PipelineWise creates one tap-specific slot in the source database. PostgreSQL retains WAL needed
 by that slot, so monitor retained WAL and do not remove the slot while the tap is

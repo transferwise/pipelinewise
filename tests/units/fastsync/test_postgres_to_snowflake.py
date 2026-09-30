@@ -67,7 +67,6 @@ class PostgresToSnowflake(unittest.TestCase):
             'smallserial': 'NUMBER',
             'serial': 'NUMBER',
             'bigserial': 'NUMBER',
-            'numeric': 'FLOAT',
             'double precision': 'FLOAT',
             'real': 'FLOAT',
             'bool': 'BOOLEAN',

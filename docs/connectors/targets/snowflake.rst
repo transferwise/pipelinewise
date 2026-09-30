@@ -7,6 +7,12 @@ Snowflake target
 CSV files into native or managed Iceberg v3 tables. It also supports FastSync
 for selected database sources.
 
+MariaDB/MySQL and PostgreSQL source decimals retain supported precision and
+scale in native and managed Iceberg tables. See :ref:`exact_decimal_mapping`
+for compatible numeric declarations, FLOAT fallback, and column versioning.
+PostgreSQL numeric primary keys use canonical text so ``NaN`` remains a valid
+key in either table format.
+
 Source-delete markers always physically remove rows before Singer state is
 acknowledged. Metadata columns are enabled automatically; see
 :ref:`metadata_columns` for deletion processing.

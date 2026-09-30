@@ -6,6 +6,11 @@ Replication methods
 A table's replication method controls how its tap finds records after the
 initial load. FastSync is a transfer optimisation, not a replication method.
 
+MariaDB/MySQL and PostgreSQL preserve supported decimal precision and scale when
+replicating to Snowflake native, managed Iceberg v3, or PostgreSQL. This applies
+to every replication method; see :ref:`exact_decimal_mapping` for numeric fallback
+and column versioning after an upgrade.
+
 
 Choose a method
 ---------------

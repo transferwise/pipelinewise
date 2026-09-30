@@ -1,6 +1,30 @@
 from unittest import TestCase
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from pipelinewise.fastsync.commons.target_postgres import FastSyncTargetPostgres
+
+
+@pytest.mark.parametrize('version', [140000, 160000])
+@pytest.mark.parametrize('declaration', ['NUMERIC(10,-2)', 'NUMERIC(2,4)'])
+def test_special_decimal_scale_uses_actual_target_capabilities(version, declaration):
+    target = FastSyncTargetPostgresMock({})
+    connection = MagicMock()
+    connection.__enter__.return_value.server_version = version
+    with patch.object(target, 'open_connection', return_value=connection) as open_connection:
+        target.create_table('target', 'items', [f'"amount" {declaration}', '"id" INTEGER'], ['"id"'])
+    expected = declaration.lower() if version >= 150000 else 'numeric'
+    assert f'"amount" {expected},"id" integer' in target.executed_queries[0]
+    open_connection.assert_called_once_with()
+
+
+def test_ordinary_target_columns_do_not_query_server_capabilities():
+    target = FastSyncTargetPostgresMock({})
+    with patch.object(target, 'open_connection') as open_connection:
+        target.create_table('target', 'items', ['"amount" NUMERIC(10,2)', '"id" INTEGER'], ['"id"'])
+    open_connection.assert_not_called()
+    assert '"amount" numeric(10,2)' in target.executed_queries[0]
 
 
 class FastSyncTargetPostgresMock(FastSyncTargetPostgres):

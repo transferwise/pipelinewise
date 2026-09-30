@@ -25,7 +25,7 @@ Packaged components
 
    * - Component
      - Standalone license
-   * - PipelineWise core and ``transform-field``
+   * - PipelineWise core, vendored ``pipelinewise-singer-python``, and ``transform-field``
      - Apache License 2.0
    * - ``tap-github``
      - AGPL 3.0

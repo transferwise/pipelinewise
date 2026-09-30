@@ -200,6 +200,15 @@ def test_connector_executes_shared_canonical_type_cases():
                 canonical_type(case['input'])
 
 
+def test_connector_executes_shared_decimal_type_cases():
+    contract = managed_iceberg.get_managed_iceberg_contract(3)
+    for case in _v3_behavior_cases()['decimal_cases']:
+        assert managed_iceberg.column_type(case['schema']) == case['declared_type']
+        mapped = managed_iceberg.column_type(case['schema'], is_iceberg_table=True, iceberg_version=3)
+        assert mapped == case['declared_type']
+        assert contract.canonical_type(mapped) == case['canonical_type']
+
+
 def test_connector_executes_shared_existing_column_cases():
     canonical_column = (
         managed_iceberg.SUPPORTED_MANAGED_ICEBERG_CONTRACTS[3]

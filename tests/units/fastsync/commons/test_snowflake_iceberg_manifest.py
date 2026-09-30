@@ -313,6 +313,8 @@ def test_partial_manifest_with_only_legacy_raw_sql_fails_closed(spec):
         ('partial', 'delete_mode', 'soft'),
         ('partial', 'end_is_unbounded', 1),
         ('partial', 'drop_target', 'false'),
+        ('partial', 'historical_columns', []),
+        ('partial', 'historical_columns', {'OLD': None}),
         ('manual_conversion', 'eventual', 'unknown'),
         ('manual_conversion', 'backup_table', ''),
         ('manual_conversion', 'source_schema_fingerprint', 'short'),

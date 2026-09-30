@@ -4,6 +4,7 @@
 import pendulum
 import singer
 from singer import metadata
+from singer.decimal_support import decimal_bookmark
 
 from tap_mysql.connection import connect_with_backoff
 from tap_mysql.sync_strategies import common
@@ -35,6 +36,25 @@ def sync_table(mysql_conn, catalog_entry, state, columns):
                                       'replication_key',
                                       replication_key_metadata)
         state = singer.clear_bookmark(state, catalog_entry.tap_stream_id, 'replication_key_value')
+
+    if replication_key_value is not None:
+        key_schema = catalog_entry.schema.properties[replication_key_metadata].to_dict()
+        if common.is_decimal_schema(key_schema):
+            legacy_float = isinstance(replication_key_value, float)
+            try:
+                replication_key_value = decimal_bookmark(replication_key_value, key_schema)
+            except ValueError as exc:
+                raise ValueError(
+                    f'Invalid decimal bookmark for stream {catalog_entry.tap_stream_id}, '
+                    f'column {replication_key_metadata}'
+                ) from exc
+            if replication_key_value is None:
+                common.LOGGER.warning(
+                    'Replaying the full stream %s because decimal bookmark column %s has a nonfinite boundary',
+                    catalog_entry.tap_stream_id, replication_key_metadata)
+            elif legacy_float:
+                common.LOGGER.warning('Replaying a conservative decimal bookmark for stream %s, column %s',
+                                      catalog_entry.tap_stream_id, replication_key_metadata)
 
     stream_version = common.get_stream_version(catalog_entry.tap_stream_id, state)
     state = singer.write_bookmark(state,

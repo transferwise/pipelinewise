@@ -19,7 +19,7 @@ virtual_env:
 	@echo "Installing requirements..."
 	@. $(VENV_DIR)/bin/activate ;\
 	pip install --upgrade pip setuptools wheel ;\
-	pip install -e .[test]
+	pip install -e ../singer-python -e .[test]
 
 start_containers: clean_containers
 	@docker-compose up -d

@@ -15,6 +15,8 @@ from typing import Callable, Dict, Optional
 from . import utils, split_gzip
 from .partial_sync_boundary import PartialSyncBoundary
 from .source_transformations import compile_source_select, quote_source_identifier, validate_bookmark_column
+from .source_numeric import decimal_text_expression, require_exact_decimal_boundary, warn_decimal_mapping
+from singer.decimal_support import postgres_numeric_scale
 from ...utils import safe_column_name
 
 LOGGER = logging.getLogger(__name__)
@@ -37,6 +39,7 @@ class FastSyncTapPostgres:
         self.source_transformations = None
         self.target_iceberg_version = None
         self.hstore_as_json = False
+        self.target_type = None
         self.conn = None
         self.curr = None
         self.primary_host_conn = None
@@ -452,7 +455,7 @@ class FastSyncTapPostgres:
             key_value = postgres_key_value.isoformat() + 'T00:00:00'
 
         elif isinstance(postgres_key_value, decimal.Decimal):
-            key_value = float(postgres_key_value)
+            key_value = str(postgres_key_value)
 
         return {
             'replication_key': replication_key,
@@ -524,6 +527,8 @@ class FastSyncTapPostgres:
                     ,CASE WHEN udt_name = 'hstore' THEN 'hstore' ELSE data_type END AS data_type
                     ,safe_sql_value
                     ,character_maximum_length
+                    ,numeric_precision
+                    ,numeric_scale
                 FROM (SELECT
                 column_name,
                 data_type,
@@ -545,7 +550,9 @@ class FastSyncTapPostgres:
                     WHEN data_type IN ('smallint', 'integer', 'bigint', 'serial', 'bigserial') THEN {integer_format} || ' AS ' || column_name
                     ELSE '"'||column_name||'"'
                 END AS safe_sql_value,
-                character_maximum_length
+                character_maximum_length,
+                numeric_precision,
+                numeric_scale
                 FROM information_schema.columns
                 WHERE table_schema = %s
                     AND table_name = %s
@@ -556,25 +563,66 @@ class FastSyncTapPostgres:
         query = self.query if metadata_query is None else metadata_query
         return query(sql, params=(schema_name, table_name))
 
-    def map_table_columns(self, columns):
+    def map_table_columns(self, columns, primary_keys=()):
         """Map already-read metadata without connections or primary-key queries."""
-        return [
-            '{} {}'.format(
-                safe_column_name(column[0], self.target_quote), self._mapped_column_type(column[1], column[3]),
-            )
-            for column in columns
-        ]
+        primary_keys = {str(name).strip('"`').upper() for name in (primary_keys or ())}
+        mapped = []
+        for column in columns:
+            name = safe_column_name(column[0], self.target_quote)
+            target_type = self._mapped_column_type(column[1], column[3], *column[4:6],
+                                                   is_key=column[0].upper() in primary_keys)
+            if column[1] in ('numeric', 'decimal'):
+                precision, scale = column[4:6]
+                scale = postgres_numeric_scale(scale)
+                declaration = 'NUMERIC' if precision is None else f'NUMERIC({precision},{scale})'
+                warn_decimal_mapping(name, declaration, target_type)
+            mapped.append(f'{name} {target_type}')
+        return mapped
+
+    def _decimal_key_projection(self, table_name, columns):
+        candidates = {column['column_name'] for column in columns
+                      if column.get('data_type') in ('numeric', 'decimal') and self._mapped_column_type(
+                          column['data_type'], None, column.get('numeric_precision'), column.get('numeric_scale'),
+                          is_key=True,
+                      ) == 'VARCHAR(134217728)'}
+        if not candidates:
+            return columns, ()
+        primary_keys = self.get_primary_keys(table_name) or ()
+        projected = []
+        for column in columns:
+            name = column['column_name']
+            if name in candidates and safe_column_name(name, self.target_quote) in primary_keys:
+                identifier = quote_source_identifier(name, 'postgres')
+                expression = decimal_text_expression(identifier, 'postgres')
+                column = dict(column, safe_sql_value=f'{expression} AS {identifier}')
+            projected.append(column)
+        return projected, primary_keys
 
     def map_column_types_to_target(self, table_name):
         """
         Map PG column types to equivalent types in target
         """
         postgres_columns = self.get_table_columns(table_name)
-        return {
-            'columns': self.map_table_columns(postgres_columns),
-            'primary_key': self.get_primary_keys(table_name),
+        primary_keys = self.get_primary_keys(table_name)
+        mapped = {
+            'columns': self.map_table_columns(postgres_columns, primary_keys),
+            'primary_key': primary_keys,
             'source_column_names': [column[0] for column in postgres_columns],
         }
+        decimal_columns = [
+            column[0].upper() for column in postgres_columns
+            if column[1] in ('numeric', 'decimal')
+        ]
+        if decimal_columns:
+            mapped['decimal_columns'] = decimal_columns
+        return mapped
+
+    def validate_partial_boundary(self, table_name, column_name):
+        """Check the source declaration when a range maps to FLOAT or text."""
+        for column in self.get_table_columns(table_name):
+            if column[0] == column_name:
+                require_exact_decimal_boundary(column_name, column[1])
+                return
 
     def copy_table(
         self,
@@ -599,6 +647,7 @@ class FastSyncTapPostgres:
             split_file_max_chunks: Max number of chunks if `split_large_files` enabled. (Default: 20)
         """
         table_columns = self.get_table_columns(table_name, max_num, date_type)
+        table_columns, _ = self._decimal_key_projection(table_name, table_columns)
         column_safe_sql_values = [c.get('safe_sql_value') for c in table_columns]
 
         # If self.get_table_columns returns zero row then table not exist
@@ -608,7 +657,7 @@ class FastSyncTapPostgres:
         source_boundary = (
             boundary.source_sql(
                 'postgres',
-                [column[0] for column in table_columns],
+                [column.get('column_name') or column[0] for column in table_columns],
             )
             if boundary is not None
             else None
@@ -642,6 +691,7 @@ class FastSyncTapPostgres:
         transformed = self._compile_source_projection(source_table, table_columns, where_clause)
         if transformed is not None:
             select_sql = f'SELECT _ppw_export.*, {",".join(metadata_columns)} FROM ({transformed}) AS _ppw_export'
+        select_sql = self._snowflake_numeric_export(source_table, table_columns, where_clause, select_sql)
         sql = f"COPY ({select_sql}) TO STDOUT with CSV DELIMITER ','"
 
         LOGGER.info('Exporting data: %s', sql)
@@ -657,8 +707,61 @@ class FastSyncTapPostgres:
         with gzip_splitter as split_gzip_files:
             self.curr.copy_expert(sql, split_gzip_files, size=131072)
 
-    def _mapped_column_type(self, data_type, character_maximum_length):
+    def _snowflake_numeric_export(self, table_name, columns, where_clause, select_sql):
+        """Normalize ordinary NaN only after source transformations have evaluated."""
+        if self.target_type != 'snowflake':
+            return select_sql
+        candidates = [column for column in columns if column.get('data_type') in ('numeric', 'decimal') and
+                      self._mapped_column_type(
+                          column['data_type'], None, column.get('numeric_precision'), column.get('numeric_scale'),
+                      ).startswith('NUMERIC(')]
+        if not candidates:
+            return select_sql
+        primary_keys = self.get_primary_keys(table_name) or ()
+        numeric_names = {
+            column['column_name'] for column in candidates
+            if self._mapped_column_type(
+                column['data_type'], None, column.get('numeric_precision'), column.get('numeric_scale'),
+                is_key=safe_column_name(column['column_name'], self.target_quote) in primary_keys,
+            ).startswith('NUMERIC(')
+        }
+        if not numeric_names:
+            return select_sql
+        numeric_keys = {name for name in numeric_names if safe_column_name(name, self.target_quote) in primary_keys}
+        self._require_finite_snowflake_numeric_keys(table_name, numeric_keys, where_clause)
+        nullable_names = numeric_names - numeric_keys
+        if not nullable_names:
+            return select_sql
+        names = [column['column_name'] for column in columns]
+        names += ['_sdc_extracted_at', '_sdc_batched_at', '_sdc_deleted_at']
+        quoted_names = [quote_source_identifier(name, 'postgres') for name in names]
+        projection = [f"NULLIF({quoted}, 'NaN'::numeric) AS {quoted}" if name in nullable_names else quoted
+                      for name, quoted in zip(names, quoted_names)]
+        return (f'SELECT {", ".join(projection)} FROM ({select_sql}) '
+                f'AS _ppw_numeric_export({", ".join(quoted_names)})')
+
+    def _require_finite_snowflake_numeric_keys(self, table_name, numeric_keys, where_clause):
+        if not numeric_keys:
+            return
+        table_reference = '.'.join(quote_source_identifier(part, 'postgres') for part in table_name.split('.'))
+        checks = ' OR '.join(f"{quote_source_identifier(name, 'postgres')} = 'NaN'::numeric"
+                             for name in sorted(numeric_keys))
+        predicate = f'{where_clause} AND ({checks})' if where_clause else f' WHERE {checks}'
+        rows = self.query(f'SELECT EXISTS (SELECT 1 FROM {table_reference}{predicate}) AS has_nan_keys')
+        if rows[0]['has_nan_keys']:
+            raise ValueError(
+                f'Cannot export NaN in Snowflake NUMERIC primary-key columns {", ".join(sorted(numeric_keys))}; '
+                'numeric key identity must be preserved'
+            )
+
+    def _mapped_column_type(self, data_type, character_maximum_length, numeric_precision=None, numeric_scale=None,
+                            is_key=False):
         """Share the existing target mapping between DDL and transformation validation."""
+        if data_type in ('numeric', 'decimal'):
+            kwargs = {'is_key': True} if is_key else {}
+            return self.tap_type_to_target_type(
+                data_type, character_maximum_length, numeric_precision, postgres_numeric_scale(numeric_scale), **kwargs,
+            )
         column_type = (
             'VARIANT' if data_type == 'hstore' and self.hstore_as_json else self.tap_type_to_target_type(data_type)
         )
@@ -670,9 +773,14 @@ class FastSyncTapPostgres:
         """Share projection validation between recovery preflight and export."""
         if self.source_transformations is None:
             return None
+        table_columns, primary_keys = self._decimal_key_projection(table_name, table_columns)
         columns = []
         for column in table_columns:
-            target_type = self._mapped_column_type(column['data_type'], column.get('character_maximum_length'))
+            target_type = self._mapped_column_type(
+                column['data_type'], column.get('character_maximum_length'),
+                column.get('numeric_precision'), column.get('numeric_scale'),
+                is_key=safe_column_name(column['column_name'], self.target_quote) in primary_keys,
+            )
             columns.append(dict(column, target_type=target_type))
         table_reference = '.'.join(
             quote_source_identifier(part, 'postgres') for part in table_name.split('.')

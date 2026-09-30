@@ -183,7 +183,7 @@ def test_replacement_skip_does_not_hide_other_tables_and_explicit_tables_check_m
     requested = ['source.replaced', 'source.merged'] if explicit else None
     with mock.patch.object(report, 'source_connection') as source, \
             mock.patch.object(report, '_table_report') as check:
-        check.side_effect = lambda _connection, _tap_type, _target, table: {
+        check.side_effect = lambda _connection, _tap_type, _target, table, **_guards: {
             'source_table': table, 'status': 'compatible',
         }
         result = report.build_report(
@@ -377,3 +377,37 @@ def test_cli_consumes_generated_selection_wrapper_and_target_overrides(tmp_path,
     }
     assert build.call_args.kwargs['selection'] == selection('orders')
     assert json.loads(capsys.readouterr().out) == [{'status': 'skipped'}]
+
+
+@pytest.mark.parametrize('guard', [{'primary_keys': ['AMOUNT']}, {'boundary_column': 'amount'}])
+def test_report_marks_protected_decimal_columns_incompatible(guard):
+    result = utils.report_source_target_columns(
+        {'schema': 'TARGET', 'table': 'ORDERS'}, ['"AMOUNT" NUMERIC(38,18)'],
+        [column('AMOUNT', type='REAL')], decimal_columns=('AMOUNT',), **guard,
+    )
+    assert result[0]['status'] == 'incompatible'
+
+
+def test_report_versions_only_columns_with_source_decimal_provenance():
+    target = report.MetadataSnowflakeClient({'dbname': 'db', 'default_target_schema': 'mapped'})
+    source_columns = report.MappedSourceColumns(
+        ['"AMOUNT" NUMERIC(18,2)', '"SCORE" FLOAT'], ('AMOUNT',),
+    )
+    target_columns = [
+        column('AMOUNT', type='REAL'),
+        column('SCORE', type='FIXED', precision=18, scale=2),
+    ]
+    with mock.patch.object(report, 'SnowflakeTableInspector') as inspector, \
+            mock.patch.object(report, 'mapped_source_columns', return_value=source_columns), \
+            mock.patch.object(target, 'query', return_value=target_columns):
+        inspector.return_value.discover_table_format.return_value = 'native'
+        result = report._table_report(mock.Mock(), mock.Mock(), target, 'source.orders')
+    assert result['status'] == 'incompatible'
+    assert [row['status'] for row in result['columns']] == ['would_version', 'incompatible']
+
+
+def test_report_carries_catalog_keys_and_configured_partial_boundary():
+    properties = catalog('orders')
+    properties['streams'][0]['metadata'][0]['metadata']['table-key-properties'] = ['amount']
+    guards = report._column_guards(properties, selection('orders'), 'db-orders')
+    assert guards == {'primary_keys': ['amount'], 'boundary_column': 'id'}

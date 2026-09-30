@@ -6,6 +6,7 @@ import re
 from .transform_utils import TransformationType
 from .snowflake_types import canonical_native_type
 from .snowflake_iceberg_versions import managed_iceberg_version_spec
+from .source_numeric import postgres_float_expression
 
 
 class UnsupportedSourceTransformation(ValueError):
@@ -154,6 +155,8 @@ def _base_expression(column, dialect):
         # Snowflake reads the exported bit-string digits as decimal, not binary.
         return f'({expression})::text::numeric(38, 0)'
     if column.get('target_type', '').upper().split('(', 1)[0] in {'FLOAT', 'DOUBLE', 'REAL'}:
+        if dialect == 'postgres' and column['data_type'].lower() in {'numeric', 'decimal'}:
+            return postgres_float_expression(expression)
         return f'({expression})::text::double precision' if dialect == 'postgres' else (
             f'(CAST(({expression}) AS CHAR CHARACTER SET utf8mb4) + 0e0)'
         )

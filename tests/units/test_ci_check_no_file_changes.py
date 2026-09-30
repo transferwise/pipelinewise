@@ -9,6 +9,7 @@ import yaml
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 DETECTOR = REPOSITORY_ROOT / 'scripts' / 'ci_check_no_file_changes.sh'
+CONNECTOR_WORKFLOW = REPOSITORY_ROOT / '.github' / 'workflows' / 'connectors.yml'
 E2E_WORKFLOW = REPOSITORY_ROOT / '.github' / 'workflows' / 'e2e_tests.yml'
 TW_RULES = REPOSITORY_ROOT / '.github' / 'tw-rules.yaml'
 
@@ -216,6 +217,14 @@ def test_e2e_workflow_triggers_checks(tmp_path):
     assert 'Detected changes in following file: .github/workflows/e2e_tests.yml' in result.stdout
 
 
+def test_decimal_integration_runner_change_triggers_e2e(tmp_path, monkeypatch):
+    """The integration runner itself must not bypass the jobs that execute it."""
+    monkeypatch.setenv('LINT_POLICY_FILE', 'scripts/test_decimal_connectors.sh')
+    result, pages = run_detector(tmp_path, 'lint_policy_only', 'python', 'config', 'e2e')
+    assert result.returncode == 1
+    assert pages == ['1']
+
+
 def test_snowflake_e2e_matrix_contract():
     """Snowflake shards cover every route exactly once with full parallelism."""
     workflow = yaml.safe_load(E2E_WORKFLOW.read_text(encoding='utf-8'))
@@ -306,6 +315,10 @@ def test_snowflake_e2e_matrix_contract():
         'transformation-parity': (
             'e2e_tests_10',
             (
+                'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake',
+                'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake',
+                'tests/end_to_end/test_numeric_replication.py::test_postgres_bounded_numeric_key_snowflake',
+                'tests/end_to_end/test_numeric_replication.py::test_mysql_bounded_decimal_key_snowflake',
                 'tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_singer_and_fastsync_preserve_mapped_types_and_values',
                 'tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_existing_singer_semantic_differences_remain_explicit',
                 'tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_ambiguous_regex_is_rejected_before_export',
@@ -341,8 +354,12 @@ def test_snowflake_e2e_matrix_contract():
         {
             'tests/end_to_end/data_diff/test_mysql_to_snowflake.py',
             'tests/end_to_end/data_diff/test_postgres_to_snowflake.py',
+            'tests/end_to_end/test_numeric_replication.py',
         }
     )
+    postgres_decimal_test = 'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_postgres'
+    postgres_commands = '\n'.join(step.get('run', '') for step in jobs['e2e_tests_01']['steps'])
+    assert postgres_decimal_test in postgres_commands
     expected_tests = set()
     tests_by_path = {}
     for test_path in expected_paths:
@@ -359,6 +376,7 @@ def test_snowflake_e2e_matrix_contract():
             for method in node.body
             if isinstance(method, (ast.FunctionDef, ast.AsyncFunctionDef)) and method.name.startswith('test_')
         )
+        test_ids.discard(postgres_decimal_test)
         assert test_ids, test_path
         tests_by_path[test_path] = test_ids
         expected_tests.update(test_ids)
@@ -448,6 +466,20 @@ def test_required_e2e_status_contract():
         'e2e_tests_pg_to_sf',
         'e2e_tests_s3_to_sf',
     }.intersection(configured_names)
+
+
+def test_required_connector_status_contract():
+    """Branch protection requires the aggregate connector test result."""
+    workflow = yaml.safe_load(CONNECTOR_WORKFLOW.read_text(encoding='utf-8'))
+    rules = yaml.safe_load(TW_RULES.read_text(encoding='utf-8'))
+    aggregate = workflow['jobs']['connector_tests']
+    configured_checks = rules['actions']['branch-protection-settings']['branches'][0]['checks']
+    configured_names = [check['name'] for check in configured_checks]
+
+    assert aggregate['name'] == 'connector_tests'
+    assert set(aggregate['needs']) == {'test_connector_units', 'test_shared_singer'}
+    assert aggregate['if'] == '${{ always() }}'
+    assert 'connector_tests' in configured_names
 
 
 def test_snowflake_e2e_matrix_preflight_once():

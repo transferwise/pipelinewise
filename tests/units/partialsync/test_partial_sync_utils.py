@@ -262,7 +262,8 @@ class PartialSyncUtilsTestCase(TestCase):
         )
 
         self.assertEqual(snowflake.method_calls, [
-            mock.call.copy_to_table(s3_key_pattern, target['schema'], args.table, size_bytes, is_temporary=True),
+            mock.call.copy_to_table(s3_key_pattern, target['schema'], args.table, size_bytes,
+                                    is_temporary=True, columns=source_columns),
             mock.call.create_table(
                 target_schema=target['schema'], table_name=target['table'], columns=source_columns,
                 primary_key=primary_keys, is_temporary=False, sort_columns=False, allow_replace_table=False,
@@ -341,7 +342,8 @@ class PartialSyncUtilsTestCase(TestCase):
         )
 
         self.assertEqual(snowflake.method_calls, [
-            mock.call.copy_to_table(s3_key_pattern, target['schema'], args.table, size_bytes, is_temporary=True),
+            mock.call.copy_to_table(s3_key_pattern, target['schema'], args.table, size_bytes,
+                                    is_temporary=True, columns=source_columns),
             mock.call.create_table(
                 target_schema=target['schema'], table_name=target['table'], columns=source_columns,
                 primary_key=primary_keys, is_temporary=False, sort_columns=False, allow_replace_table=False,
@@ -372,7 +374,8 @@ class PartialSyncUtilsTestCase(TestCase):
 
         self.assertFalse(target['publication_status']['attempted'])
         self.assertEqual(snowflake.method_calls, [
-            mock.call.copy_to_table('FOO_PATTERN', 'FOO_SCHEMA', args.table, 3, is_temporary=True)
+            mock.call.copy_to_table('FOO_PATTERN', 'FOO_SCHEMA', args.table, 3,
+                                    is_temporary=True, columns=source_columns)
         ])
 
     def test_load_into_snowflake_stops_if_created_target_is_not_native(self):
@@ -434,6 +437,7 @@ class PartialSyncUtilsTestCase(TestCase):
                         args.table,
                         3,
                         is_temporary=True,
+                        columns=['"FOO_SOURCE_COLUMN" FOO_TYPE'],
                     ),
                     mock.call.create_table(
                         target_schema='FOO_SCHEMA',
@@ -486,7 +490,8 @@ class PartialSyncUtilsTestCase(TestCase):
 
         self.assertTrue(target['publication_status']['attempted'])
         self.assertEqual(snowflake.method_calls, [
-            mock.call.copy_to_table('FOO_PATTERN', 'FOO_SCHEMA', args.table, 3, is_temporary=True),
+            mock.call.copy_to_table('FOO_PATTERN', 'FOO_SCHEMA', args.table, 3,
+                                    is_temporary=True, columns=source_columns),
             mock.call.create_table(
                 target_schema='FOO_SCHEMA', table_name='FOO_TABLE', columns=source_columns,
                 primary_key=['FOO_PRIMARY'], is_temporary=False, sort_columns=False, allow_replace_table=False,
@@ -686,6 +691,7 @@ class PartialSyncUtilsTestCase(TestCase):
                                'FOO_COLUMN_3', 'FOO_COLUMN_4',
                                '_SDC_EXTRACTED_AT', '_SDC_BATCHED_AT', '_SDC_DELETED_AT', '_SDC_FOO_BAR'],
             'varchar_columns_to_widen': [],
+            'column_versions': {},
         }
         actual_output = diff_source_target_columns(target_sf=sample_target_sf, source_columns=sample_source_columns)
         self.assertDictEqual(actual_output, expected_output)

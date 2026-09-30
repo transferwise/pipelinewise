@@ -6,6 +6,11 @@ PostgreSQL target
 ``target-postgres`` loads Singer streams into PostgreSQL and manages compatible
 target schema changes.
 
+MariaDB/MySQL and PostgreSQL source decimals use ``NUMERIC(p,s)`` with their
+supported dimensions. Unconstrained PostgreSQL ``NUMERIC`` remains unconstrained.
+Older targets use unconstrained ``NUMERIC`` for unsupported scale declarations.
+See :ref:`exact_decimal_mapping` for column versioning and key restrictions.
+
 .. list-table:: Support
    :header-rows: 1
    :widths: 28 24 48

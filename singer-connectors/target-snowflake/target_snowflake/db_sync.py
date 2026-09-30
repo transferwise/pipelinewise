@@ -2,12 +2,13 @@ import json
 import sys
 import snowflake.connector
 import re
-import time
+from datetime import datetime, timedelta, timezone
 
 from typing import List, Dict, Union, Tuple, Set
 from cryptography.hazmat.primitives import serialization
 
 from singer import get_logger
+from singer.decimal_support import decimal_key, is_decimal_schema
 from target_snowflake import flattening
 from target_snowflake import managed_iceberg
 from target_snowflake import stream_utils
@@ -359,9 +360,13 @@ class DbSync:
 
     def record_primary_key_string(self, record):
         """Generate a unique PK string in the record"""
-        if len(self.stream_schema_message['key_properties']) == 0:
+        keys = self.stream_schema_message['key_properties']
+        if not keys and not self.decimal_fields():
             return None
         flatten = flattening.flatten_record(record, self.flatten_schema, max_level=self.data_flattening_max_level)
+        self.check_decimal_nan(flatten)
+        if not keys:
+            return None
 
         key_props = []
         for key_prop in self.stream_schema_message['key_properties']:
@@ -371,10 +376,45 @@ class DbSync:
                     f"Available fields: {list(flatten.keys())}"
                 )
 
-            key_props.append(str(flatten[key_prop]))
+            key_value = flatten[key_prop]
+            key_props.append(
+                decimal_key(key_value)
+                if is_decimal_schema(self.flatten_schema.get(key_prop))
+                else str(key_value)
+            )
 
         # Delimiters may occur inside key values; encode component boundaries unambiguously.
         return json.dumps(key_props, ensure_ascii=False, separators=(',', ':'))
+
+    def decimal_fields(self):
+        """Cache marked fields once for this immutable stream schema."""
+        if not hasattr(self, '_decimal_fields'):
+            self._decimal_fields = {
+                name: schema for name, schema in self.flatten_schema.items() if is_decimal_schema(schema)
+            }
+        return self._decimal_fields
+
+    def check_decimal_nan(self, record):
+        """Keep ordinary NaN rows while refusing null primary-key identities."""
+        keys = self.stream_schema_message['key_properties']
+        for name, schema in self.decimal_fields().items():
+            if record.get(name) != 'NaN':
+                continue
+            if not column_type(schema, is_key=name in keys, source=self.decimal_source()).startswith('NUMERIC'):
+                continue
+            if name in keys:
+                raise ValueError(
+                    f'Cannot load NaN primary key {name}; Snowflake fixed-point numbers cannot represent NaN. '
+                    'Use an explicit lossless text key.'
+                )
+            warned = getattr(self, '_decimal_nan_warned', set())
+            if name not in warned:
+                self.logger.warning(
+                    'Converting NaN to SQL NULL in fixed-point column %s.%s; retaining its row',
+                    self.stream_schema_message['stream'], name,
+                )
+                warned.add(name)
+                self._decimal_nan_warned = warned
 
     def present_column_names(self, record):
         """Return flattened schema columns represented by a PATCH record."""
@@ -450,7 +490,12 @@ class DbSync:
             {
                 "name": safe_column_name(name),
                 "json_element_name": json_element_name(name),
-                "trans": column_trans(schema)
+                "trans": column_trans(schema),
+                **({'decimal_type': column_type(
+                    schema, is_key=name in self.stream_schema_message['key_properties'],
+                    source=self.decimal_source(),
+                ), 'decimal_key': name in self.stream_schema_message['key_properties']}
+                   if is_decimal_schema(schema) else {}),
             }
             for (name, schema) in self.flatten_schema.items()
         ]
@@ -556,6 +601,11 @@ class DbSync:
         """Get list of columns in the schema"""
         return [safe_column_name(name) for name in self.flatten_schema]
 
+    def decimal_source(self):
+        """Use the per-tap runtime config to apply PostgreSQL key identity policy."""
+        config = getattr(self, 'connection_config', {})
+        return 'postgres' if config.get('source_tap_type') == 'tap-postgres' else None
+
     def create_table_query(self, is_temporary=False):
         """Generate CREATE TABLE SQL"""
         stream_schema_message = self.stream_schema_message
@@ -563,7 +613,9 @@ class DbSync:
             column_clause(
                 name,
                 schema,
-                is_iceberg_table=False
+                is_iceberg_table=False,
+                is_key=name in stream_schema_message.get('key_properties', []),
+                source=self.decimal_source(),
             )
             for (name, schema) in self.flatten_schema.items()
         ]
@@ -591,6 +643,8 @@ class DbSync:
                 schema,
                 is_iceberg_table=True,
                 iceberg_version=iceberg_version,
+                is_key=name in stream_schema_message.get('key_properties', []),
+                source=self.decimal_source(),
             )
             for (name, schema) in self.flatten_schema.items()
         ]
@@ -734,6 +788,8 @@ class DbSync:
                              WHEN 'REAL'  THEN 'FLOAT'
                              ELSE PARSE_JSON("data_type"):type::varchar
                            END data_type
+                          ,PARSE_JSON("data_type"):precision::integer AS numeric_precision
+                          ,PARSE_JSON("data_type"):scale::integer AS numeric_scale
                       FROM TABLE(RESULT_SCAN(%(LAST_QID)s))
                 """
 
@@ -773,7 +829,10 @@ class DbSync:
         table_name = self.table_name(stream, False, True)
         all_table_columns = []
 
-        if self.table_cache:
+        # Later SCHEMA messages may replace DbSync while retaining the startup cache.
+        # Decimal dimensions must be compared with the table after earlier DDL.
+        has_decimals = any(is_decimal_schema(schema) for schema in self.flatten_schema.values())
+        if self.table_cache and not has_decimals:
             all_table_columns = self.table_cache
         else:
             all_table_columns = self.get_table_columns(table_schemas=[self.schema_name])
@@ -786,24 +845,24 @@ class DbSync:
         plan = managed_iceberg.plan_column_changes(
             self.flatten_schema,
             {
-                column['COLUMN_NAME']: column['DATA_TYPE']
+                column['COLUMN_NAME']: self._existing_column_type(column)
                 for column in columns
             },
             is_iceberg_table,
             iceberg_version,
+            key_properties=stream_schema_message['key_properties'],
+            source=self.decimal_source(),
         )
-
-        # Note: Iceberg tables may still have column type changes automatically applied via
-        # versioning (self.version_column) and re-adding the column. The previous logic that
-        # blocked all automatic type changes for Iceberg tables has been intentionally removed.
-        # If stricter handling is required in the future, it should be reintroduced explicitly.
 
         for column in plan.additions:
             self.add_column(column, stream, is_iceberg_table)
 
+        existing_names = {column['COLUMN_NAME'].upper() for column in columns} | {
+            name.upper() for name in self.flatten_schema
+        }
         for (column_name, column) in plan.replacements:
-            # self.drop_column(column_name, stream)
-            self.version_column(column_name, stream, is_iceberg_table)
+            archived_name = self.version_column(column_name, stream, is_iceberg_table, existing_names)
+            existing_names.add(archived_name)
             self.add_column(column, stream, is_iceberg_table)
 
         # Refresh table cache if required
@@ -816,30 +875,46 @@ class DbSync:
         self.logger.info('Dropping column: %s', drop_column)
         self.query(drop_column)
 
-    def version_column(self, column_name, stream, is_iceberg_table=False):
+    @staticmethod
+    def _existing_column_type(column):
+        """Retain fixed-point dimensions while keeping legacy non-decimal comparisons."""
+        data_type = column['DATA_TYPE'].upper()
+        precision = column.get('NUMERIC_PRECISION')
+        scale = column.get('NUMERIC_SCALE')
+        if data_type in ('NUMBER', 'NUMERIC', 'DECIMAL', 'FIXED') and precision is not None and scale is not None:
+            return f'NUMBER({precision},{scale})'
+        return data_type
+
+    def version_column(self, column_name, stream, is_iceberg_table=False, existing_names=()):
         """Versions a column in an existing table"""
         p_table_name = self.table_name(stream, False)
         p_column_name = column_name.replace("\"", "")
-        p_ver_time = time.strftime("%Y%m%d_%H%M")
+        version_time = datetime.now(timezone.utc)
+        while True:
+            p_ver_time = version_time.strftime('%Y%m%d_%H%M%S_%f')
+            archived_name = f'{p_column_name[:232]}_{p_ver_time}'
+            if archived_name not in existing_names:
+                break
+            version_time += timedelta(microseconds=1)
 
         if is_iceberg_table:
             version_column = (
                 f'ALTER ICEBERG TABLE {p_table_name} RENAME COLUMN '
-                f'{column_name} TO "{p_column_name}_{p_ver_time}"'
+                f'{column_name} TO "{archived_name}"'
             )
         else:
             version_column = (
                 f'ALTER TABLE {p_table_name} RENAME COLUMN {column_name} '
-                f'TO "{p_column_name}_{p_ver_time}"'
+                f'TO "{archived_name}"'
             )
         self.logger.warning(
-            'Column "%s" in table "%s" has been renamed to "%s_%s"',
+            'Column "%s" in table "%s" has been renamed to "%s"',
             column_name,
             p_table_name,
-            p_column_name,
-            p_ver_time,
+            archived_name,
         )
         self.query(version_column)
+        return archived_name
 
     def add_column(self, column, stream, is_iceberg_table=False):
         """Adds a new column to an existing table"""
@@ -853,6 +928,17 @@ class DbSync:
 
     def sync_table(self):
         """Creates or alters the target table according to the schema"""
+        for name, schema in self.flatten_schema.items():
+            if is_decimal_schema(schema):
+                precision, scale = schema['decimal']['precision'], schema['decimal']['scale']
+                mapped_type = column_type(
+                    schema, is_key=name in self.stream_schema_message['key_properties'], source=self.decimal_source(),
+                )
+                if mapped_type != f'NUMERIC({precision},{scale})':
+                    self.logger.warning(
+                        'Decimal fallback for %s.%s: source NUMERIC(%s,%s) maps to %s',
+                        self.stream_schema_message['stream'], name, precision, scale, mapped_type,
+                    )
         stream_schema_message = self.stream_schema_message
         stream = stream_schema_message['stream']
         table_name_with_schema = self.table_name(stream, False)
