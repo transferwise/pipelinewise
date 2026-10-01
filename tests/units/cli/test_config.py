@@ -125,6 +125,48 @@ class TestConfig:
             cli.utils.load_schema('tap'),
         )
 
+    @pytest.mark.parametrize('tap_id', ['UPPER', 'has-hyphen', 'has.dot', 't' * 51, ''])
+    def test_log_based_postgres_tap_rejects_ambiguous_slot_names(self, tap_id):
+        """PostgreSQL tap IDs map one-to-one into identifiers of at most 63 bytes."""
+        tap = self._table_format_tap(id=tap_id)
+        tap['schemas'] = [{'tables': [{'replication_method': 'LOG_BASED'}]}]
+        with pytest.raises(InvalidConfigException):
+            Config.validate_postgres_replication_slot_identity(tap)
+
+    def test_log_based_postgres_tap_accepts_slot_length_boundary(self):
+        """The 13-byte slot prefix leaves 50 ASCII bytes for a canonical tap ID."""
+        tap = self._table_format_tap(id='t' * 50)
+        tap['schemas'] = [{'tables': [{'replication_method': 'LOG_BASED'}]}]
+        Config.validate_postgres_replication_slot_identity(tap)
+
+    def test_implicit_log_based_postgres_default_validates_slot_identity(self):
+        """An omitted table method still inherits PostgreSQL's LOG_BASED default."""
+        tap = self._table_format_tap(id='has-hyphen')
+        tap['schemas'] = [{
+            'source_schema': 'public',
+            'target_schema': 'public',
+            'tables': [{'table_name': 'orders'}],
+        }]
+
+        with pytest.raises(InvalidConfigException):
+            Config.validate_postgres_replication_slot_identity(tap)
+
+    @pytest.mark.parametrize('tap_type', ['tap-mysql', 'tap-postgres'])
+    def test_taps_without_postgres_log_based_retain_existing_id_rules(self, tap_type):
+        """Connectors and PostgreSQL taps that cannot create pgoutput objects remain unchanged."""
+        tap = self._table_format_tap(id='Mixed-id.with-punctuation', type=tap_type)
+        tap['schemas'] = [{'tables': [{'replication_method': 'FULL_TABLE'}]}]
+        Config.validate_postgres_replication_slot_identity(tap)
+
+    def test_postgres_tap_rejects_legacy_database_slot_collision(self):
+        """Import and validate reject a tap ID that aliases the historical database slot."""
+        tap = self._table_format_tap(id='same_name')
+        tap['db_conn'] = {'dbname': 'same_name'}
+        tap['schemas'] = [{'tables': [{'replication_method': 'LOG_BASED'}]}]
+
+        with pytest.raises(InvalidConfigException, match='collides with a historical wal2json slot'):
+            Config.validate_postgres_replication_slot_identity(tap)
+
     @pytest.mark.parametrize(
         'settings',
         [

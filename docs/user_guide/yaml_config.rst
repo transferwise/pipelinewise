@@ -81,7 +81,7 @@ Global configuration
    * - ``switch_over_data_file``
      - No
      - None
-     - Supplies state mapping used by ``reset_state``.
+     - Supplies MariaDB/MySQL state mapping used by ``reset_state``.
    * - ``backend_db``
      - For data-diff
      - Disabled
@@ -374,7 +374,7 @@ project passes validation.
    ``import_config`` treats a missing tap or target YAML file as a deletion. It
    removes that connector's generated directory, including every ``state.json``
    bookmark; removing a target removes all of its taps. Removing a PostgreSQL
-   tap also drops its replication slot. Renaming an ``id`` has the same effect
-   as deleting the old connector and adding a new one. Stop the pipeline, back
-   up its generated state, and plan a full initial sync before removing or
-   renaming imported configuration.
+   tap also drops its managed tap-specific replication slots and publication.
+   Renaming an ``id`` has the same effect as deleting the old connector and
+   adding a new one. Stop the pipeline, back up its generated state, and plan a
+   full initial sync before removing or renaming imported configuration.

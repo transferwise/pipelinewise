@@ -64,6 +64,13 @@ stream's acknowledged history. Unsupported binlog encodings and selected-table
 ``TRUNCATE`` stop replication; see :ref:`tap-mysql` for source settings and
 legacy-checkpoint recovery requirements.
 
+PostgreSQL LOG_BASED requires PostgreSQL 14 or later and uses the built-in
+pgoutput plugin with logical messages enabled. Each run commits a tap-specific
+transactional logical message. By default, it stops after decoding that
+transaction's commit. The target-acknowledged commit LSN bounds slot feedback
+even when no selected rows changed. See :ref:`tap-postgres` for publication,
+replica-identity, slot-migration, and permission requirements.
+
 .. warning::
 
    Losing a binlog, logical replication slot, WAL range, or change-stream token

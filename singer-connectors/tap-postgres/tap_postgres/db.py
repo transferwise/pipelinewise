@@ -14,7 +14,7 @@ from dateutil.parser import parse
 LOGGER = singer.get_logger('tap_postgres')
 
 CURSOR_ITER_SIZE = 20000
-MIN_SUPPORTED_POSTGRES_VERSION = 110002
+MIN_SUPPORTED_POSTGRES_VERSION = 140000
 
 
 class UnsupportedPostgresVersionError(RuntimeError):
@@ -22,11 +22,11 @@ class UnsupportedPostgresVersionError(RuntimeError):
 
 
 def validate_server_version(connection):
-    """Reject PostgreSQL source versions older than 11.2."""
+    """Reject PostgreSQL source versions older than 14."""
     server_version = connection.server_version
     if server_version < MIN_SUPPORTED_POSTGRES_VERSION:
         raise UnsupportedPostgresVersionError(
-            'PostgreSQL 11.2 or later is required; '
+            'PostgreSQL 14 or later is required; '
             f'connected server reports server_version_num {server_version}'
         )
 
@@ -74,6 +74,12 @@ def open_connection(conn_config, logical_replication=False, prioritize_primary=F
 
     if logical_replication:
         cfg['connection_factory'] = psycopg2.extras.LogicalReplicationConnection
+        # pgoutput text fields use the replication session's output settings.
+        # Pin stable, lossless formats that match PostgreSQL's logical receiver.
+        cfg['options'] = (
+            '-crow_security=off -cclient_encoding=UTF8 '
+            '-cdatestyle=ISO -cintervalstyle=postgres -cextra_float_digits=3'
+        )
 
     conn = psycopg2.connect(**cfg)
     try:
@@ -160,14 +166,14 @@ def selected_value_to_singer_value_impl(elem, sql_datatype):  # noqa: C901
     elif isinstance(elem, str):
         cleaned_elem = elem
     elif isinstance(elem, decimal.Decimal):
-        # NB> We cast NaN's to NULL as wal2json does not support them and now we are at least consistent(ly wrong)
+        # Keep full-table and incremental output consistent with logical replication:
+        # non-finite numeric values cannot be represented safely in Singer JSON.
         if elem.is_nan():
             cleaned_elem = None
         else:
             cleaned_elem = elem
     elif isinstance(elem, float):
-        # NB> We cast NaN's, +Inf, -Inf to NULL as wal2json does not support them and
-        # now we are at least consistent(ly wrong)
+        # Keep full-table and incremental output consistent with logical replication.
         if math.isnan(elem):
             cleaned_elem = None
         elif math.isinf(elem):

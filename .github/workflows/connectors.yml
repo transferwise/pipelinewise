@@ -1,4 +1,4 @@
-# Workflow to check if all singer connectors are installable
+# Install connectors and run their unit and integration suites.
 name: Singer connectors
 
 on:
@@ -50,8 +50,12 @@ jobs:
             test_target: unit_test_cov
           - connector: tap-postgres
             test_target: unit_test_cov
+          - connector: target-postgres
+            test_target: unit_test
           - connector: target-snowflake
             test_target: unit_test
+          - connector: transform-field
+            test_target: unit_test integration_test
 
     steps:
       - name: Checking out repo
@@ -68,6 +72,111 @@ jobs:
         run: make venv
         working-directory: singer-connectors/${{ matrix.connector }}
 
-      - name: Run connector unit tests
+      - name: Run connector tests
         run: make ${{ matrix.test_target }}
         working-directory: singer-connectors/${{ matrix.connector }}
+
+  test_tap_postgres_integration:
+    name: Integration tests (tap-postgres, PostgreSQL 14)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checking out repo
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: singer-connectors/tap-postgres/setup.py
+
+      - name: Install tap-postgres test dependencies
+        run: make venv
+        working-directory: singer-connectors/tap-postgres
+
+      - name: Start PostgreSQL 14 primary and replica
+        run: make start_db
+        working-directory: singer-connectors/tap-postgres
+
+      - name: Wait for PostgreSQL primary and replica
+        run: |
+          for attempt in {1..60}; do
+            if docker compose exec -T db_primary pg_isready -U test_user -d tap_postgres_test \
+              && docker compose exec -T db_replica pg_isready -U repl_user -d tap_postgres_test; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose logs
+          exit 1
+        working-directory: singer-connectors/tap-postgres
+
+      - name: Run tap-postgres unit and integration coverage
+        env:
+          TAP_POSTGRES_HOST: 127.0.0.1
+          TAP_POSTGRES_PORT: 5432
+          TAP_POSTGRES_USER: repl_user
+          TAP_POSTGRES_PASSWORD: repl_password
+          TAP_POSTGRES_SECONDARY_HOST: 127.0.0.1
+          TAP_POSTGRES_SECONDARY_PORT: 5433
+          TAP_POSTGRES_DB: tap_postgres_test
+          TAP_POSTGRES_PG_USER: postgres
+          TAP_POSTGRES_PG_PASSWORD: my-secret-passwd
+        run: |
+          make unit_test_cov
+          make integration_test_cov
+          make total_cov
+        working-directory: singer-connectors/tap-postgres
+
+      - name: Stop PostgreSQL primary and replica
+        if: always()
+        run: docker compose down --volumes
+        working-directory: singer-connectors/tap-postgres
+
+  test_target_postgres_integration:
+    name: Integration tests (target-postgres, PostgreSQL 14)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:14-bookworm
+        env:
+          POSTGRES_DB: target_db
+          POSTGRES_USER: my_user
+          POSTGRES_PASSWORD: secret
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U my_user -d target_db"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    steps:
+      - name: Checking out repo
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: singer-connectors/target-postgres/setup.py
+
+      - name: Install target-postgres test dependencies
+        run: make venv
+        working-directory: singer-connectors/target-postgres
+
+      - name: Run target-postgres integration coverage
+        env:
+          TARGET_POSTGRES_HOST: 127.0.0.1
+          TARGET_POSTGRES_PORT: 5432
+          TARGET_POSTGRES_DBNAME: target_db
+          TARGET_POSTGRES_USER: my_user
+          TARGET_POSTGRES_PASSWORD: secret
+          TARGET_POSTGRES_SCHEMA: target_postgres_ci
+        run: make integration_test
+        working-directory: singer-connectors/target-postgres

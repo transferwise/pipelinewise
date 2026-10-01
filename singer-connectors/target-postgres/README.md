@@ -109,13 +109,16 @@ must be emitted by the tap; key-based incremental replication cannot discover th
 ```
   export TARGET_POSTGRES_HOST=<postgres-host>
   export TARGET_POSTGRES_PORT=<postgres-port>
-  export TARGET_POSTGRES_USER=<postgres-password>
+  export TARGET_POSTGRES_USER=<postgres-user>
   export TARGET_POSTGRES_PASSWORD=<postgres-password>
   export TARGET_POSTGRES_DBNAME=<postgres-dbname>
   export TARGET_POSTGRES_SCHEMA=<postgres-schema>
 ```
 
-**PS**: You can run `make env` to export pre-defined environment variables
+`make integration_test` supplies defaults for the local test database defined in
+`docker-compose.yml`. The environment variables above override those defaults.
+Use a dedicated test schema: the suite drops it before each test. The default
+schema is `target_postgres_ci`.
 
 
 2. Install python dependencies in a virtual env and run unit and integration tests

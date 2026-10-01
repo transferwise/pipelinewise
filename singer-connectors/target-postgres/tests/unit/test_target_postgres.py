@@ -1,9 +1,7 @@
 import unittest
 import os
-import gzip
-import tempfile
 
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import target_postgres
 
@@ -37,3 +35,60 @@ class TestTargetPostgres(unittest.TestCase):
         target_postgres.persist_lines(self.config, lines)
 
         flush_streams_mock.assert_called_once()
+
+    def test_store_record_coalesces_patch_events_for_same_primary_key(self):
+        db_sync = Mock(record_update_mode=target_postgres.RECORD_UPDATE_MODE_PATCH)
+        records = {}
+
+        target_postgres.store_record(records, '1', {'id': 1, 'payload': 'value'}, db_sync)
+        target_postgres.store_record(records, '1', {'id': 1, 'marker': 'updated'}, db_sync)
+
+        self.assertEqual(records, {
+            '1': {'id': 1, 'payload': 'value', 'marker': 'updated'},
+        })
+
+    def test_store_record_patch_explicit_null_overwrites_buffered_value(self):
+        db_sync = Mock(record_update_mode=target_postgres.RECORD_UPDATE_MODE_PATCH)
+        records = {}
+
+        target_postgres.store_record(records, '1', {'id': 1, 'payload': 'value'}, db_sync)
+        target_postgres.store_record(records, '1', {'id': 1, 'payload': None}, db_sync)
+
+        self.assertEqual(records, {'1': {'id': 1, 'payload': None}})
+
+    def test_store_record_replaces_non_patch_event_for_same_primary_key(self):
+        db_sync = Mock(record_update_mode=None)
+        records = {}
+
+        target_postgres.store_record(records, '1', {'id': 1, 'payload': 'value'}, db_sync)
+        target_postgres.store_record(records, '1', {'id': 1, 'marker': 'updated'}, db_sync)
+
+        self.assertEqual(records, {'1': {'id': 1, 'marker': 'updated'}})
+
+    def test_group_patch_records_distinguishes_absent_column_from_explicit_null(self):
+        db_sync = Mock(record_update_mode=target_postgres.RECORD_UPDATE_MODE_PATCH)
+        db_sync.present_column_names.side_effect = lambda record: tuple(record)
+        records = {
+            '1': {'id': 1},
+            '2': {'id': 2, 'payload': None},
+            '3': {'id': 3, 'payload': 'value'},
+        }
+
+        groups = target_postgres.group_records_by_update_columns(records, db_sync)
+
+        self.assertEqual(groups, [
+            (('id',), {'1': {'id': 1}}),
+            (('id', 'payload'), {
+                '2': {'id': 2, 'payload': None},
+                '3': {'id': 3, 'payload': 'value'},
+            }),
+        ])
+
+    def test_group_non_patch_records_keeps_one_unrestricted_batch(self):
+        db_sync = Mock(record_update_mode=None)
+        records = {'1': {'id': 1}, '2': {'id': 2, 'payload': None}}
+
+        self.assertEqual(
+            target_postgres.group_records_by_update_columns(records, db_sync),
+            [(None, records)],
+        )

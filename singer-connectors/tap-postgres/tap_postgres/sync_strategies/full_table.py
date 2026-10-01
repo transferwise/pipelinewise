@@ -122,17 +122,19 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
 
                 fq_table_name = post_db.fully_qualified_table_name(schema_name, stream['table_name'])
                 xmin = singer.get_bookmark(state, stream['tap_stream_id'], 'xmin')
+                # Match the resume predicate's transaction age across XID digit
+                # changes and wraparound, so older rows precede each checkpoint.
                 if xmin:
                     LOGGER.info("Resuming Full Table replication %s from xmin %s", nascent_stream_version, xmin)
                     select_sql = f"""
                         SELECT {','.join(escaped_columns)}, xmin::text::bigint
                         FROM {fq_table_name} where age(xmin::xid) <= age('{xmin}'::xid)
-                        ORDER BY xmin::text ASC"""
+                        ORDER BY age(xmin::xid) DESC"""
                 else:
                     LOGGER.info("Beginning new Full Table replication %s", nascent_stream_version)
                     select_sql = f"""SELECT {','.join(escaped_columns)}, xmin::text::bigint
                                       FROM {fq_table_name}
-                                     ORDER BY xmin::text ASC"""
+                                     ORDER BY age(xmin::xid) DESC"""
 
                 LOGGER.info("select %s with itersize %s", select_sql, cur.itersize)
                 cur.execute(select_sql)

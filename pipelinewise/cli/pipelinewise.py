@@ -38,7 +38,10 @@ from .errors import (
     PreRunChecksException
 )
 
-from pipelinewise.fastsync.commons.tap_postgres import FastSyncTapPostgres
+from pipelinewise.fastsync.commons.tap_postgres import (
+    FastSyncTapPostgres,
+    PGOUTPUT_MIGRATION_STATE_KEY,
+)
 from pipelinewise.fastsync.commons import utils as fastsync_utils
 from pipelinewise.cli.multiprocess import Process
 from pipelinewise.data_diff.coverage import FAILED_STATUSES
@@ -1075,6 +1078,7 @@ class PipelineWise:
         start = None
         state = None
         retryable_disconnect = False
+        self._process_postgres_pgoutput_migration(tap, after_success=False)
 
         def update_state_file(line: str) -> str:
             nonlocal start, state, retryable_disconnect
@@ -1158,6 +1162,105 @@ class PipelineWise:
         # update the state file one last time to make sure it always has the last state message.
         if state is not None:
             _persist_singer_state(tap.state, state)
+        self._process_postgres_pgoutput_migration(tap, after_success=True)
+
+    def _minimum_durable_postgres_lsn(self, state: Dict) -> Optional[int]:
+        """Return the shared target-durable LSN for every selected logical stream."""
+        properties = utils.load_json(self.tap['files']['properties'])
+        if not isinstance(properties, dict):
+            raise RuntimeError(
+                f'Missing or invalid PostgreSQL tap catalog: {self.tap["files"]["properties"]}.'
+            )
+        logical_stream_ids = []
+        for stream in properties.get('streams', []):
+            root_metadata = next((
+                item.get('metadata', {})
+                for item in stream.get('metadata', [])
+                if item.get('breadcrumb') == []
+            ), {})
+            if (
+                root_metadata.get('selected')
+                and root_metadata.get('replication-method') == self.LOG_BASED
+            ):
+                logical_stream_ids.append(stream.get('tap_stream_id'))
+        if not logical_stream_ids:
+            return None
+
+        bookmarks = state.get('bookmarks', {})
+        durable_lsns = [
+            bookmarks.get(stream_id, {}).get('lsn')
+            for stream_id in logical_stream_ids
+        ]
+        if any(type(lsn) is not int or lsn < 0 for lsn in durable_lsns):
+            return None
+        return min(durable_lsns)
+
+    def _process_postgres_pgoutput_migration(
+        self, tap: TapParams, *, after_success: bool
+    ) -> None:
+        """Advance durable slots and perform versioned migration phase transitions."""
+        if tap.type != ConnectorType.TAP_POSTGRES.value or not os.path.exists(tap.state):
+            return
+        state = utils.load_json(tap.state)
+        if not isinstance(state, dict):
+            raise RuntimeError(f'Missing or invalid PostgreSQL tap state: {tap.state}.')
+        connection_config = utils.load_json(tap.config)
+        if not isinstance(connection_config, dict):
+            raise RuntimeError(
+                f'Missing or invalid PostgreSQL tap config: {tap.config}. '
+                'No source or state changes were made.'
+            )
+        has_marker = PGOUTPUT_MIGRATION_STATE_KEY in state
+        marker = state.get(PGOUTPUT_MIGRATION_STATE_KEY)
+        if has_marker:
+            phase, _, _ = FastSyncTapPostgres.validate_migration_state_marker(
+                connection_config, marker
+            )
+            if phase == 'bridge':
+                durable_lsn = self._minimum_durable_postgres_lsn(state)
+                if durable_lsn is None or durable_lsn < marker['bridge_lsn']:
+                    raise RuntimeError(
+                        'Cannot promote the PostgreSQL pgoutput migration before every selected '
+                        'LOG_BASED bookmark reaches the target-durable bridge boundary. '
+                        'Migration state was retained and no source changes were made.'
+                    )
+                state[PGOUTPUT_MIGRATION_STATE_KEY] = (
+                    FastSyncTapPostgres.advance_migrated_replication_slot(
+                        connection_config, marker
+                    )
+                )
+                fastsync_utils.save_dict_to_json(tap.state, state)
+                return
+            if not after_success:
+                return
+        elif not after_success:
+            return
+
+        durable_lsn = self._minimum_durable_postgres_lsn(state)
+        if (
+            has_marker
+            and marker['phase'] == 'retire'
+            and (
+                durable_lsn is None
+                or durable_lsn < marker['retire_lsn']
+            )
+        ):
+            raise RuntimeError(
+                'Cannot retire the PostgreSQL wal2json slot before every selected '
+                'LOG_BASED bookmark reaches the target-durable pgoutput commit. '
+                'Migration state was retained and no source changes were made.'
+            )
+        if durable_lsn is not None:
+            FastSyncTapPostgres.advance_canonical_replication_slot(
+                connection_config, durable_lsn
+            )
+
+        if has_marker and marker['phase'] == 'retire':
+            FastSyncTapPostgres.retire_migrated_replication_slot(
+                connection_config, marker
+            )
+            del state[PGOUTPUT_MIGRATION_STATE_KEY]
+            fastsync_utils.save_dict_to_json(tap.state, state)
 
     def run_tap_partialsync(self, tap: TapParams, target: TargetParams, transform: TransformParams):
         """Running the tap for partial sync table"""
@@ -1497,11 +1600,32 @@ class PipelineWise:
         ):
             return False
 
+        return self._postgres_tap_has_log_based_selection()
+
+    def _postgres_tap_has_log_based_selection(self) -> bool:
+        """Return whether the PostgreSQL tap owns a selected logical stream."""
+        if self.tap['type'] != ConnectorType.TAP_POSTGRES.value:
+            return False
+
         selection = utils.load_json(self.tap['files']['selection']) or {}
         return any(
             table.get('replication_method') == self.LOG_BASED
             for table in selection.get('selection', [])
         )
+
+    def _prepare_postgres_pgoutput_publication(self) -> None:
+        """Prepare the publication and transaction fence before a pgoutput boundary."""
+        command = commands.build_postgres_publication_preflight_command(
+            self.tap_bin,
+            self.tap['files']['config'],
+            self.tap['files']['properties'],
+        )
+        return_code, _, stderr = commands.run_command_argv(command)
+        if return_code != 0:
+            detail = stderr.strip() if stderr else 'tap-postgres publication preflight failed'
+            raise PreRunChecksException(
+                f'{detail}. No state or replication-slot changes were made.'
+            )
 
     def do_sync_tables(self, fastsync_stream_ids=None, reset_postgres_slot: bool = False):
         """
@@ -1520,13 +1644,20 @@ class PipelineWise:
         if selected_tables['full_sync']:
             self._check_target_table_format_supports_fastsync('full_sync')
 
+        tap_config = target_config = None
         if reset_postgres_slot:
             tap_config, target_config = self._preflight_postgres_slot_reset(selected_tables)
+
+        if reset_postgres_slot:
             with self._guard_postgres_slot_reset_from_iceberg_recovery(selected_tables, target_config):
+                if self._postgres_tap_has_log_based_selection():
+                    self._prepare_postgres_pgoutput_publication()
                 FastSyncTapPostgres.reset_slot(
                     tap_config,
                     before_reset=self._clear_tap_bookmarks_before_postgres_slot_reset,
                 )
+        elif self._postgres_tap_has_log_based_selection():
+            self._prepare_postgres_pgoutput_publication()
 
         processes_list = []
         if selected_tables['partial_sync']:
@@ -1666,6 +1797,7 @@ class PipelineWise:
         self.logger.info('Pre-reset tap state backed up to %s', backup_path)
         state['bookmarks'] = {}
         state['currently_syncing'] = None
+        state.pop(PGOUTPUT_MIGRATION_STATE_KEY, None)
         fastsync_utils.save_dict_to_json(state_path, state)
         return backup_path
 
@@ -1817,6 +1949,7 @@ class PipelineWise:
 
             tap_yml = utils.load_yaml(os.path.join(yaml_dir, yaml_file), vault_secret)
             utils.validate(tap_yml, tap_schema)
+            Config.validate_postgres_replication_slot_identity(tap_yml)
 
             if tap_yml['id'] in tap_ids:
                 raise DuplicateConfigException(f'Duplicate tap found "{tap_yml["id"]}"')
@@ -2388,6 +2521,30 @@ class PipelineWise:
     def reset_state(self):
         """Reset state file"""
         if self.tap.get('type') == 'tap-postgres':
+            state = utils.load_json(self.tap['files']['state'])
+            if isinstance(state, dict) and PGOUTPUT_MIGRATION_STATE_KEY in state:
+                self.logger.error(
+                    'PostgreSQL state cannot be reset while wal2json-to-pgoutput '
+                    'slot migration is in progress. Run the tap successfully to '
+                    'finish the migration. Then reset the slot and state with an '
+                    'unfiltered whole-tap FastSync: pipelinewise fast_sync '
+                    '--tap %s --target %s. Do not add --tables or '
+                    '--replication_method_only. No source or state changes were made.',
+                    self.tap['id'],
+                    self.target['id'],
+                )
+                raise SystemExit(1)
+            if self._postgres_tap_has_log_based_selection():
+                self.logger.error(
+                    'PostgreSQL LOG_BASED state cannot be reset independently because '
+                    'a pgoutput replication slot cannot rewind. Reset the slot and '
+                    'state with an unfiltered whole-tap FastSync: pipelinewise '
+                    'fast_sync --tap %s --target %s. Do not add --tables or '
+                    '--replication_method_only. No source or state changes were made.',
+                    self.tap['id'],
+                    self.target['id'],
+                )
+                raise SystemExit(1)
             state_items_to_update = [('lsn', 1), ]
         elif self.tap.get('type') == 'tap-mysql':
             state_items_to_update = self._get_data_from_switchover_file()

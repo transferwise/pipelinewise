@@ -14,6 +14,7 @@ from pipelinewise.fastsync.commons.source_transformations import (
     validate_bookmark_column,
     validate_source_transformation_config,
 )
+from pipelinewise.fastsync.commons.tap_postgres import FastSyncTapPostgres
 from pipelinewise.utils import safe_column_name
 from . import fastsync_capabilities, utils
 from .errors import InvalidConfigException, InvalidTransformationException
@@ -105,6 +106,7 @@ class Config:
             cls.validate_tap_table_format_placement(tap_data)
             cls._validate_tap_query_history_poll_timeout_placement(tap_data)
             utils.validate(instance=tap_data, schema=tap_schema)
+            cls.validate_postgres_replication_slot_identity(tap_data)
 
             tap_id = tap_data['id']
 
@@ -150,6 +152,29 @@ class Config:
         Returns the tap specific temp directory
         """
         return os.path.join(self.config_dir, 'tmp')
+
+    @staticmethod
+    def validate_postgres_replication_slot_identity(tap: Dict) -> None:
+        """Reject a PostgreSQL tap whose canonical slot aliases its legacy slot."""
+        if tap.get('type') != 'tap-postgres':
+            return
+        tables = [
+            table
+            for schema in tap.get('schemas', [])
+            for table in schema.get('tables', [])
+        ]
+        uses_log_based = any(table.get('replication_method') == 'LOG_BASED' for table in tables)
+        if not uses_log_based and any('replication_method' not in table for table in tables):
+            uses_log_based = utils.get_tap_default_replication_method(tap) == 'LOG_BASED'
+        if not uses_log_based:
+            return
+        dbname = tap.get('db_conn', {}).get('dbname')
+        try:
+            FastSyncTapPostgres.validate_postgres_tap_id(tap.get('id'))
+            if dbname:
+                FastSyncTapPostgres.validate_replication_slot_identity(dbname, tap.get('id'))
+        except RuntimeError as exc:
+            raise InvalidConfigException(str(exc)) from exc
 
     def get_data_diff_definitions(self, selected_taps=None):
         """Return validated data-diff definitions from the loaded YAML model."""

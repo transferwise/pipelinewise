@@ -44,41 +44,105 @@ class TestResetState(TestCase):
         with mock.patch('sys.argv', argv_list):
             self.test_cli.main()
 
-    def test_reset_state_file_if_tap_is_pg(self):
-        """ Test reset_state command for Postgres taps"""
+    def test_reset_state_file_rejects_pgoutput_tap(self):
+        """PostgreSQL pgoutput state cannot rewind independently of its slot."""
         state_content = {
-                'bookmarks': {
-                    'foo_table': {
-                        'lsn': 54321
-                    },
-                    'bar_table': {
-                        'foo': 'bar'
-                    }
+            'bookmarks': {
+                'foo_table': {
+                    'lsn': 54321
+                },
+                'bar_table': {
+                    'foo': 'bar'
                 }
+            }
         }
-        with open(f'{self.test_cli.CONFIG_DIR}/target_foo/tap_pg/state.json', 'w', encoding='utf-8') as state_file:
+        state_path = f'{self.test_cli.CONFIG_DIR}/target_foo/tap_pg/state.json'
+        with open(state_path, 'w', encoding='utf-8') as state_file:
             json.dump(state_content, state_file)
 
-        arguments = {
-            'tap': 'tap_pg',
-            'target': 'target_foo'
-        }
-        self._run_cli(arguments)
+        with mock.patch(
+                'pipelinewise.cli.pipelinewise.logging.Logger.error'
+        ) as log_error:
+            with self.assertRaises(SystemExit) as system_exit:
+                self._run_cli({'tap': 'tap_pg', 'target': 'target_foo'})
 
-        with open(f'{self.test_cli.CONFIG_DIR}/target_foo/tap_pg/state.json', 'r', encoding='utf-8') as state_file:
+        self.assertEqual(system_exit.exception.code, 1)
+        error = '\n'.join(
+            item.args[0] % item.args[1:]
+            for item in log_error.call_args_list
+        )
+        self.assertIn('pgoutput replication slot cannot rewind', error)
+        self.assertIn(
+            'pipelinewise fast_sync --tap tap_pg --target target_foo',
+            error,
+        )
+        self.assertIn('Do not add --tables or --replication_method_only', error)
+
+        with open(state_path, encoding='utf-8') as state_file:
+            self.assertEqual(json.load(state_file), state_content)
+
+    def test_reset_state_file_rejects_active_pgoutput_migration(self):
+        """PostgreSQL state reset must not invalidate a slot migration boundary."""
+        state_path = f'{self.test_cli.CONFIG_DIR}/target_foo/tap_pg/state.json'
+        state_content = {
+            'bookmarks': {'foo_table': {'lsn': 54321}},
+            '_pipelinewise_pgoutput_migration': {
+                'version': 1,
+                'phase': 'pgoutput',
+            },
+        }
+        with open(state_path, 'w', encoding='utf-8') as state_file:
+            json.dump(state_content, state_file)
+
+        with mock.patch(
+                'pipelinewise.cli.pipelinewise.logging.Logger.error'
+        ) as log_error:
+            with self.assertRaises(SystemExit) as system_exit:
+                self._run_cli({'tap': 'tap_pg', 'target': 'target_foo'})
+
+        self.assertEqual(system_exit.exception.code, 1)
+        error = '\n'.join(
+            item.args[0] % item.args[1:]
+            for item in log_error.call_args_list
+        )
+        self.assertIn('slot migration is in progress', error)
+        self.assertIn('Run the tap successfully to finish the migration', error)
+        self.assertIn(
+            'pipelinewise fast_sync --tap tap_pg --target target_foo',
+            error,
+        )
+
+        with open(state_path, encoding='utf-8') as state_file:
+            self.assertEqual(json.load(state_file), state_content)
+
+    def test_reset_state_file_still_allows_postgres_without_log_based_selection(self):
+        """Non-LOG_BASED PostgreSQL taps retain the existing reset behaviour."""
+        state_path = f'{self.test_cli.CONFIG_DIR}/target_foo/tap_pg/state.json'
+        state_content = {
+            'bookmarks': {
+                'foo_table': {'lsn': 54321},
+                'bar_table': {'foo': 'bar'},
+            },
+        }
+        with open(state_path, 'w', encoding='utf-8') as state_file:
+            json.dump(state_content, state_file)
+        selection_path = (
+            f'{self.test_cli.CONFIG_DIR}/target_foo/tap_pg/selection.json'
+        )
+        with open(selection_path, 'w', encoding='utf-8') as selection_file:
+            json.dump({
+                'selection': [{
+                    'tap_stream_id': 'public-foo_table',
+                    'replication_method': 'FULL_TABLE',
+                }],
+            }, selection_file)
+
+        self._run_cli({'tap': 'tap_pg', 'target': 'target_foo'})
+
+        with open(state_path, encoding='utf-8') as state_file:
             actual_state = json.load(state_file)
-
-        expected_state = {
-                'bookmarks': {
-                    'foo_table': {
-                        'lsn': 1
-                    },
-                    'bar_table': {
-                        'foo': 'bar'
-                    }
-                }
-        }
-        self.assertDictEqual(expected_state, actual_state)
+        self.assertEqual(actual_state['bookmarks']['foo_table']['lsn'], 1)
+        self.assertEqual(actual_state['bookmarks']['bar_table'], {'foo': 'bar'})
 
     def test_reset_state_file_if_tap_is_mysql(self):
         """ Test reset_state command for MySQL taps"""

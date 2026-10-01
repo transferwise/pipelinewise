@@ -1,6 +1,7 @@
 import argparse
 import itertools
 import copy
+import math
 import psycopg2
 import psycopg2.extras
 import psycopg2.extensions
@@ -18,7 +19,7 @@ from tap_postgres.sync_strategies import incremental
 from tap_postgres.discovery_utils import discover_db
 from tap_postgres.stream_utils import (
     dump_catalog, clear_state_on_replication_change,
-    is_selected_via_metadata, refresh_streams_schema, any_logical_streams)
+    is_selected_via_metadata, refresh_streams_schema)
 
 LOGGER = singer.get_logger('tap_postgres')
 
@@ -29,6 +30,17 @@ REQUIRED_CONFIG_KEYS = [
     'user',
     'password'
 ]
+
+
+def _positive_finite_number(config, key, default):
+    """Return a positive finite numeric setting or fail before connecting."""
+    try:
+        value = float(config.get(key, default))
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f'{key} must be a positive finite number') from exc
+    if not math.isfinite(value) or value <= 0:
+        raise ValueError(f'{key} must be a positive finite number')
+    return value
 
 
 def do_discovery(conn_config):
@@ -164,6 +176,13 @@ def sync_traditional_stream(conn_config, stream, state, sync_method, end_lsn):
         LOGGER.warning('There are no columns selected for stream %s, skipping it', stream['tap_stream_id'])
         return state
 
+    if sync_method in {'logical_initial', 'logical_initial_interrupted'}:
+        snapshot_lsn = (
+            end_lsn if sync_method == 'logical_initial'
+            else get_bookmark(state, stream['tap_stream_id'], 'lsn')
+        )
+        logical_replication.wait_for_replica_replay(conn_config, snapshot_lsn)
+
     register_type_adapters(conn_config)
 
     if sync_method == 'full':
@@ -210,7 +229,8 @@ def sync_logical_streams(conn_config, logical_streams, state, end_lsn, state_fil
         for stream in logical_streams:
             selected_streams.add(stream['tap_stream_id'])
 
-        new_state = dict(currently_syncing=state['currently_syncing'], bookmarks={})
+        new_state = copy.deepcopy(state)
+        new_state['bookmarks'] = {}
 
         for stream, bookmark in state['bookmarks'].items():
             if bookmark == {} or bookmark['last_replication_method'] != 'LOG_BASED' or stream in selected_streams:
@@ -285,14 +305,23 @@ def do_sync(conn_config, catalog, default_replication_method, state, state_file=
     streams = list(filter(is_selected_via_metadata, catalog['streams']))
     streams.sort(key=lambda s: s['tap_stream_id'])
     LOGGER.info("Selected streams: %s ", [s['tap_stream_id'] for s in streams])
-    if any_logical_streams(streams, default_replication_method):
+    logical_catalog_streams = prepare_logical_replication(
+        conn_config, streams, default_replication_method)
+    if logical_catalog_streams:
         # Use of logical replication requires fetching an lsn
         end_lsn = logical_replication.fetch_current_lsn(conn_config)
         LOGGER.debug("end_lsn = %s ", end_lsn)
     else:
         end_lsn = None
 
-    refresh_streams_schema(conn_config, streams)
+    if conn_config.get('use_secondary') and logical_catalog_streams:
+        logical_ids = {stream['tap_stream_id'] for stream in logical_catalog_streams}
+        traditional_catalog_streams = [stream for stream in streams if stream['tap_stream_id'] not in logical_ids]
+        if traditional_catalog_streams:
+            refresh_streams_schema(conn_config, traditional_catalog_streams)
+        refresh_streams_schema({**conn_config, 'use_secondary': False}, logical_catalog_streams)
+    else:
+        refresh_streams_schema(conn_config, streams)
 
     sync_method_lookup, traditional_streams, logical_streams = \
         sync_method_for_streams(streams, state, default_replication_method)
@@ -334,6 +363,46 @@ def do_sync(conn_config, catalog, default_replication_method, state, state_file=
     return state
 
 
+def prepare_logical_replication(conn_config, streams, default_replication_method):
+    """Prepare the publication before capturing a snapshot or slot boundary."""
+    logical_streams = []
+    for stream in streams:
+        stream_metadata = metadata.to_map(stream['metadata'])
+        replication_method = stream_metadata.get((), {}).get(
+            'replication-method', default_replication_method)
+        if replication_method != 'LOG_BASED':
+            continue
+        if stream_metadata.get((), {}).get('is-view'):
+            raise ValueError(
+                f'Logical Replication is NOT supported for views: {stream["tap_stream_id"]}'
+            )
+        if any(
+                sync_common.should_sync_column(stream_metadata, column)
+                for column in stream['schema']['properties']):
+            logical_streams.append(stream)
+
+    if not logical_streams:
+        return []
+    if not conn_config.get('tap_id'):
+        raise ValueError('tap_id is required for LOG_BASED replication')
+    logical_replication.validate_tap_id(conn_config['tap_id'])
+
+    original_dbname = conn_config['dbname']
+    try:
+        logical_streams.sort(
+            key=lambda stream: metadata.to_map(stream['metadata']).get(()).get(
+                'database-name', original_dbname))
+        for dbname, grouped_streams in itertools.groupby(
+                logical_streams,
+                lambda stream: metadata.to_map(stream['metadata']).get(()).get(
+                    'database-name', original_dbname)):
+            conn_config['dbname'] = dbname
+            logical_replication.prepare_publication(conn_config, list(grouped_streams))
+    finally:
+        conn_config['dbname'] = original_dbname
+    return logical_streams
+
+
 def parse_args(required_config_keys):
     # fork function to be able to grab path of state file
     """Parse standard command-line args.
@@ -373,6 +442,11 @@ def parse_args(required_config_keys):
         '-d', '--discover',
         action='store_true',
         help='Do schema discovery')
+
+    parser.add_argument(
+        '--prepare-publication',
+        action='store_true',
+        help='Prepare the LOG_BASED publication, then exit')
 
     args = parser.parse_args()
     if args.config:
@@ -419,6 +493,8 @@ def main_impl():
         'max_run_seconds': args.config.get('max_run_seconds', 43200),
         'break_at_end_lsn': args.config.get('break_at_end_lsn', True),
         'logical_poll_total_seconds': float(args.config.get('logical_poll_total_seconds', 0)),
+        'publication_fence_timeout_seconds': _positive_finite_number(
+            args.config, 'publication_fence_timeout_seconds', 300),
         'use_secondary': args.config.get('use_secondary', False),
         'limit': int(limit) if limit else None
     }
@@ -442,6 +518,16 @@ def main_impl():
 
     if args.discover:
         do_discovery(conn_config)
+    elif args.prepare_publication:
+        catalog = args.catalog.to_dict() if args.catalog else args.properties
+        if catalog is None:
+            raise ValueError('--prepare-publication requires --catalog or --properties')
+        streams = list(filter(is_selected_via_metadata, catalog['streams']))
+        prepare_logical_replication(
+            conn_config,
+            streams,
+            args.config.get('default_replication_method'),
+        )
     elif args.properties or args.catalog:
         state = args.state
         state_file = args.state_file

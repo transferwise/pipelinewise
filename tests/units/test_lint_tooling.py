@@ -124,12 +124,20 @@ def test_root_ci_dependencies_and_policy_use_ruff():
 
     connector_workflow = (REPOSITORY_ROOT / '.github/workflows/connectors.yml').read_text()
     ci_tested_connectors = set(re.findall(r'^\s+- connector: ([\w-]+)$', connector_workflow, re.MULTILINE))
-    assert ci_tested_connectors == {'tap-mysql', 'tap-postgres', 'target-snowflake'}
+    assert ci_tested_connectors == {
+        'tap-mysql', 'tap-postgres', 'target-postgres', 'target-snowflake', 'transform-field',
+    }
+    assert re.search(r'^  test_tap_postgres_integration:$', connector_workflow, re.MULTILINE)
+    assert re.search(r'^  test_target_postgres_integration:$', connector_workflow, re.MULTILINE)
+    assert 'make integration_test_cov' in connector_workflow
+    assert 'make total_cov' in connector_workflow
+    assert 'run: make integration_test' in connector_workflow
+    assert 'test_target: unit_test integration_test' in connector_workflow
 
     connector_test_dirs = {
         str(path.relative_to(REPOSITORY_ROOT))
         for connector_dir in (REPOSITORY_ROOT / 'singer-connectors').iterdir()
-        if connector_dir.is_dir()
+        if connector_dir.is_dir() and (connector_dir / 'setup.py').is_file()
         for name in ('spikes', 'test', 'tests')
         if (path := connector_dir / name).is_dir()
     }
@@ -141,7 +149,8 @@ def test_root_ci_dependencies_and_policy_use_ruff():
             integration_dir = f'{test_dir}/integration'
             assert not any(fnmatch.fnmatchcase(unit_dir, pattern) for pattern in exclusions)
             if (REPOSITORY_ROOT / integration_dir).is_dir():
-                assert any(fnmatch.fnmatchcase(integration_dir, pattern) for pattern in exclusions)
+                integration_excluded = any(fnmatch.fnmatchcase(integration_dir, pattern) for pattern in exclusions)
+                assert integration_excluded == (connector not in {'target-postgres', 'transform-field'})
         else:
             assert is_excluded
 

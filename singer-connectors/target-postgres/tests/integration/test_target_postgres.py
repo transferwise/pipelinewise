@@ -143,7 +143,9 @@ class TestIntegration(unittest.TestCase):
         table_one = postgres.query("SELECT * FROM {}.logical1_table1 ORDER BY cid".format(target_schema))
         table_two = postgres.query("SELECT * FROM {}.logical1_table2 ORDER BY cid".format(target_schema))
         table_three = postgres.query("SELECT * FROM {}.logical2_table1 ORDER BY cid".format(target_schema))
-        table_four = postgres.query("SELECT cid, ctimentz, ctimetz FROM {}.logical1_edgydata WHERE CID IN(1,2,3,4,5,6,8,9) ORDER BY cid".format(target_schema))
+        table_four = postgres.query(
+            'SELECT cid, ctimentz, ctimetz FROM {}.logical1_edgydata '
+            'WHERE CID IN(1,2,3,4,5,6,8,9) ORDER BY cid'.format(target_schema))
 
         # ----------------------------------------------------------------------
         # Check rows in table_one
@@ -217,7 +219,9 @@ class TestIntegration(unittest.TestCase):
         table_one = postgres.query("SELECT * FROM {}.logical1_table1 ORDER BY CID".format(target_schema))
         table_two = postgres.query("SELECT * FROM {}.logical1_table2 ORDER BY CID".format(target_schema))
         table_three = postgres.query("SELECT * FROM {}.logical2_table1 ORDER BY CID".format(target_schema))
-        table_four = postgres.query("SELECT * FROM {}.logical1_edgydata WHERE cid IN(1,2,3,4,5,6,8,9) ORDER BY cid".format(target_schema))
+        table_four = postgres.query(
+            'SELECT * FROM {}.logical1_edgydata WHERE cid IN(1,2,3,4,5,6,8,9) '
+            'ORDER BY cid'.format(target_schema))
 
         self.assertEqual(table_one, [])
         self.assertEqual(table_two, [])
@@ -381,9 +385,24 @@ class TestIntegration(unittest.TestCase):
                 {'c_int': 1, 'c_pk': 1,
                  'c_varchar': 'Up to 128 characters: Lorem ipsum dolor sit amet, consectetuer adipiscing elit.'},
                 {'c_int': 2, 'c_pk': 2,
-                 'c_varchar': 'Up to 256 characters: Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Donec quam felis, ultricies.'},
+                 'c_varchar': (
+                     'Up to 256 characters: Lorem ipsum dolor sit amet, consectetuer adipiscing elit. '
+                     'Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et '
+                     'magnis dis parturient montes, nascetur ridiculus mus. Donec quam felis, ultricies.')},
                 {'c_int': 3, 'c_pk': 3,
-                 'c_varchar': 'Up to 1024 characters: Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Donec quam felis, ultricies nec, pellentesque eu, pretium quis, sem. Nulla consequat massa quis enim. Donec pede justo, fringilla vel, aliquet nec, vulputate eget, arcu. In enim justo, rhoncus ut, imperdiet a, venenatis vitae, justo. Nullam dictum felis eu pede mollis pretium. Integer tincidunt. Cras dapibus. Vivamus elementum semper nisi. Aenean vulputate eleifend tellus. Aenean leo ligula, porttitor eu, consequat vitae, eleifend ac, enim. Aliquam lorem ante, dapibus in, viverra quis, feugiat a, tellus. Phasellus viverra nulla ut metus varius laoreet. Quisque rutrum. Aenean imperdiet. Etiam ultricies nisi vel augue. Curabitur ullamcorper ultricies nisi. Nam eget dui. Etiam rhoncus. Maecenas tempus, tellus eget condimentum rhoncus, sem quam semper libero, sit amet adipiscing sem neque sed ipsum.'},
+                 'c_varchar': (
+                     'Up to 1024 characters: Lorem ipsum dolor sit amet, consectetuer adipiscing elit. '
+                     'Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et '
+                     'magnis dis parturient montes, nascetur ridiculus mus. Donec quam felis, ultricies nec, '
+                     'pellentesque eu, pretium quis, sem. Nulla consequat massa quis enim. Donec pede justo, '
+                     'fringilla vel, aliquet nec, vulputate eget, arcu. In enim justo, rhoncus ut, imperdiet a, '
+                     'venenatis vitae, justo. Nullam dictum felis eu pede mollis pretium. Integer tincidunt. '
+                     'Cras dapibus. Vivamus elementum semper nisi. Aenean vulputate eleifend tellus. '
+                     'Aenean leo ligula, porttitor eu, consequat vitae, eleifend ac, enim. Aliquam lorem ante, '
+                     'dapibus in, viverra quis, feugiat a, tellus. Phasellus viverra nulla ut metus varius laoreet. '
+                     'Quisque rutrum. Aenean imperdiet. Etiam ultricies nisi vel augue. Curabitur ullamcorper '
+                     'ultricies nisi. Nam eget dui. Etiam rhoncus. Maecenas tempus, tellus eget condimentum '
+                     'rhoncus, sem quam semper libero, sit amet adipiscing sem neque sed ipsum.')},
             ])
 
         # Test very long texts by string length
@@ -571,11 +590,11 @@ class TestIntegration(unittest.TestCase):
         postgres.query("DROP USER IF EXISTS user_2")
         try:
             postgres.query("DROP GROUP group_1")  # DROP GROUP has no IF EXISTS
-        except:
+        except Exception:
             pass
         try:
             postgres.query("DROP GROUP group_2")
-        except:
+        except Exception:
             pass
         postgres.query("CREATE USER user_1 WITH PASSWORD 'Abcdefgh1234'")
         postgres.query("CREATE USER user_2 WITH PASSWORD 'Abcdefgh1234'")
@@ -652,12 +671,23 @@ class TestIntegration(unittest.TestCase):
             mock_emit_state.mock_calls,
             [
                 mock.call({"currently_syncing": None, "bookmarks": {
-                    "logical1-logical1_edgydata": {"last_replication_method": "LOG_BASED", "lsn": 108240872, "version": 1570922723596, "xmin": None},
-                    "logical1-logical1_table1": {"last_replication_method": "LOG_BASED", "lsn": 108240872, "version": 1570922723618, "xmin": None},
-                    "logical1-logical1_table2": {"last_replication_method": "LOG_BASED", "lsn": 108240872, "version": 1570922723635, "xmin": None},
-                    "logical2-logical2_table1": {"last_replication_method": "LOG_BASED", "lsn": 108240872, "version": 1570922723651, "xmin": None},
-                    "public-city": {"last_replication_method": "INCREMENTAL", "replication_key": "id", "version": 1570922723667, "replication_key_value": 4079},
-                    "public-country": {"last_replication_method": "FULL_TABLE", "version": 1570922730456, "xmin": None},
+                    "logical1-logical1_edgydata": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108240872,
+                        "version": 1570922723596, "xmin": None},
+                    "logical1-logical1_table1": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108240872,
+                        "version": 1570922723618, "xmin": None},
+                    "logical1-logical1_table2": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108240872,
+                        "version": 1570922723635, "xmin": None},
+                    "logical2-logical2_table1": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108240872,
+                        "version": 1570922723651, "xmin": None},
+                    "public-city": {
+                        "last_replication_method": "INCREMENTAL", "replication_key": "id",
+                        "version": 1570922723667, "replication_key_value": 4079},
+                    "public-country": {
+                        "last_replication_method": "FULL_TABLE", "version": 1570922730456, "xmin": None},
                     "public2-wearehere": {}}})
             ])
 
@@ -680,58 +710,124 @@ class TestIntegration(unittest.TestCase):
             [
                 # Flush #1 - Flushed edgydata until lsn: 108197216
                 mock.call({"currently_syncing": None, "bookmarks": {
-                    "logical1-logical1_edgydata": {"last_replication_method": "LOG_BASED", "lsn": 108197216, "version": 1570922723596, "xmin": None},
-                    "logical1-logical1_table1": {"last_replication_method": "LOG_BASED", "lsn": 108196176, "version": 1570922723618, "xmin": None},
-                     "logical1-logical1_table2": {"last_replication_method": "LOG_BASED", "lsn": 108196176, "version": 1570922723635, "xmin": None},
-                     "logical2-logical2_table1": {"last_replication_method": "LOG_BASED", "lsn": 108196176, "version": 1570922723651, "xmin": None},
-                     "public-city": {"last_replication_method": "INCREMENTAL", "replication_key": "id", "version": 1570922723667, "replication_key_value": 4079},
-                     "public-country": {"last_replication_method": "FULL_TABLE", "version": 1570922730456, "xmin": None},
-                     "public2-wearehere": {}}}),
+                    "logical1-logical1_edgydata": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108197216,
+                        "version": 1570922723596, "xmin": None},
+                    "logical1-logical1_table1": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108197216,
+                        "version": 1570922723618, "xmin": None},
+                    "logical1-logical1_table2": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108197216,
+                        "version": 1570922723635, "xmin": None},
+                    "logical2-logical2_table1": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108197216,
+                        "version": 1570922723651, "xmin": None},
+                    "public-city": {
+                        "last_replication_method": "INCREMENTAL", "replication_key": "id",
+                        "version": 1570922723667, "replication_key_value": 4079},
+                    "public-country": {
+                        "last_replication_method": "FULL_TABLE", "version": 1570922730456, "xmin": None},
+                    "public2-wearehere": {}}}),
                 # Flush #2 - Flushed logical1-logical1_table2 until lsn: 108201336
                 mock.call({"currently_syncing": None, "bookmarks": {
-                    "logical1-logical1_edgydata": {"last_replication_method": "LOG_BASED", "lsn": 108197216, "version": 1570922723596, "xmin": None},
-                    "logical1-logical1_table1": {"last_replication_method": "LOG_BASED", "lsn": 108196176, "version": 1570922723618, "xmin": None},
-                     "logical1-logical1_table2": {"last_replication_method": "LOG_BASED", "lsn": 108201336, "version": 1570922723635, "xmin": None},
-                     "logical2-logical2_table1": {"last_replication_method": "LOG_BASED", "lsn": 108196176, "version": 1570922723651, "xmin": None},
-                     "public-city": {"last_replication_method": "INCREMENTAL", "replication_key": "id", "version": 1570922723667, "replication_key_value": 4079},
-                     "public-country": {"last_replication_method": "FULL_TABLE", "version": 1570922730456, "xmin": None},
-                     "public2-wearehere": {}}}),
+                    "logical1-logical1_edgydata": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108197216,
+                        "version": 1570922723596, "xmin": None},
+                    "logical1-logical1_table1": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108197216,
+                        "version": 1570922723618, "xmin": None},
+                    "logical1-logical1_table2": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108201336,
+                        "version": 1570922723635, "xmin": None},
+                    "logical2-logical2_table1": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108197216,
+                        "version": 1570922723651, "xmin": None},
+                    "public-city": {
+                        "last_replication_method": "INCREMENTAL", "replication_key": "id",
+                        "version": 1570922723667, "replication_key_value": 4079},
+                    "public-country": {
+                        "last_replication_method": "FULL_TABLE", "version": 1570922730456, "xmin": None},
+                    "public2-wearehere": {}}}),
                 # Flush #3 - Flushed logical1-logical1_table2 until lsn: 108237600
                 mock.call({"currently_syncing": None, "bookmarks": {
-                    "logical1-logical1_edgydata": {"last_replication_method": "LOG_BASED", "lsn": 108197216, "version": 1570922723596, "xmin": None},
-                    "logical1-logical1_table1": {"last_replication_method": "LOG_BASED", "lsn": 108196176, "version": 1570922723618, "xmin": None},
-                     "logical1-logical1_table2": {"last_replication_method": "LOG_BASED", "lsn": 108237600, "version": 1570922723635, "xmin": None},
-                     "logical2-logical2_table1": {"last_replication_method": "LOG_BASED", "lsn": 108196176, "version": 1570922723651, "xmin": None},
-                     "public-city": {"last_replication_method": "INCREMENTAL", "replication_key": "id", "version": 1570922723667, "replication_key_value": 4079},
-                     "public-country": {"last_replication_method": "FULL_TABLE", "version": 1570922730456, "xmin": None},
-                     "public2-wearehere": {}}}),
+                    "logical1-logical1_edgydata": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108197216,
+                        "version": 1570922723596, "xmin": None},
+                    "logical1-logical1_table1": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108197216,
+                        "version": 1570922723618, "xmin": None},
+                    "logical1-logical1_table2": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108237600,
+                        "version": 1570922723635, "xmin": None},
+                    "logical2-logical2_table1": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108197216,
+                        "version": 1570922723651, "xmin": None},
+                    "public-city": {
+                        "last_replication_method": "INCREMENTAL", "replication_key": "id",
+                        "version": 1570922723667, "replication_key_value": 4079},
+                    "public-country": {
+                        "last_replication_method": "FULL_TABLE", "version": 1570922730456, "xmin": None},
+                    "public2-wearehere": {}}}),
                 # Flush #4 - Flushed logical1-logical1_table2 until lsn: 108238768
                 mock.call({"currently_syncing": None, "bookmarks": {
-                    "logical1-logical1_edgydata": {"last_replication_method": "LOG_BASED", "lsn": 108197216, "version": 1570922723596, "xmin": None},
-                    "logical1-logical1_table1": {"last_replication_method": "LOG_BASED", "lsn": 108196176, "version": 1570922723618, "xmin": None},
-                     "logical1-logical1_table2": {"last_replication_method": "LOG_BASED", "lsn": 108238768, "version": 1570922723635, "xmin": None},
-                     "logical2-logical2_table1": {"last_replication_method": "LOG_BASED", "lsn": 108196176, "version": 1570922723651, "xmin": None},
-                     "public-city": {"last_replication_method": "INCREMENTAL", "replication_key": "id", "version": 1570922723667, "replication_key_value": 4079},
-                     "public-country": {"last_replication_method": "FULL_TABLE", "version": 1570922730456, "xmin": None},
-                     "public2-wearehere": {}}}),
+                    "logical1-logical1_edgydata": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108197216,
+                        "version": 1570922723596, "xmin": None},
+                    "logical1-logical1_table1": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108197216,
+                        "version": 1570922723618, "xmin": None},
+                    "logical1-logical1_table2": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108238768,
+                        "version": 1570922723635, "xmin": None},
+                    "logical2-logical2_table1": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108197216,
+                        "version": 1570922723651, "xmin": None},
+                    "public-city": {
+                        "last_replication_method": "INCREMENTAL", "replication_key": "id",
+                        "version": 1570922723667, "replication_key_value": 4079},
+                    "public-country": {
+                        "last_replication_method": "FULL_TABLE", "version": 1570922730456, "xmin": None},
+                    "public2-wearehere": {}}}),
                 # Flush #5 - Flushed logical1-logical1_table2 until lsn: 108239704,
                 mock.call({"currently_syncing": None, "bookmarks": {
-                    "logical1-logical1_edgydata": {"last_replication_method": "LOG_BASED", "lsn": 108197216, "version": 1570922723596, "xmin": None},
-                    "logical1-logical1_table1": {"last_replication_method": "LOG_BASED", "lsn": 108196176, "version": 1570922723618, "xmin": None},
-                     "logical1-logical1_table2": {"last_replication_method": "LOG_BASED", "lsn": 108239896, "version": 1570922723635, "xmin": None},
-                     "logical2-logical2_table1": {"last_replication_method": "LOG_BASED", "lsn": 108196176, "version": 1570922723651, "xmin": None},
-                     "public-city": {"last_replication_method": "INCREMENTAL", "replication_key": "id", "version": 1570922723667, "replication_key_value": 4079},
-                     "public-country": {"last_replication_method": "FULL_TABLE", "version": 1570922730456, "xmin": None},
-                     "public2-wearehere": {}}}),
+                    "logical1-logical1_edgydata": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108197216,
+                        "version": 1570922723596, "xmin": None},
+                    "logical1-logical1_table1": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108197216,
+                        "version": 1570922723618, "xmin": None},
+                    "logical1-logical1_table2": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108239896,
+                        "version": 1570922723635, "xmin": None},
+                    "logical2-logical2_table1": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108197216,
+                        "version": 1570922723651, "xmin": None},
+                    "public-city": {
+                        "last_replication_method": "INCREMENTAL", "replication_key": "id",
+                        "version": 1570922723667, "replication_key_value": 4079},
+                    "public-country": {
+                        "last_replication_method": "FULL_TABLE", "version": 1570922730456, "xmin": None},
+                    "public2-wearehere": {}}}),
                 # Flush #6 - Last flush, update every stream lsn: 108240872,
                 mock.call({"currently_syncing": None, "bookmarks": {
-                    "logical1-logical1_edgydata": {"last_replication_method": "LOG_BASED", "lsn": 108240872, "version": 1570922723596, "xmin": None},
-                    "logical1-logical1_table1": {"last_replication_method": "LOG_BASED", "lsn": 108240872, "version": 1570922723618, "xmin": None},
-                     "logical1-logical1_table2": {"last_replication_method": "LOG_BASED", "lsn": 108240872, "version": 1570922723635, "xmin": None},
-                     "logical2-logical2_table1": {"last_replication_method": "LOG_BASED", "lsn": 108240872, "version": 1570922723651, "xmin": None},
-                     "public-city": {"last_replication_method": "INCREMENTAL", "replication_key": "id", "version": 1570922723667, "replication_key_value": 4079},
-                     "public-country": {"last_replication_method": "FULL_TABLE", "version": 1570922730456, "xmin": None},
-                     "public2-wearehere": {}}}),
+                    "logical1-logical1_edgydata": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108240872,
+                        "version": 1570922723596, "xmin": None},
+                    "logical1-logical1_table1": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108240872,
+                        "version": 1570922723618, "xmin": None},
+                    "logical1-logical1_table2": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108240872,
+                        "version": 1570922723635, "xmin": None},
+                    "logical2-logical2_table1": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108240872,
+                        "version": 1570922723651, "xmin": None},
+                    "public-city": {
+                        "last_replication_method": "INCREMENTAL", "replication_key": "id",
+                        "version": 1570922723667, "replication_key_value": 4079},
+                    "public-country": {
+                        "last_replication_method": "FULL_TABLE", "version": 1570922730456, "xmin": None},
+                    "public2-wearehere": {}}}),
             ])
 
         # Every table should be loaded correctly
@@ -754,57 +850,123 @@ class TestIntegration(unittest.TestCase):
             [
                 # Flush #1 - Flush every stream until lsn: 108197216
                 mock.call({"currently_syncing": None, "bookmarks": {
-                    "logical1-logical1_edgydata": {"last_replication_method": "LOG_BASED", "lsn": 108197216, "version": 1570922723596, "xmin": None},
-                    "logical1-logical1_table1": {"last_replication_method": "LOG_BASED", "lsn": 108197216, "version": 1570922723618, "xmin": None},
-                    "logical1-logical1_table2": {"last_replication_method": "LOG_BASED", "lsn": 108197216, "version": 1570922723635, "xmin": None},
-                    "logical2-logical2_table1": {"last_replication_method": "LOG_BASED", "lsn": 108197216, "version": 1570922723651, "xmin": None},
-                    "public-city": {"last_replication_method": "INCREMENTAL", "replication_key": "id", "version": 1570922723667, "replication_key_value": 4079},
-                    "public-country": {"last_replication_method": "FULL_TABLE", "version": 1570922730456, "xmin": None},
+                    "logical1-logical1_edgydata": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108197216,
+                        "version": 1570922723596, "xmin": None},
+                    "logical1-logical1_table1": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108197216,
+                        "version": 1570922723618, "xmin": None},
+                    "logical1-logical1_table2": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108197216,
+                        "version": 1570922723635, "xmin": None},
+                    "logical2-logical2_table1": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108197216,
+                        "version": 1570922723651, "xmin": None},
+                    "public-city": {
+                        "last_replication_method": "INCREMENTAL", "replication_key": "id",
+                        "version": 1570922723667, "replication_key_value": 4079},
+                    "public-country": {
+                        "last_replication_method": "FULL_TABLE", "version": 1570922730456, "xmin": None},
                     "public2-wearehere": {}}}),
                 # Flush #2 - Flush every stream until lsn 108201336
                 mock.call({'currently_syncing': None, 'bookmarks': {
-                    "logical1-logical1_edgydata": {"last_replication_method": "LOG_BASED", "lsn": 108201336, "version": 1570922723596, "xmin": None},
-                    "logical1-logical1_table1": {"last_replication_method": "LOG_BASED", "lsn": 108201336, "version": 1570922723618, "xmin": None},
-                    "logical1-logical1_table2": {"last_replication_method": "LOG_BASED", "lsn": 108201336, "version": 1570922723635, "xmin": None},
-                    "logical2-logical2_table1": {"last_replication_method": "LOG_BASED", "lsn": 108201336, "version": 1570922723651, "xmin": None},
-                    "public-city": {"last_replication_method": "INCREMENTAL", "replication_key": "id", "version": 1570922723667, "replication_key_value": 4079},
-                    "public-country": {"last_replication_method": "FULL_TABLE", "version": 1570922730456, "xmin": None},
+                    "logical1-logical1_edgydata": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108201336,
+                        "version": 1570922723596, "xmin": None},
+                    "logical1-logical1_table1": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108201336,
+                        "version": 1570922723618, "xmin": None},
+                    "logical1-logical1_table2": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108201336,
+                        "version": 1570922723635, "xmin": None},
+                    "logical2-logical2_table1": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108201336,
+                        "version": 1570922723651, "xmin": None},
+                    "public-city": {
+                        "last_replication_method": "INCREMENTAL", "replication_key": "id",
+                        "version": 1570922723667, "replication_key_value": 4079},
+                    "public-country": {
+                        "last_replication_method": "FULL_TABLE", "version": 1570922730456, "xmin": None},
                     "public2-wearehere": {}}}),
                 # Flush #3 - Flush every stream until lsn: 108237600
                 mock.call({'currently_syncing': None, 'bookmarks': {
-                    "logical1-logical1_edgydata": {"last_replication_method": "LOG_BASED", "lsn": 108237600, "version": 1570922723596, "xmin": None},
-                    "logical1-logical1_table1": {"last_replication_method": "LOG_BASED", "lsn": 108237600, "version": 1570922723618, "xmin": None},
-                    "logical1-logical1_table2": {"last_replication_method": "LOG_BASED", "lsn": 108237600, "version": 1570922723635, "xmin": None},
-                    "logical2-logical2_table1": {"last_replication_method": "LOG_BASED", "lsn": 108237600, "version": 1570922723651, "xmin": None},
-                    "public-city": {"last_replication_method": "INCREMENTAL", "replication_key": "id", "version": 1570922723667, "replication_key_value": 4079},
-                    "public-country": {"last_replication_method": "FULL_TABLE", "version": 1570922730456, "xmin": None},
+                    "logical1-logical1_edgydata": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108237600,
+                        "version": 1570922723596, "xmin": None},
+                    "logical1-logical1_table1": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108237600,
+                        "version": 1570922723618, "xmin": None},
+                    "logical1-logical1_table2": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108237600,
+                        "version": 1570922723635, "xmin": None},
+                    "logical2-logical2_table1": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108237600,
+                        "version": 1570922723651, "xmin": None},
+                    "public-city": {
+                        "last_replication_method": "INCREMENTAL", "replication_key": "id",
+                        "version": 1570922723667, "replication_key_value": 4079},
+                    "public-country": {
+                        "last_replication_method": "FULL_TABLE", "version": 1570922730456, "xmin": None},
                     "public2-wearehere": {}}}),
                 # Flush #4 - Flush every stream until lsn: 108238768
                 mock.call({'currently_syncing': None, 'bookmarks': {
-                    "logical1-logical1_edgydata": {"last_replication_method": "LOG_BASED", "lsn": 108238768, "version": 1570922723596, "xmin": None},
-                    "logical1-logical1_table1": {"last_replication_method": "LOG_BASED", "lsn": 108238768, "version": 1570922723618, "xmin": None},
-                    "logical1-logical1_table2": {"last_replication_method": "LOG_BASED", "lsn": 108238768, "version": 1570922723635, "xmin": None},
-                    "logical2-logical2_table1": {"last_replication_method": "LOG_BASED", "lsn": 108238768, "version": 1570922723651, "xmin": None},
-                    "public-city": {"last_replication_method": "INCREMENTAL", "replication_key": "id", "version": 1570922723667, "replication_key_value": 4079},
-                    "public-country": {"last_replication_method": "FULL_TABLE", "version": 1570922730456, "xmin": None},
+                    "logical1-logical1_edgydata": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108238768,
+                        "version": 1570922723596, "xmin": None},
+                    "logical1-logical1_table1": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108238768,
+                        "version": 1570922723618, "xmin": None},
+                    "logical1-logical1_table2": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108238768,
+                        "version": 1570922723635, "xmin": None},
+                    "logical2-logical2_table1": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108238768,
+                        "version": 1570922723651, "xmin": None},
+                    "public-city": {
+                        "last_replication_method": "INCREMENTAL", "replication_key": "id",
+                        "version": 1570922723667, "replication_key_value": 4079},
+                    "public-country": {
+                        "last_replication_method": "FULL_TABLE", "version": 1570922730456, "xmin": None},
                     "public2-wearehere": {}}}),
                 # Flush #5 - Flush every stream until lsn: 108239704,
                 mock.call({'currently_syncing': None, 'bookmarks': {
-                    "logical1-logical1_edgydata": {"last_replication_method": "LOG_BASED", "lsn": 108239896, "version": 1570922723596, "xmin": None},
-                    "logical1-logical1_table1": {"last_replication_method": "LOG_BASED", "lsn": 108239896, "version": 1570922723618, "xmin": None},
-                    "logical1-logical1_table2": {"last_replication_method": "LOG_BASED", "lsn": 108239896, "version": 1570922723635, "xmin": None},
-                    "logical2-logical2_table1": {"last_replication_method": "LOG_BASED", "lsn": 108239896, "version": 1570922723651, "xmin": None},
-                    "public-city": {"last_replication_method": "INCREMENTAL", "replication_key": "id", "version": 1570922723667, "replication_key_value": 4079},
-                    "public-country": {"last_replication_method": "FULL_TABLE", "version": 1570922730456, "xmin": None},
+                    "logical1-logical1_edgydata": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108239896,
+                        "version": 1570922723596, "xmin": None},
+                    "logical1-logical1_table1": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108239896,
+                        "version": 1570922723618, "xmin": None},
+                    "logical1-logical1_table2": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108239896,
+                        "version": 1570922723635, "xmin": None},
+                    "logical2-logical2_table1": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108239896,
+                        "version": 1570922723651, "xmin": None},
+                    "public-city": {
+                        "last_replication_method": "INCREMENTAL", "replication_key": "id",
+                        "version": 1570922723667, "replication_key_value": 4079},
+                    "public-country": {
+                        "last_replication_method": "FULL_TABLE", "version": 1570922730456, "xmin": None},
                     "public2-wearehere": {}}}),
                 # Flush #6 - Last flush, update every stream until lsn: 108240872,
                 mock.call({'currently_syncing': None, 'bookmarks': {
-                    "logical1-logical1_edgydata": {"last_replication_method": "LOG_BASED", "lsn": 108240872, "version": 1570922723596, "xmin": None},
-                    "logical1-logical1_table1": {"last_replication_method": "LOG_BASED", "lsn": 108240872, "version": 1570922723618, "xmin": None},
-                    "logical1-logical1_table2": {"last_replication_method": "LOG_BASED", "lsn": 108240872, "version": 1570922723635, "xmin": None},
-                    "logical2-logical2_table1": {"last_replication_method": "LOG_BASED", "lsn": 108240872, "version": 1570922723651, "xmin": None},
-                    "public-city": {"last_replication_method": "INCREMENTAL", "replication_key": "id", "version": 1570922723667, "replication_key_value": 4079},
-                    "public-country": {"last_replication_method": "FULL_TABLE", "version": 1570922730456, "xmin": None},
+                    "logical1-logical1_edgydata": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108240872,
+                        "version": 1570922723596, "xmin": None},
+                    "logical1-logical1_table1": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108240872,
+                        "version": 1570922723618, "xmin": None},
+                    "logical1-logical1_table2": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108240872,
+                        "version": 1570922723635, "xmin": None},
+                    "logical2-logical2_table1": {
+                        "last_replication_method": "LOG_BASED", "lsn": 108240872,
+                        "version": 1570922723651, "xmin": None},
+                    "public-city": {
+                        "last_replication_method": "INCREMENTAL", "replication_key": "id",
+                        "version": 1570922723667, "replication_key_value": 4079},
+                    "public-country": {
+                        "last_replication_method": "FULL_TABLE", "version": 1570922730456, "xmin": None},
                     "public2-wearehere": {}}}),
             ])
 
@@ -835,3 +997,69 @@ class TestIntegration(unittest.TestCase):
         target_postgres.persist_lines(self.config, tap_lines)
 
         self.assert_multiple_streams_are_into_postgres()
+
+    def test_patch_updates_preserve_absent_toast_columns_and_merge_repeated_events(self):
+        """PATCH updates keep absent columns and merge repeated events for one primary key."""
+        stream = 'public-patch_toast'
+        target_schema = self.config['default_target_schema']
+        postgres = DbSync(self.config)
+        postgres.query('DROP TABLE IF EXISTS {}.patch_toast'.format(target_schema))
+        schema_message = {
+            'type': 'SCHEMA',
+            'stream': stream,
+            'key_properties': ['id'],
+            'schema': {
+                'type': 'object',
+                'x-pipelinewise-record-update-mode': 'PATCH',
+                'properties': {
+                    'id': {'type': ['integer']},
+                    'large_payload': {'type': ['null', 'string']},
+                    'status': {'type': ['null', 'string']},
+                    'note': {'type': ['null', 'string']},
+                    'nullable_value': {'type': ['null', 'string']},
+                },
+            },
+        }
+        large_payload = 'toast-value-' * 2000
+        initial_messages = [
+            schema_message,
+            {
+                'type': 'RECORD',
+                'stream': stream,
+                'record': {
+                    'id': 1,
+                    'large_payload': large_payload,
+                    'status': 'initial',
+                    'note': 'initial',
+                    'nullable_value': 'clear-me',
+                },
+            },
+        ]
+        target_postgres.persist_lines(self.config, map(json.dumps, initial_messages))
+
+        patch_messages = [
+            schema_message,
+            {
+                'type': 'RECORD',
+                'stream': stream,
+                'record': {'id': 1, 'status': 'updated'},
+            },
+            {
+                'type': 'RECORD',
+                'stream': stream,
+                'record': {'id': 1, 'note': 'updated-note', 'nullable_value': None},
+            },
+        ]
+        target_postgres.persist_lines(self.config, map(json.dumps, patch_messages))
+
+        rows = postgres.query(
+            'SELECT id, large_payload, status, note, nullable_value '
+            'FROM {}.patch_toast WHERE id = 1'.format(target_schema)
+        )
+        self.assertEqual([dict(row) for row in rows], [{
+            'id': 1,
+            'large_payload': large_payload,
+            'status': 'updated',
+            'note': 'updated-note',
+            'nullable_value': None,
+        }])

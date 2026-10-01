@@ -5,16 +5,19 @@ Read root `AGENTS.md` and relevant implementation, test, E2E, and docs guides.
 ## Environments and CI
 
 These are vendored sources, not submodules. The root Ruff gate checks connector
-source packages plus the tap-mysql, tap-postgres, and target-snowflake unit
-suites run by connector CI. Connector tests outside GitHub connector CI,
-including integration suites, legacy tests, and spikes, remain excluded; root
-unit tests exclude connectors. Prefer the ready `pipelinewise` container; report
-host fallbacks.
+source packages plus all unit suites run by connector CI, and target-postgres
+and transform-field integration suites. Other legacy tests listed in
+`pyproject.toml` remain excluded; root unit tests exclude connectors. Prefer
+the ready `pipelinewise` container; report host fallbacks.
 
 Connector CI installs all connectors and runs Python 3.12 units for tap-mysql
-(`make unit_test_cov`, 47%), tap-postgres (`make unit_test_cov`, 58%), and
-target-snowflake (`make unit_test`, 67%). It excludes integration; behavior
-changes need local connector tests and an available E2E route.
+(`make unit_test_cov`, 47%), tap-postgres (`make unit_test_cov`, 58%),
+target-postgres (`make unit_test`, 44%), target-snowflake (`make unit_test`,
+67%), and transform-field (`make unit_test integration_test`). Tap-postgres
+integration runs on PostgreSQL 14 with unit, integration, and combined coverage
+gates. Target-postgres integration runs on an isolated PostgreSQL 14 service
+with its 87% coverage gate. Other integration remains local and needs an
+available E2E route for behavior changes.
 
 Root `make connectors -e pw_connector=<name>` creates runtime
 `.virtualenvs/<name>/`; connector Makefiles often test in `./venv/`. Never mix
@@ -24,10 +27,10 @@ PipelineWise, runtime-connector, connector-test, host, or container interpreters
 
 Ruff is the only supported connector linter. Where present, the owning
 Makefile's `lint` target runs the connector environment's Ruff binary from the
-repository root so the root `pyproject.toml` applies. The tap-mysql,
-tap-postgres, and target-snowflake targets lint source, their GitHub-tested unit
-suites, and shared unit helpers; other connector targets lint source only. Unit
-and integration targets remain the behavioral validation. Do not add
+repository root so the root `pyproject.toml` applies. CI-tested connectors lint
+source, unit suites, and shared unit helpers. Target-postgres and transform-field
+also lint their integration suites; other connector targets lint source only.
+Unit and integration targets remain the behavioral validation. Do not add
 connector-local lint configuration, another Python linter, or an automatic
 formatter. Line length, docstring quoting, lambda assignment, and complexity
 rules apply to all connector source. Keep unavoidable legacy ignores inline,
@@ -39,10 +42,9 @@ without lowering thresholds; integration may need containers or credentials.
 
 - Most use `venv`, `lint`, `unit_test`, and `integration_test`; inspect the
   Makefile for variants.
-- PostgreSQL also requires `integration_test_cov` >=63 and `total_cov` >=85;
+- PostgreSQL also requires `integration_test_cov` >=63 and `total_cov` >=84;
   MySQL uses Pytest for unit and integration tests.
-- Without Makefiles: GitHub uses `tests/`, Zendesk uses Nose, and
-  transform-field uses direct suites and Singer E2E. Jira is an external pin
+- Without Makefiles: GitHub uses `tests/` and Zendesk uses Nose. Jira is an external pin
   without local source/tests; Salesforce has a Makefile but no tests. GitHub,
   Jira, and Zendesk lack repository E2E.
 
@@ -92,7 +94,7 @@ real client-side encryption master key and expects 50 passes.
 - These are upstream-derived copies. Coordinate non-trivial divergence
   upstream; keep local fixes narrow, comments limited to why divergence is
   needed, and avoid broad formatting.
-- PostgreSQL sources require version 11.2 or later for every Singer replication
+- PostgreSQL sources require version 14 or later for every Singer replication
   method and PipelineWise FullSync/PartialSync. Keep their version checks aligned;
   this source minimum does not constrain target-postgres or the PipelineWise
   backend database.

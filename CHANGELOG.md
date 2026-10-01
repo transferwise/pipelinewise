@@ -1,3 +1,42 @@
+0.94.0 (2026-10-01)
+-------------------
+
+**PostgreSQL logical replication**
+
+- Require PostgreSQL 14 or later and use native pgoutput for all new LOG_BASED
+  replication slots.
+- Name new slots ``pipelinewise_<tap_id>``. Automatically copy the historical
+  tap-specific wal2json slot, bridge it through a transactional logical-message
+  boundary, and remove it only after the target acknowledges pgoutput
+  consumption. Preserve the old slot and migration state after target failure.
+  Keep wal2json installed and permitted by ``output_plugin_libraries``, where
+  available, until migration completes.
+- Require LOG_BASED PostgreSQL tap IDs to use at most 50 lowercase letters,
+  digits, or underscores. Grant the tap role permission to manage its publication
+  and execute ``pg_logical_emit_message`` before upgrading.
+- Require each LOG_BASED table and partition leaf to have a primary key with
+  ``REPLICA IDENTITY DEFAULT``. Reject unsupported inheritance, foreign
+  partitions, and restored bookmarks behind WAL already released by the slot.
+- Refuse automatic migration of potentially shared database-wide slots and
+  selected partition roots. These cases require DBA coordination and a
+  whole-tap resync.
+- Remove a deleted tap's publication only when its management metadata proves
+  that PipelineWise adopted it. Preserve ambiguous publications and slots for
+  manual review, including normalized canonical names derived from old invalid
+  tap IDs that could collide with a current valid tap.
+- Refuse ``reset_state`` for PostgreSQL LOG_BASED taps because a pgoutput slot
+  cannot rewind. Use an unfiltered whole-tap FastSync to reset the slot and state
+  together.
+- Preserve unchanged TOAST columns when pgoutput sends partial updates to
+  PostgreSQL and Snowflake targets.
+- Preserve dates, timestamps, and floating-point values when source roles use
+  custom text-output formats. Pin the pgoutput connection's output settings.
+- Wait for replica replay before starting PostgreSQL logical-replication
+  snapshots. Stop before export if the replica cannot reach the primary boundary
+  within the timeout. See the [PostgreSQL guide](docs/connectors/taps/postgres.rst).
+- Resume interrupted PostgreSQL full-table snapshots in transaction-age order
+  to avoid skipping rows at transaction-ID digit and wraparound boundaries.
+
 0.93.0 (2026-09-28)
 -------------------
 

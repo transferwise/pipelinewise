@@ -353,6 +353,22 @@ def build_singer_command(
     return command
 
 
+def build_postgres_publication_preflight_command(
+    tap_bin: str,
+    tap_config: str,
+    tap_catalog: str,
+) -> list[str]:
+    """Build the connector preflight that prepares pgoutput relations."""
+    return [
+        tap_bin,
+        '--config',
+        tap_config,
+        '--catalog',
+        tap_catalog,
+        '--prepare-publication',
+    ]
+
+
 def build_partialsync_command(
         tap: TapParams,
         target: TargetParams,
@@ -546,3 +562,15 @@ def run_command(command: str, log_file: str = None, line_callback: callable = No
             LOGGER.error(stderr)
 
     return [proc_rc, stdout, stderr]
+
+
+def run_command_argv(command: list[str]):
+    """Run one command directly so argument boundaries cannot be reinterpreted by a shell."""
+    LOGGER.debug('Running command argv %s', command)
+    with Popen(command, stdout=PIPE, stderr=PIPE) as proc:
+        stdout, stderr = proc.communicate()
+    return [
+        proc.returncode,
+        stdout.decode('utf-8'),
+        stderr.decode('utf-8'),
+    ]

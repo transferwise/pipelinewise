@@ -1,7 +1,7 @@
 [tool.ruff]
 line-length = 120
 force-exclude = true
-# Connector suites outside GitHub connector CI remain out of scope.
+# Legacy connector suites remain excluded unless explicitly added to the lint gate.
 extend-exclude = [
     "singer-connectors/tap-github/tests",
     "singer-connectors/tap-kafka/tests",
@@ -15,10 +15,8 @@ extend-exclude = [
     "singer-connectors/tap-twilio/tests",
     "singer-connectors/tap-zendesk/spikes",
     "singer-connectors/tap-zendesk/test",
-    "singer-connectors/target-postgres/tests",
     "singer-connectors/target-s3-csv/tests",
     "singer-connectors/target-snowflake/tests/integration",
-    "singer-connectors/transform-field/tests",
 ]
 
 [tool.ruff.lint]

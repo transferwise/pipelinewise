@@ -60,7 +60,7 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
 
 ## Runtime and data-diff constraints
 
-- PostgreSQL replication sources require 11.2 or later across Singer,
+- PostgreSQL replication sources require 14 or later across Singer,
   FullSync, and PartialSync. Keep the Singer and FastSync connection gates
   aligned; only deleted-tap slot cleanup may bypass the floor. PostgreSQL
   targets, the backend, and data-diff connections are separate.
