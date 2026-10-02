@@ -38,11 +38,11 @@ class RepositoryContext:
         }
 
 
-def _pipelinewise(**args):
+def _pipelinewise(*, config_dir="/config", **args):
     instance = object.__new__(PipelineWise)
     instance.args = CliArgs(**args)
     instance.config = {"backend_db": {"host": "backend"}}
-    instance.config_dir = "/config"
+    instance.config_dir = str(config_dir)
     instance.alert_sender = Mock()
     instance.logger = Mock()
     return instance
@@ -299,14 +299,15 @@ def test_remediation_command_prints_failure_reason(capsys, unresolved):
 
 
 @pytest.mark.parametrize('historical_scans_pending', [0, 3])
-def test_import_persists_definitions_only_after_successful_discovery(historical_scans_pending):
+def test_import_persists_definitions_only_after_successful_discovery(
+        historical_scans_pending, tmp_path):
     definition = Mock()
     imported = Mock()
     imported.global_config = {"backend_db": {"host": "backend"}}
     imported.targets = _import_targets("tap")
     imported.get_data_diff_definitions.return_value = [definition]
     repository = RepositoryContext(historical_scans_pending=historical_scans_pending)
-    pipelinewise = _pipelinewise(taps="*")
+    pipelinewise = _pipelinewise(config_dir=tmp_path, taps="*")
     pipelinewise.logger = Mock()
     pipelinewise.config = {}
     pipelinewise._discover_tap = Mock(return_value=None)
@@ -331,14 +332,14 @@ def test_import_persists_definitions_only_after_successful_discovery(historical_
     assert summary.args[6] == historical_scans_pending
 
 
-def test_import_excludes_definitions_after_discovery_failure():
+def test_import_excludes_definitions_after_discovery_failure(tmp_path):
     definition = Mock(tap_id="tap")
     imported = Mock()
     imported.global_config = {"backend_db": {"host": "backend"}}
     imported.targets = _import_targets("tap")
     imported.get_data_diff_definitions.return_value = [definition]
     repository = RepositoryContext()
-    pipelinewise = _pipelinewise(taps="*")
+    pipelinewise = _pipelinewise(config_dir=tmp_path, taps="*")
     pipelinewise.logger = Mock()
     pipelinewise.config = {}
     pipelinewise._discover_tap = Mock(return_value="discovery failed")
@@ -357,12 +358,12 @@ def test_import_excludes_definitions_after_discovery_failure():
     assert repository.synced == ([definition], ["*"], {"tap"})
 
 
-def test_import_without_backend_does_not_report_zero_pending_scans():
+def test_import_without_backend_does_not_report_zero_pending_scans(tmp_path):
     imported = Mock()
     imported.global_config = {}
     imported.targets = _import_targets('tap')
     imported.get_data_diff_definitions.return_value = []
-    pipelinewise = _pipelinewise(taps='*')
+    pipelinewise = _pipelinewise(config_dir=tmp_path, taps='*')
     pipelinewise.config = {}
     pipelinewise._discover_tap = Mock(return_value=None)
     pipelinewise.load_config = Mock()
@@ -378,7 +379,7 @@ def test_import_without_backend_does_not_report_zero_pending_scans():
     assert summary.args[6] == 'not configured'
 
 
-def test_import_persists_successful_tap_definitions_after_partial_failure():
+def test_import_persists_successful_tap_definitions_after_partial_failure(tmp_path):
     successful_definition = Mock(tap_id="successful")
     failed_definition = Mock(tap_id="failed")
     imported = Mock()
@@ -389,7 +390,7 @@ def test_import_persists_successful_tap_definitions_after_partial_failure():
         failed_definition,
     ]
     repository = RepositoryContext()
-    pipelinewise = _pipelinewise(taps="*")
+    pipelinewise = _pipelinewise(config_dir=tmp_path, taps="*")
     pipelinewise.logger = Mock()
     pipelinewise.config = {}
     pipelinewise._discover_tap = Mock(
@@ -421,14 +422,14 @@ def test_import_persists_successful_tap_definitions_after_partial_failure():
     )
 
 
-def test_import_deactivates_removed_definition_for_successful_tap_after_partial_failure():
+def test_import_deactivates_removed_definition_for_successful_tap_after_partial_failure(tmp_path):
     failed_definition = Mock(tap_id="failed")
     imported = Mock()
     imported.global_config = {"backend_db": {"host": "backend"}}
     imported.targets = _import_targets("successful", "failed")
     imported.get_data_diff_definitions.return_value = [failed_definition]
     repository = RepositoryContext()
-    pipelinewise = _pipelinewise(taps="*")
+    pipelinewise = _pipelinewise(config_dir=tmp_path, taps="*")
     pipelinewise.logger = Mock()
     pipelinewise.config = {}
     pipelinewise._discover_tap = Mock(
@@ -452,14 +453,14 @@ def test_import_deactivates_removed_definition_for_successful_tap_after_partial_
     assert repository.synced == ([failed_definition], ["*"], {"failed"})
 
 
-def test_import_reconciles_an_explicitly_selected_tap_missing_from_yaml():
+def test_import_reconciles_an_explicitly_selected_tap_missing_from_yaml(tmp_path):
     definition = Mock(tap_id="found")
     imported = Mock()
     imported.global_config = {"backend_db": {"host": "backend"}}
     imported.targets = _import_targets("found")
     imported.get_data_diff_definitions.return_value = [definition]
     repository = RepositoryContext()
-    pipelinewise = _pipelinewise(taps="found,missing")
+    pipelinewise = _pipelinewise(config_dir=tmp_path, taps="found,missing")
     pipelinewise.logger = Mock()
     pipelinewise.config = {}
     pipelinewise._discover_tap = Mock(return_value=None)
@@ -487,12 +488,12 @@ def test_import_reconciles_an_explicitly_selected_tap_missing_from_yaml():
     )
 
 
-def test_import_rejects_incomplete_parallel_discovery_results():
+def test_import_rejects_incomplete_parallel_discovery_results(tmp_path):
     imported = Mock()
     imported.global_config = {}
     imported.targets = _import_targets("first", "second")
     imported.get_data_diff_definitions.return_value = []
-    pipelinewise = _pipelinewise(taps="*")
+    pipelinewise = _pipelinewise(config_dir=tmp_path, taps="*")
 
     with patch(
         "pipelinewise.cli.pipelinewise.Config.from_yamls",
@@ -504,7 +505,7 @@ def test_import_rejects_incomplete_parallel_discovery_results():
         pipelinewise.import_project()
 
 
-def test_import_reports_backend_sync_failure_after_partial_discovery():
+def test_import_reports_backend_sync_failure_after_partial_discovery(tmp_path):
     successful_definition = Mock(tap_id="successful")
     failed_definition = Mock(tap_id="failed")
     imported = Mock()
@@ -516,7 +517,7 @@ def test_import_reports_backend_sync_failure_after_partial_discovery():
     ]
     backend_error = RuntimeError("backend unavailable")
     repository = RepositoryContext(sync_error=backend_error)
-    pipelinewise = _pipelinewise(taps="*")
+    pipelinewise = _pipelinewise(config_dir=tmp_path, taps="*")
     pipelinewise.config = {}
     pipelinewise._discover_tap = Mock(
         side_effect=lambda tap, **_kwargs: (
