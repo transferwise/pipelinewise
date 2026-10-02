@@ -339,15 +339,21 @@ def test_renamed_legacy_tap_preserves_checkpoint_and_retires_truncated_slot(tmp_
 
         _run_success(run_command, command_env)
         bridge_state = _read_state(state_path)
-        assert bridge_state[MIGRATION_STATE_KEY]['source_slot'] == old_slot
-        assert _slot_status(e2e, old_slot) is not None
+        bridge_marker = bridge_state[MIGRATION_STATE_KEY]
+        assert bridge_marker['phase'] == 'pgoutput_overlap'
+        assert bridge_marker['source_slot'] == old_slot
+        assert bridge_marker['destination_slot'] == new_slot
+        assert _slot_status(e2e, old_slot) is None
         assert _source_target_rows(e2e)[0] == _source_target_rows(e2e)[1]
+        _run_success(run_command, command_env)
+        assert _slot_status(e2e, old_slot) is None
+        assert MIGRATION_STATE_KEY not in _read_state(state_path)
+        assert _source_target_rows(e2e)[0] == _source_target_rows(e2e)[1]
+
         e2e.run_query_tap_postgres(
             f"UPDATE {SOURCE_SCHEMA}.{TABLE_NAME} SET status = 'pgoutput after rename' WHERE id = 2"
         )
         _run_success(run_command, command_env)
-        assert _slot_status(e2e, old_slot) is None
-        assert MIGRATION_STATE_KEY not in _read_state(state_path)
         assert _source_target_rows(e2e)[0] == _source_target_rows(e2e)[1]
         final_state = _read_state(state_path)
         _run_success(['pipelinewise', 'import_config', '--dir', str(project_dir)], command_env)
