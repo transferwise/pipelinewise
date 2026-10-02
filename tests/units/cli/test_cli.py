@@ -117,25 +117,37 @@ class TestCli:
             pipelinewise.sync_tables_fast_sync(selected_tables)
         mocked_fastsync.assert_called_once()
 
-    def _assert_import_command(self, args):
+    def _assert_import_command(self, args, tmp_path):
         if '*' in args.taps.split(','):
             expected_taps = ['tap_one', 'tap_two', 'tap_three']
             expected_save_arg = ['*']
         else:
             expected_save_arg = expected_taps = args.taps.split(',')
 
+        config_dir = tmp_path / 'runtime'
+        config_dir.mkdir()
+        (config_dir / 'config.json').write_text('{"targets": []}', encoding='utf-8')
+        config_save = Config.save
         with patch.object(PipelineWise, '_discover_tap') as mocked_parallel:
-            with patch.object(Config, 'save') as mocked_config_save:
-                pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
+            with patch.object(Config, 'save', autospec=True) as mocked_config_save, patch.object(
+                PipelineWise, '_reconcile_postgres_pgoutput_publication'
+            ) as reconcile_publication:
+                mocked_config_save.side_effect = config_save
+                pipelinewise = PipelineWise(args, str(config_dir), VIRTUALENVS_DIR)
                 mocked_parallel.return_value = None
 
                 pipelinewise.import_project()
 
-                mocked_config_save.assert_called_with(expected_save_arg)
+                assert mocked_config_save.call_args.args[1] == expected_save_arg
 
                 assert mocked_parallel.call_count == len(expected_taps)
                 for call_arg in mocked_parallel.call_args_list:
                     assert call_arg[1]['tap']['id'] in expected_taps
+                reconcile_publication.assert_has_calls([
+                    call(call_arg.kwargs['tap'])
+                    for call_arg in mocked_parallel.call_args_list
+                    if call_arg.kwargs['tap']['type'] == ConnectorType.TAP_POSTGRES.value
+                ])
 
     @staticmethod
     def _import_salesforce_iceberg(config_dir: Path) -> PipelineWise:
@@ -645,23 +657,23 @@ class TestCli:
         assert pytest_wrapped_e.type is SystemExit
         assert pytest_wrapped_e.value.code == 1
 
-    def test_command_import_all_taps(self):
+    def test_command_import_all_taps(self, tmp_path):
         """Test import_config command for all taps"""
         args = CliArgs(dir=f'{os.path.dirname(__file__)}/resources/test_import_command')
-        self._assert_import_command(args)
+        self._assert_import_command(args, tmp_path)
 
-    def test_command_import_selected_taps(self):
+    def test_command_import_selected_taps(self, tmp_path):
         """Test import_config command for selected taps"""
         args = CliArgs(dir=f'{os.path.dirname(__file__)}/resources/test_import_command', taps='tap_one,tap_three')
-        self._assert_import_command(args)
+        self._assert_import_command(args, tmp_path)
 
-    def test_command_import_wildcard_with_selected_tap(self):
+    def test_command_import_wildcard_with_selected_tap(self, tmp_path):
         """A wildcard combined with a tap still imports every tap."""
         args = CliArgs(
             dir=f'{os.path.dirname(__file__)}/resources/test_import_command',
             taps='*,tap_one',
         )
-        self._assert_import_command(args)
+        self._assert_import_command(args, tmp_path)
 
     def test_import_accepts_salesforce_iceberg_and_generates_target_runtime(self, tmp_path):
         """Singer-only Iceberg settings are generated for target-snowflake, not the tap."""
@@ -1060,7 +1072,8 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         [
             ('connect', False, 0), ('inspect', False, 1), ('plugin', False, 1),
             ('active', False, 1), ('backup', False, 1), ('save_state', False, 1),
-            ('fresh_create', True, 2), ('fresh_create_response', True, 2),
+            ('fresh_drop', True, 2), ('fresh_drop_response', True, 2),
+            ('fresh_create', True, 3), ('fresh_create_response', True, 3),
             ('drop', True, 2), ('drop_response', True, 2), ('create', True, 3), ('create_response', True, 3),
         ],
     )
@@ -1076,11 +1089,11 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         fastsync_utils.save_dict_to_json(state_path, original)
         connection = MagicMock()
         cursor = connection.cursor.return_value.__enter__.return_value
-        if failure.startswith('fresh_create'):
+        if failure.startswith('fresh_'):
             cursor.fetchall.return_value = [('pipelinewise_my_db_my_tap', 'my_db', 'wal2json', False)]
         else:
             cursor.fetchall.return_value = [(
-                'pipelinewise_my_tap', 'my_db',
+                'ppw_slot_my_tap', 'my_db',
                 'wal2json' if failure == 'plugin' else 'pgoutput',
                 failure == 'active',
             )]
@@ -1088,8 +1101,8 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         reset_state = {
             'bookmarks': {}, 'currently_syncing': None,
             '_pipelinewise_pgoutput_fresh_start': {
-                'version': 1, 'destination_slot': 'pipelinewise_my_tap',
-                'source_slot': 'pipelinewise_my_db_my_tap' if failure.startswith('fresh_create') else None,
+                'version': 1, 'destination_slot': 'ppw_slot_my_tap',
+                'wal2json_slot': 'pipelinewise_my_db_my_tap' if failure.startswith('fresh_') else None,
             },
         }
         source_failure = failure.removeprefix('fresh_')
@@ -1105,7 +1118,7 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
                 backups = list(tmp_path.glob('state.json.before-slot-reset-*.bak'))
                 assert len(backups) == 1
                 assert fastsync_utils.load_json(backups[0]) == original
-                if failure == 'drop' and 'pg_drop_' in sql:
+                if source_failure == 'drop' and 'pg_drop_' in sql:
                     raise psycopg2.errors.ObjectInUse('slot became active after preflight')
                 if source_failure == 'create' and 'pg_create_' in sql:
                     raise psycopg2.errors.InsufficientPrivilege('creation denied')

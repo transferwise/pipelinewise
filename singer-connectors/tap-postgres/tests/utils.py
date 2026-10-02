@@ -229,7 +229,7 @@ def insert_record(cursor, table_name, data):
 
 def create_replication_slot(target_db='postgres', tap_id='tap_test'):
 
-    sql = f"select pg_create_logical_replication_slot('pipelinewise_{tap_id}', 'pgoutput');"
+    sql = f"select pg_create_logical_replication_slot('ppw_slot_{tap_id}', 'pgoutput');"
 
     with get_test_connection(target_db) as conn:
         with conn.cursor() as cur:
@@ -239,7 +239,7 @@ def create_replication_slot(target_db='postgres', tap_id='tap_test'):
 
 def drop_replication_slot(target_db='postgres', tap_id='tap_test'):
 
-    sql = f"SELECT pg_drop_replication_slot('pipelinewise_{tap_id}');"
+    sql = f"SELECT pg_drop_replication_slot('ppw_slot_{tap_id}');"
 
     with get_test_connection(target_db) as conn:
         with conn.cursor() as cur:

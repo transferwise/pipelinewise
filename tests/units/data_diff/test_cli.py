@@ -48,6 +48,19 @@ def _pipelinewise(**args):
     return instance
 
 
+def _import_targets(*tap_ids):
+    """Build complete non-PostgreSQL import stubs for data-diff-only tests."""
+    return {
+        "target": {
+            "id": "target",
+            "taps": [
+                {"id": tap_id, "type": "tap-mysql"}
+                for tap_id in tap_ids
+            ],
+        },
+    }
+
+
 def _stored_check():
     return {
         "check_id": uuid4(),
@@ -290,7 +303,7 @@ def test_import_persists_definitions_only_after_successful_discovery(historical_
     definition = Mock()
     imported = Mock()
     imported.global_config = {"backend_db": {"host": "backend"}}
-    imported.targets = {"target": {"taps": [{"id": "tap"}]}}
+    imported.targets = _import_targets("tap")
     imported.get_data_diff_definitions.return_value = [definition]
     repository = RepositoryContext(historical_scans_pending=historical_scans_pending)
     pipelinewise = _pipelinewise(taps="*")
@@ -322,7 +335,7 @@ def test_import_excludes_definitions_after_discovery_failure():
     definition = Mock(tap_id="tap")
     imported = Mock()
     imported.global_config = {"backend_db": {"host": "backend"}}
-    imported.targets = {"target": {"taps": [{"id": "tap"}]}}
+    imported.targets = _import_targets("tap")
     imported.get_data_diff_definitions.return_value = [definition]
     repository = RepositoryContext()
     pipelinewise = _pipelinewise(taps="*")
@@ -347,7 +360,7 @@ def test_import_excludes_definitions_after_discovery_failure():
 def test_import_without_backend_does_not_report_zero_pending_scans():
     imported = Mock()
     imported.global_config = {}
-    imported.targets = {'target': {'taps': [{'id': 'tap'}]}}
+    imported.targets = _import_targets('tap')
     imported.get_data_diff_definitions.return_value = []
     pipelinewise = _pipelinewise(taps='*')
     pipelinewise.config = {}
@@ -370,9 +383,7 @@ def test_import_persists_successful_tap_definitions_after_partial_failure():
     failed_definition = Mock(tap_id="failed")
     imported = Mock()
     imported.global_config = {"backend_db": {"host": "backend"}}
-    imported.targets = {
-        "target": {"taps": [{"id": "successful"}, {"id": "failed"}]}
-    }
+    imported.targets = _import_targets("successful", "failed")
     imported.get_data_diff_definitions.return_value = [
         successful_definition,
         failed_definition,
@@ -405,7 +416,7 @@ def test_import_persists_successful_tap_definitions_after_partial_failure():
         {"failed"},
     )
     pipelinewise.logger.error.assert_called_once_with(
-        "Tap discovery failed: %s",
+        "Tap import failed: %s",
         "discovery failed",
     )
 
@@ -414,9 +425,7 @@ def test_import_deactivates_removed_definition_for_successful_tap_after_partial_
     failed_definition = Mock(tap_id="failed")
     imported = Mock()
     imported.global_config = {"backend_db": {"host": "backend"}}
-    imported.targets = {
-        "target": {"taps": [{"id": "successful"}, {"id": "failed"}]}
-    }
+    imported.targets = _import_targets("successful", "failed")
     imported.get_data_diff_definitions.return_value = [failed_definition]
     repository = RepositoryContext()
     pipelinewise = _pipelinewise(taps="*")
@@ -447,7 +456,7 @@ def test_import_reconciles_an_explicitly_selected_tap_missing_from_yaml():
     definition = Mock(tap_id="found")
     imported = Mock()
     imported.global_config = {"backend_db": {"host": "backend"}}
-    imported.targets = {"target": {"taps": [{"id": "found"}]}}
+    imported.targets = _import_targets("found")
     imported.get_data_diff_definitions.return_value = [definition]
     repository = RepositoryContext()
     pipelinewise = _pipelinewise(taps="found,missing")
@@ -481,9 +490,7 @@ def test_import_reconciles_an_explicitly_selected_tap_missing_from_yaml():
 def test_import_rejects_incomplete_parallel_discovery_results():
     imported = Mock()
     imported.global_config = {}
-    imported.targets = {
-        "target": {"taps": [{"id": "first"}, {"id": "second"}]}
-    }
+    imported.targets = _import_targets("first", "second")
     imported.get_data_diff_definitions.return_value = []
     pipelinewise = _pipelinewise(taps="*")
 
@@ -502,9 +509,7 @@ def test_import_reports_backend_sync_failure_after_partial_discovery():
     failed_definition = Mock(tap_id="failed")
     imported = Mock()
     imported.global_config = {"backend_db": {"host": "backend"}}
-    imported.targets = {
-        "target": {"taps": [{"id": "successful"}, {"id": "failed"}]}
-    }
+    imported.targets = _import_targets("successful", "failed")
     imported.get_data_diff_definitions.return_value = [
         successful_definition,
         failed_definition,
@@ -537,7 +542,7 @@ def test_import_reports_backend_sync_failure_after_partial_discovery():
         {"failed"},
     )
     pipelinewise.logger.error.assert_called_once_with(
-        "Tap discovery failed: %s",
+        "Tap import failed: %s",
         "discovery failed",
     )
     pipelinewise.logger.exception.assert_called_once_with(

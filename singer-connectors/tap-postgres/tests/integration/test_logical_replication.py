@@ -372,8 +372,10 @@ class TestPgoutputPreflightSafety(unittest.TestCase):
                 cur.execute(f'DROP TABLE IF EXISTS {table}')
             conn.close()
 
-    def test_publication_membership_accumulates_across_snapshot_and_cdc_subsets(self):
-        tables = ['publication_existing_review', 'publication_snapshot_review']
+    def test_publication_membership_is_additive_until_explicit_reconcile(self):
+        managed_tables = ['publication_existing_review', 'publication_snapshot_review']
+        external_table = 'publication_dba_review'
+        tables = [*managed_tables, external_table]
         config = {**get_test_connection_config(), 'tap_id': 'publication_subset_review'}
         publication = logical_replication.generate_publication_name(config['tap_id'])
         conn = get_test_connection()
@@ -381,18 +383,90 @@ class TestPgoutputPreflightSafety(unittest.TestCase):
             with conn.cursor() as cur:
                 for table in tables:
                     cur.execute(f'CREATE TABLE {table} (id integer PRIMARY KEY)')
-            streams = [set_replication_method_for_stream(s, 'LOG_BASED')
-                       for s in tap_postgres.do_discovery(config) if s['table_name'] in tables]
-            for selection in ([streams[0]], [streams[1]], [streams[0]]):
-                logical_replication.prepare_publication(config, selection)
+            streams = {
+                stream['table_name']: set_replication_method_for_stream(stream, 'LOG_BASED')
+                for stream in tap_postgres.do_discovery(config)
+                if stream['table_name'] in managed_tables
+            }
+
+            logical_replication.prepare_publication(config, [streams[managed_tables[0]]])
+            with conn.cursor() as cur:
+                cur.execute(
+                    f'ALTER PUBLICATION {publication} ADD TABLE public.{external_table}')
+
+            logical_replication.prepare_publication(config, [streams[managed_tables[1]]])
             with conn.cursor() as cur:
                 cur.execute('SELECT tablename FROM pg_publication_tables WHERE pubname = %s', (publication,))
                 self.assertEqual({row[0] for row in cur.fetchall()}, set(tables))
+                cur.execute(
+                    "SELECT pg_catalog.obj_description(oid, 'pg_publication') "
+                    'FROM pg_catalog.pg_publication WHERE pubname = %s',
+                    (publication,),
+                )
+                _, _, tracked = logical_replication._decode_publication_fence_comment(
+                    cur.fetchone()[0])
+                self.assertEqual(
+                    tracked,
+                    {('public', table) for table in managed_tables},
+                )
+
+            logical_replication.prepare_publication(
+                config, [streams[managed_tables[0]]], reconcile=True)
+            with conn.cursor() as cur:
+                cur.execute('SELECT tablename FROM pg_publication_tables WHERE pubname = %s', (publication,))
+                self.assertEqual(
+                    {row[0] for row in cur.fetchall()},
+                    {managed_tables[0], external_table},
+                )
+
+            logical_replication.prepare_publication(config, [], reconcile=True)
+            with conn.cursor() as cur:
+                cur.execute('SELECT tablename FROM pg_publication_tables WHERE pubname = %s', (publication,))
+                self.assertEqual({row[0] for row in cur.fetchall()}, {external_table})
+                cur.execute(
+                    "SELECT pg_catalog.obj_description(oid, 'pg_publication') "
+                    'FROM pg_catalog.pg_publication WHERE pubname = %s',
+                    (publication,),
+                )
+                self.assertEqual(
+                    logical_replication._decode_publication_fence_comment(cur.fetchone()[0]),
+                    ('ready', None, set()),
+                )
         finally:
             with conn.cursor() as cur:
                 cur.execute(f'DROP PUBLICATION IF EXISTS {publication}')
                 for table in tables:
                     cur.execute(f'DROP TABLE IF EXISTS {table}')
+            conn.close()
+
+    def test_reconcile_does_not_create_an_absent_publication(self):
+        table = 'publication_absent_reconcile_review'
+        config = {**get_test_connection_config(), 'tap_id': 'publication_absent_review'}
+        publication = logical_replication.generate_publication_name(config['tap_id'])
+        conn = get_test_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(f'DROP PUBLICATION IF EXISTS {publication}')
+                cur.execute(f'CREATE TABLE {table} (id integer PRIMARY KEY)')
+            stream = next(
+                set_replication_method_for_stream(stream, 'LOG_BASED')
+                for stream in tap_postgres.do_discovery(config)
+                if stream['table_name'] == table
+            )
+
+            logical_replication.prepare_publication(
+                config, [stream], reconcile=True)
+
+            with conn.cursor() as cur:
+                cur.execute(
+                    'SELECT 1 FROM pg_catalog.pg_publication WHERE pubname = %s',
+                    (publication,),
+                )
+                self.assertIsNone(cur.fetchone())
+        finally:
+            with conn.cursor() as cur:
+                cur.execute(f'DROP PUBLICATION IF EXISTS {publication}')
+                cur.execute(f'DROP TABLE IF EXISTS {table}')
             conn.close()
 
     def test_publication_lock_wait_is_bounded(self):
@@ -723,7 +797,7 @@ class TestPgoutputPreflightSafety(unittest.TestCase):
                 cur.execute(f'DROP TABLE IF EXISTS public.{root_table} CASCADE')
             conn.close()
 
-    def test_partition_root_rejects_live_wal2json_migration_before_slot_copy(self):
+    def test_partition_root_rejects_live_wal2json_migration_before_slot_creation(self):
         root_table = 'partition_migration_root_test'
         leaf_table = f'{root_table}_leaf'
         config = get_test_connection_config()
@@ -789,6 +863,118 @@ class TestPgoutputPreflightSafety(unittest.TestCase):
                         cur.execute('SELECT pg_catalog.pg_drop_replication_slot(%s)', (slot,))
                 cur.execute(f'DROP PUBLICATION IF EXISTS {publication}')
                 cur.execute(f'DROP TABLE IF EXISTS public.{root_table} CASCADE')
+            conn.close()
+
+    def test_interrupted_wal2json_bridge_reuses_original_boundary(self):
+        table_name = 'wal2json_bridge_retry_test'
+        config = get_test_connection_config()
+        config['tap_id'] = 'wal2json_bridge_retry'
+        config['logical_poll_total_seconds'] = 10
+        publication_name = logical_replication.generate_publication_name(config['tap_id'])
+        destination = logical_replication.generate_replication_slot_name(config['tap_id'])
+        source = logical_replication.legacy_replication_slot_names(
+            config['dbname'], config['tap_id'])[1]
+        conn = get_test_connection()
+        try:
+            with conn.cursor() as cur:
+                for slot_name in (destination, source):
+                    cur.execute(
+                        'SELECT 1 FROM pg_catalog.pg_replication_slots WHERE slot_name = %s',
+                        (slot_name,),
+                    )
+                    if cur.fetchone() is not None:
+                        cur.execute(
+                            'SELECT pg_catalog.pg_drop_replication_slot(%s)',
+                            (slot_name,),
+                        )
+                cur.execute(f'DROP PUBLICATION IF EXISTS {publication_name}')
+                cur.execute(f'DROP TABLE IF EXISTS public.{table_name}')
+                cur.execute(
+                    f'CREATE TABLE public.{table_name} '
+                    '(id integer PRIMARY KEY, value text)')
+                cur.execute(
+                    'SELECT * FROM pg_catalog.pg_create_logical_replication_slot(%s, %s)',
+                    (source, 'wal2json'),
+                )
+
+            streams = tap_postgres.do_discovery(config)
+            stream = next(
+                stream for stream in streams
+                if stream['tap_stream_id'] == f'public-{table_name}'
+            )
+            stream = set_replication_method_for_stream(stream, 'LOG_BASED')
+            publication = logical_replication.prepare_publication(config, [stream])
+            slot = logical_replication.locate_replication_slot(config)
+            state = {
+                'bookmarks': {
+                    stream['tap_stream_id']: {
+                        'last_replication_method': 'LOG_BASED',
+                        'lsn': slot.source_confirmed_lsn,
+                        'version': 1,
+                    },
+                },
+            }
+            boundary_tokens = []
+            emit_boundary_message = logical_replication.emit_boundary_message
+
+            def record_boundary(connection_config, token=None):
+                boundary_tokens.append(token)
+                return emit_boundary_message(connection_config, token)
+
+            output = SingerOutput()
+            with unittest.mock.patch.object(
+                    logical_replication,
+                    'emit_boundary_message',
+                    side_effect=record_boundary), contextlib.redirect_stdout(output):
+                interrupted_config = {**config, 'max_run_seconds': 0}
+                state = logical_replication._bridge_wal2json_slot(
+                    interrupted_config,
+                    [stream],
+                    state,
+                    '/tmp/unused-wal2json-bridge-retry-state.json',
+                    publication,
+                    source,
+                    slot,
+                    slot.confirmed_flush_lsn,
+                    slot.source_confirmed_lsn,
+                    None,
+                )
+                self.assertEqual(
+                    state[logical_replication.PGOUTPUT_MIGRATION_STATE_KEY]['phase'],
+                    'bridge_pending',
+                )
+                state = logical_replication._bridge_wal2json_slot(
+                    config,
+                    [stream],
+                    state,
+                    '/tmp/unused-wal2json-bridge-retry-state.json',
+                    publication,
+                    source,
+                    slot,
+                    slot.confirmed_flush_lsn,
+                    slot.source_confirmed_lsn,
+                    None,
+                )
+
+            self.assertEqual(boundary_tokens[0], boundary_tokens[1])
+            self.assertEqual(
+                state[logical_replication.PGOUTPUT_MIGRATION_STATE_KEY]['phase'],
+                'bridge',
+            )
+        finally:
+            with conn.cursor() as cur:
+                for slot_name in (destination, source):
+                    cur.execute(
+                        'SELECT 1 FROM pg_catalog.pg_replication_slots WHERE slot_name = %s',
+                        (slot_name,),
+                    )
+                    if cur.fetchone() is not None:
+                        cur.execute(
+                            'SELECT pg_catalog.pg_drop_replication_slot(%s)',
+                            (slot_name,),
+                        )
+                cur.execute(f'DROP PUBLICATION IF EXISTS {publication_name}')
+                cur.execute(f'DROP TABLE IF EXISTS public.{table_name}')
             conn.close()
 
     def test_ordinary_inheritance_parent_is_rejected_before_publication_mutation(self):
@@ -1062,7 +1248,7 @@ class TestPgoutputPreflightSafety(unittest.TestCase):
 
             self.assertEqual(
                 logical_replication._decode_publication_fence_comment(pending_comment),
-                ('pending', 'DBA comment'),
+                ('pending', 'DBA comment', {('public', table_name)}),
             )
             self.assertTrue(waiter.is_alive())
             transaction.commit()
@@ -1079,7 +1265,7 @@ class TestPgoutputPreflightSafety(unittest.TestCase):
                 ready_comment = cur.fetchone()[0]
             self.assertEqual(
                 logical_replication._decode_publication_fence_comment(ready_comment),
-                ('ready', 'DBA comment'),
+                ('ready', 'DBA comment', {('public', table_name)}),
             )
         finally:
             transaction.close()

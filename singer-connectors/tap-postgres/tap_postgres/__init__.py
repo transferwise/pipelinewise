@@ -366,7 +366,9 @@ def do_sync(conn_config, catalog, default_replication_method, state, state_file=
     return state
 
 
-def prepare_logical_replication(conn_config, streams, default_replication_method, state=None, fresh_start=False):
+def prepare_logical_replication(
+        conn_config, streams, default_replication_method, state=None,
+        fresh_start=False, reconcile=False, final_log_deselection=False):
     """Prepare the publication before capturing a snapshot or slot boundary."""
     logical_streams = []
     for stream in streams:
@@ -384,8 +386,10 @@ def prepare_logical_replication(conn_config, streams, default_replication_method
                 for column in stream['schema']['properties']):
             logical_streams.append(stream)
 
-    if not logical_streams:
+    if not logical_streams and not reconcile:
         return []
+    if final_log_deselection and (logical_streams or not reconcile):
+        raise ValueError('Final LOG deselection requires an empty LOG_BASED selection and publication reconciliation')
     if not conn_config.get('tap_id'):
         raise ValueError('tap_id is required for LOG_BASED replication')
     logical_replication.validate_tap_id(conn_config['tap_id'])
@@ -396,6 +400,11 @@ def prepare_logical_replication(conn_config, streams, default_replication_method
         or logical_replication.PGOUTPUT_MIGRATION_STATE_KEY in (state or {})
     )
     try:
+        if not logical_streams:
+            logical_replication.prepare_publication(
+                conn_config, [], state=state, fresh_start=fresh_start, reconcile=True,
+                final_log_deselection=final_log_deselection)
+            return []
         logical_streams.sort(
             key=lambda stream: metadata.to_map(stream['metadata']).get(()).get(
                 'database-name', original_dbname))
@@ -406,7 +415,8 @@ def prepare_logical_replication(conn_config, streams, default_replication_method
             conn_config['dbname'] = dbname
             logical_replication.prepare_publication(
                 conn_config, list(grouped_streams), state=state,
-                fresh_start=fresh_start or not has_logical_history)
+                fresh_start=fresh_start or not has_logical_history,
+                reconcile=reconcile)
     finally:
         conn_config['dbname'] = original_dbname
     return logical_streams
@@ -461,9 +471,21 @@ def parse_args(required_config_keys):
         '--fresh-start', action='store_true',
         help='Prepare for an explicit whole-tap snapshot that replaces all logical history')
 
+    parser.add_argument(
+        '--reconcile-publication', action='store_true',
+        help='Remove stale PipelineWise-managed publication members during import')
+
+    parser.add_argument(
+        '--final-log-deselection', action='store_true',
+        help='Remove all managed members after PipelineWise invalidates LOG_BASED state')
+
     args = parser.parse_args()
     if args.fresh_start and not args.prepare_publication:
         parser.error('--fresh-start requires --prepare-publication')
+    if args.reconcile_publication and not args.prepare_publication:
+        parser.error('--reconcile-publication requires --prepare-publication')
+    if args.final_log_deselection and not args.reconcile_publication:
+        parser.error('--final-log-deselection requires --reconcile-publication')
     if args.config:
         setattr(args, 'config_path', args.config)
         args.config = utils.load_json(args.config)
@@ -545,6 +567,8 @@ def main_impl():
             args.config.get('default_replication_method'),
             state=args.state,
             fresh_start=args.fresh_start,
+            reconcile=args.reconcile_publication,
+            final_log_deselection=args.final_log_deselection,
         )
     elif args.properties or args.catalog:
         state = args.state

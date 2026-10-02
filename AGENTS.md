@@ -61,6 +61,12 @@ Never run bare `pytest tests/` because it collects credentialed E2E. Collect
 nested data-diff/backend-db tests from `tests/units`, narrowing with `-k` to
 avoid import failures.
 
+Run E2E tests locally only when the user specifically asks to run E2E tests.
+If a pull request already exists, prefer its GitHub Actions E2E jobs and inspect
+their exact pass, skip, and failure results instead of polling a duplicate local
+run. This keeps feedback fast and avoids spending Codex allowance on long-running
+local test monitoring.
+
 After implementation, schema, example-config, or connector-config changes,
 validate in Docker (Compose loads `dev-project/.env`):
 
@@ -139,7 +145,9 @@ severity; if there are no concerns, say so explicitly.
 
 Before completion:
 
-1. Run every applicable lint, unit, config, scoped E2E, connector, and docs check.
+1. Run every applicable lint, unit, config, connector, and docs check. Run local
+   E2E only when specifically requested; for an existing pull request, prefer
+   the applicable GitHub Actions E2E jobs.
 2. Update validated docs for user-facing behavior/config changes and the root
    changelog for release-visible connector changes.
 3. Report pass/skip/fail counts by group; skips, failures, and unavailable checks

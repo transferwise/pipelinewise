@@ -144,7 +144,7 @@ def _read_state(state_path):
 
 def _slot_name(_e2e):
     """Return the tap-specific PostgreSQL replication slot name."""
-    return re.sub('[^a-z0-9_]', '_', f'pipelinewise_{TAP_ID}'.lower())
+    return f'ppw_slot_{TAP_ID}'
 
 
 def _wal2json_slot_name(e2e):

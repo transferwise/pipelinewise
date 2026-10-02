@@ -57,10 +57,13 @@ def _migration_marker(phase='bridge'):
         'version': 1,
         'phase': phase,
         'source_slot': 'pipelinewise_my_db_my_tap',
-        'destination_slot': 'pipelinewise_my_tap',
-        'copy_lsn': 90,
-        'bridge_lsn': 100,
+        'destination_slot': 'ppw_slot_my_tap',
+        'slot_lsn': 90,
     }
+    if phase == 'bridge_pending':
+        marker['boundary_token'] = 'a' * 32
+    else:
+        marker['bridge_lsn'] = 100
     if phase == 'retire':
         marker['retire_lsn'] = 120
     return marker
@@ -112,7 +115,7 @@ def test_reset_retains_intent_until_all_snapshots_are_durable(tmp_path, second_l
              '_pipelinewise_pgoutput_fresh_start': {'version': 1}}
     state_path.write_text(json.dumps(state), encoding='utf-8')
     runner.tap['files']['state'] = str(state_path)
-    result = {'source_slot': 'pipelinewise_db_old', 'destination_slot': 'pipelinewise_new', 'copy_lsn': 100}
+    result = {'destination_slot': 'ppw_slot_new', 'slot_lsn': 100}
     if second_lsn is None or second_lsn <= 100:
         with pytest.raises(PreRunChecksException, match='resync is incomplete'):
             runner._finish_postgres_slot_reset(result)
@@ -121,8 +124,7 @@ def test_reset_retains_intent_until_all_snapshots_are_durable(tmp_path, second_l
         runner._finish_postgres_slot_reset(result)
         persisted = json.loads(state_path.read_text())
         assert '_pipelinewise_pgoutput_fresh_start' not in persisted
-        assert persisted[PGOUTPUT_MIGRATION_STATE_KEY]['phase'] == 'pgoutput'
-        assert persisted[PGOUTPUT_MIGRATION_STATE_KEY]['bridge_lsn'] == 110
+        assert PGOUTPUT_MIGRATION_STATE_KEY not in persisted
 
 
 def test_rename_preserves_bookmarks_and_never_overwrites_new_progress(tmp_path):
@@ -185,9 +187,277 @@ def test_publication_preflight_uses_connector_cli_and_reports_failure(tmp_path):
     with patch.object(commands, 'run_command_argv', return_value=[2, '', 'permission denied']):
         with pytest.raises(
             PreRunChecksException,
-            match='permission denied.*State and slots are unchanged',
+            match='permission denied.*Replication slots are unchanged',
         ):
             runner._prepare_postgres_pgoutput_publication()
+
+
+def test_publication_reconciliation_uses_connector_cli_and_tap_lock(tmp_path):
+    """Import reconciliation passes the dedicated CLI flag under the tap lock."""
+    runner = _runner(tmp_path, [_logical_stream('public-active')])
+    (tmp_path / 'config.json').write_text(
+        json.dumps({'dbname': 'my_db', 'tap_id': 'my_tap'}), encoding='utf-8')
+    state = tmp_path / 'state.json'
+    state.write_text('{}', encoding='utf-8')
+    tap = {
+        'id': 'my_tap',
+        'type': 'tap-postgres',
+        'files': {
+            **runner.tap['files'],
+            'state': str(state),
+            'pidfile': str(tmp_path / 'tap.pid'),
+        },
+    }
+
+    with patch.object(
+        runner, 'get_connector_bin', return_value='/venv/bin/tap-postgres'
+    ) as get_bin, patch(
+        'pipelinewise.cli.pipelinewise.pidfile.PIDFile'
+    ) as pid_file, patch.object(
+        FastSyncTapPostgres, 'migration_slots_coexist', return_value=False
+    ), patch.object(
+        commands, 'run_command_argv', return_value=[0, '', '']
+    ) as run:
+        runner._reconcile_postgres_pgoutput_publication(tap)
+
+    get_bin.assert_called_once_with('tap-postgres')
+    pid_file.assert_called_once_with(str(tmp_path / 'tap.pid'))
+    run.assert_called_once_with([
+        '/venv/bin/tap-postgres',
+        '--config',
+        str(tmp_path / 'config.json'),
+        '--catalog',
+        str(tmp_path / 'properties.json'),
+        '--prepare-publication',
+        '--state',
+        str(state),
+        '--reconcile-publication',
+    ], timeout=360)
+
+
+def test_final_log_deselection_uses_explicit_connector_retirement_mode(tmp_path):
+    """The connector may bypass a frozen selection only after LOG state is gone."""
+    runner, files, _ = _retirement_runner(tmp_path, migration=True)
+    events = []
+
+    def reconcile(*_args, **kwargs):
+        assert kwargs['final_log_deselection'] is True
+        assert json.loads(Path(files.state).read_text()) == {
+            'bookmarks': {'full': {'xmin': 4, 'version': 5}},
+            'currently_syncing': None,
+        }
+        events.append('publication')
+
+    def retire(_config, *, before_drop):
+        before_drop()
+        events.append('slots')
+
+    with patch.object(
+        runner, '_postgres_pgoutput_migration_is_frozen'
+    ) as frozen, patch.object(
+        runner, 'get_connector_bin', return_value='/venv/bin/tap-postgres'
+    ), patch.object(
+        runner, '_run_postgres_publication_preflight', side_effect=reconcile
+    ), patch.object(
+        FastSyncTapPostgres, 'retire_logical_slots', side_effect=retire
+    ):
+        runner._reconcile_postgres_pgoutput_publication(runner.tap)
+
+    frozen.assert_not_called()
+    assert events == ['publication', 'slots']
+
+
+def test_import_reconciles_only_successfully_discovered_postgres_taps(tmp_path):
+    """Discovery failure or another tap type must not mutate a publication."""
+    runner = _runner(tmp_path)
+    postgres = {'id': 'pg', 'type': 'tap-postgres'}
+    mysql = {'id': 'mysql', 'type': 'tap-mysql'}
+
+    with patch.object(runner, '_reconcile_postgres_pgoutput_publication') as reconcile:
+        assert runner._reconcile_postgres_publication_after_discovery(
+            'target', postgres, 'discovery failed'
+        ) == 'discovery failed'
+        assert runner._reconcile_postgres_publication_after_discovery(
+            'target', mysql, None
+        ) is None
+        assert runner._reconcile_postgres_publication_after_discovery(
+            'target', postgres, None
+        ) is None
+
+    reconcile.assert_called_once_with(postgres)
+
+
+def test_partial_logical_deselection_invalidates_only_removed_log_history(tmp_path):
+    """Re-adding a removed logical stream must snapshot even before peers advance."""
+    inactive = _logical_stream('removed-initial')
+    inactive['metadata'][0]['metadata']['selected'] = False
+    full = _logical_stream('full')
+    full['metadata'][0]['metadata']['replication-method'] = 'FULL_TABLE'
+    runner = _runner(tmp_path, [_logical_stream('active'), inactive, full])
+    state = {
+        'bookmarks': {
+            'active': {'lsn': 100, 'version': 1},
+            'removed': {'lsn': 100, 'xmin': 12, 'version': 2},
+            'removed-initial': {'xmin': 13, 'version': 3},
+            'full': {'xmin': 14, 'version': 4},
+            'incremental': {'replication_key': 'updated_at', 'replication_key_value': 5},
+        },
+        'currently_syncing': 'removed',
+        PGOUTPUT_MIGRATION_STATE_KEY: _migration_marker(),
+    }
+    files = _tap_files(tmp_path, state)
+    runner.tap['files']['state'] = files.state
+
+    assert runner._invalidate_deselected_postgres_logical_bookmarks(runner.tap) == {'active'}
+    persisted = json.loads(Path(files.state).read_text())
+    assert persisted['bookmarks'] == {
+        key: value for key, value in state['bookmarks'].items()
+        if key in {'active', 'full', 'incremental'}
+    }
+    assert persisted['currently_syncing'] is None
+    assert persisted[PGOUTPUT_MIGRATION_STATE_KEY] == _migration_marker()
+
+
+def _retirement_runner(tmp_path, *, migration=False):
+    runner = _runner(tmp_path)
+    state = {
+        'bookmarks': {'old-log': {'lsn': 100, 'xmin': 3}, 'full': {'xmin': 4, 'version': 5}},
+        'currently_syncing': 'old-log',
+        '_pipelinewise_pgoutput_fresh_start': {'version': 1},
+    }
+    if migration:
+        state[PGOUTPUT_MIGRATION_STATE_KEY] = _migration_marker()
+    files = _tap_files(tmp_path, state)
+    runner.tap.update({'type': 'tap-postgres', 'id': 'my_tap'})
+    runner.tap['files'].update({'state': files.state, 'pidfile': str(tmp_path / 'tap.pid')})
+    return runner, files, state
+
+
+def test_final_logical_deselection_persists_before_publication_and_slot_mutations(tmp_path):
+    """An interruption at either source change cannot preserve old logical history."""
+    runner, files, _ = _retirement_runner(tmp_path)
+    events = []
+
+    def assert_invalidated():
+        assert json.loads(Path(files.state).read_text()) == {
+            'bookmarks': {'full': {'xmin': 4, 'version': 5}},
+            'currently_syncing': None,
+        }
+
+    def prepare(*_args, **_kwargs):
+        assert_invalidated()
+        events.append('publication')
+
+    def retire(_config, *, before_drop):
+        before_drop()
+        assert_invalidated()
+        events.append('slots')
+
+    with patch.object(runner, 'get_connector_bin'), patch.object(
+        FastSyncTapPostgres, 'migration_slots_coexist', return_value=False
+    ), patch.object(
+        runner, '_run_postgres_publication_preflight', side_effect=prepare
+    ), patch.object(FastSyncTapPostgres, 'retire_logical_slots', side_effect=retire):
+        runner._reconcile_postgres_pgoutput_publication(runner.tap)
+    assert events == ['publication', 'slots']
+
+
+@pytest.mark.parametrize('persisted_marker', [False, True])
+def test_frozen_migration_rejects_partial_deselection_before_state_invalidation(
+        tmp_path, persisted_marker):
+    """A partial selection rejection preserves retry state before any invalidation."""
+    runner, files, original = _retirement_runner(tmp_path, migration=persisted_marker)
+    Path(runner.tap['files']['properties']).write_text(
+        json.dumps({'streams': [_logical_stream('active')]}), encoding='utf-8')
+
+    with patch.object(
+        FastSyncTapPostgres,
+        'migration_slots_coexist',
+        return_value=True,
+    ) as slots_coexist, patch.object(
+        runner,
+        'get_connector_bin',
+        return_value='/venv/bin/tap-postgres',
+    ), patch.object(
+        runner,
+        '_run_postgres_publication_preflight',
+        side_effect=PreRunChecksException('publication selection cannot change'),
+    ) as prepare, patch.object(
+        FastSyncTapPostgres, 'retire_logical_slots'
+    ) as retire:
+        with pytest.raises(PreRunChecksException, match='selection cannot change'):
+            runner._reconcile_postgres_pgoutput_publication(runner.tap)
+
+    if persisted_marker:
+        slots_coexist.assert_not_called()
+    else:
+        slots_coexist.assert_called_once_with({'dbname': 'my_db', 'tap_id': 'my_tap'})
+    prepare.assert_called_once()
+    retire.assert_not_called()
+    assert json.loads(Path(files.state).read_text()) == original
+
+
+def test_failed_state_invalidation_prevents_publication_and_slot_changes(tmp_path):
+    runner, files, original = _retirement_runner(tmp_path)
+    with patch(
+        'pipelinewise.cli.pipelinewise.fastsync_utils.save_dict_to_json', side_effect=OSError('disk full')
+    ), patch.object(
+        FastSyncTapPostgres, 'migration_slots_coexist', return_value=False
+    ), patch.object(runner, '_run_postgres_publication_preflight') as prepare, patch.object(
+        FastSyncTapPostgres, 'retire_logical_slots'
+    ) as retire:
+        with pytest.raises(OSError, match='disk full'):
+            runner._reconcile_postgres_pgoutput_publication(runner.tap)
+    prepare.assert_not_called()
+    retire.assert_not_called()
+    assert json.loads(Path(files.state).read_text()) == original
+
+
+def test_failed_slot_retirement_retries_with_invalidated_logical_state(tmp_path):
+    runner, files, _ = _retirement_runner(tmp_path)
+    with patch.object(
+        FastSyncTapPostgres, 'migration_slots_coexist', return_value=False
+    ), patch.object(runner, 'get_connector_bin'), patch.object(
+        runner, '_run_postgres_publication_preflight'
+    ), patch.object(
+        FastSyncTapPostgres, 'retire_logical_slots', side_effect=[RuntimeError('lost response'), None]
+    ) as retire:
+        with pytest.raises(RuntimeError, match='lost response'):
+            runner._reconcile_postgres_pgoutput_publication(runner.tap)
+        assert json.loads(Path(files.state).read_text())['bookmarks'] == {'full': {'xmin': 4, 'version': 5}}
+        runner._reconcile_postgres_pgoutput_publication(runner.tap)
+    assert retire.call_count == 2
+
+
+@pytest.mark.parametrize('tap_id', ['orders-full', 'Orders', 'x' * 51])
+def test_nonlogical_tap_with_historical_id_skips_canonical_source_cleanup(tmp_path, tap_id):
+    """LOG-only naming rules must not prevent import of other replication methods."""
+    runner, files, _ = _retirement_runner(tmp_path)
+    runner.tap['id'] = tap_id
+    with patch.object(runner, '_run_postgres_publication_preflight') as prepare, patch.object(
+        FastSyncTapPostgres, 'retire_logical_slots'
+    ) as retire:
+        runner._reconcile_postgres_pgoutput_publication(runner.tap)
+    prepare.assert_not_called()
+    retire.assert_not_called()
+    assert json.loads(Path(files.state).read_text()) == {
+        'bookmarks': {'full': {'xmin': 4, 'version': 5}}, 'currently_syncing': None,
+    }
+
+
+def test_import_reports_publication_reconciliation_failure(tmp_path):
+    """A failed reconciliation fails that imported tap with its identity attached."""
+    runner = _runner(tmp_path)
+    tap = {'id': 'pg', 'type': 'tap-postgres'}
+
+    with patch.object(
+        runner,
+        '_reconcile_postgres_pgoutput_publication',
+        side_effect=PreRunChecksException('reconciliation failed'),
+    ):
+        assert runner._reconcile_postgres_publication_after_discovery(
+            'target', tap, None
+        ) == 'target - pg: reconciliation failed'
 
 
 def test_publication_preflight_preserves_paths_with_spaces_and_quotes(tmp_path):
@@ -232,6 +502,27 @@ def test_persisted_bridge_is_advanced_and_rewritten_before_next_run(tmp_path):
         PGOUTPUT_MIGRATION_STATE_KEY: updated,
         'bookmarks': {'public-one': {'lsn': 100}},
     }
+
+
+def test_success_does_not_advance_canonical_slot_while_bridge_boundary_is_pending(tmp_path):
+    marker = _migration_marker('bridge_pending')
+    state = {
+        PGOUTPUT_MIGRATION_STATE_KEY: marker,
+        'bookmarks': {'public-one': {'lsn': 95}},
+    }
+    tap = _tap_files(tmp_path, state)
+    runner = _runner(tmp_path, [_logical_stream('public-one')])
+
+    with patch.object(
+        FastSyncTapPostgres, 'advance_canonical_replication_slot'
+    ) as advance_canonical, patch.object(
+        FastSyncTapPostgres, 'advance_migrated_replication_slot'
+    ) as advance_migration:
+        runner._process_postgres_pgoutput_migration(tap, after_success=True)
+
+    advance_canonical.assert_not_called()
+    advance_migration.assert_not_called()
+    assert json.loads((tmp_path / 'state.json').read_text(encoding='utf-8')) == state
 
 
 def test_bridge_is_retained_until_every_logical_bookmark_reaches_boundary(tmp_path):

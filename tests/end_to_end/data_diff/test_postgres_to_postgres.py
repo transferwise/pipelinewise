@@ -8,7 +8,6 @@ separate ``ddl_user``. Cross-dialect checksum agreement belongs to the other rou
 
 import json
 import os
-import shutil
 
 from dataclasses import replace
 from datetime import timedelta
@@ -27,6 +26,7 @@ from pipelinewise.data_diff.runner import run_due_checks
 from pipelinewise.data_diff.runtime import RuntimeConnectorConfigLoader
 
 from ..helpers import assertions, tasks
+from ..helpers.config_cleanup import remove_runtime_config
 from ..helpers.env import E2EEnv
 
 
@@ -127,7 +127,7 @@ class TestPostgresToPostgresDataDiff:
         self.e2e.setup_tap_postgres()
         self.e2e.setup_pipelinewise_backend()
         self.run_target_query(f'DROP SCHEMA IF EXISTS {TARGET_SCHEMA} CASCADE')
-        shutil.rmtree(Path.home() / '.pipelinewise' / TARGET_ID, ignore_errors=True)
+        remove_runtime_config(Path.home() / '.pipelinewise', TARGET_ID)
 
         # Keep three rows in the previous completed UTC hour and one seven days
         # old, outside the configured one-day rolling window.

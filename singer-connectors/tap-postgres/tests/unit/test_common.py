@@ -295,14 +295,55 @@ class TestLogicalProgressMarkers(TestCase):
             tap_postgres.prepare_logical_replication(conn_config, [stream], 'LOG_BASED')
         prepare_publication.assert_not_called()
 
+    def test_empty_reconcile_prepares_publication_cleanup(self):
+        conn_config = {'dbname': 'configured_db', 'tap_id': 'tap'}
+
+        with patch('tap_postgres.logical_replication.prepare_publication') as prepare_publication:
+            result = tap_postgres.prepare_logical_replication(
+                conn_config, [], 'LOG_BASED', reconcile=True)
+
+        self.assertEqual([], result)
+        prepare_publication.assert_called_once_with(
+            conn_config,
+            [],
+            state=None,
+            fresh_start=False,
+            reconcile=True,
+            final_log_deselection=False,
+        )
+
+    def test_selected_reconcile_is_forwarded_for_each_database(self):
+        stream = self._stream('logical', 'configured_db')
+        conn_config = {'dbname': 'configured_db', 'tap_id': 'tap'}
+        state = {'bookmarks': {'logical': {'lsn': 100}}}
+
+        with patch('tap_postgres.sync_common.should_sync_column', return_value=True), \
+                patch('tap_postgres.logical_replication.prepare_publication') as prepare_publication:
+            result = tap_postgres.prepare_logical_replication(
+                conn_config,
+                [stream],
+                'LOG_BASED',
+                state=state,
+                reconcile=True,
+            )
+
+        self.assertEqual([stream], result)
+        prepare_publication.assert_called_once_with(
+            conn_config,
+            [stream],
+            state=state,
+            fresh_start=False,
+            reconcile=True,
+        )
+
     def test_logical_bookmark_cleanup_preserves_migration_state(self):
         stream = self._stream('selected', 'configured_db')
         migration = {
             'version': 1,
             'phase': 'pgoutput',
             'source_slot': 'pipelinewise_configured_db_tap',
-            'destination_slot': 'pipelinewise_tap',
-            'copy_lsn': 100,
+            'destination_slot': 'ppw_slot_tap',
+            'slot_lsn': 100,
             'bridge_lsn': 110,
         }
         state = {

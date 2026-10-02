@@ -92,8 +92,8 @@ the resync size limit. Taps without LOG_BASED tables do not reset a slot.
    * - Command or operation
      - Source slot
    * - Unfiltered ``fast_sync`` (with or without ``--force``)
-     - Create a fresh pgoutput slot, replacing an existing canonical slot.
-       Retain the old dedicated wal2json slot until the target confirms pgoutput.
+     - Drop the canonical pgoutput slot and any dedicated wal2json slot, then
+       create a fresh pgoutput slot.
    * - ``fast_sync --tables ...`` (even if every table is listed, or ``--force`` is supplied)
      - Retain.
    * - ``fast_sync --replication_method_only log_based`` (or another non-default filter, with or without ``--force``)
@@ -111,17 +111,20 @@ plugin blocks the operation.
 
 After these checks, PipelineWise saves a unique
 ``state.json.before-slot-reset-<id>.bak`` alongside the state file. It records
-a durable reset intent and clears every tap bookmark before replacing
-``pipelinewise_<tap_id>`` with a fresh pgoutput slot. An explicit resync never
-copies the old wal2json slot, so it can recover when that slot's WAL is no longer
-usable. Potentially shared database-wide slots remain untouched.
+a durable reset intent and clears every tap bookmark before dropping
+``ppw_slot_<tap_id>`` and any dedicated historical wal2json slot. It then creates
+a fresh pgoutput slot. This explicit whole-tap resync replaces the old history
+with new snapshots; it does not bridge or copy the old slot. It can recover
+when the old slot's WAL is no longer usable. Potentially shared database-wide
+slots remain untouched. PipelineWise also preserves an implicitly truncated
+historical tap-specific slot because its 63-byte name does not prove ownership.
+Use :ref:`postgres_tap_rename` with ``previous_tap_id`` when that slot contains
+history which must be migrated.
 
-The old tap-specific wal2json slot is retained while the fresh snapshot loads.
 After every worker succeeds, the reset intent is cleared and normal pgoutput
-consumption can resume. PipelineWise removes the old tap-specific slot only
-after the target acknowledges a later pgoutput boundary. This also works for
-selected partition roots, whose automatic wal2json bridge is unsupported.
-The overlap temporarily needs one additional replication-slot entry.
+consumption can resume. This also works for selected partition roots, whose
+automatic wal2json bridge is unsupported. A failed target load does not restore
+the dropped wal2json slot; complete the whole-tap resync before ordinary runs.
 
 Backups are retained across retries. No FullSync or configured PartialSync worker
 starts until slot preparation succeeds. A failed or interrupted whole-tap reset
@@ -136,7 +139,7 @@ an incomplete resync as a completed snapshot.
    absent or replaced; bookmarks remain cleared. Keep scheduled
    replication stopped, resolve the error, then retry the unfiltered
    ``fast_sync`` and complete the whole-tap resync. A state backup cannot recover
-   WAL discarded by a completed or uncertain canonical-slot drop. Never restore
+   WAL discarded by a completed or uncertain slot drop. Never restore
    old LOG_BASED bookmarks after that outcome. Errors report the failed phase
    and backup path when available.
    Add ``--force`` only if the resync size limit needs to be bypassed.
@@ -151,15 +154,20 @@ FastSync or conversion command to finish recovery, then retry the unfiltered
 ``fast_sync``.
 
 Separately, ``import_config`` removes a deleted PostgreSQL tap's canonical
-pgoutput slot, tap-specific wal2json slot, and ``pw_pub_<tap_id>`` publication
+pgoutput slot, tap-specific wal2json slot, and ``ppw_slot_<tap_id>`` publication
 when it removes that tap's runtime configuration. It leaves the database-wide
 historical slot unchanged. It validates each owned slot and verifies that the
 current role can remove the publication before changing the source. The
 publication must also carry valid PipelineWise management metadata. Otherwise,
 cleanup preserves the publication and slots and requires manual review. This is
-cleanup, not a resync. Cleanup also preserves the normalized canonical slot and
-publication for an old tap ID that does not meet the current lowercase naming
-rules, because that name may belong to a different valid tap.
+cleanup, not a resync. For an old tap ID that does not meet the current naming
+rules, cleanup preserves every canonical and normalized historical slot candidate
+and the publication. Those non-injective names may belong to another valid tap.
+Cleanup is journaled before the generated project config changes. If a retry
+reports pending local cleanup, keep that tap absent for one successful
+``import_config`` before adding it again. Changing a PostgreSQL tap's source,
+connector type, or target in place is rejected; use the same remove, import,
+add, and import sequence.
 
 
 Configured PartialSync and replicas

@@ -10,6 +10,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from . import db
+from .config_cleanup import remove_runtime_config
 
 USER_HOME = os.path.expanduser('~')
 CONFIG_DIR = os.path.join(USER_HOME, '.pipelinewise')
@@ -739,10 +740,7 @@ class E2EEnv:
     @staticmethod
     def remove_dir_from_config_dir(dir_path):
         """Remove generated config while surfacing failures other than absence."""
-        try:
-            shutil.rmtree(os.path.join(CONFIG_DIR, dir_path))
-        except FileNotFoundError:
-            pass
+        remove_runtime_config(CONFIG_DIR, dir_path)
 
     def delete_record_from_target_snowflake(self, tap_type, table, where_clause):
         """Delete all records except the first one from the snowflake target"""

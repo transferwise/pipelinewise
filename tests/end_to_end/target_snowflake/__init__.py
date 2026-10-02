@@ -1,9 +1,9 @@
 import os
-import shutil
 import unittest
 from pathlib import Path
 
 from tests.end_to_end.helpers import assertions, tasks
+from tests.end_to_end.helpers.config_cleanup import remove_runtime_config
 from tests.end_to_end.helpers.env import E2EEnv
 
 TEST_PROJECTS_DIR_PATH = 'tests/end_to_end/test-project'
@@ -149,7 +149,4 @@ class TargetSnowflake(unittest.TestCase):
         """
         remove directory from config directory
         """
-        try:
-            shutil.rmtree(os.path.join(CONFIG_DIR, dir_path))
-        except FileNotFoundError:
-            pass
+        remove_runtime_config(CONFIG_DIR, dir_path)

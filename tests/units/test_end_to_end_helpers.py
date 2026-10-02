@@ -666,18 +666,16 @@ class EndToEndHelpersTestCase(TestCase):
             '--table public.edgydata --column cid --start_value 3',
         )
 
-    @mock.patch('tests.end_to_end.target_snowflake.shutil.rmtree')
-    def test_remove_generated_config_removes_the_exact_directory(self, rmtree_mock):
-        """Generated-target cleanup must remove only its resolved directory."""
+    @mock.patch('tests.end_to_end.target_snowflake.remove_runtime_config')
+    def test_remove_generated_config_delegates_the_exact_owner(self, cleanup_mock):
+        """Generated-target cleanup must remove only its requested owner."""
         target = TargetSnowflake(methodName='runTest')
 
         target.remove_dir_from_config_dir('snowflake/postgres_to_sf')
 
-        rmtree_mock.assert_called_once_with(
-            os.path.join(
-                target_snowflake_module.CONFIG_DIR,
-                'snowflake/postgres_to_sf',
-            )
+        cleanup_mock.assert_called_once_with(
+            target_snowflake_module.CONFIG_DIR,
+            'snowflake/postgres_to_sf',
         )
 
     def test_iceberg_cleanup_rejects_a_stale_target_pointer(self):
@@ -705,52 +703,57 @@ class EndToEndHelpersTestCase(TestCase):
                 target.assert_iceberg_fastsync_cleanup('TARGET_SCHEMA')
 
     @mock.patch(
-        'tests.end_to_end.target_snowflake.shutil.rmtree',
-        side_effect=FileNotFoundError,
+        'tests.end_to_end.target_snowflake.remove_runtime_config',
     )
-    def test_remove_generated_config_tolerates_a_missing_directory(self, rmtree_mock):
-        """An already absent generated-target directory is clean state."""
+    def test_remove_generated_config_delegates_target_cleanup(self, cleanup_mock):
+        """Target cleanup uses the shared runtime and inventory helper."""
         target = TargetSnowflake(methodName='runTest')
 
         target.remove_dir_from_config_dir('snowflake')
 
-        rmtree_mock.assert_called_once()
+        cleanup_mock.assert_called_once_with(
+            target_snowflake_module.CONFIG_DIR,
+            'snowflake',
+        )
 
     @mock.patch(
-        'tests.end_to_end.target_snowflake.shutil.rmtree',
+        'tests.end_to_end.target_snowflake.remove_runtime_config',
         side_effect=PermissionError('cleanup failed'),
     )
-    def test_remove_generated_config_propagates_other_failures(self, _rmtree_mock):
+    def test_remove_generated_config_propagates_other_failures(self, _cleanup_mock):
         """Permission and filesystem failures must fail target setup."""
         target = TargetSnowflake(methodName='runTest')
 
         with self.assertRaisesRegex(PermissionError, 'cleanup failed'):
             target.remove_dir_from_config_dir('snowflake')
 
-    @mock.patch('tests.end_to_end.helpers.env.shutil.rmtree')
-    def test_environment_config_cleanup_removes_the_exact_directory(self, rmtree_mock):
-        """Environment cleanup must resolve the requested generated target."""
+    @mock.patch('tests.end_to_end.helpers.env.remove_runtime_config')
+    def test_environment_config_cleanup_delegates_the_exact_owner(self, cleanup_mock):
+        """Environment cleanup must remove the requested generated target."""
         E2EEnv.remove_dir_from_config_dir('postgres_dwh')
 
-        rmtree_mock.assert_called_once_with(
-            os.path.join(env_module.CONFIG_DIR, 'postgres_dwh')
+        cleanup_mock.assert_called_once_with(
+            env_module.CONFIG_DIR,
+            'postgres_dwh',
         )
 
     @mock.patch(
-        'tests.end_to_end.helpers.env.shutil.rmtree',
-        side_effect=FileNotFoundError,
+        'tests.end_to_end.helpers.env.remove_runtime_config',
     )
-    def test_environment_config_cleanup_tolerates_absence(self, rmtree_mock):
-        """Environment cleanup tolerates only an already absent directory."""
+    def test_environment_config_cleanup_delegates_snowflake(self, cleanup_mock):
+        """Environment cleanup uses the shared runtime and inventory helper."""
         E2EEnv.remove_dir_from_config_dir('snowflake')
 
-        rmtree_mock.assert_called_once()
+        cleanup_mock.assert_called_once_with(
+            env_module.CONFIG_DIR,
+            'snowflake',
+        )
 
     @mock.patch(
-        'tests.end_to_end.helpers.env.shutil.rmtree',
+        'tests.end_to_end.helpers.env.remove_runtime_config',
         side_effect=PermissionError('cleanup failed'),
     )
-    def test_environment_config_cleanup_propagates_failures(self, _rmtree_mock):
+    def test_environment_config_cleanup_propagates_failures(self, _cleanup_mock):
         """Environment cleanup must surface permission failures."""
         with self.assertRaisesRegex(PermissionError, 'cleanup failed'):
             E2EEnv.remove_dir_from_config_dir('snowflake')

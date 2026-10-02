@@ -89,6 +89,10 @@ class TestResetState(TestCase):
             '_pipelinewise_pgoutput_migration': {
                 'version': 1,
                 'phase': 'pgoutput',
+                'source_slot': 'pipelinewise_source_tap_pg',
+                'destination_slot': 'ppw_slot_tap_pg',
+                'slot_lsn': 100,
+                'bridge_lsn': 200,
             },
         }
         with open(state_path, 'w', encoding='utf-8') as state_file:

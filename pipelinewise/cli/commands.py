@@ -361,6 +361,8 @@ def build_postgres_publication_preflight_command(
     tap_state: str | None = None,
     *,
     fresh_start: bool = False,
+    reconcile: bool = False,
+    final_log_deselection: bool = False,
 ) -> list[str]:
     """Build the connector preflight that prepares pgoutput relations."""
     command = [tap_bin, '--config', tap_config, '--catalog', tap_catalog, '--prepare-publication']
@@ -368,6 +370,10 @@ def build_postgres_publication_preflight_command(
         command.extend(['--state', tap_state])
     if fresh_start:
         command.append('--fresh-start')
+    if reconcile:
+        command.append('--reconcile-publication')
+    if final_log_deselection:
+        command.append('--final-log-deselection')
     return command
 
 

@@ -15,6 +15,7 @@ from pipelinewise.fastsync.commons.source_transformations import (
     validate_source_transformation_config,
 )
 from pipelinewise.fastsync.commons.tap_postgres import FastSyncTapPostgres
+from pipelinewise.fastsync.commons import utils as fastsync_utils
 from pipelinewise.utils import safe_column_name
 from . import fastsync_capabilities, utils
 from .errors import InvalidConfigException, InvalidTransformationException
@@ -159,7 +160,7 @@ class Config:
 
     @staticmethod
     def validate_postgres_replication_slot_identity(tap: Dict) -> None:
-        """Reject a PostgreSQL tap whose canonical slot aliases its legacy slot."""
+        """Validate canonical and historical PostgreSQL replication identities."""
         if tap.get('type') != 'tap-postgres':
             return
         tables = [
@@ -282,7 +283,11 @@ class Config:
         """
         return os.path.join(connector_dir, 'config.json')
 
-    def save(self, selected_taps: Union[None, List] = None):
+    def save(
+            self,
+            selected_taps: Union[None, List] = None,
+            persisted_config: Union[None, Dict] = None,
+    ):
         """
         Generating pipelinewise configuration directory layout on the disk.
 
@@ -291,22 +296,122 @@ class Config:
         ~/.pipelinewise
         """
         selected_taps_list = selected_taps if selected_taps else ['*']
+        if persisted_config is None:
+            persisted_config = self.build_persisted_config(
+                selected_taps_list,
+                utils.load_json(self.config_path) or {},
+            )
         self.logger.info('SAVING CONFIG')
-        self.save_main_config_json()
+        os.makedirs(self.config_dir, exist_ok=True)
 
-        # Save every target config json
+        # Save runtime credentials before the root inventory claims ownership.
         for target in self.targets.values():
+            selected_target_taps = [
+                tap for tap in target['taps']
+                if selected_taps_list == ['*'] or tap['id'] in selected_taps_list
+            ]
+            if selected_taps_list != ['*'] and not selected_target_taps:
+                continue
             self.save_target_jsons(target)
 
-            # Save every tap JSON files
-            for tap in target['taps']:
-                if tap['id'] in selected_taps_list or selected_taps_list == ['*']:
-                    extra_config_keys = utils.get_tap_extra_config_keys(
-                        tap, self.get_temp_dir()
-                    )
-                    self.save_tap_jsons(target, tap, extra_config_keys)
+            for tap in selected_target_taps:
+                extra_config_keys = utils.get_tap_extra_config_keys(
+                    tap, self.get_temp_dir()
+                )
+                self.save_tap_jsons(target, tap, extra_config_keys)
 
-    def save_main_config_json(self):
+        self.save_main_config_json(persisted_config)
+
+    def build_persisted_config(self, selected_taps: List, previous_config: Dict) -> Dict:
+        """Build the root inventory changed by this import.
+
+        Partial imports add selected taps, retain previously imported taps that
+        remain in YAML, and omit brand-new unselected taps.
+        """
+        if '*' in selected_taps:
+            targets = [
+                Config._main_target_setting(target, [
+                    Config._main_tap_setting(tap) for tap in target.get('taps', [])
+                ])
+                for target in self.targets.values()
+            ]
+            return {**self.global_config, 'targets': targets}
+
+        selected = set(selected_taps)
+        current_taps = {
+            tap['id']: (target['id'], tap)
+            for target in self.targets.values()
+            for tap in target.get('taps', [])
+        }
+        previous_targets = {
+            target['id']: target
+            for target in previous_config.get('targets', [])
+        }
+        retained_by_target = {}
+        for target in previous_config.get('targets', []):
+            for tap in target.get('taps', []):
+                if tap['id'] in current_taps and tap['id'] not in selected:
+                    retained_by_target.setdefault(target['id'], []).append(
+                        Config._main_tap_setting(tap)
+                    )
+
+        selected_by_target = {}
+        for target in self.targets.values():
+            for tap in target.get('taps', []):
+                if tap['id'] in selected:
+                    selected_by_target.setdefault(target['id'], []).append(
+                        Config._main_tap_setting(tap)
+                    )
+
+        target_ids = list(self.targets)
+        target_ids.extend(
+            target_id for target_id in previous_targets
+            if target_id not in self.targets and target_id in retained_by_target
+        )
+        targets = []
+        for target_id in target_ids:
+            taps = retained_by_target.get(target_id, []) + selected_by_target.get(target_id, [])
+            previous_target = previous_targets.get(target_id)
+            current_target = self.targets.get(target_id)
+            if not taps:
+                if previous_target is None or current_target is None or previous_target.get('taps'):
+                    continue
+                targets.append(Config._main_target_setting(previous_target, []))
+                continue
+            target = current_target if selected_by_target.get(target_id) else previous_target
+            targets.append(Config._main_target_setting(target, taps))
+
+        return {**self.global_config, 'targets': targets}
+
+    @staticmethod
+    def _main_tap_setting(tap):
+        setting = {
+            'id': tap.get('id'),
+            'name': tap.get('name'),
+            'type': tap.get('type'),
+            'owner': tap.get('owner'),
+            'stream_buffer_size': tap.get('stream_buffer_size'),
+            'send_alert': tap.get('send_alert', True),
+            'enabled': tap.get('enabled', True),
+        }
+        for key in ('target_table_format', 'iceberg_version', 'previous_tap_id'):
+            if key in tap:
+                setting[key] = tap[key]
+        if tap.get('slack_alert_channel'):
+            setting['slack_alert_channel'] = tap['slack_alert_channel']
+        return setting
+
+    @staticmethod
+    def _main_target_setting(target, taps):
+        return {
+            'id': target.get('id'),
+            'name': target.get('name'),
+            'status': target.get('status', 'ready'),
+            'type': target.get('type'),
+            'taps': taps,
+        }
+
+    def save_main_config_json(self, main_config=None):
         """
         Generating pipelinewise main config.json file
 
@@ -314,46 +419,23 @@ class Config:
         and has the list of targets and its taps with some basic information.
         """
         self.logger.info('SAVING MAIN CONFIG JSON to %s', self.config_path)
-        targets = []
-
-        # Generate dictionary for config.json
-        for target_tuple in self.targets.items():
-            target = target_tuple[1]
-            taps = []
-            for tap in target.get('taps'):
-                tap_setting = {
-                        'id': tap.get('id'),
-                        'name': tap.get('name'),
-                        'type': tap.get('type'),
-                        'owner': tap.get('owner'),
-                        'stream_buffer_size': tap.get('stream_buffer_size'),
-                        'send_alert': tap.get('send_alert', True),
-                        'enabled': True,
-                    }
-                for key in ('target_table_format', 'iceberg_version', 'previous_tap_id'):
-                    if key in tap:
-                        tap_setting[key] = tap[key]
-                if tap.get('slack_alert_channel'):
-                    tap_setting['slack_alert_channel'] = tap['slack_alert_channel']
-                taps.append(tap_setting)
-
-            targets.append(
-                {
-                    'id': target.get('id'),
-                    'name': target.get('name'),
-                    'status': 'ready',
-                    'type': target.get('type'),
-                    'taps': taps,
-                }
-            )
-        main_config = {**self.global_config, **{'targets': targets}}
+        if main_config is None:
+            main_config = self.build_persisted_config(['*'], {})
 
         # Create config dir if not exists
         if not os.path.exists(self.config_dir):
             os.mkdir(self.config_dir)
 
         # Save to JSON
-        utils.save_json(main_config, self.config_path)
+        serializable_config = json.loads(json.dumps(
+            main_config,
+            cls=utils.AnsibleJSONEncoder,
+        ))
+        fastsync_utils.save_dict_to_json(
+            self.config_path,
+            serializable_config,
+            log_level=logging.DEBUG,
+        )
 
     def save_target_jsons(self, target):
         """

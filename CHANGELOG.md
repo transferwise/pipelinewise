@@ -9,11 +9,13 @@
 
 **PostgreSQL logical replication**
 
-- Use native pgoutput for new LOG_BASED slots named
-  ``pipelinewise_<tap_id>``. Automatically copy a historical tap-specific
-  wal2json slot and bridge it through a transactional logical message. Retire
-  the old slot only after the target acknowledges pgoutput consumption.
-- Grant the tap role permission to create, copy, advance, consume, and remove
+- Use ``ppw_slot_<tap_id>`` for both native pgoutput slots and publications.
+  Create a fresh slot, then bridge historical wal2json changes through a later
+  transactional logical message. Advance pgoutput only after the target
+  acknowledges the bridge. Retire the old slot after confirmed pgoutput writes.
+  Reuse interrupted migration boundaries and freeze publication selection until
+  migration finishes or an unfiltered whole-tap FastSync resets it.
+- Grant the tap role permission to create, advance, consume, and remove
   its logical slots, manage its publication, and execute
   ``pg_logical_emit_message`` before upgrading. Ensure sufficient
   ``max_wal_senders`` capacity and one unused slot within
@@ -21,32 +23,41 @@
   Keep wal2json installed and, where available, permitted by
   ``output_plugin_libraries`` until all old slots are retired.
 - Require tap IDs to use at most 50 lowercase letters, digits, or underscores,
-  differ from the normalized database name, and be unique across the source
-  cluster. Use ``previous_tap_id`` and targeted ``import_config`` when renaming
-  a historical tap. Follow the
+  and be unique across the source cluster. Use ``previous_tap_id`` and targeted
+  ``import_config`` when renaming a historical tap. Follow the
   [rename procedure](docs/connectors/taps/postgres.rst#renaming-a-historical-tap-id).
 - Require non-deferrable primary keys with ``REPLICA IDENTITY DEFAULT`` on
   selected tables and partition leaves. Exclude index INCLUDE columns from
   merge keys. Reject selected generated columns, unsupported inheritance,
   foreign partitions, and bookmarks behind released WAL.
-- Add selected tables to the publication without removing existing members.
-  Prepare membership before snapshots and direct PartialSync. Use
-  ``publication_fence_timeout_seconds`` (300 seconds by default) to bound
-  publication DDL, earlier-writer waits, and initial replica catch-up.
+- Keep publication changes additive during runs and filtered syncs. Remove
+  persistently deselected managed members during ``import_config`` while
+  preserving untracked DBA-added tables. Clear deselected logical bookmarks
+  before removal so re-added tables receive a fresh snapshot. Retire dedicated
+  slots when the last LOG_BASED table is deselected. Prepare membership before
+  snapshots and direct PartialSync. Use ``publication_fence_timeout_seconds``
+  (300 seconds by default) to bound publication DDL, earlier-writer waits, and
+  initial replica catch-up.
 - Preserve shared database-wide slots and require a whole-tap resync when
   existing bookmarks depend on one or when migrating a selected partition
   root. Use an explicit whole-tap FastSync to create a fresh pgoutput slot when
-  WAL is unusable. Refuse ``reset_state`` because a slot cannot rewind.
-- Preserve the old slot, WAL, and migration state after target failure. Block
-  ordinary replication until an interrupted whole-tap resync finishes. Limit
+  WAL is unusable. Drop the dedicated wal2json slot during that explicit reset.
+  Preserve an implicitly truncated historical slot unless ``previous_tap_id``
+  explicitly establishes its ownership.
+  Refuse ``reset_state`` because a slot cannot rewind.
+- Preserve the old slot, WAL, and migration state after automatic-migration
+  target failure. Block ordinary replication until an interrupted whole-tap
+  resync finishes. Limit
   slot feedback and retirement to target-acknowledged state.
 - Preserve TOAST values, dates, floats, and source encodings. Restart interrupted
   Singer snapshots from the first row with their original version and CDC
   boundary. Wait for replica replay before exporting a snapshot.
 - Remove a deleted tap's publication only when its metadata proves PipelineWise
-  manages it. Preserve ambiguous slots and publications for manual review. See
-  the [PostgreSQL guide](docs/connectors/taps/postgres.rst) for constraints and
-  recovery procedures.
+  manages it. Preserve ambiguous slots and publications, including every source
+  object candidate for a historical invalid tap ID, for manual review. Journal
+  cleanup across interrupted imports. Require cleanup to finish before reusing
+  an ID for another PostgreSQL source, connector type, or target. See the
+  [PostgreSQL guide](docs/connectors/taps/postgres.rst) for recovery procedures.
 
 **PostgreSQL and Snowflake targets**
 
@@ -54,6 +65,11 @@
 - Prevent PostgreSQL composite-key collisions from merging distinct source rows.
 - Flush pending streams to establish the initial durable checkpoint. Continue
   per-stream checkpoints afterwards and withhold state after a failed flush.
+
+**CI**
+
+- Require pgoutput lifecycle E2E coverage and rebalance Snowflake shards to
+  shorten the required checks.
 
 0.93.0 (2026-09-28)
 -------------------

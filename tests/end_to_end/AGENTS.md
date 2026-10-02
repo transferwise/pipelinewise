@@ -33,6 +33,13 @@ step ran and report pass/skip/fail counts.
 
 ## E2E matrix
 
+Run this local E2E matrix only when the user specifically asks to run E2E tests.
+When a pull request already exists, prefer the corresponding GitHub Actions E2E
+jobs and inspect their exact pass, skip, and failure results. Avoid duplicating
+those jobs locally and polling them through Codex, which slows validation and
+uses Codex allowance. A user-requested local run remains authoritative for that
+task even when it is long-running.
+
 These groups mirror `.github/workflows/e2e_tests.yml` in required-check order
 `e2e_tests_01` through `e2e_tests_11`; update both together. CI runs ten
 Snowflake groups concurrently on isolated runners; local groups share/reset
@@ -54,12 +61,12 @@ run_e2e \
 
 run_e2e \
   tests/end_to_end/target_snowflake/tap_postgres/test_snowflake_iceberg_publisher.py \
-  tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_replica_to_sf.py
+  tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_replica_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_with_custom_buffer_size.py
 
 run_e2e \
   tests/end_to_end/target_snowflake/tap_postgres/test_partial_sync_pg_to_sf.py \
   tests/end_to_end/target_snowflake/tap_postgres/test_multiline_native_pg_to_sf.py \
-  tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_with_custom_buffer_size.py \
   tests/end_to_end/data_diff/test_postgres_to_snowflake.py
 
 run_e2e \
@@ -109,6 +116,16 @@ PostgreSQL, and genuine MySQL cover native and explicit v3.
 Do not infer one format from another. `SHOW PRIMARY KEYS` does not prove Iceberg
 identifier fields; compare raw-metadata `identifier-field-ids` with current
 schema field IDs.
+
+PostgreSQL lifecycle coverage uses `ppw_slot_<tap_id>` for both the slot and
+publication. Verify fresh-slot creation before the wal2json bridge, retirement
+after target acknowledgement, and dedicated wal2json removal during explicit
+whole-tap FastSync. Persistent import must remove deselected managed publication
+members while preserving untracked DBA members and filtered-run peers.
+Remove a logical table, change its source rows, and re-add it before any peer
+advances: a fresh snapshot must recover those changes. Removing the last LOG
+selection must clear old logical state and retire dedicated slots; re-adding it
+must create a fresh slot and snapshot.
 
 ### Multiline coverage
 

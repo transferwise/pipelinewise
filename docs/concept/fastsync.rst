@@ -184,8 +184,9 @@ it. ``--force`` only bypasses the resync size limit; configured
 for exact commands, safety checks, pending-Iceberg guards, and failure recovery.
 An explicit reset creates a fresh pgoutput slot and records its intent durably.
 Ordinary replication stays blocked until the whole-tap FastSync completes.
-The historical tap-specific wal2json slot is retained until the target confirms
-subsequent pgoutput consumption.
+It drops any dedicated historical wal2json slot before loading new snapshots.
+Shared database-wide slots remain untouched. Automatic migration instead keeps
+the old dedicated slot until the target confirms pgoutput consumption.
 
 
 .. _defined_partial_sync:

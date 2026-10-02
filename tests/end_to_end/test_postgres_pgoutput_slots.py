@@ -28,7 +28,7 @@ PARTITIONED_TABLE_NAME = 'partitioned_records'
 PARTITIONED_STREAM_ID = f'{SOURCE_SCHEMA}-{PARTITIONED_TABLE_NAME}'
 TEMPLATE_DIR = Path(__file__).parent / 'postgres_pgoutput_test_project'
 MIGRATION_STATE_KEY = '_pipelinewise_pgoutput_migration'
-PUBLICATION_NAME = f'pw_pub_{TAP_ID}'
+PUBLICATION_NAME = f'ppw_slot_{TAP_ID}'
 PUBLICATION_FENCE_COMMENT_PREFIX = 'pipelinewise-publication-fence-v1:'
 
 
@@ -174,12 +174,12 @@ def _partition_source_target_rows(e2e):
     return source_rows, target_rows
 
 
-def _select_partition_root(project_dir):
-    """Add the partition root after wal2json migration has completed."""
+def _select_logical_table(project_dir, table_name):
+    """Persist another logical table in the generated test project."""
     tap_yaml = project_dir / 'tap_postgres_pgoutput_to_pg.yml'
     with tap_yaml.open('a', encoding='utf-8') as config_file:
         config_file.write(
-            f'      - table_name: "{PARTITIONED_TABLE_NAME}"\n'
+            f'      - table_name: "{table_name}"\n'
             '        replication_method: "LOG_BASED"\n'
         )
 
@@ -217,6 +217,7 @@ def _wait_for_publication_fence(e2e, process, command, timeout=20):
             and _decode_publication_fence_comment(comment_rows[0][0]) == {
                 'state': 'pending',
                 'original_comment': None,
+                'managed_tables': [[SOURCE_SCHEMA, TABLE_NAME]],
             }
         ):
             assert process.poll() is None
@@ -294,7 +295,7 @@ def test_renamed_legacy_tap_preserves_checkpoint_and_retires_truncated_slot(tmp_
     old_tap_id = 'Historical-Postgres-' + 'x' * 45
     database = e2e.get_conn_env_var('TAP_POSTGRES', 'DB')
     old_slot = _slot_name(database, old_tap_id)
-    new_slot = _slot_name(TAP_ID)
+    new_slot = f'ppw_slot_{TAP_ID}'
     run_command = ['pipelinewise', 'run_tap', '--tap', TAP_ID, '--target', TARGET_ID]
     state_path = config_dir / TARGET_ID / TAP_ID / 'state.json'
     try:
@@ -360,6 +361,108 @@ def test_renamed_legacy_tap_preserves_checkpoint_and_retires_truncated_slot(tmp_
         e2e.run_query_target_postgres(f'DROP SCHEMA IF EXISTS {TARGET_SCHEMA} CASCADE')
 
 
+def test_import_removes_only_deselected_managed_publication_tables(tmp_path):
+    """Persisted selection removes owned members while filtered runs preserve peers."""
+    project_dir = tmp_path / 'project'
+    shutil.copytree(TEMPLATE_DIR, project_dir)
+    e2e = E2EEnv(project_dir)
+    config_dir = tmp_path / 'pipelinewise-config'
+    config_dir.mkdir()
+    command_env = {**os.environ, 'PIPELINEWISE_CONFIG_DIRECTORY': str(config_dir)}
+    retained_table = 'retained_records'
+    unmanaged_table = 'dba_managed_records'
+    slot_name = f'ppw_slot_{TAP_ID}'
+    wal2json_slot = _slot_name(e2e.get_conn_env_var('TAP_POSTGRES', 'DB'), TAP_ID)
+    import_command = ['pipelinewise', 'import_config', '--dir', str(project_dir)]
+    run_command = ['pipelinewise', 'run_tap', '--tap', TAP_ID, '--target', TARGET_ID]
+    state_path = config_dir / TARGET_ID / TAP_ID / 'state.json'
+    try:
+        _drop_slot(e2e, slot_name)
+        _drop_slot(e2e, wal2json_slot)
+        _drop_publication(e2e)
+        e2e.run_query_tap_postgres(
+            f'DROP SCHEMA IF EXISTS {SOURCE_SCHEMA} CASCADE; CREATE SCHEMA {SOURCE_SCHEMA}'
+        )
+        for table_name in (TABLE_NAME, retained_table, unmanaged_table):
+            e2e.run_query_tap_postgres(
+                f'CREATE TABLE {SOURCE_SCHEMA}.{table_name} '
+                '(id integer PRIMARY KEY, status text, payload text); '
+                f"INSERT INTO {SOURCE_SCHEMA}.{table_name} VALUES (1, 'source', 'payload')"
+            )
+        e2e.run_query_target_postgres(f'DROP SCHEMA IF EXISTS {TARGET_SCHEMA} CASCADE')
+        _select_logical_table(project_dir, retained_table)
+        _run_success(import_command, command_env)
+        filtered_sync = [
+            'pipelinewise', 'fast_sync', '--tap', TAP_ID, '--target', TARGET_ID,
+            '--tables', f'{SOURCE_SCHEMA}.{TABLE_NAME}',
+        ]
+        _run_success(filtered_sync, command_env)
+        expected_managed = {(SOURCE_SCHEMA, TABLE_NAME), (SOURCE_SCHEMA, retained_table)}
+        assert _publication_tables(e2e) == expected_managed
+        e2e.run_query_tap_postgres(
+            f'ALTER PUBLICATION {PUBLICATION_NAME} ADD TABLE {SOURCE_SCHEMA}.{unmanaged_table}'
+        )
+        _run_success(filtered_sync, command_env)
+        assert _publication_tables(e2e) == expected_managed | {(SOURCE_SCHEMA, unmanaged_table)}
+        original_lsn = _slot_status(e2e, slot_name)['confirmed_flush_lsn']
+        assert STREAM_ID in _read_state(state_path)['bookmarks']
+        tap_yaml = project_dir / 'tap_postgres_pgoutput_to_pg.yml'
+        tap_yaml.write_text(
+            tap_yaml.read_text(encoding='utf-8').replace(
+                f'      - table_name: "{TABLE_NAME}"\n        replication_method: "LOG_BASED"\n', ''),
+            encoding='utf-8',
+        )
+        _run_success(import_command, command_env)
+        assert _publication_tables(e2e) == {
+            (SOURCE_SCHEMA, retained_table), (SOURCE_SCHEMA, unmanaged_table),
+        }
+        assert _publication_fence_metadata(e2e)['managed_tables'] == [[SOURCE_SCHEMA, retained_table]]
+        assert STREAM_ID not in _read_state(state_path)['bookmarks']
+        e2e.run_query_tap_postgres(
+            f"UPDATE {SOURCE_SCHEMA}.{TABLE_NAME} SET status = 'changed while deselected' WHERE id = 1; "
+            f"INSERT INTO {SOURCE_SCHEMA}.{TABLE_NAME} VALUES (2, 'inserted while deselected', 'payload2')"
+        )
+        _select_logical_table(project_dir, TABLE_NAME)
+        _run_success(import_command, command_env)
+        assert _slot_status(e2e, slot_name)['confirmed_flush_lsn'] == original_lsn
+        assert STREAM_ID not in _read_state(state_path)['bookmarks']
+        _run_success(run_command, command_env)
+        assert _source_target_rows(e2e)[0] == _source_target_rows(e2e)[1]
+        assert _source_target_rows(e2e)[1][0][1] == 'changed while deselected'
+        e2e.run_query_tap_postgres(
+            'SELECT * FROM pg_create_logical_replication_slot(%s, %s)', (wal2json_slot, 'wal2json'),
+        )
+        tap_yaml.write_text(
+            tap_yaml.read_text(encoding='utf-8').replace('"LOG_BASED"', '"FULL_TABLE"'),
+            encoding='utf-8',
+        )
+        _run_success(import_command, command_env)
+        assert _publication_tables(e2e) == {(SOURCE_SCHEMA, unmanaged_table)}
+        assert _publication_fence_metadata(e2e)['managed_tables'] == []
+        assert _slot_status(e2e, slot_name) is None
+        assert _slot_status(e2e, wal2json_slot) is None
+        assert not any('lsn' in bookmark for bookmark in _read_state(state_path)['bookmarks'].values())
+        e2e.run_query_tap_postgres(
+            f"UPDATE {SOURCE_SCHEMA}.{TABLE_NAME} SET status = 'changed with no slot' WHERE id = 1"
+        )
+        tap_yaml.write_text(
+            tap_yaml.read_text(encoding='utf-8').replace('"FULL_TABLE"', '"LOG_BASED"'),
+            encoding='utf-8',
+        )
+        _run_success(import_command, command_env)
+        assert _slot_status(e2e, slot_name) is None
+        _run_success(run_command, command_env)
+        assert _slot_status(e2e, slot_name)['plugin'] == 'pgoutput'
+        assert _source_target_rows(e2e)[0] == _source_target_rows(e2e)[1]
+        assert _source_target_rows(e2e)[1][0][1] == 'changed with no slot'
+    finally:
+        _drop_slot(e2e, slot_name)
+        _drop_slot(e2e, wal2json_slot)
+        _drop_publication(e2e)
+        e2e.run_query_tap_postgres(f'DROP SCHEMA IF EXISTS {SOURCE_SCHEMA} CASCADE')
+        e2e.run_query_target_postgres(f'DROP SCHEMA IF EXISTS {TARGET_SCHEMA} CASCADE')
+
+
 @pytest.mark.parametrize('fresh_reset', [False, True], ids=['automatic-migration', 'explicit-reset'])
 def test_wal2json_slot_is_retired_after_pgoutput_target_checkpoint(tmp_path, fresh_reset):
     """Migrate safely, retire after durability, and checkpoint a logical message."""
@@ -376,7 +479,7 @@ def test_wal2json_slot_is_retired_after_pgoutput_target_checkpoint(tmp_path, fre
     database = e2e.get_conn_env_var('TAP_POSTGRES', 'DB')
     legacy_wal2json_slot = _slot_name(database)
     wal2json_slot = _slot_name(database, TAP_ID)
-    pgoutput_slot = f'pipelinewise_{TAP_ID}'
+    pgoutput_slot = f'ppw_slot_{TAP_ID}'
     fast_sync_process = None
     long_transaction = None
 
@@ -419,6 +522,7 @@ def test_wal2json_slot_is_retired_after_pgoutput_target_checkpoint(tmp_path, fre
             ['pipelinewise', 'import_config', '--dir', str(project_dir)],
             command_env,
         )
+        _drop_publication(e2e)
         long_transaction = _connect_source(e2e)
         with long_transaction.cursor() as cursor:
             cursor.execute(
@@ -453,21 +557,22 @@ def test_wal2json_slot_is_retired_after_pgoutput_target_checkpoint(tmp_path, fre
         assert _publication_fence_metadata(e2e) == {
             'state': 'ready',
             'original_comment': None,
+            'managed_tables': [[SOURCE_SCHEMA, TABLE_NAME]],
         }
         assert _publication_tables(e2e) == {(SOURCE_SCHEMA, TABLE_NAME)}
 
-        copied_old_slot = _slot_status(e2e, wal2json_slot)
-        copied_new_slot = _slot_status(e2e, pgoutput_slot)
-        assert copied_old_slot is not None
-        assert copied_new_slot is not None
-        assert copied_old_slot['plugin'] == 'wal2json'
-        assert copied_new_slot['plugin'] == 'pgoutput'
-        assert copied_new_slot['database'] == database
-        assert copied_old_slot['confirmed_flush_lsn'] == original_slot['confirmed_flush_lsn']
+        old_slot = _slot_status(e2e, wal2json_slot)
+        new_slot = _slot_status(e2e, pgoutput_slot)
+        assert new_slot is not None
+        assert new_slot['plugin'] == 'pgoutput'
+        assert new_slot['database'] == database
+        assert new_slot['confirmed_flush_lsn'] > original_slot['confirmed_flush_lsn']
         if fresh_reset:
-            assert copied_new_slot['confirmed_flush_lsn'] > copied_old_slot['confirmed_flush_lsn']
+            assert old_slot is None
         else:
-            assert copied_new_slot['confirmed_flush_lsn'] == copied_old_slot['confirmed_flush_lsn']
+            assert old_slot is not None
+            assert old_slot['plugin'] == 'wal2json'
+            assert old_slot['confirmed_flush_lsn'] == original_slot['confirmed_flush_lsn']
         source_rows, target_rows = _source_target_rows(e2e)
         assert source_rows == target_rows
         assert source_rows[0][1:3] == ('committed across publication setup', 32768)
@@ -480,24 +585,25 @@ def test_wal2json_slot_is_retired_after_pgoutput_target_checkpoint(tmp_path, fre
             )
 
         bridge_state = _read_state(state_path)
-        bridge_marker = bridge_state[MIGRATION_STATE_KEY]
+        bridge_marker = bridge_state.get(MIGRATION_STATE_KEY)
         assert '_pipelinewise_pgoutput_fresh_start' not in bridge_state
-        assert bridge_marker['phase'] == 'pgoutput'
-        assert bridge_marker['source_slot'] == wal2json_slot
-        assert bridge_marker['destination_slot'] == pgoutput_slot
-        assert bridge_marker['bridge_lsn'] > bridge_marker['copy_lsn']
         bridge_lsn = _read_state_lsn(state_path)
-        assert bridge_lsn == bridge_marker['bridge_lsn']
         bridged_old_slot = _slot_status(e2e, wal2json_slot)
         bridged_new_slot = _slot_status(e2e, pgoutput_slot)
-        assert bridged_old_slot is not None
-        assert bridged_old_slot['plugin'] == 'wal2json'
         assert bridged_new_slot is not None
         assert bridged_new_slot['plugin'] == 'pgoutput'
         if fresh_reset:
-            assert bridged_old_slot['confirmed_flush_lsn'] == original_slot['confirmed_flush_lsn']
-            assert bridged_new_slot['confirmed_flush_lsn'] == bridge_marker['copy_lsn']
+            assert bridge_marker is None
+            assert bridged_old_slot is None
         else:
+            assert bridge_marker['phase'] == 'pgoutput'
+            assert bridge_marker['source_slot'] == wal2json_slot
+            assert bridge_marker['destination_slot'] == pgoutput_slot
+            assert bridge_marker['slot_lsn'] == new_slot['confirmed_flush_lsn']
+            assert bridge_marker['bridge_lsn'] > bridge_marker['slot_lsn']
+            assert bridge_lsn == bridge_marker['bridge_lsn']
+            assert bridged_old_slot is not None
+            assert bridged_old_slot['plugin'] == 'wal2json'
             assert bridged_old_slot['confirmed_flush_lsn'] >= bridge_lsn
             assert bridged_new_slot['confirmed_flush_lsn'] >= bridge_lsn
         source_rows, target_rows = _source_target_rows(e2e)
@@ -530,10 +636,13 @@ def test_wal2json_slot_is_retired_after_pgoutput_target_checkpoint(tmp_path, fre
         assert failed_slot is not None
         assert failed_slot['plugin'] == 'pgoutput'
         failed_old_slot = _slot_status(e2e, wal2json_slot)
-        assert failed_old_slot is not None
-        assert failed_old_slot['plugin'] == 'wal2json'
+        if fresh_reset:
+            assert failed_old_slot is None
+        else:
+            assert failed_old_slot is not None
+            assert failed_old_slot['plugin'] == 'wal2json'
         failed_state = _read_state(state_path)
-        assert failed_state[MIGRATION_STATE_KEY] == bridge_marker
+        assert failed_state.get(MIGRATION_STATE_KEY) == bridge_marker
         assert _read_state_lsn(state_path) == bridge_lsn
         assert _source_target_rows(e2e)[1] == target_rows
 
@@ -599,7 +708,7 @@ def test_wal2json_slot_is_retired_after_pgoutput_target_checkpoint(tmp_path, fre
             f'INSERT INTO {SOURCE_SCHEMA}.{PARTITIONED_TABLE_NAME} '
             "VALUES (1, 1, 'initial')"
         )
-        _select_partition_root(project_dir)
+        _select_logical_table(project_dir, PARTITIONED_TABLE_NAME)
         _run_success(
             ['pipelinewise', 'import_config', '--dir', str(project_dir)],
             command_env,
@@ -654,6 +763,7 @@ def test_wal2json_slot_is_retired_after_pgoutput_target_checkpoint(tmp_path, fre
         assert _publication_fence_metadata(e2e) == {
             'state': 'ready',
             'original_comment': None,
+            'managed_tables': [[SOURCE_SCHEMA, TABLE_NAME], [SOURCE_SCHEMA, PARTITIONED_TABLE_NAME]],
         }
         assert _publication_tables(e2e) == {
             (SOURCE_SCHEMA, TABLE_NAME),
@@ -666,7 +776,7 @@ def test_wal2json_slot_is_retired_after_pgoutput_target_checkpoint(tmp_path, fre
                 assert failed_reset.returncode != 0
                 pending_state = _read_state(state_path)
                 assert pending_state['_pipelinewise_pgoutput_fresh_start'] == {
-                    'version': 1, 'source_slot': None, 'destination_slot': pgoutput_slot,
+                    'version': 1, 'wal2json_slot': None, 'destination_slot': pgoutput_slot,
                 }
                 rejected_resume = _run(
                     ['pipelinewise', 'run_tap', '--tap', TAP_ID, '--target', TARGET_ID], command_env,

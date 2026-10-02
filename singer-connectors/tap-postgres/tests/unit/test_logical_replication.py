@@ -40,7 +40,7 @@ class TestLogicalReplication(unittest.TestCase):
     def test_generate_replication_slot_name(self):
         self.assertEqual(
             logical_replication.generate_replication_slot_name('some_tap'),
-            'pipelinewise_some_tap',
+            'ppw_slot_some_tap',
         )
         self.assertEqual(
             logical_replication.generate_replication_slot_name('some_tap', prefix='custom'),
@@ -48,7 +48,7 @@ class TestLogicalReplication(unittest.TestCase):
         )
         self.assertEqual(
             logical_replication.generate_publication_name('some_tap'),
-            'pw_pub_some_tap',
+            'ppw_slot_some_tap',
         )
 
         for tap_id in ('SomeTap', 'some-tap', '', 'a' * 51):
@@ -531,8 +531,8 @@ class TestLogicalReplication(unittest.TestCase):
 
                 logical_replication._start_replication(
                     cursor,
-                    'pw_pub_tap',
-                    'pipelinewise_slot',
+                    'ppw_slot_tap',
+                    'ppw_slot_tap',
                     42,
                     version,
                 )
@@ -544,13 +544,13 @@ class TestLogicalReplication(unittest.TestCase):
                 else:
                     cursor.execute.assert_not_called()
                 cursor.start_replication.assert_called_once_with(
-                    slot_name='pipelinewise_slot',
+                    slot_name='ppw_slot_tap',
                     decode=False,
                     start_lsn=42,
                     status_interval=10,
                     options={
                         'proto_version': '1',
-                        'publication_names': 'pw_pub_tap',
+                        'publication_names': 'ppw_slot_tap',
                         'messages': 'true',
                     },
                 )
@@ -746,10 +746,10 @@ class TestLogicalReplication(unittest.TestCase):
     def test_locate_replication_slot(self, mocked_open_connection, mocked_locate):
         connection = mocked_open_connection.return_value.__enter__.return_value
         cursor = connection.cursor.return_value.__enter__.return_value
-        mocked_locate.return_value = 'pipelinewise_tap_id_value'
+        mocked_locate.return_value = 'ppw_slot_tap_id_value'
 
         self.assertEqual(
-            'pipelinewise_tap_id_value',
+            'ppw_slot_tap_id_value',
             logical_replication.locate_replication_slot(self.conn_info),
         )
         mocked_locate.assert_called_once_with(

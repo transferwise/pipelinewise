@@ -46,7 +46,7 @@ LOG_BASED replication also requires:
 - a connection to the writable primary;
 - ``wal_level=logical`` and sufficient ``max_replication_slots`` and
   ``max_wal_senders`` capacity;
-- permission to create, copy, advance, consume, and remove the tap's logical
+- permission to create, advance, consume, and remove the tap's logical
   replication slots;
 - ``EXECUTE`` on
   ``pg_catalog.pg_logical_emit_message(boolean, text, text)``;
@@ -54,12 +54,41 @@ LOG_BASED replication also requires:
 - a valid, non-deferrable primary key with ``REPLICA IDENTITY DEFAULT`` on every selected table
   and every physical leaf of a selected partition root.
 
-PipelineWise creates or validates ``pw_pub_<tap_id>``. It adds every selected
-LOG_BASED table before creating a snapshot boundary or consuming WAL. Preparation
-never removes an existing member, including during a filtered run or a switch
-between snapshot and CDC phases. Deselected tables can therefore remain in the
-publication; the tap filters their changes. Deliberate removal requires a separate
-DBA operation with replication stopped.
+PipelineWise creates or validates ``ppw_slot_<tap_id>``. It adds every selected
+LOG_BASED table before creating a snapshot boundary or consuming WAL. Normal
+runs, filtered FastSync, and switches between snapshot and CDC phases only add
+members; they never remove tables needed by another selected stream.
+
+``import_config`` reconciles an existing publication with the saved YAML selection
+while the tap is stopped. It leaves publication creation to the first sync.
+It removes deselected tables only when PipelineWise has
+recorded them as managed members. Tables added separately by a DBA remain in
+the publication unless they were also selected and tracked by PipelineWise.
+This ownership list is stored with the transaction fence in the publication
+comment. Existing metadata without a list does not prove ownership of old
+unselected members; remove those separately after checking their use.
+
+Before removing a logical table from the publication, ``import_config`` durably
+removes its old logical bookmark. Re-adding that table therefore takes a fresh
+snapshot, including changes made while it was absent from the publication.
+Selected logical streams and FULL_TABLE/INCREMENTAL progress remain unchanged.
+
+After automatic migration finishes, removing the final LOG_BASED selection
+also clears reset markers, then drops the canonical pgoutput slot and dedicated
+historical wal2json slot. An import that changes the selection during migration
+is rejected before bookmark or marker invalidation. Revert the selection and
+re-import it, finish migration, and then import the removal again.
+It preserves the shared database-wide slot and the publication, including any
+untracked DBA-added members. Re-enabling LOG_BASED creates a fresh slot and takes
+new snapshots. If import fails partway through cleanup, retry the same import;
+invalidated logical bookmarks remain cleared and completed slot drops are safe
+to repeat. Do not restore old logical bookmarks after this cleanup.
+Keep a deleted tap absent until one ``import_config`` completes its pending
+local cleanup. Only then re-add that ID. PipelineWise also rejects changing a
+PostgreSQL tap's source, connector type, or target in place. Remove and import
+the old tap first, then add and import the replacement.
+For a historical tap ID outside the LOG_BASED naming rules, nonlogical import
+clears stale logical state but leaves source cleanup to the DBA or rename path.
 
 The publication publishes ``insert``, ``update``, and ``delete``. It excludes
 ``truncate`` and uses ``publish_via_partition_root = true``. Row filters and
@@ -124,34 +153,47 @@ partition root may contain only local ordinary or partitioned descendants;
 foreign-table partitions are outside the local WAL stream. Select supported
 physical tables separately or resync them through another supported route.
 
-PipelineWise creates a native pgoutput slot named ``pipelinewise_<tap_id>`` and
-a publication named ``pw_pub_<tap_id>``. A LOG_BASED PostgreSQL tap ID must
+PipelineWise creates a native pgoutput slot and publication with the same name,
+``ppw_slot_<tap_id>``. A LOG_BASED PostgreSQL tap ID must
 contain only lowercase letters, digits, and underscores and be at most 50
 characters. PostgreSQL retains WAL needed by the slot, so monitor retained WAL
 and do not remove it while the tap is active.
-The tap ID must also differ from the database name after lowercasing and
-replacing punctuation with underscores, to avoid the historical shared-slot name.
 Tap IDs must be unique across every database and PipelineWise project using the
 same PostgreSQL cluster. Slot names belong to the cluster, not one database.
 A conflicting slot is rejected before use.
 
-When the pgoutput slot is absent, PipelineWise can copy the historical
-tap-specific ``pipelinewise_<dbname>_<tap_id>`` wal2json slot at its confirmed
-LSN. Historical names use PostgreSQL's 63-byte truncation rule. Ambiguous
-collisions are rejected. PipelineWise will not claim ``pipelinewise_<dbname>``
+When the pgoutput slot is absent, PipelineWise creates a fresh slot and keeps
+the historical tap-specific ``pipelinewise_<dbname>_<tap_id>`` wal2json slot for
+the bridge. It does not copy a slot or require ``pg_copy_logical_replication_slot``.
+Historical names use PostgreSQL's 63-byte truncation rule. PipelineWise will
+not infer ownership of a tap-specific name that was truncated. It preserves
+that slot when a canonical slot already exists, during an explicit fresh start,
+and after final LOG_BASED deselection. To migrate it, verify ownership and use
+the explicit ``previous_tap_id`` rename path. PipelineWise will not claim
+``pipelinewise_<dbname>``
 because that older database-wide slot may serve another tap. A new tap with no
 saved history can create its own slot while preserving the shared slot. An
 existing tap whose bookmarks depend on the shared slot needs DBA coordination
 or an explicit whole-tap resync.
 
-PipelineWise prepares the publication, emits a unique transactional logical
-message, and consumes wal2json through that message's commit. Once the target
-acknowledges the bridge state, PipelineWise advances pgoutput to the same LSN
-and switches on the next run. Pgoutput then emits another transactional message.
+PipelineWise prepares the publication and creates the fresh pgoutput slot
+before emitting a transactional logical message. It persists a pending marker
+whose retry-stable identity makes interrupted or duration-limited runs continue
+toward the same commit. The message's commit is later than the new slot's start
+LSN. PipelineWise consumes wal2json from the saved target bookmark through that
+commit, so the old slot supplies the history that predates the new slot. Only
+after the target acknowledges this bridge does PipelineWise advance pgoutput to
+the same LSN and switch on the next run. Pgoutput then emits another
+retry-stable transactional message.
 A successful target acknowledgement of that boundary confirms pgoutput
 consumption and allows PipelineWise to remove the tap-specific wal2json slot.
 This works even when no selected rows changed. A failed target write preserves
 the old slot, state, and WAL for retry.
+
+Publication selection and options are frozen while a migration marker exists
+or both migration slots coexist. If ``import_config`` rejects a selection
+change, finish the migration or revert the selection and re-import it. Use an
+unfiltered whole-tap FastSync when the migration must be explicitly reset.
 
 Migration temporarily needs one additional replication-slot entry. Keep
 wal2json installed until all old slots have been retired. On servers with
@@ -169,8 +211,8 @@ Publication setup records a pending fence in the publication comment and waits
 for transactions with an assigned transaction ID that predate the publication
 change. Long readers without a transaction ID do not block it. Prepared
 transactions must be resolved by the DBA. The wait reuses one connection and
-reports blockers. PipelineWise records the ready fence before creating or
-copying a slot boundary.
+reports blockers. PipelineWise records the ready fence before creating the
+fresh slot boundary.
 
 ``publication_fence_timeout_seconds`` bounds this wait and publication DDL lock
 and statement timeouts. A timeout leaves preparation retryable. Resolve the

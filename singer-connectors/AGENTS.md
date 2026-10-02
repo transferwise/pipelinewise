@@ -99,6 +99,22 @@ real client-side encryption master key and expects 52 passes.
   14.18, 15.13, 16.9, and 17.5, but allow the connection. Keep the Singer and
   FastSync checks aligned. This source minimum does not constrain
   target-postgres or the PipelineWise backend database.
+- Use `ppw_slot_<tap_id>` for both PostgreSQL slots and publications. Automatic
+  migration creates a fresh pgoutput slot, bridges wal2json through a later
+  committed message, and advances only after target acknowledgement. Persist a
+  `bridge_pending` marker and reuse migration boundary tokens across retries.
+  Freeze publication selection and options while a migration marker or both
+  migration slots exist, and reject import changes before state invalidation.
+  It does not copy slots. Retire wal2json after acknowledged pgoutput
+  consumption. Preserve an implicitly truncated historical tap-specific slot
+  unless `previous_tap_id` explicitly establishes its ownership.
+- Keep runtime publication preparation additive. Persistent `import_config`
+  selection may remove only members tracked as managed in the publication
+  comment; preserve untracked DBA members. An explicit whole-tap FastSync
+  invalidates state and drops dedicated old slots before taking new snapshots.
+  Persistent deselection invalidates each removed logical bookmark before
+  publication removal. Zero LOG selections also retire dedicated slots and
+  clear migration/reset state; preserve shared database-wide slots.
 - PostgreSQL/Snowflake targets silently ignore retired deletion-mode options,
   enable metadata automatically, and physically process `_SDC_DELETED_AT` before
   acknowledging state. Keep this marker in Singer schemas and transport.

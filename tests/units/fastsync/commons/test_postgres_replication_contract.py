@@ -17,7 +17,8 @@ def _singer_helpers():
     # Load only dependency-free protocol helpers, without importing another runtime's packages.
     tree = ast.parse((TAP / 'sync_strategies/logical_replication.py').read_text())
     names = {'_replication_identifier', 'validate_tap_id', 'generate_replication_slot_name',
-             'legacy_replication_slot_names', '_validate_migration_state'}
+             'legacy_replication_slot_names', '_implicit_historical_slot_is_truncated',
+             '_validate_migration_state'}
     module = ast.Module(body=[node for node in tree.body if isinstance(node, ast.FunctionDef)
                               and node.name in names], type_ignores=[])
     namespace = {'re': re, 'ReplicationSlotMigrationError': RuntimeError,
@@ -37,11 +38,15 @@ def test_canonical_and_truncated_historical_slot_names_match(dbname, old_id, new
     assert [shared, dedicated] == singer['legacy_replication_slot_names'](dbname, old_id)
 
 
-@pytest.mark.parametrize('phase', ['bridge', 'pgoutput', 'retire'])
+@pytest.mark.parametrize('phase', ['bridge_pending', 'bridge', 'pgoutput', 'retire'])
 def test_persisted_migration_marker_is_accepted_by_both_runtimes(phase):
     config = {'dbname': 'orders', 'tap_id': 'new_id', 'previous_tap_id': 'Old-id'}
     marker = {'version': 1, 'phase': phase, 'source_slot': 'pipelinewise_orders_old_id',
-              'destination_slot': 'pipelinewise_new_id', 'copy_lsn': 100, 'bridge_lsn': 200}
+              'destination_slot': 'ppw_slot_new_id', 'slot_lsn': 100}
+    if phase == 'bridge_pending':
+        marker['boundary_token'] = 'a' * 32
+    else:
+        marker['bridge_lsn'] = 200
     if phase == 'retire':
         marker['retire_lsn'] = 300
     assert fastsync.FastSyncTapPostgres.validate_migration_state_marker(config, marker)[0] == phase

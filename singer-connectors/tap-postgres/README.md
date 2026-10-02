@@ -152,11 +152,10 @@ to the tap for the next sync.
   client in the order they were made on the original server. Each slot streams a sequence of changes from a single
   database.
 
-  PipelineWise creates new slots as `pgoutput` and names them
-  `pipelinewise_<tap_id>`. A LOG_BASED `tap_id` can contain only lowercase
-  letters, digits, and underscores and can be at most 50 characters. The ID
-  must be unique across the PostgreSQL cluster and differ from the normalized
-  database name. For a historical ID rename, use PipelineWise's
+  PipelineWise creates new slots as `pgoutput` and uses `ppw_slot_<tap_id>`
+  for both the slot and publication. A LOG_BASED `tap_id` can contain only
+  lowercase letters, digits, and underscores and can be at most 50 characters.
+  The ID must be unique across the PostgreSQL cluster. For a historical ID rename, use PipelineWise's
   [previous_tap_id procedure](../../docs/connectors/taps/postgres.rst#renaming-a-historical-tap-id).
 
   Before any slot boundary or initial copy, prepare the selected-table
@@ -166,8 +165,23 @@ to the tap for the next sync.
   tap-postgres --config config.json --catalog catalog.json --prepare-publication
   ```
 
-  The tap adds selected tables to `pw_pub_<tap_id>` without removing existing
-  members. It sets `publish_via_partition_root = true` and enables
+  The tap adds selected tables to `ppw_slot_<tap_id>` without removing existing
+  members during normal or filtered runs. PipelineWise `import_config` removes
+  persistently deselected members only when its publication comment tracks them
+  as managed; it leaves publication creation to the first sync. Untracked
+  DBA-added tables remain untouched. Import clears a deselected logical table's
+  bookmark before removing it, so re-adding it requires a fresh snapshot.
+  After automatic migration finishes, removing the final LOG_BASED selection
+  also clears reset markers and drops the canonical and dedicated wal2json
+  slots. Selection changes during migration are rejected before state
+  invalidation; revert and re-import the selection, finish migration, then
+  import the removal again. Shared database-wide slots remain untouched. Retry
+  an interrupted cleanup without restoring old bookmarks. Keep a deleted tap
+  absent for one successful `import_config` if pending local cleanup blocks its
+  re-add. Change a PostgreSQL tap's source, connector type, or target through a
+  remove/import/add/import sequence rather than changing it in place. See the
+  [PostgreSQL guide](../../docs/connectors/taps/postgres.rst).
+  The publication sets `publish_via_partition_root = true` and enables
   insert/update/delete. It uses
   a reserved `pipelinewise-publication-fence-v1:` publication comment to record
   that earlier writing transactions have finished; an existing DBA
@@ -215,22 +229,43 @@ to the tap for the next sync.
 
   ```
     SELECT *
-    FROM pg_create_logical_replication_slot('pipelinewise_<tap_id>', 'pgoutput');
+    FROM pg_create_logical_replication_slot('ppw_slot_<tap_id>', 'pgoutput');
   ```
 
-  When the canonical slot is missing, PipelineWise can copy the historical
-  tap-specific `pipelinewise_<database_name>_<tap_id>` wal2json slot to pgoutput
-  at the same LSN. It first bridges wal2json through a post-publication logical
-  message and advances pgoutput only after the target durably acknowledges that
-  overlap. It removes the old slot only after the target later acknowledges a
-  pgoutput transactional boundary. The migration temporarily requires one
-  additional free replication slot.
+  When the canonical slot is missing, PipelineWise creates a fresh pgoutput
+  slot after preparing the publication. It then emits a transactional logical
+  message and reads the historical `pipelinewise_<database_name>_<tap_id>`
+  wal2json slot from the target bookmark through that later commit. Only after
+  target acknowledgement does PipelineWise advance pgoutput to the bridge LSN.
+  It removes the old slot after the target later acknowledges a pgoutput
+  transactional boundary. A durable pending marker makes interrupted or
+  duration-limited runs reuse each migration boundary, so later retries
+  continue toward the original commit.
+  While the two migration slots coexist, publication selection and options are
+  frozen. If `import_config` rejects a selection change, finish migration or
+  revert the selection and re-import it. An unfiltered whole-tap FastSync can
+  explicitly reset the migration.
+  Migration temporarily requires one additional free replication slot and
+  permission to create, advance, consume, and remove slots. Slot copying and
+  permission to copy slots are not required.
+
+  An explicit unfiltered whole-tap FastSync takes new snapshots instead of
+  bridging old WAL. It invalidates state, drops both the canonical slot and any
+  dedicated wal2json slot, and creates a fresh pgoutput slot before workers run.
+  After an interruption, complete that whole-tap resync before ordinary runs.
 
   PipelineWise never auto-migrates the older database-wide
   `pipelinewise_<database_name>` slot because multiple taps may share it. If
   existing bookmarks depend on it, arrange a whole-tap resync or dedicated
   migration source with the DBA. A new tap without saved LOG_BASED history can
   create its own pgoutput slot while preserving the shared slot.
+
+  Historical tap-specific names are truncated to PostgreSQL's 63-byte identifier
+  limit. PipelineWise does not infer ownership of an implicitly truncated name.
+  It preserves that slot when the canonical slot already exists, during an
+  explicit fresh start, and after final LOG_BASED deselection. To migrate its
+  history, verify ownership and use the explicit `previous_tap_id` rename
+  procedure linked above.
 
   Automatic wal2json migration is also rejected when any selected relation is
   a partition root. The wal2json table filter cannot safely include partitions

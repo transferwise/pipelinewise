@@ -3,6 +3,8 @@ import os
 import shutil
 import pytest
 
+from unittest.mock import patch
+
 from pipelinewise import cli
 from pipelinewise.cli.config import Config
 from pipelinewise.cli.errors import InvalidConfigException
@@ -158,14 +160,13 @@ class TestConfig:
         tap['schemas'] = [{'tables': [{'replication_method': 'FULL_TABLE'}]}]
         Config.validate_postgres_replication_slot_identity(tap)
 
-    def test_postgres_tap_rejects_legacy_database_slot_collision(self):
-        """Import and validate reject a tap ID that aliases the historical database slot."""
+    def test_postgres_tap_accepts_database_name_as_tap_id(self):
+        """The canonical prefix keeps a tap ID distinct from historical slot names."""
         tap = self._table_format_tap(id='same_name')
         tap['db_conn'] = {'dbname': 'same_name'}
         tap['schemas'] = [{'tables': [{'replication_method': 'LOG_BASED'}]}]
 
-        with pytest.raises(InvalidConfigException, match='collides with a historical wal2json slot'):
-            Config.validate_postgres_replication_slot_identity(tap)
+        Config.validate_postgres_replication_slot_identity(tap)
 
     @pytest.mark.parametrize(
         'settings',
@@ -741,35 +742,15 @@ class TestConfig:
             }
         ]
 
-        expected_generated_taps = [
-            {
-                'id': 'tap_one',
-                'type': 'tap-mysql',
-                'name': 'Sample MySQL Database',
-                'owner': 'somebody@foo.com',
-                'stream_buffer_size': None,
-                'send_alert': True,
-                'enabled': True,
-            },
-            {
-                'id': 'tap_two',
-                'type': 'tap-mysql',
-                'name': 'Sample MySQL Database',
-                'owner': 'somebody@foo.com',
-                'stream_buffer_size': None,
-                'send_alert': True,
-                'enabled': True,
-            },
-            {
-                'id': 'tap_three',
-                'type': 'tap-mysql',
-                'name': 'Sample MySQL Database',
-                'owner': 'somebody@foo.com',
-                'stream_buffer_size': None,
-                'send_alert': True,
-                'enabled': True,
-            }
-        ]
+        expected_generated_taps = [{
+            'id': 'tap_two',
+            'type': 'tap-mysql',
+            'name': 'Sample MySQL Database',
+            'owner': 'somebody@foo.com',
+            'stream_buffer_size': None,
+            'send_alert': True,
+            'enabled': True,
+        }]
         assert len(generated_targets_taps) == len(expected_generated_taps)
         for tap in expected_generated_taps:
             assert tap in generated_targets_taps
@@ -840,6 +821,138 @@ class TestConfig:
 
         # Assert only tap_two is created
         assert tap_one_existence is False
+
+    def test_partial_persisted_config_adds_taps_only_when_selected(self):
+        """A partial import cannot claim source cleanup credentials it did not write."""
+        config = Config('/tmp/pipelinewise-test-config')
+        config.targets = {
+            'warehouse': {
+                'id': 'warehouse',
+                'name': 'Warehouse',
+                'type': 'target-snowflake',
+                'taps': [
+                    {'id': 'orders', 'name': 'Orders', 'type': 'tap-postgres'},
+                    {'id': 'customers', 'name': 'Customers', 'type': 'tap-postgres'},
+                ],
+            },
+        }
+
+        first_import = config.build_persisted_config(['orders'], {'targets': []})
+        second_import = config.build_persisted_config(['customers'], first_import)
+
+        assert [tap['id'] for tap in first_import['targets'][0]['taps']] == ['orders']
+        assert [tap['id'] for tap in second_import['targets'][0]['taps']] == [
+            'orders',
+            'customers',
+        ]
+
+    def test_partial_persisted_config_defers_unselected_target_move(self):
+        """An unselected tap keeps its prior runtime owner until the tap is imported."""
+        config = Config('/tmp/pipelinewise-test-config')
+        config.targets = {
+            'target-b': {
+                'id': 'target-b',
+                'name': 'New target',
+                'type': 'target-snowflake',
+                'taps': [{'id': 'orders', 'name': 'Orders', 'type': 'tap-postgres'}],
+            },
+        }
+        previous = {
+            'targets': [{
+                'id': 'target-a',
+                'name': 'Old target',
+                'status': 'ready',
+                'type': 'target-snowflake',
+                'taps': [{'id': 'orders', 'name': 'Orders', 'type': 'tap-postgres'}],
+            }],
+        }
+
+        persisted = config.build_persisted_config(['another-tap'], previous)
+
+        assert [(target['id'], [tap['id'] for tap in target['taps']]) for target in persisted['targets']] == [
+            ('target-a', ['orders']),
+        ]
+
+    def test_partial_persisted_config_uses_current_target_for_selected_and_retained_taps(self):
+        """A selected tap updates the shared target while retaining its imported sibling."""
+        config = Config('/tmp/pipelinewise-test-config')
+        config.targets = {
+            'warehouse': {
+                'id': 'warehouse',
+                'name': 'Current warehouse',
+                'type': 'target-snowflake',
+                'taps': [
+                    {'id': 'orders', 'name': 'Current orders', 'type': 'tap-postgres'},
+                    {'id': 'customers', 'name': 'Customers', 'type': 'tap-postgres'},
+                ],
+            },
+        }
+        previous = {
+            'targets': [{
+                'id': 'warehouse',
+                'name': 'Previous warehouse',
+                'type': 'target-snowflake',
+                'taps': [{'id': 'orders', 'name': 'Previous orders', 'type': 'tap-postgres'}],
+            }],
+        }
+
+        persisted = config.build_persisted_config(['customers'], previous)
+
+        target = persisted['targets'][0]
+        assert target['name'] == 'Current warehouse'
+        assert [(tap['id'], tap['name']) for tap in target['taps']] == [
+            ('orders', 'Previous orders'),
+            ('customers', 'Customers'),
+        ]
+
+    def test_save_partial_config_creates_a_fresh_runtime_root(self, tmp_path):
+        """Writing runtime credentials first still supports a nonexistent config root."""
+        config_dir = tmp_path / 'nested' / 'runtime'
+        config = self._get_config(str(config_dir), yaml_path='test_import_command')
+
+        config.save(['tap_two'])
+
+        assert (config_dir / 'config.json').is_file()
+        assert (config_dir / 'test_snowflake_target' / 'tap_two' / 'config.json').is_file()
+
+    def test_full_save_materializes_target_without_taps(self, tmp_path):
+        """A target claimed by a full root inventory always has runtime credentials."""
+        config_dir = tmp_path / 'runtime'
+        connection = {'host': 'warehouse', 'dbname': 'analytics'}
+        config = Config(str(config_dir))
+        config.targets = {
+            'warehouse': {
+                'id': 'warehouse',
+                'name': 'Warehouse',
+                'type': 'target-postgres',
+                'db_conn': connection,
+                'taps': [],
+            },
+        }
+
+        config.save(['*'])
+
+        assert cli.utils.load_json(str(config_dir / 'warehouse' / 'config.json')) == connection
+        assert cli.utils.load_json(str(config_dir / 'config.json'))['targets'][0]['taps'] == []
+
+    def test_atomic_root_save_failure_preserves_previous_inventory(self, tmp_path):
+        """A failed final replace cannot truncate the last durable root inventory."""
+        config_dir = tmp_path / 'runtime'
+        config_dir.mkdir()
+        root_path = config_dir / 'config.json'
+        previous = {'targets': [{'id': 'previous', 'type': 'target-postgres', 'taps': []}]}
+        root_path.write_text(json.dumps(previous), encoding='utf-8')
+        config = self._get_config(str(config_dir), yaml_path='test_import_command')
+        persisted = config.build_persisted_config(['tap_two'], previous)
+
+        with patch(
+                'pipelinewise.cli.config.fastsync_utils.os.replace',
+                side_effect=OSError('replace failed'),
+        ):
+            with pytest.raises(OSError, match='replace failed'):
+                config.save(['tap_two'], persisted_config=persisted)
+
+        assert cli.utils.load_json(str(root_path)) == previous
 
     def test_save_config_with_optional_slack_channel_for_alerts(self):
         """Test config target and tap JSON save functionalities if there is a optional setting for slack channel"""
