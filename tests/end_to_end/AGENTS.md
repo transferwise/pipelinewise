@@ -39,6 +39,9 @@ jobs and inspect their exact pass, skip, and failure results. Avoid duplicating
 those jobs locally and polling them through Codex, which slows validation and
 uses Codex allowance. A user-requested local run remains authoritative for that
 task even when it is long-running.
+Monitor GitHub E2E with status/conclusion polling only. Do not stream or download
+logs for running or passing jobs. Inspect logs only after a job fails, scoped to
+that failed job and step.
 
 These groups mirror `.github/workflows/e2e_tests.yml` in required-check order
 `e2e_tests_01` through `e2e_tests_11`; update both together. CI runs ten

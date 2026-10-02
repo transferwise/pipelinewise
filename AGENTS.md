@@ -66,6 +66,9 @@ If a pull request already exists, prefer its GitHub Actions E2E jobs and inspect
 their exact pass, skip, and failure results instead of polling a duplicate local
 run. This keeps feedback fast and avoids spending Codex allowance on long-running
 local test monitoring.
+When monitoring GitHub tests, poll only workflow and job status/conclusion. Do
+not stream or download logs for jobs that are running or passing. Inspect logs
+only after a job fails, and limit inspection to the failed job and step.
 
 After implementation, schema, example-config, or connector-config changes,
 validate in Docker (Compose loads `dev-project/.env`):
