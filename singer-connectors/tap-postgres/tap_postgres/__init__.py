@@ -176,14 +176,9 @@ def sync_traditional_stream(conn_config, stream, state, sync_method, end_lsn):
         LOGGER.warning('There are no columns selected for stream %s, skipping it', stream['tap_stream_id'])
         return state
 
-    if sync_method in {'logical_initial', 'logical_initial_interrupted'}:
-        snapshot_lsn = (
-            end_lsn if sync_method == 'logical_initial'
-            else get_bookmark(state, stream['tap_stream_id'], 'lsn')
-        )
-        logical_replication.wait_for_replica_replay(conn_config, snapshot_lsn)
-
-    register_type_adapters(conn_config)
+    register_type_adapters(
+        {**conn_config, 'use_secondary': False}
+        if sync_method in {'logical_initial', 'logical_initial_interrupted'} else conn_config)
 
     if sync_method == 'full':
         state = singer.set_currently_syncing(state, stream['tap_stream_id'])
@@ -194,16 +189,17 @@ def sync_traditional_stream(conn_config, stream, state, sync_method, end_lsn):
     elif sync_method == 'logical_initial':
         state = singer.set_currently_syncing(state, stream['tap_stream_id'])
         LOGGER.info("Performing initial full table sync")
-        state = singer.write_bookmark(state, stream['tap_stream_id'], 'lsn', end_lsn)
-
         sync_common.send_schema_message(stream, [])
-        state = full_table.sync_table(conn_config, stream, state, desired_columns, md_map)
+        state = full_table.sync_table(
+            conn_config, stream, state, desired_columns, md_map, snapshot_lsn=end_lsn)
         state = singer.write_bookmark(state, stream['tap_stream_id'], 'xmin', None)
     elif sync_method == 'logical_initial_interrupted':
         state = singer.set_currently_syncing(state, stream['tap_stream_id'])
         LOGGER.info("Initial stage of full table sync was interrupted. resuming...")
         sync_common.send_schema_message(stream, [])
-        state = full_table.sync_table(conn_config, stream, state, desired_columns, md_map)
+        state = full_table.sync_table(
+            conn_config, stream, state, desired_columns, md_map,
+            snapshot_lsn=get_bookmark(state, stream['tap_stream_id'], 'lsn'))
     else:
         raise Exception(f"unknown sync method {sync_method} for stream {stream['tap_stream_id']}")
 
@@ -301,12 +297,16 @@ def do_sync(conn_config, catalog, default_replication_method, state, state_file=
     """
     Orchestrates sync of all streams
     """
+    if '_pipelinewise_pgoutput_fresh_start' in state:
+        raise logical_replication.ReplicationSlotMigrationError(
+            'A whole-tap PostgreSQL resync is incomplete; finish an unfiltered FastSync '
+            'before starting Singer replication')
     currently_syncing = singer.get_currently_syncing(state)
     streams = list(filter(is_selected_via_metadata, catalog['streams']))
     streams.sort(key=lambda s: s['tap_stream_id'])
     LOGGER.info("Selected streams: %s ", [s['tap_stream_id'] for s in streams])
     logical_catalog_streams = prepare_logical_replication(
-        conn_config, streams, default_replication_method)
+        conn_config, streams, default_replication_method, state=state)
     if logical_catalog_streams:
         # Use of logical replication requires fetching an lsn
         end_lsn = logical_replication.fetch_current_lsn(conn_config)
@@ -348,6 +348,9 @@ def do_sync(conn_config, catalog, default_replication_method, state, state_file=
                                         state,
                                         sync_method_lookup[stream['tap_stream_id']],
                                         end_lsn)
+        if sync_method_lookup[stream['tap_stream_id']] in {'logical_initial', 'logical_initial_interrupted'}:
+            if not get_bookmark(state, stream['tap_stream_id'], 'xmin'):
+                logical_streams.append(stream)
 
     logical_streams.sort(key=lambda s: metadata.to_map(s['metadata']).get(()).get('database-name'))
     for dbname, streams in itertools.groupby(
@@ -363,7 +366,7 @@ def do_sync(conn_config, catalog, default_replication_method, state, state_file=
     return state
 
 
-def prepare_logical_replication(conn_config, streams, default_replication_method):
+def prepare_logical_replication(conn_config, streams, default_replication_method, state=None, fresh_start=False):
     """Prepare the publication before capturing a snapshot or slot boundary."""
     logical_streams = []
     for stream in streams:
@@ -388,6 +391,10 @@ def prepare_logical_replication(conn_config, streams, default_replication_method
     logical_replication.validate_tap_id(conn_config['tap_id'])
 
     original_dbname = conn_config['dbname']
+    has_logical_history = (
+        any(get_bookmark(state or {}, stream['tap_stream_id'], 'lsn') is not None for stream in logical_streams)
+        or logical_replication.PGOUTPUT_MIGRATION_STATE_KEY in (state or {})
+    )
     try:
         logical_streams.sort(
             key=lambda stream: metadata.to_map(stream['metadata']).get(()).get(
@@ -397,7 +404,9 @@ def prepare_logical_replication(conn_config, streams, default_replication_method
                 lambda stream: metadata.to_map(stream['metadata']).get(()).get(
                     'database-name', original_dbname)):
             conn_config['dbname'] = dbname
-            logical_replication.prepare_publication(conn_config, list(grouped_streams))
+            logical_replication.prepare_publication(
+                conn_config, list(grouped_streams), state=state,
+                fresh_start=fresh_start or not has_logical_history)
     finally:
         conn_config['dbname'] = original_dbname
     return logical_streams
@@ -448,7 +457,13 @@ def parse_args(required_config_keys):
         action='store_true',
         help='Prepare the LOG_BASED publication, then exit')
 
+    parser.add_argument(
+        '--fresh-start', action='store_true',
+        help='Prepare for an explicit whole-tap snapshot that replaces all logical history')
+
     args = parser.parse_args()
+    if args.fresh_start and not args.prepare_publication:
+        parser.error('--fresh-start requires --prepare-publication')
     if args.config:
         setattr(args, 'config_path', args.config)
         args.config = utils.load_json(args.config)
@@ -488,6 +503,7 @@ def main_impl():
 
         # Optional config keys
         'tap_id': args.config.get('tap_id'),
+        'previous_tap_id': args.config.get('previous_tap_id'),
         'filter_schemas': args.config.get('filter_schemas'),
         'debug_lsn': args.config.get('debug_lsn') == 'true',
         'max_run_seconds': args.config.get('max_run_seconds', 43200),
@@ -527,6 +543,8 @@ def main_impl():
             conn_config,
             streams,
             args.config.get('default_replication_method'),
+            state=args.state,
+            fresh_start=args.fresh_start,
         )
     elif args.properties or args.catalog:
         state = args.state

@@ -108,21 +108,16 @@ def int_to_lsn(lsni):
 
 
 def fetch_current_lsn(conn_config):
-    with post_db.open_connection(conn_config, False, True) as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT pg_current_wal_insert_lsn() AS current_lsn")
-
-            current_lsn = cur.fetchone()[0]
-            return lsn_to_int(current_lsn)
+    return post_db.capture_snapshot_boundary(conn_config)
 
 
-def wait_for_replica_replay(conn_info, boundary_lsn):
+def wait_for_replica_replay(conn_info, boundary_lsn, connection=None):
     """Wait until a secondary snapshot can contain everything before its bookmark."""
     if not conn_info.get('use_secondary'):
         return
     timeout_seconds = conn_info.get('publication_fence_timeout_seconds', 300)
     deadline = time.monotonic() + timeout_seconds
-    conn = post_db.open_connection(conn_info)
+    conn = connection if connection is not None else post_db.open_connection(conn_info)
     try:
         with conn.cursor() as cur:
             while True:
@@ -137,7 +132,8 @@ def wait_for_replica_replay(conn_info, boundary_lsn):
                     )
                 time.sleep(0.1)
     finally:
-        conn.close()
+        if connection is None:
+            conn.close()
 
 
 def add_automatic_properties(stream, debug_lsn: bool = False):
@@ -454,8 +450,11 @@ def _old_primary_key_for_changed_update(message_payload, key_properties, desired
     if all(old_values[key] == new_values[key] for key in key_properties):
         return None
 
+    historical_columns = {
+        column['name'] for column in message_payload.get('relation_columns', [])
+    }
     missing_values = (
-        set(desired_columns)
+        set(desired_columns).intersection(historical_columns or desired_columns)
         .difference(new_values)
         .difference({'_sdc_deleted_at', '_sdc_lsn'})
     )
@@ -662,8 +661,8 @@ def generate_publication_name(tap_id):
 def legacy_replication_slot_names(dbname, tap_id):
     """Return the database-wide and tap-specific historical slot names."""
     return [
-        _replication_identifier('pipelinewise', dbname),
-        _replication_identifier('pipelinewise', dbname, tap_id),
+        _replication_identifier('pipelinewise', dbname)[:63],
+        _replication_identifier('pipelinewise', dbname, tap_id)[:63],
     ]
 
 
@@ -702,13 +701,20 @@ def _validate_slot(slot_name, slot, dbname, expected_plugin):
 
 
 def _validate_replication_slot_candidates(
-        cursor, dbname, tap_id, allow_wal2json_migration=True):
+        cursor, dbname, tap_id, allow_wal2json_migration=True,
+        fresh_start=False, previous_tap_id=None):
     """Read and validate every tap-owned slot candidate without mutating it."""
     destination = generate_replication_slot_name(tap_id)
-    legacy_names = legacy_replication_slot_names(dbname, tap_id)
+    legacy_names = legacy_replication_slot_names(dbname, previous_tap_id or tap_id)
     rows = _slot_rows(cursor, list(dict.fromkeys([destination, *legacy_names])))
 
     database_wide_slot, tap_specific_slot = legacy_names
+    ambiguous_legacy = database_wide_slot == tap_specific_slot
+    if ambiguous_legacy and tap_specific_slot in rows and destination not in rows and not fresh_start:
+        raise ReplicationSlotMigrationError(
+            'The historical database-wide and tap-specific slot names collide after '
+            'PostgreSQL truncation; their ownership must be resolved before migration'
+        )
     destination_row = rows.get(destination)
     if destination_row and destination_row['plugin'] != 'pgoutput':
         if destination in legacy_names and destination_row['plugin'] == 'wal2json':
@@ -723,19 +729,20 @@ def _validate_replication_slot_candidates(
         _validate_slot(destination, destination_row, dbname, 'pgoutput')
 
     migration_source = tap_specific_slot if (
-        tap_specific_slot != destination and tap_specific_slot in rows
+        not ambiguous_legacy and tap_specific_slot != destination and tap_specific_slot in rows
     ) else None
 
     if migration_source is not None:
         _validate_slot(migration_source, rows[migration_source], dbname, 'wal2json')
-        if not allow_wal2json_migration:
+        if not allow_wal2json_migration and not fresh_start:
             raise ReplicationSlotMigrationError(
                 'Automatic wal2json migration is not supported when a selected relation is a '
                 'partition root because partitions can change while the bridge is running. '
                 'Complete a full resync into a fresh pgoutput slot instead.'
             )
 
-    if destination_row is None and migration_source is None and database_wide_slot in rows:
+    if (destination_row is None and migration_source is None
+            and database_wide_slot in rows and not fresh_start):
         raise ReplicationSlotMigrationError(
             f'Historical database-wide slot {database_wide_slot} may be shared by '
             'multiple taps and cannot be migrated automatically. A DBA must migrate '
@@ -746,13 +753,15 @@ def _validate_replication_slot_candidates(
     return destination, migration_source, rows
 
 
-def locate_replication_slot_by_cur(cursor, dbname, tap_id, allow_wal2json_migration=True):
+def locate_replication_slot_by_cur(cursor, dbname, tap_id, allow_wal2json_migration=True,
+                                   previous_tap_id=None):
     """Resolve or copy a slot to the canonical pgoutput slot name."""
     destination, migration_source, rows = _validate_replication_slot_candidates(
         cursor,
         dbname,
         tap_id,
         allow_wal2json_migration=allow_wal2json_migration,
+        previous_tap_id=previous_tap_id,
     )
     destination_row = rows.get(destination)
 
@@ -799,13 +808,16 @@ def locate_replication_slot(conn_info, allow_wal2json_migration=True):
                 conn_info['dbname'],
                 conn_info['tap_id'],
                 allow_wal2json_migration=allow_wal2json_migration,
+                previous_tap_id=conn_info.get('previous_tap_id'),
             )
 
 
 def _wait_for_prepublication_transactions(conn_info):
-    """Fence transactions whose catalog snapshots can predate publication DDL."""
+    """Fence transactions that wrote before the publication change committed."""
     timeout_seconds = conn_info.get('publication_fence_timeout_seconds', 300)
-    with post_db.open_connection(conn_info, False, True) as conn:
+    deadline = time.monotonic() + timeout_seconds
+    conn = post_db.open_connection(conn_info, False, True)
+    try:
         with conn.cursor() as cur:
             cur.execute(
                 """
@@ -817,15 +829,13 @@ def _wait_for_prepublication_transactions(conn_info):
                    AND lock.mode = 'ExclusiveLock'
                    AND lock.granted
                    AND activity.datname = pg_catalog.current_database()
+                   AND activity.backend_xid IS NOT NULL
                    AND lock.pid <> pg_catalog.pg_backend_pid()
                 """
             )
             virtual_xids = [row[0] for row in cur.fetchall()]
 
-    deadline = time.monotonic() + timeout_seconds
-    while True:
-        with post_db.open_connection(conn_info, False, True) as conn:
-            with conn.cursor() as cur:
+            while True:
                 if virtual_xids:
                     cur.execute(
                         """
@@ -856,12 +866,15 @@ def _wait_for_prepublication_transactions(conn_info):
                     )
                 if not remaining:
                     return
-        if time.monotonic() >= deadline:
-            raise ReplicationSlotMigrationError(
-                'Timed out waiting for transactions that predate pgoutput publication setup: '
-                f'{remaining}'
-            )
-        time.sleep(0.1)
+                if time.monotonic() >= deadline:
+                    raise ReplicationSlotMigrationError(
+                        'Timed out waiting for writing transactions that predate pgoutput publication setup: '
+                        f'{remaining}'
+                    )
+                LOGGER.debug('Waiting for pre-publication writing transactions: %s', remaining)
+                time.sleep(0.5)
+    finally:
+        conn.close()
 
 
 def _validate_publication_tables(cur, tables, _server_version=None):
@@ -1064,6 +1077,7 @@ def _validate_replica_identity(cur, physical_tables, expected_primary_keys=None)
                    SELECT source_index.indisvalid
                           AND source_index.indisready
                           AND source_index.indislive
+                          AND source_index.indimmediate
                      FROM pg_catalog.pg_index AS source_index
                     WHERE source_index.indrelid = relation.oid
                       AND source_index.indisprimary
@@ -1107,7 +1121,7 @@ def _validate_replica_identity(cur, physical_tables, expected_primary_keys=None)
     )
     if invalid:
         raise ReplicationSlotMigrationError(
-            'LOG_BASED pgoutput requires REPLICA IDENTITY DEFAULT backed by a valid primary key '
+            'LOG_BASED pgoutput requires REPLICA IDENTITY DEFAULT backed by a valid non-deferrable primary key '
             'so source row identity matches the Singer target merge key. Add a valid primary key '
             'and set REPLICA IDENTITY DEFAULT on: '
             f'{invalid}'
@@ -1156,8 +1170,8 @@ def _set_publication_comment(cur, publication, comment):
         sql.Identifier(publication), value))
 
 
-def prepare_publication(conn_info, logical_streams):  # noqa: C901
-    """Create or update the tap publication to contain exactly the selected tables."""
+def prepare_publication(conn_info, logical_streams, state=None, fresh_start=False):  # noqa: C901
+    """Add selected tables without removing tables needed by other replication runs."""
     if not logical_streams:
         raise ValueError('Cannot create a pgoutput publication without selected tables')
     publication = generate_publication_name(conn_info['tap_id'])
@@ -1176,8 +1190,16 @@ def prepare_publication(conn_info, logical_streams):  # noqa: C901
     publication_changed = False
     original_publication_comment = None
     publication_fence_state = None
+    migration_state = (state or {}).get(PGOUTPUT_MIGRATION_STATE_KEY)
+    migration_phase = (
+        _validate_migration_state(conn_info, migration_state)
+        if migration_state is not None and not fresh_start else None
+    )
     with post_db.open_connection(conn_info, False, True) as conn:
         with conn.cursor() as cur:
+            timeout = str(max(1, int(conn_info.get('publication_fence_timeout_seconds', 300) * 1000)))
+            cur.execute("SELECT set_config('lock_timeout', %s, TRUE), "
+                        "set_config('statement_timeout', %s, TRUE)", (timeout, timeout))
             _reject_selected_generated_columns(cur, logical_streams)
             (publication_tables,
              publishes_partition_roots,
@@ -1189,7 +1211,10 @@ def prepare_publication(conn_info, logical_streams):  # noqa: C901
                 cur,
                 conn_info['dbname'],
                 conn_info['tap_id'],
-                allow_wal2json_migration=not publishes_partition_roots,
+                allow_wal2json_migration=(
+                    not publishes_partition_roots or migration_phase in {'pgoutput', 'retire'}),
+                fresh_start=fresh_start,
+                previous_tap_id=conn_info.get('previous_tap_id'),
             )
             # Pgoutput encodes partition changes against the publication root,
             # but PostgreSQL executes source DML on physical leaves and checks
@@ -1206,7 +1231,6 @@ def prepare_publication(conn_info, logical_streams):  # noqa: C901
             })
             _validate_replica_identity(
                 cur, identity_tables, expected_primary_keys)
-            publication_table_set = set(publication_tables)
             table_list = sql.SQL(', ').join(
                 sql.SQL('{}.{}').format(sql.Identifier(schema_name), sql.Identifier(table_name))
                 for schema_name, table_name in publication_tables
@@ -1295,10 +1319,15 @@ def prepare_publication(conn_info, logical_streams):  # noqa: C901
                         """,
                         (publication,),
                     )
-                    if set(cur.fetchall()) != publication_table_set:
+                    added_tables = set(publication_tables).difference(cur.fetchall())
+                    if added_tables:
+                        added_table_list = sql.SQL(', ').join(
+                            sql.SQL('{}.{}').format(sql.Identifier(schema_name), sql.Identifier(table_name))
+                            for schema_name, table_name in sorted(added_tables)
+                        )
                         cur.execute(
-                            sql.SQL('ALTER PUBLICATION {} SET TABLE {}').format(
-                                sql.Identifier(publication), table_list
+                            sql.SQL('ALTER PUBLICATION {} ADD TABLE {}').format(
+                                sql.Identifier(publication), added_table_list
                             )
                         )
                         needs_transaction_fence = True
@@ -1474,7 +1503,7 @@ def _bridge_wal2json_slot(conn_info, logical_streams, state, state_file, publica
                           destination_slot, copy_lsn, start_lsn,
                           time_extracted):
     """Deliver the legacy backlog through a post-publication logical-message commit."""
-    conn = post_db.open_connection(conn_info, True, True)
+    conn = post_db.open_connection(conn_info, True, True, replication_plugin='wal2json')
     cur = None
     bridge_lsn = None
     try:
@@ -1490,7 +1519,7 @@ def _bridge_wal2json_slot(conn_info, logical_streams, state, state_file, publica
         )
         cur.send_feedback(
             write_lsn=start_lsn,
-            flush_lsn=start_lsn,
+            flush_lsn=0,
             reply=True,
             force=True,
         )
@@ -1501,7 +1530,7 @@ def _bridge_wal2json_slot(conn_info, logical_streams, state, state_file, publica
         last_message_at = datetime.datetime.utcnow()
         started_at = datetime.datetime.utcnow()
         poll_timestamp = datetime.datetime.utcnow()
-        feedback_lsn = start_lsn
+        feedback_lsn = 0
         while True:
             now = datetime.datetime.utcnow()
             if now >= started_at + datetime.timedelta(seconds=conn_info['max_run_seconds']):
@@ -1542,7 +1571,6 @@ def _bridge_wal2json_slot(conn_info, logical_streams, state, state_file, publica
                 )
                 if message_payload.get('action') == 'C':
                     last_complete_lsn = int(msg.data_start)
-                    state = _write_lsn_bookmarks(state, logical_streams, last_complete_lsn)
                     commits_since_state += 1
                     if boundary_transaction:
                         bridge_lsn = last_complete_lsn
@@ -1627,7 +1655,8 @@ def _validate_migration_state(conn_info, migration_state):
     }
     destination = generate_replication_slot_name(conn_info['tap_id'])
     allowed_sources = {
-        legacy_replication_slot_names(conn_info['dbname'], conn_info['tap_id'])[1]
+        legacy_replication_slot_names(
+            conn_info['dbname'], conn_info.get('previous_tap_id') or conn_info['tap_id'])[1]
     } - {destination}
     if (
             not isinstance(migration_state, dict)
@@ -1673,7 +1702,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):  # noqa
 
     # Publication DDL must commit before an old slot is copied or bridged. Pgoutput
     # evaluates historical transactions against their historical catalog snapshot.
-    publication = prepare_publication(conn_info, logical_streams)
+    publication = prepare_publication(conn_info, logical_streams, state=state)
     slot = locate_replication_slot(
         conn_info,
         allow_wal2json_migration=(
@@ -1760,13 +1789,14 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):  # noqa
     last_complete_lsn = None
     state_emitted_lsn = None
     commits_since_state = 0
+    feedback_lsn = 0
 
     try:
         cur = conn.cursor()
         _start_replication(cur, publication, slot, start_lsn, conn.server_version)
         cur.send_feedback(
             write_lsn=target_acknowledged_lsn,
-            flush_lsn=target_acknowledged_lsn,
+            flush_lsn=0,
             reply=True,
             force=True,
         )
@@ -1815,7 +1845,6 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):  # noqa
                     if commit_lsn is None:
                         raise PgoutputProtocolError('pgoutput Commit message has no end LSN')
                     last_complete_lsn = commit_lsn
-                    state = _write_lsn_bookmarks(state, logical_streams, commit_lsn)
                     commits_since_state += 1
 
                     if transaction_has_boundary:
@@ -1854,17 +1883,18 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):  # noqa
             if datetime.datetime.utcnow() >= (
                     poll_timestamp + datetime.timedelta(seconds=FEEDBACK_POLL_INTERVAL)):
                 target_acknowledged_lsn = _read_target_acknowledged_lsn(
-                    state_file, logical_streams, target_acknowledged_lsn)
-                if target_acknowledged_lsn > start_lsn:
+                    state_file, logical_streams, feedback_lsn)
+                safe_feedback_lsn = min(target_acknowledged_lsn, last_complete_lsn or start_lsn)
+                if safe_feedback_lsn > feedback_lsn:
                     LOGGER.info('Confirming pgoutput through target-acknowledged LSN %s',
-                                int_to_lsn(target_acknowledged_lsn))
+                                int_to_lsn(safe_feedback_lsn))
                     cur.send_feedback(
-                        write_lsn=target_acknowledged_lsn,
-                        flush_lsn=target_acknowledged_lsn,
+                        write_lsn=safe_feedback_lsn,
+                        flush_lsn=safe_feedback_lsn,
                         reply=True,
                         force=True,
                     )
-                    start_lsn = target_acknowledged_lsn
+                    feedback_lsn = safe_feedback_lsn
                 poll_timestamp = datetime.datetime.utcnow()
     finally:
         try:

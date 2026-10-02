@@ -45,7 +45,7 @@ class Config:
         self.targets = {}
 
     @classmethod
-    def from_yamls(cls, config_dir, yaml_dir='.', vault_secret=None):
+    def from_yamls(cls, config_dir, yaml_dir='.', vault_secret=None, selected_taps=None):
         """
         Class Constructor
 
@@ -106,7 +106,8 @@ class Config:
             cls.validate_tap_table_format_placement(tap_data)
             cls._validate_tap_query_history_poll_timeout_placement(tap_data)
             utils.validate(instance=tap_data, schema=tap_schema)
-            cls.validate_postgres_replication_slot_identity(tap_data)
+            if not selected_taps or '*' in selected_taps or tap_data['id'] in selected_taps:
+                cls.validate_postgres_replication_slot_identity(tap_data)
 
             tap_id = tap_data['id']
 
@@ -135,6 +136,9 @@ class Config:
 
             # Add tap to list
             taps[tap_id] = tap_data
+
+        cls.validate_postgres_previous_ids(taps)
+        cls.validate_postgres_legacy_slot_collisions(taps, selected_taps)
 
         # Link taps to targets
         for target_key, target in targets.items():
@@ -172,9 +176,61 @@ class Config:
         try:
             FastSyncTapPostgres.validate_postgres_tap_id(tap.get('id'))
             if dbname:
-                FastSyncTapPostgres.validate_replication_slot_identity(dbname, tap.get('id'))
+                FastSyncTapPostgres.validate_replication_slot_identity(
+                    dbname, tap.get('id'), previous_tap_id=tap.get('previous_tap_id'),
+                )
         except RuntimeError as exc:
             raise InvalidConfigException(str(exc)) from exc
+
+    @staticmethod
+    def validate_postgres_legacy_slot_collisions(taps, selected_taps=None):
+        """Reject configured taps that could claim the same normalized historical slot."""
+        owners = {}
+        for tap_id, tap in taps.items():
+            if tap.get('type') != 'tap-postgres':
+                continue
+            tables = [table for schema in tap.get('schemas', []) for table in schema.get('tables', [])]
+            default_method = (
+                utils.get_tap_default_replication_method(tap)
+                if any('replication_method' not in table for table in tables) else None
+            )
+            if not any(table.get('replication_method', default_method) == 'LOG_BASED' for table in tables):
+                continue
+            connection = tap.get('db_conn', {})
+            slot = FastSyncTapPostgres.generate_replication_slot_name(
+                connection.get('dbname', ''), tap.get('previous_tap_id') or tap_id,
+            )
+            # The runtime already treats this name as shared and never adopts it for a fresh tap.
+            if slot == FastSyncTapPostgres.generate_replication_slot_name(connection.get('dbname', '')):
+                continue
+            key = (connection.get('host'), str(connection.get('port', 5432)), slot)
+            owners.setdefault(key, []).append(tap_id)
+        for (_, _, slot), tap_ids in owners.items():
+            if len(tap_ids) > 1 and (
+                not selected_taps or '*' in selected_taps or set(tap_ids).intersection(selected_taps)
+            ):
+                raise InvalidConfigException(
+                    f'PostgreSQL taps {sorted(tap_ids)} share historical slot "{slot}" after normalization/truncation. '
+                    'Resolve slot ownership with the DBA before migration.'
+                )
+
+    @staticmethod
+    def validate_postgres_previous_ids(taps):
+        """Keep historical slot aliases exclusive to a single PostgreSQL tap."""
+        claimed = set()
+        for tap in taps.values():
+            previous_id = tap.get('previous_tap_id')
+            if previous_id is None:
+                continue
+            if (
+                tap.get('type') != 'tap-postgres' or not previous_id
+                or previous_id in taps or previous_id in claimed
+                or '/' in previous_id or '\\' in previous_id or previous_id in ('.', '..')
+            ):
+                raise InvalidConfigException(
+                    'previous_tap_id must name one removed PostgreSQL tap and cannot be shared by multiple taps.'
+                )
+            claimed.add(previous_id)
 
     def get_data_diff_definitions(self, selected_taps=None):
         """Return validated data-diff definitions from the loaded YAML model."""
@@ -274,7 +330,7 @@ class Config:
                         'send_alert': tap.get('send_alert', True),
                         'enabled': True,
                     }
-                for key in ('target_table_format', 'iceberg_version'):
+                for key in ('target_table_format', 'iceberg_version', 'previous_tap_id'):
                     if key in tap:
                         tap_setting[key] = tap[key]
                 if tap.get('slack_alert_channel'):

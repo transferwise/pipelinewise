@@ -258,6 +258,11 @@ def flush_streams(
     parallelism = config.get("parallelism", DEFAULT_PARALLELISM)
     max_parallelism = config.get("max_parallelism", DEFAULT_MAX_PARALLELISM)
 
+    # Establish a durable baseline once, so continuously busy streams can then
+    # acknowledge independent flushes without advancing unflushed bookmarks.
+    if flushed_state is None and state is not None:
+        filter_streams = None
+
     # Parallelism 0 means auto parallelism:
     #
     # Auto parallelism trying to flush streams efficiently with auto defined number

@@ -77,11 +77,40 @@ def test_filtered_flush_never_acknowledges_an_unloaded_stream(initial_state):
             interrupted_input(),
         )
 
-    assert [entry.args[0] for entry in load.call_args_list] == ['db-fast']
     emitted = [json.loads(line) for line in output.getvalue().splitlines()]
     if initial_state is None:
-        assert emitted == []
+        assert [entry.args[0] for entry in load.call_args_list] == ['db-slow', 'db-fast']
+        assert emitted == [{'bookmarks': {'db-slow': {'lsn': 10}, 'db-fast': {'lsn': 10}}}]
     else:
+        assert [entry.args[0] for entry in load.call_args_list] == ['db-fast']
         expected = copy.deepcopy(initial_state)
         expected['bookmarks']['db-fast']['lsn'] = 10
         assert emitted == [expected]
+
+
+def test_initial_checkpoint_is_not_acknowledged_if_another_stream_fails_to_load():
+    """Establishing the first checkpoint requires every pending stream to load."""
+    messages = [schema_message(stream) for stream in ['db-fast', 'db-slow']]
+    messages.extend([
+        {'type': 'RECORD', 'stream': 'db-fast', 'record': {'id': '1'}},
+        {'type': 'RECORD', 'stream': 'db-slow', 'record': {'id': '1'}},
+        {'type': 'STATE', 'value': {'bookmarks': {
+            'db-fast': {'lsn': 10}, 'db-slow': {'lsn': 10},
+        }}},
+        {'type': 'RECORD', 'stream': 'db-fast', 'record': {'id': '2'}},
+    ])
+
+    def load(stream, *_args):
+        if stream == 'db-slow':
+            raise RuntimeError('target unavailable')
+
+    output = io.StringIO()
+    with patch('target_postgres.DbSync', side_effect=mock_db_sync), \
+            patch('target_postgres.flush_records', side_effect=load), redirect_stdout(output), \
+            pytest.raises(RuntimeError, match='target unavailable'):
+        target_postgres.persist_lines(
+            {'parallelism': 1, 'batch_size_rows': 2, 'flush_all_streams': False},
+            map(json.dumps, messages),
+        )
+
+    assert output.getvalue() == ''

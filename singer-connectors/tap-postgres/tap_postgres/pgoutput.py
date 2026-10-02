@@ -31,7 +31,8 @@ class PgoutputRelation:
 
 class _Reader:
     def __init__(self, payload, encoding):
-        self.payload = memoryview(payload)
+        self.raw = payload if isinstance(payload, bytes) else bytes(payload)
+        self.payload = memoryview(self.raw)
         self.encoding = encoding
         self.offset = 0
 
@@ -62,12 +63,12 @@ class _Reader:
         return struct.unpack('!Q', self._read(8))[0]
 
     def cstring(self):
-        remaining = self.payload[self.offset:].tobytes()
-        nul = remaining.find(b'\x00')
+        nul = self.raw.find(b'\x00', self.offset)
         if nul < 0:
             raise PgoutputProtocolError('Unterminated string in pgoutput message')
-        self.offset += nul + 1
-        return remaining[:nul].decode(self.encoding)
+        value = self.raw[self.offset:nul].decode(self.encoding)
+        self.offset = nul + 1
+        return value
 
     def text(self):
         length = self.int32()
@@ -244,7 +245,7 @@ class PgoutputDecoder:
             for column in relation.columns
         ]
 
-    def _tuple(self, reader, relation, key_only=False):
+    def _tuple(self, reader, relation, key_only=False, unchanged_columns=None):
         column_count = reader.uint16()
         if column_count != len(relation.columns):
             raise PgoutputProtocolError(
@@ -258,6 +259,8 @@ class PgoutputDecoder:
             if kind == 'n':
                 value = None
             elif kind == 'u':
+                if unchanged_columns is not None:
+                    unchanged_columns.add(column.name)
                 continue
             elif kind == 't':
                 value = reader.text()
@@ -306,9 +309,15 @@ class PgoutputDecoder:
         if tuple_kind != 'N':
             raise PgoutputProtocolError('Update message does not contain a new tuple')
         result = self._base_dml('U', relation)
-        result['columns'] = self._tuple(reader, relation)
+        unchanged_columns = set()
+        result['columns'] = self._tuple(reader, relation, unchanged_columns=unchanged_columns)
         if old_tuple is not None:
             result['identity'] = old_tuple
+            key_names = {column.name for column in relation.columns if column.is_key}
+            result['columns'].extend(
+                column for column in old_tuple
+                if column['name'] in unchanged_columns and column['name'] in key_names
+            )
         return result
 
     def _decode_delete(self, reader):

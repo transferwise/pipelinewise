@@ -1063,3 +1063,93 @@ class TestIntegration(unittest.TestCase):
             'note': 'updated-note',
             'nullable_value': None,
         }])
+
+    def test_patch_composite_keys_with_commas_remain_separate(self):
+        """Sparse updates must not merge different rows with ambiguous joined keys."""
+        stream = 'public-composite_patch'
+        schema = {
+            'type': 'SCHEMA',
+            'stream': stream,
+            'key_properties': ['first', 'second'],
+            'schema': {
+                'type': 'object',
+                'x-pipelinewise-record-update-mode': 'PATCH',
+                'properties': {
+                    name: {'type': ['null', 'string']}
+                    for name in ['first', 'second', 'payload', 'status']
+                },
+            },
+        }
+        original_rows = [
+            {'first': 'a,b', 'second': 'c', 'payload': 'left', 'status': 'left-original'},
+            {'first': 'a', 'second': 'b,c', 'payload': 'right', 'status': 'right-original'},
+        ]
+        for record in original_rows:
+            target_postgres.persist_lines(self.config, map(json.dumps, [
+                schema, {'type': 'RECORD', 'stream': stream, 'record': record},
+            ]))
+
+        target_postgres.persist_lines(self.config, map(json.dumps, [
+            schema,
+            {'type': 'RECORD', 'stream': stream, 'record': {
+                'first': 'a,b', 'second': 'c', 'payload': 'left-updated',
+            }},
+            {'type': 'RECORD', 'stream': stream, 'record': {
+                'first': 'a', 'second': 'b,c', 'status': 'right-updated',
+            }},
+        ]))
+
+        rows = DbSync(self.config).query(
+            'SELECT first, second, payload, status FROM {}.composite_patch ORDER BY first'.format(
+                self.config['default_target_schema'])
+        )
+        self.assertEqual([dict(row) for row in rows], [
+            {'first': 'a', 'second': 'b,c', 'payload': 'right', 'status': 'right-updated'},
+            {'first': 'a,b', 'second': 'c', 'payload': 'left-updated', 'status': 'left-original'},
+        ])
+
+    def test_busy_streams_acknowledge_initial_checkpoint_before_interruption(self):
+        """The first all-stream flush establishes durable state, then stream flushes resume."""
+        self.config.update({'flush_all_streams': False, 'batch_size_rows': 2, 'parallelism': 1})
+        streams = ['public-checkpoint_slow', 'public-checkpoint_fast']
+        messages = [{
+            'type': 'SCHEMA', 'stream': stream, 'key_properties': ['id'],
+            'schema': {'properties': {'id': {'type': ['integer']}}},
+        } for stream in streams]
+        messages.extend([
+            {'type': 'RECORD', 'stream': streams[0], 'record': {'id': 1}},
+            {'type': 'RECORD', 'stream': streams[1], 'record': {'id': 1}},
+            {'type': 'STATE', 'value': {'bookmarks': {stream: {'lsn': 10} for stream in streams}}},
+            {'type': 'RECORD', 'stream': streams[1], 'record': {'id': 2}},
+            {'type': 'RECORD', 'stream': streams[0], 'record': {'id': 2}},
+            {'type': 'RECORD', 'stream': streams[1], 'record': {'id': 3}},
+            {'type': 'STATE', 'value': {'bookmarks': {stream: {'lsn': 20} for stream in streams}}},
+            {'type': 'RECORD', 'stream': streams[1], 'record': {'id': 4}},
+        ])
+
+        def interrupted_input():
+            yield from map(json.dumps, messages)
+            raise RuntimeError('source interrupted')
+
+        postgres = DbSync(self.config)
+        expected_durable_rows = [[1], [1, 2]]
+
+        def verify_checkpoint(state):
+            if state is None:
+                return
+            schema = self.config['default_target_schema']
+            actual = [
+                [row['id'] for row in postgres.query(f'SELECT id FROM {schema}.{table} ORDER BY id')]
+                for table in ['checkpoint_slow', 'checkpoint_fast']
+            ]
+            self.assertEqual(actual, expected_durable_rows)
+            expected_durable_rows[1] = [1, 2, 3, 4]
+
+        with mock.patch('target_postgres.emit_state', side_effect=verify_checkpoint) as emit, \
+                self.assertRaisesRegex(RuntimeError, 'source interrupted'):
+            target_postgres.persist_lines(self.config, interrupted_input())
+
+        self.assertEqual(emit.call_args_list, [
+            mock.call({'bookmarks': {streams[0]: {'lsn': 10}, streams[1]: {'lsn': 10}}}),
+            mock.call({'bookmarks': {streams[0]: {'lsn': 10}, streams[1]: {'lsn': 20}}}),
+        ])

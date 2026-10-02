@@ -60,9 +60,10 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
 
 ## Runtime and data-diff constraints
 
-- PostgreSQL replication sources require 14 or later across Singer,
-  FullSync, and PartialSync. Keep the Singer and FastSync connection gates
-  aligned; only deleted-tap slot cleanup may bypass the floor. PostgreSQL
+- PostgreSQL replication sources require 14+ across Singer, FullSync, and
+  PartialSync. Warn below the catalog-cache fixes in 14.18, 15.13, 16.9, and
+  17.5, but allow the connection. Keep Singer and FastSync aligned; only
+  deleted-tap slot cleanup may bypass the major-version floor. PostgreSQL
   targets, the backend, and data-diff connections are separate.
 - Source deletes are always physical. Silently ignore retired deletion-mode
   options in YAML and bundled PostgreSQL/Snowflake target JSON; do not require

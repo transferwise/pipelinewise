@@ -9,8 +9,10 @@
 This is a [PipelineWise](https://transferwise.github.io/pipelinewise) compatible tap connector.
 
 PostgreSQL 14 or later is required for every Singer replication method and for
-PipelineWise FullSync/PartialSync. This source minimum does not constrain
-PostgreSQL targets or the PipelineWise backend database.
+PipelineWise FullSync/PartialSync. Releases before 14.18, 15.13, 16.9, or 17.5
+remain supported but log a warning because wal2json and pgoutput may omit or
+misdecode changes. This source minimum does not constrain PostgreSQL targets or
+the PipelineWise backend database.
 
 ## How to use it
 
@@ -152,25 +154,29 @@ to the tap for the next sync.
 
   PipelineWise creates new slots as `pgoutput` and names them
   `pipelinewise_<tap_id>`. A LOG_BASED `tap_id` can contain only lowercase
-  letters, digits, and underscores and can be at most 50 characters.
+  letters, digits, and underscores and can be at most 50 characters. The ID
+  must be unique across the PostgreSQL cluster and differ from the normalized
+  database name. For a historical ID rename, use PipelineWise's
+  [previous_tap_id procedure](../../docs/connectors/taps/postgres.rst#renaming-a-historical-tap-id).
 
-  Before any slot boundary or initial copy, prepare the exact selected-table
+  Before any slot boundary or initial copy, prepare the selected-table
   publication:
 
   ```
   tap-postgres --config config.json --catalog catalog.json --prepare-publication
   ```
 
-  The tap creates or validates `pw_pub_<tap_id>` with only the selected tables,
-  `publish_via_partition_root = true`, and insert/update/delete enabled. It uses
+  The tap adds selected tables to `pw_pub_<tap_id>` without removing existing
+  members. It sets `publish_via_partition_root = true` and enables
+  insert/update/delete. It uses
   a reserved `pipelinewise-publication-fence-v1:` publication comment to record
-  that transactions predating publication setup have finished; an existing DBA
+  that earlier writing transactions have finished; an existing DBA
   comment is retained inside that metadata. The tap user therefore needs to own
   the publication, including when a DBA pre-creates it, so the tap can alter and
   comment it. Creating the publication also requires database `CREATE` and
   ownership of the published tables.
 
-  Every LOG_BASED publication relation must have a valid primary key and use
+  Every LOG_BASED publication relation must have a valid non-deferrable primary key and use
   `REPLICA IDENTITY DEFAULT`. For a selected partition root this requirement
   applies to both the root and every current physical leaf. Apply the same
   primary key and default replica identity to each future partition before it
@@ -222,10 +228,9 @@ to the tap for the next sync.
 
   PipelineWise never auto-migrates the older database-wide
   `pipelinewise_<database_name>` slot because multiple taps may share it. If
-  it is the only historical slot and no canonical pgoutput slot exists,
-  preflight stops before publication or slot changes and asks a DBA to create
-  a dedicated tap-specific migration source. An unrelated database-wide slot
-  is ignored when the canonical or tap-specific slot is available.
+  existing bookmarks depend on it, arrange a whole-tap resync or dedicated
+  migration source with the DBA. A new tap without saved LOG_BASED history can
+  create its own pgoutput slot while preserving the shared slot.
 
   Automatic wal2json migration is also rejected when any selected relation is
   a partition root. The wal2json table filter cannot safely include partitions

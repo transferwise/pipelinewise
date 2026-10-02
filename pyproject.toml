@@ -8,7 +8,9 @@ extend-exclude = [
     "singer-connectors/tap-mixpanel/tests",
     "singer-connectors/tap-mongodb/tests",
     "singer-connectors/tap-mysql/tests/integration",
-    "singer-connectors/tap-postgres/tests/integration",
+    "singer-connectors/tap-postgres/tests/integration/test_discovery.py",
+    "singer-connectors/tap-postgres/tests/integration/test_streams_utils.py",
+    "singer-connectors/tap-postgres/tests/integration/test_unsupported_pk.py",
     "singer-connectors/tap-s3-csv/tests",
     "singer-connectors/tap-slack/tests",
     "singer-connectors/tap-snowflake/tests",
@@ -16,7 +18,9 @@ extend-exclude = [
     "singer-connectors/tap-zendesk/spikes",
     "singer-connectors/tap-zendesk/test",
     "singer-connectors/target-s3-csv/tests",
-    "singer-connectors/target-snowflake/tests/integration",
+    "singer-connectors/target-snowflake/tests/integration/test_target_snowflake.py",
+    "singer-connectors/target-snowflake/tests/integration/test_iceberg_v3.py",
+    "singer-connectors/target-snowflake/tests/integration/utils.py",
 ]
 
 [tool.ruff.lint]

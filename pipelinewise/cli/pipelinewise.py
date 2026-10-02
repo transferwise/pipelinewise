@@ -1365,6 +1365,13 @@ class PipelineWise:
             self.tap.get('target_table_format'),
         )
 
+        if tap_type == ConnectorType.TAP_POSTGRES.value:
+            state = utils.load_json(self.tap['files']['state']) or {}
+            if '_pipelinewise_pgoutput_fresh_start' in state:
+                raise PreRunChecksException(
+                    'An interrupted PostgreSQL slot reset requires an unfiltered whole-tap fast_sync retry.'
+                )
+
         not_partial_syned_tables = set()
 
         self.force_fast_sync = True
@@ -1602,7 +1609,7 @@ class PipelineWise:
 
         return self._postgres_tap_has_log_based_selection()
 
-    def _postgres_tap_has_log_based_selection(self) -> bool:
+    def _postgres_tap_has_log_based_selection(self, tables=None) -> bool:
         """Return whether the PostgreSQL tap owns a selected logical stream."""
         if self.tap['type'] != ConnectorType.TAP_POSTGRES.value:
             return False
@@ -1610,21 +1617,36 @@ class PipelineWise:
         selection = utils.load_json(self.tap['files']['selection']) or {}
         return any(
             table.get('replication_method') == self.LOG_BASED
+            and (tables is None or self._get_fixed_name_of_table(table['tap_stream_id']) in tables)
             for table in selection.get('selection', [])
         )
 
-    def _prepare_postgres_pgoutput_publication(self) -> None:
+    def _postgres_has_no_logical_bookmarks(self):
+        """Allow a new tap to create an independent slot beside an unrelated shared slot."""
+        state = utils.load_json(self.tap['files']['state']) or {}
+        return (
+            PGOUTPUT_MIGRATION_STATE_KEY not in state
+            and '_pipelinewise_pgoutput_fresh_start' not in state
+            and not any('lsn' in bookmark for bookmark in state.get('bookmarks', {}).values())
+        )
+
+    def _prepare_postgres_pgoutput_publication(self, *, fresh_start=False) -> None:
         """Prepare the publication and transaction fence before a pgoutput boundary."""
         command = commands.build_postgres_publication_preflight_command(
             self.tap_bin,
             self.tap['files']['config'],
             self.tap['files']['properties'],
+            self.tap['files'].get('state'),
+            fresh_start=fresh_start,
         )
-        return_code, _, stderr = commands.run_command_argv(command)
+        self.logger.info('Preparing PostgreSQL publication; waiting for source transactions if necessary...')
+        connection_config = utils.load_json(self.tap['files']['config']) or {}
+        timeout = max(1, float(connection_config.get('publication_fence_timeout_seconds', 300))) + 60
+        return_code, _, stderr = commands.run_command_argv(command, timeout=timeout)
         if return_code != 0:
             detail = stderr.strip() if stderr else 'tap-postgres publication preflight failed'
             raise PreRunChecksException(
-                f'{detail}. No state or replication-slot changes were made.'
+                f'{detail}. State and slots are unchanged; publication preparation may need an unchanged retry.'
             )
 
     def do_sync_tables(self, fastsync_stream_ids=None, reset_postgres_slot: bool = False):
@@ -1648,17 +1670,24 @@ class PipelineWise:
         if reset_postgres_slot:
             tap_config, target_config = self._preflight_postgres_slot_reset(selected_tables)
 
+        requested_tables = set(selected_tables['full_sync']) | set(selected_tables['partial_sync'])
+        logical_requested = self._postgres_tap_has_log_based_selection(requested_tables)
+        reset_result = None
         if reset_postgres_slot:
             with self._guard_postgres_slot_reset_from_iceberg_recovery(selected_tables, target_config):
-                if self._postgres_tap_has_log_based_selection():
-                    self._prepare_postgres_pgoutput_publication()
-                FastSyncTapPostgres.reset_slot(
+                if logical_requested:
+                    self._prepare_postgres_pgoutput_publication(fresh_start=True)
+                reset_result = FastSyncTapPostgres.reset_slot(
                     tap_config,
                     before_reset=self._clear_tap_bookmarks_before_postgres_slot_reset,
                 )
-        elif self._postgres_tap_has_log_based_selection():
+        elif logical_requested:
             self._prepare_postgres_pgoutput_publication()
+            FastSyncTapPostgres.ensure_replication_slot(
+                utils.load_json(self.tap['files']['config']), fresh_start=self._postgres_has_no_logical_bookmarks(),
+            )
 
+        self._postgres_publication_prepared = logical_requested
         processes_list = []
         if selected_tables['partial_sync']:
             self._reset_state_file_for_partial_sync(selected_tables)
@@ -1680,6 +1709,26 @@ class PipelineWise:
                 raise Exception(error)
             if process.exitcode != 0:
                 raise SystemExit(process.exitcode)
+
+        if reset_result is not None:
+            self._finish_postgres_slot_reset(reset_result)
+
+    def _finish_postgres_slot_reset(self, reset_result):
+        """Retain the old slot until a post-snapshot pgoutput boundary reaches the target."""
+        state_path = self.tap['files']['state']
+        state = self._load_required_json_object(state_path, 'tap state')
+        durable_lsn = self._minimum_durable_postgres_lsn(state)
+        if durable_lsn is None or durable_lsn <= reset_result['copy_lsn']:
+            raise PreRunChecksException('PostgreSQL resync is incomplete. Retry the unfiltered whole-tap fast_sync.')
+        if reset_result.get('source_slot'):
+            state[PGOUTPUT_MIGRATION_STATE_KEY] = {
+                'version': 1, 'phase': 'pgoutput',
+                'source_slot': reset_result['source_slot'],
+                'destination_slot': reset_result['destination_slot'],
+                'copy_lsn': reset_result['copy_lsn'], 'bridge_lsn': durable_lsn,
+            }
+        state.pop('_pipelinewise_pgoutput_fresh_start', None)
+        fastsync_utils.save_dict_to_json(state_path, state)
 
     def _preflight_postgres_slot_reset(self, selected_tables):
         """Validate every local reset dependency before changing source or state."""
@@ -1785,12 +1834,10 @@ class PipelineWise:
                     )
             yield
 
-    def _clear_tap_bookmarks_before_postgres_slot_reset(self):
+    def _clear_tap_bookmarks_before_postgres_slot_reset(self, *, fresh_start_marker=None):
         """Durably back up and invalidate state before replacing the tap-wide slot."""
         state_path = self.tap['files']['state']
-        if not os.path.exists(state_path):
-            return None
-        state = self._load_required_json_object(state_path, 'tap state')
+        state = self._load_required_json_object(state_path, 'tap state') if os.path.exists(state_path) else {}
         # Unique backups preserve the original bookmarks even after a failed reset is retried.
         backup_path = f'{state_path}.before-slot-reset-{uuid4().hex}.bak'
         fastsync_utils.save_dict_to_json(backup_path, state)
@@ -1798,6 +1845,8 @@ class PipelineWise:
         state['bookmarks'] = {}
         state['currently_syncing'] = None
         state.pop(PGOUTPUT_MIGRATION_STATE_KEY, None)
+        if fresh_start_marker is not None:
+            state['_pipelinewise_pgoutput_fresh_start'] = fresh_start_marker
         fastsync_utils.save_dict_to_json(state_path, state)
         return backup_path
 
@@ -2004,6 +2053,118 @@ class PipelineWise:
         validated_config.get_scheduled_job_definitions()
         self.logger.info('Validation successful')
 
+    def _preserve_renamed_postgres_state(self, config, selected_taps):
+        """Copy an explicitly renamed tap's durable state before generating its new config."""
+        for target in config.targets.values():
+            for tap in target.get('taps', []):
+                previous_id = tap.get('previous_tap_id')
+                if not previous_id or (selected_taps != ['*'] and tap['id'] not in selected_taps):
+                    continue
+                old_files = Config.get_connector_files(config.get_tap_dir(target['id'], previous_id))
+                new_files = tap['files']
+                old_connection = self._load_required_json_object(old_files['config'], 'previous tap configuration')
+                self._validate_postgres_rename_connection(old_connection, tap)
+                self._validate_postgres_rename_destination(config, target, tap, old_files)
+                # A completed import owns its own progressing state; never overwrite it on reimport.
+                if os.path.exists(new_files['state']):
+                    existing = utils.load_json(new_files['config']) or {}
+                    if existing.get('previous_tap_id') != previous_id:
+                        raise PreRunChecksException('The renamed tap already has state from another identity.')
+                    continue
+                with pidfile.PIDFile(old_files['pidfile']):
+                    state = self._load_required_json_object(old_files['state'], 'previous tap state')
+                    if PGOUTPUT_MIGRATION_STATE_KEY in state or '_pipelinewise_pgoutput_fresh_start' in state:
+                        raise PreRunChecksException(
+                            'Complete the existing PostgreSQL migration or resync before renaming.'
+                        )
+                    self._validate_postgres_rename_source({**tap['db_conn'], 'tap_id': previous_id})
+                    os.makedirs(os.path.dirname(new_files['state']), exist_ok=True)
+                    # Save identity first so a crash after the atomic state copy can be retried.
+                    fastsync_utils.save_dict_to_json(new_files['config'], {
+                        **tap['db_conn'], 'tap_id': tap['id'], 'previous_tap_id': previous_id,
+                    })
+                    fastsync_utils.save_dict_to_json(new_files['state'], state)
+
+    @staticmethod
+    def _validate_postgres_rename_source(connection_config):
+        """Only adopt a dedicated, inactive wal2json slot during a tap rename."""
+        dbname = connection_config['dbname']
+        dedicated = FastSyncTapPostgres.generate_replication_slot_name(dbname, connection_config['tap_id'])
+        if dedicated == FastSyncTapPostgres.generate_replication_slot_name(dbname):
+            raise PreRunChecksException('The historical slot name is shared; coordinate a full resync with the DBA.')
+        connection = FastSyncTapPostgres.get_connection(connection_config, prioritize_primary=True)
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    'SELECT database, plugin, active FROM pg_replication_slots WHERE slot_name = %s', (dedicated,),
+                )
+                row = cursor.fetchone()
+                if row != (dbname, 'wal2json', False):
+                    raise PreRunChecksException(
+                        'A tap rename requires its original dedicated, inactive wal2json slot. '
+                        'Stop the old tap or coordinate a full resync before renaming.'
+                    )
+        finally:
+            connection.close()
+
+    @staticmethod
+    def _validate_postgres_rename_connection(old_connection, tap):
+        new_connection = tap['db_conn']
+        for key, default in (('host', None), ('port', 5432), ('dbname', None), ('user', None)):
+            if str(old_connection.get(key, default)) != str(new_connection.get(key, default)):
+                raise PreRunChecksException('A PostgreSQL tap rename must preserve its source connection and target.')
+        if old_connection.get('tap_id') != tap['previous_tap_id']:
+            raise PreRunChecksException('Previous PostgreSQL tap configuration does not match previous_tap_id.')
+
+    def _validate_postgres_rename_destination(self, config, target, tap, old_files):
+        """Keep preserved bookmarks bound to the same destination rows and selection."""
+        project = self._load_required_json_object(config.config_path, 'previous project configuration')
+        previous_target = next((item for item in project.get('targets', []) if item.get('id') == target['id']), None)
+        if previous_target is None or previous_target.get('type') != target.get('type'):
+            raise PreRunChecksException('A PostgreSQL tap rename must preserve its target connector.')
+        identity_keys = {
+            'target-postgres': (('host', None), ('port', 5432), ('dbname', None)),
+            'target-snowflake': (('account', None), ('dbname', None)),
+        }.get(target.get('type'))
+        if identity_keys is None:
+            raise PreRunChecksException(
+                'State-preserving PostgreSQL tap renames require PostgreSQL or Snowflake targets.'
+            )
+        old_target = self._load_required_json_object(
+            Config.get_connector_files(config.get_target_dir(target['id']))['config'], 'previous target configuration',
+        )
+        new_target = target['db_conn']
+        for key, default in identity_keys:
+            old_value, new_value = old_target.get(key, default), new_target.get(key, default)
+            if old_value is None or new_value is None or str(old_value) != str(new_value):
+                raise PreRunChecksException('A PostgreSQL tap rename must preserve its target connection.')
+        old_mapping = self._load_required_json_object(old_files['inheritable_config'], 'previous target mapping')
+        new_mapping = config.generate_inheritable_config(tap)
+        for key in ('schema_mapping', 'default_target_schema', 'data_flattening_max_level',
+                    'target_table_format', 'iceberg_version'):
+            if old_mapping.get(key) != new_mapping.get(key):
+                raise PreRunChecksException('A PostgreSQL tap rename must preserve its target schema and table format.')
+        self._validate_postgres_rename_selection(tap, old_files)
+
+    def _validate_postgres_rename_selection(self, tap, old_files):
+        """Reject combined rename and data-shape changes that could reuse unsafe bookmarks."""
+        old_selection = self._load_required_json_object(old_files['selection'], 'previous tap selection')
+        old_transformations = self._load_required_json_object(old_files['transformation'], 'previous transformations')
+        if not isinstance(old_selection.get('selection'), list) or not isinstance(
+                old_transformations.get('transformations'), list):
+            raise PreRunChecksException('Previous PostgreSQL selection and transformation files are incomplete.')
+
+        def selection_key(item):
+            return item['tap_stream_id']
+
+        if sorted(old_selection['selection'], key=selection_key) != sorted(
+                Config.generate_selection(tap), key=selection_key):
+            raise PreRunChecksException(
+                'A PostgreSQL tap rename must preserve its selected streams and replication methods.'
+            )
+        if old_transformations['transformations'] != Config.generate_transformations(tap):
+            raise PreRunChecksException('A PostgreSQL tap rename must preserve its transformations.')
+
     def import_project(self):
         """
         Take a list of YAML files from a directory and use it as the source to build
@@ -2013,10 +2174,13 @@ class PipelineWise:
 
         # Read the YAML config files and transform/save into singer compatible
         # JSON files in a common directory structure
-        config = Config.from_yamls(self.config_dir, self.args.dir, self.args.secret)
         selected_taps_id = self.args.taps.split(',')
         if '*' in selected_taps_id:
             selected_taps_id = ['*']
+        config = Config.from_yamls(
+            self.config_dir, self.args.dir, self.args.secret, selected_taps=selected_taps_id,
+        )
+        self._preserve_renamed_postgres_state(config, selected_taps_id)
         data_diff_definitions = config.get_data_diff_definitions(selected_taps_id)
         config.save(selected_taps_id)
 
@@ -2497,6 +2661,15 @@ class PipelineWise:
                 target_id=target_id,
             )
 
+            if (
+                not getattr(self, '_postgres_publication_prepared', False)
+                and self._postgres_tap_has_log_based_selection(self.args.table.split(','))
+            ):
+                self._prepare_postgres_pgoutput_publication()
+                FastSyncTapPostgres.ensure_replication_slot(
+                    utils.load_json(tap_config), fresh_start=self._postgres_has_no_logical_bookmarks(),
+                )
+
             self.run_tap_partialsync(tap=tap_params, target=target_params, transform=transform_params)
 
         # Delete temp file if there is any
@@ -2976,7 +3149,15 @@ TAP RUN SUMMARY
             else:
                 deleted_tap_ids = set(taps.keys()) - new_config_dict[target_id]
 
+                adopted_ids = {
+                    tap.get('previous_tap_id')
+                    for target in self.config.get('targets', []) if target['id'] == target_id
+                    for tap in target.get('taps', [])
+                }
                 for deleted_tap_id in deleted_tap_ids:
+                    if deleted_tap_id in adopted_ids:
+                        self.logger.info('Retaining renamed tap %s files and wal2json slot', deleted_tap_id)
+                        continue
                     # we have taps whose config was deleted, thus need to clean up their files
                     self._remove_tap_config(deleted_tap_id, target_id, taps[deleted_tap_id])
 

@@ -13,6 +13,7 @@ import time
 from pathlib import Path
 
 import psycopg2
+import pytest
 
 from .helpers.env import E2EEnv
 
@@ -88,7 +89,7 @@ def _run_success(command, env, timeout=120):
 
 def _slot_name(*parts):
     """Build the exact normalized slot name used by PipelineWise."""
-    return re.sub('[^a-z0-9_]', '_', '_'.join(('pipelinewise', *parts)).lower())
+    return re.sub('[^a-z0-9_]', '_', '_'.join(('pipelinewise', *parts)).lower())[:63]
 
 
 def _slot_status(e2e, slot_name):
@@ -259,7 +260,108 @@ def _publication_tables(e2e):
     ))
 
 
-def test_wal2json_slot_is_retired_after_pgoutput_target_checkpoint(tmp_path):
+def _simulate_historical_tap_identity(config_dir, old_tap_id, lsn):
+    """Retain a complete generated configuration as it existed before this upgrade."""
+    old_dir = config_dir / TARGET_ID / old_tap_id
+    (config_dir / TARGET_ID / TAP_ID).rename(old_dir)
+    old_config_path = old_dir / 'config.json'
+    old_config = _read_state(old_config_path)
+    old_config['tap_id'] = old_tap_id
+    old_config_path.write_text(json.dumps(old_config), encoding='utf-8')
+    state_path = old_dir / 'state.json'
+    state = _read_state(state_path)
+    assert MIGRATION_STATE_KEY not in state
+    state['bookmarks'][STREAM_ID]['lsn'] = lsn
+    state_path.write_text(json.dumps(state), encoding='utf-8')
+    root_config_path = config_dir / 'config.json'
+    root_config = _read_state(root_config_path)
+    for target in root_config['targets']:
+        for tap in target['taps']:
+            if tap['id'] == TAP_ID:
+                tap['id'] = old_tap_id
+    root_config_path.write_text(json.dumps(root_config), encoding='utf-8')
+    return state_path
+
+
+def test_renamed_legacy_tap_preserves_checkpoint_and_retires_truncated_slot(tmp_path):
+    """Import a valid replacement ID without losing its existing target or WAL history."""
+    project_dir = tmp_path / 'project'
+    shutil.copytree(TEMPLATE_DIR, project_dir)
+    e2e = E2EEnv(project_dir)
+    config_dir = tmp_path / 'pipelinewise-config'
+    config_dir.mkdir()
+    command_env = {**os.environ, 'PIPELINEWISE_CONFIG_DIRECTORY': str(config_dir)}
+    old_tap_id = 'Historical-Postgres-' + 'x' * 45
+    database = e2e.get_conn_env_var('TAP_POSTGRES', 'DB')
+    old_slot = _slot_name(database, old_tap_id)
+    new_slot = _slot_name(TAP_ID)
+    run_command = ['pipelinewise', 'run_tap', '--tap', TAP_ID, '--target', TARGET_ID]
+    state_path = config_dir / TARGET_ID / TAP_ID / 'state.json'
+    try:
+        _drop_slot(e2e, new_slot)
+        _drop_slot(e2e, old_slot)
+        _drop_publication(e2e)
+        e2e.run_query_tap_postgres(
+            f'DROP SCHEMA IF EXISTS {SOURCE_SCHEMA} CASCADE; CREATE SCHEMA {SOURCE_SCHEMA}; '
+            f'CREATE TABLE {SOURCE_SCHEMA}.{TABLE_NAME} '
+            '(id integer PRIMARY KEY, status text NOT NULL, payload text NOT NULL); '
+            f"INSERT INTO {SOURCE_SCHEMA}.{TABLE_NAME} VALUES (1, 'existing target row', 'payload')"
+        )
+        e2e.run_query_target_postgres(f'DROP SCHEMA IF EXISTS {TARGET_SCHEMA} CASCADE')
+        _run_success(['pipelinewise', 'import_config', '--dir', str(project_dir)], command_env)
+        _run_success(
+            ['pipelinewise', 'fast_sync', '--tap', TAP_ID, '--target', TARGET_ID,
+             '--tables', f'{SOURCE_SCHEMA}.{TABLE_NAME}'],
+            command_env,
+        )
+        assert _source_target_rows(e2e)[0] == _source_target_rows(e2e)[1]
+        _drop_slot(e2e, new_slot)
+        _drop_publication(e2e)
+        e2e.run_query_tap_postgres(
+            'SELECT * FROM pg_create_logical_replication_slot(%s, %s)', (old_slot, 'wal2json'),
+        )
+        assert len(old_slot) == 63
+        old_boundary = _slot_status(e2e, old_slot)['confirmed_flush_lsn']
+        old_state_path = _simulate_historical_tap_identity(config_dir, old_tap_id, old_boundary)
+        old_state = _read_state(old_state_path)
+        e2e.run_query_tap_postgres(
+            f"UPDATE {SOURCE_SCHEMA}.{TABLE_NAME} SET status = 'committed before rename' WHERE id = 1; "
+            f"INSERT INTO {SOURCE_SCHEMA}.{TABLE_NAME} VALUES (2, 'new row before rename', 'payload2')"
+        )
+        with (project_dir / 'tap_postgres_pgoutput_to_pg.yml').open('a', encoding='utf-8') as tap_yaml:
+            tap_yaml.write(f'\nprevious_tap_id: "{old_tap_id}"\n')
+        _run_success(['pipelinewise', 'import_config', '--dir', str(project_dir)], command_env)
+        assert _read_state(state_path) == old_state
+        assert _read_state(old_state_path) == old_state
+        assert _slot_status(e2e, old_slot)['confirmed_flush_lsn'] == old_boundary
+        assert _slot_status(e2e, new_slot) is None
+
+        _run_success(run_command, command_env)
+        bridge_state = _read_state(state_path)
+        assert bridge_state[MIGRATION_STATE_KEY]['source_slot'] == old_slot
+        assert _slot_status(e2e, old_slot) is not None
+        assert _source_target_rows(e2e)[0] == _source_target_rows(e2e)[1]
+        e2e.run_query_tap_postgres(
+            f"UPDATE {SOURCE_SCHEMA}.{TABLE_NAME} SET status = 'pgoutput after rename' WHERE id = 2"
+        )
+        _run_success(run_command, command_env)
+        assert _slot_status(e2e, old_slot) is None
+        assert MIGRATION_STATE_KEY not in _read_state(state_path)
+        assert _source_target_rows(e2e)[0] == _source_target_rows(e2e)[1]
+        final_state = _read_state(state_path)
+        _run_success(['pipelinewise', 'import_config', '--dir', str(project_dir)], command_env)
+        assert _read_state(state_path) == final_state
+        assert _read_state(old_state_path) == old_state
+    finally:
+        _drop_slot(e2e, new_slot)
+        _drop_slot(e2e, old_slot)
+        _drop_publication(e2e)
+        e2e.run_query_tap_postgres(f'DROP SCHEMA IF EXISTS {SOURCE_SCHEMA} CASCADE')
+        e2e.run_query_target_postgres(f'DROP SCHEMA IF EXISTS {TARGET_SCHEMA} CASCADE')
+
+
+@pytest.mark.parametrize('fresh_reset', [False, True], ids=['automatic-migration', 'explicit-reset'])
+def test_wal2json_slot_is_retired_after_pgoutput_target_checkpoint(tmp_path, fresh_reset):
     """Migrate safely, retire after durability, and checkpoint a logical message."""
     project_dir = tmp_path / 'project'
     shutil.copytree(TEMPLATE_DIR, project_dir)
@@ -331,6 +433,8 @@ def test_wal2json_slot_is_retired_after_pgoutput_target_checkpoint(tmp_path):
             '--target',
             TARGET_ID,
         ]
+        if not fresh_reset:
+            fast_sync_command.extend(['--tables', f'{SOURCE_SCHEMA}.{TABLE_NAME}'])
         fast_sync_process = _start(fast_sync_command, command_env)
         _wait_for_publication_fence(
             e2e,
@@ -359,26 +463,25 @@ def test_wal2json_slot_is_retired_after_pgoutput_target_checkpoint(tmp_path):
         assert copied_old_slot['plugin'] == 'wal2json'
         assert copied_new_slot['plugin'] == 'pgoutput'
         assert copied_new_slot['database'] == database
-        assert copied_new_slot['confirmed_flush_lsn'] == copied_old_slot['confirmed_flush_lsn']
+        assert copied_old_slot['confirmed_flush_lsn'] == original_slot['confirmed_flush_lsn']
+        if fresh_reset:
+            assert copied_new_slot['confirmed_flush_lsn'] > copied_old_slot['confirmed_flush_lsn']
+        else:
+            assert copied_new_slot['confirmed_flush_lsn'] == copied_old_slot['confirmed_flush_lsn']
         source_rows, target_rows = _source_target_rows(e2e)
         assert source_rows == target_rows
         assert source_rows[0][1:3] == ('committed across publication setup', 32768)
         original_payload_fingerprint = source_rows[0][2:]
 
-        _run_success(
-            [
-                'pipelinewise',
-                'run_tap',
-                '--tap',
-                TAP_ID,
-                '--target',
-                TARGET_ID,
-            ],
-            command_env,
-        )
+        if not fresh_reset:
+            _run_success(
+                ['pipelinewise', 'run_tap', '--tap', TAP_ID, '--target', TARGET_ID],
+                command_env,
+            )
 
         bridge_state = _read_state(state_path)
         bridge_marker = bridge_state[MIGRATION_STATE_KEY]
+        assert '_pipelinewise_pgoutput_fresh_start' not in bridge_state
         assert bridge_marker['phase'] == 'pgoutput'
         assert bridge_marker['source_slot'] == wal2json_slot
         assert bridge_marker['destination_slot'] == pgoutput_slot
@@ -391,8 +494,12 @@ def test_wal2json_slot_is_retired_after_pgoutput_target_checkpoint(tmp_path):
         assert bridged_old_slot['plugin'] == 'wal2json'
         assert bridged_new_slot is not None
         assert bridged_new_slot['plugin'] == 'pgoutput'
-        assert bridged_old_slot['confirmed_flush_lsn'] >= bridge_lsn
-        assert bridged_new_slot['confirmed_flush_lsn'] >= bridge_lsn
+        if fresh_reset:
+            assert bridged_old_slot['confirmed_flush_lsn'] == original_slot['confirmed_flush_lsn']
+            assert bridged_new_slot['confirmed_flush_lsn'] == bridge_marker['copy_lsn']
+        else:
+            assert bridged_old_slot['confirmed_flush_lsn'] >= bridge_lsn
+            assert bridged_new_slot['confirmed_flush_lsn'] >= bridge_lsn
         source_rows, target_rows = _source_target_rows(e2e)
         assert source_rows == target_rows
 
@@ -552,6 +659,30 @@ def test_wal2json_slot_is_retired_after_pgoutput_target_checkpoint(tmp_path):
             (SOURCE_SCHEMA, TABLE_NAME),
             (SOURCE_SCHEMA, PARTITIONED_TABLE_NAME),
         }
+        if fresh_reset:
+            target_config_path.write_text(json.dumps(broken_target_config), encoding='utf-8')
+            try:
+                failed_reset = _run(fast_sync_command, command_env)
+                assert failed_reset.returncode != 0
+                pending_state = _read_state(state_path)
+                assert pending_state['_pipelinewise_pgoutput_fresh_start'] == {
+                    'version': 1, 'source_slot': None, 'destination_slot': pgoutput_slot,
+                }
+                rejected_resume = _run(
+                    ['pipelinewise', 'run_tap', '--tap', TAP_ID, '--target', TARGET_ID], command_env,
+                )
+                assert rejected_resume.returncode != 0
+                assert 'whole-tap fast_sync' in rejected_resume.stderr + rejected_resume.stdout
+                assert _read_state(state_path) == pending_state
+            finally:
+                target_config_path.write_text(original_target_config, encoding='utf-8')
+            _run_success(fast_sync_command, command_env)
+            assert '_pipelinewise_pgoutput_fresh_start' not in _read_state(state_path)
+            _run_success(
+                ['pipelinewise', 'run_tap', '--tap', TAP_ID, '--target', TARGET_ID], command_env,
+            )
+            assert _source_target_rows(e2e)[0] == _source_target_rows(e2e)[1]
+            assert _partition_source_target_rows(e2e)[0] == _partition_source_target_rows(e2e)[1]
     finally:
         test_error = sys.exception()
         cleanup_errors = []

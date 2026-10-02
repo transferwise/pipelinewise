@@ -36,40 +36,89 @@ class TestDbFunctions(unittest.TestCase):
         connection.close.assert_called_once_with()
 
     @patch('tap_postgres.db.psycopg2.connect')
-    def test_open_connection_accepts_supported_versions(self, connect):
-        """The exact support floor and newer logical connections are accepted."""
-        cases = ((140000, False), (140000, True), (180000, True))
+    @patch('tap_postgres.db.ReplicationConnection')
+    def test_open_connection_accepts_fixed_versions(self, replication_connect, connect):
+        """Fixed minor releases use a driver with explicit WAL feedback."""
+        with patch('tap_postgres.db.LOGGER.warning') as warning:
+            for server_version in (140018, 150013, 160009, 170005, 180000):
+                for logical_replication in (False, True):
+                    with self.subTest(server_version=server_version, logical_replication=logical_replication):
+                        factory = replication_connect if logical_replication else connect
+                        factory.reset_mock()
+                        warning.reset_mock()
+                        connection = factory.return_value
+                        connection.server_version = server_version
+                        result = db.open_connection(self.conn_config, logical_replication=logical_replication)
+                        self.assertIs(connection, result)
+                        connection.close.assert_not_called()
+                        warning.assert_not_called()
+                        if logical_replication:
+                            self.assertEqual(
+                                '-crow_security=off -cdatestyle=ISO -cintervalstyle=postgres '
+                                '-cextra_float_digits=3 -cclient_encoding=UTF8',
+                                factory.call_args.kwargs['options'],
+                            )
+                        else:
+                            self.assertNotIn('options', factory.call_args.kwargs)
 
-        for server_version, logical_replication in cases:
-            with self.subTest(
-                    server_version=server_version,
-                    logical_replication=logical_replication,
-            ):
+    @patch('tap_postgres.db.psycopg2.connect')
+    @patch('tap_postgres.db.LOGGER.warning')
+    def test_open_connection_warns_for_unsafe_minor_releases(self, warning, connect):
+        for server_version in (140000, 140017, 150012, 160008, 170004):
+            with self.subTest(server_version=server_version):
                 connect.reset_mock()
-                connection = MagicMock()
-                connection.server_version = server_version
-                connect.return_value = connection
+                warning.reset_mock()
+                connect.return_value.server_version = server_version
 
-                result = db.open_connection(
-                    self.conn_config,
-                    logical_replication=logical_replication,
-                )
+                self.assertIs(connect.return_value, db.open_connection(self.conn_config))
 
-                self.assertIs(connection, result)
-                connection.close.assert_not_called()
-                if logical_replication:
-                    self.assertIs(
-                        db.psycopg2.extras.LogicalReplicationConnection,
-                        connect.call_args.kwargs['connection_factory'],
-                    )
-                    self.assertEqual(
-                        '-crow_security=off -cclient_encoding=UTF8 '
-                        '-cdatestyle=ISO -cintervalstyle=postgres -cextra_float_digits=3',
-                        connect.call_args.kwargs['options'],
-                    )
-                else:
-                    self.assertNotIn('connection_factory', connect.call_args.kwargs)
-                    self.assertNotIn('options', connect.call_args.kwargs)
+                warning.assert_called_once()
+                self.assertIn('may omit or misdecode changes', warning.call_args.args[0])
+                self.assertEqual(server_version, warning.call_args.args[1])
+                connect.return_value.close.assert_not_called()
+
+    @patch('tap_postgres.db.ReplicationConnection')
+    def test_wal2json_decodes_database_encoding(self, connect):
+        connection = connect.return_value
+        connection.server_version = 150013
+        connection.get_parameter_status.return_value = 'LATIN1'
+
+        db.open_connection(self.conn_config, logical_replication=True, replication_plugin='wal2json')
+
+        self.assertNotIn('client_encoding', connect.call_args.kwargs['options'])
+        connection.get_parameter_status.assert_called_once_with('server_encoding')
+        connection.set_client_encoding.assert_called_once_with('LATIN1')
+
+    @patch('tap_postgres.db.open_connection')
+    def test_snapshot_boundary_is_committed_before_returning(self, connect):
+        connection = connect.return_value
+        cursor = connection.cursor.return_value.__enter__.return_value
+        cursor.fetchone.return_value = ('1/20',)
+        calls = MagicMock()
+        calls.attach_mock(cursor, 'cursor')
+        calls.attach_mock(connection.commit, 'commit')
+        calls.attach_mock(connection.close, 'close')
+
+        self.assertEqual((1 << 32) + 32, db.capture_snapshot_boundary(self.conn_config))
+
+        connect.assert_called_once_with(self.conn_config, prioritize_primary=True)
+        self.assertEqual(
+            ["SET LOCAL synchronous_commit = on",
+             "SELECT pg_logical_emit_message(true, 'pipelinewise_snapshot', '')::text"],
+            [call.args[0] for call in cursor.execute.call_args_list],
+        )
+        self.assertEqual(['cursor.execute', 'cursor.execute', 'cursor.fetchone', 'commit', 'close'],
+                         [call[0] for call in calls.mock_calls])
+
+    @patch('tap_postgres.db.open_connection')
+    def test_snapshot_hstore_detection_uses_the_same_replica(self, connect):
+        snapshot_connection = MagicMock()
+        snapshot_connection.cursor.return_value.__enter__.return_value.fetchone.return_value = ('1.8',)
+
+        self.assertTrue(db.hstore_available(self.conn_config, connection=snapshot_connection))
+
+        connect.assert_not_called()
+        snapshot_connection.close.assert_not_called()
 
     def test_value_to_singer_value(self):
         """Test if every element converted from sql_datatype to the correct singer type"""

@@ -47,6 +47,13 @@ def test_decodes_non_ascii_text_as_utf8():
     assert insert['columns'][2]['value'] == 'café 東京'
 
 
+@pytest.mark.parametrize('buffer_type', [bytes, bytearray, memoryview])
+def test_relation_accepts_supported_buffer_types_without_sharing_mutable_storage(buffer_type):
+    decoded = PgoutputDecoder().decode(buffer_type(_relation()))
+    assert decoded['table'] == 'payments'
+    assert [column['name'] for column in decoded['relation_columns']] == ['id', 'amount', 'description']
+
+
 def test_decodes_relation_insert_and_commit_with_exact_numeric_text():
     decoder = PgoutputDecoder()
     relation = decoder.decode(_relation())
@@ -114,6 +121,22 @@ def test_unchanged_toast_value_is_omitted_from_patch_update():
     update = decoder.decode(b'U' + struct.pack('!I', 42) + b'N' + _tuple(1, '12.30', Ellipsis))
 
     assert [column['name'] for column in update['columns']] == ['id', 'amount']
+
+
+@pytest.mark.parametrize('key_value', [Ellipsis, None])
+def test_update_recovers_only_explicitly_unchanged_identity_fields(key_value):
+    decoder = PgoutputDecoder()
+    decoder.decode(_relation())
+
+    update = decoder.decode(
+        b'U' + struct.pack('!I', 42)
+        + b'K' + _tuple('long-old-key', None, None)
+        + b'N' + _tuple(key_value, '12.30', Ellipsis)
+    )
+
+    values = {column['name']: column['value'] for column in update['columns']}
+    assert values == {'id': 'long-old-key' if key_value is Ellipsis else None, 'amount': '12.30'}
+    assert update['identity'][0]['value'] == 'long-old-key'
 
 
 def test_delete_decodes_replica_identity_tuple():

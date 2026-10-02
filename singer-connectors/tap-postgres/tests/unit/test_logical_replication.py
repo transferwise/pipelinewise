@@ -516,24 +516,12 @@ class TestLogicalReplication(unittest.TestCase):
             'key2': [{'kk': 'yo'}, {}]
         }, output)
 
-    @patch('tap_postgres.sync_strategies.logical_replication.post_db.open_connection')
-    def test_fetch_current_lsn(self, mocked_open_connection):
-        """Fetch the current LSN through one primary connection."""
-        connection = mocked_open_connection.return_value.__enter__.return_value
-        cursor = connection.cursor.return_value.__enter__.return_value
-        test_lsn = '1/2'
-        cursor.fetchone.return_value = [test_lsn]
-
-        # Look at tap_postgres.sync_strategies.logical_replication.lsn_to_int to find out why!
-        converted_lsn_to_int = 4294967298
-
-        actual_value = logical_replication.fetch_current_lsn(self.conn_info)
-
-        self.assertEqual(converted_lsn_to_int, actual_value)
-        mocked_open_connection.assert_called_once_with(self.conn_info, False, True)
-        cursor.execute.assert_called_once_with(
-            'SELECT pg_current_wal_insert_lsn() AS current_lsn'
-        )
+    @patch('tap_postgres.sync_strategies.logical_replication.post_db.capture_snapshot_boundary')
+    def test_fetch_current_lsn(self, capture_snapshot_boundary):
+        """Fetch a committed record boundary that an idle replica can replay."""
+        capture_snapshot_boundary.return_value = 4294967298
+        self.assertEqual(4294967298, logical_replication.fetch_current_lsn(self.conn_info))
+        capture_snapshot_boundary.assert_called_once_with(self.conn_info)
 
     def test_start_replication_sets_wal_sender_timeout_from_postgres_14(self):
         """Every supported PostgreSQL version receives the sender timeout."""
@@ -650,7 +638,7 @@ class TestLogicalReplication(unittest.TestCase):
     @patch("psycopg2.connect")
     def test_create_hstore_elem(self, mocked_connect):
         """Test if the output of create_hstore_elem is as expected"""
-        mocked_connect.return_value.server_version = 140000
+        mocked_connect.return_value.server_version = 140018
         mocked_cursor = mocked_connect.return_value.__enter__.return_value.cursor
         mocked_fetchone = mocked_cursor.return_value.__enter__.return_value.fetchone
         mocked_fetchone.return_value = (['foo', 'bar'],)
@@ -662,7 +650,7 @@ class TestLogicalReplication(unittest.TestCase):
     @patch("psycopg2.connect")
     def test_create_array_elem(self, mocked_connect):
         """Test if the output of create_array_elem is as expected"""
-        mocked_connect.return_value.server_version = 140000
+        mocked_connect.return_value.server_version = 140018
         mocked_cursor = mocked_connect.return_value.__enter__.return_value.cursor
         mocked_fetchone = mocked_cursor.return_value.__enter__.return_value.fetchone
         test_values = [('foo', '{bar}', ['bar']),
@@ -709,7 +697,7 @@ class TestLogicalReplication(unittest.TestCase):
     @patch("psycopg2.connect")
     def test_selected_value_to_singer_value(self, mocked_connect):
         """Test if selected_value_to_singer_value returns expected value"""
-        mocked_connect.return_value.server_version = 140000
+        mocked_connect.return_value.server_version = 140018
         mocked_cursor = mocked_connect.return_value.__enter__.return_value.cursor
         mocked_fetchone = mocked_cursor.return_value.__enter__.return_value.fetchone
         mocked_fetchone.return_value = (['foo'],)
@@ -769,6 +757,7 @@ class TestLogicalReplication(unittest.TestCase):
             'foo_db',
             'tap_id_value',
             allow_wal2json_migration=True,
+            previous_tap_id=None,
         )
 
     def test_impl_if_sql_datatype_is_money(self):
@@ -883,7 +872,7 @@ class TestLogicalReplication(unittest.TestCase):
     @patch("psycopg2.connect")
     def test_impl_with_sql_datatype_is_hstore(self, mocked_connect):
         """Test selected_value_to_singer_value_impl if datatype is hstore"""
-        mocked_connect.return_value.server_version = 140000
+        mocked_connect.return_value.server_version = 140018
         mocked_cursor = mocked_connect.return_value.__enter__.return_value.cursor
         mocked_fetchone = mocked_cursor.return_value.__enter__.return_value.fetchone
         mocked_fetchone.return_value = (['1', '0', '2', '1'],)

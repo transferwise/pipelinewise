@@ -92,8 +92,8 @@ the resync size limit. Taps without LOG_BASED tables do not reset a slot.
    * - Command or operation
      - Source slot
    * - Unfiltered ``fast_sync`` (with or without ``--force``)
-     - Reset an existing pgoutput slot. If only a historical wal2json slot
-       exists, copy it to pgoutput and retain the old slot.
+     - Create a fresh pgoutput slot, replacing an existing canonical slot.
+       Retain the old dedicated wal2json slot until the target confirms pgoutput.
    * - ``fast_sync --tables ...`` (even if every table is listed, or ``--force`` is supplied)
      - Retain.
    * - ``fast_sync --replication_method_only log_based`` (or another non-default filter, with or without ``--force``)
@@ -110,42 +110,40 @@ unchanged. An active slot, a slot for another database, or an unexpected output
 plugin blocks the operation.
 
 After these checks, PipelineWise saves a unique
-``state.json.before-slot-reset-<id>.bak`` alongside the state file, clears every
-tap bookmark, then prepares ``pipelinewise_<tap_id>``. An existing canonical
-pgoutput slot is dropped and recreated. If the canonical slot is absent,
-PipelineWise copies the historical tap-specific
-``pipelinewise_<dbname>_<tap_id>`` slot, changing its plugin from wal2json to
-pgoutput without changing its LSN. It never copies or drops the older
-``pipelinewise_<dbname>`` slot because that database-wide slot may serve another
-tap. A DBA must first migrate it to the dedicated tap-specific name. If no
-candidate exists, PipelineWise creates a new pgoutput slot. Backups are retained
-across retries. No FullSync or configured PartialSync worker starts until slot
-preparation succeeds.
+``state.json.before-slot-reset-<id>.bak`` alongside the state file. It records
+a durable reset intent and clears every tap bookmark before replacing
+``pipelinewise_<tap_id>`` with a fresh pgoutput slot. An explicit resync never
+copies the old wal2json slot, so it can recover when that slot's WAL is no longer
+usable. Potentially shared database-wide slots remain untouched.
 
-A copied wal2json slot remains alongside pgoutput. Singer first consumes the
-old slot through a post-publication transactional logical message. After the
-target acknowledges that overlap, PipelineWise advances the new slot to the
-same boundary. A later run switches to pgoutput. PipelineWise removes wal2json
-after the target acknowledges another pgoutput logical-message boundary. This
-works without selected-table activity. The overlap temporarily needs one
-additional replication-slot entry.
+The old tap-specific wal2json slot is retained while the fresh snapshot loads.
+After every worker succeeds, the reset intent is cleared and normal pgoutput
+consumption can resume. PipelineWise removes the old tap-specific slot only
+after the target acknowledges a later pgoutput boundary. This also works for
+selected partition roots, whose automatic wal2json bridge is unsupported.
+The overlap temporarily needs one additional replication-slot entry.
 
-Automatic wal2json migration stops before source or state changes when a
-selected table is a partition root. The fixed wal2json table filter cannot
-safely cover a leaf attached while the bridge is running. Coordinate removal or
-renaming of the old tap-specific slot and complete the whole-tap resync instead.
+Backups are retained across retries. No FullSync or configured PartialSync worker
+starts until slot preparation succeeds. A failed or interrupted whole-tap reset
+retains its durable intent; ordinary replication refuses to run until the
+unfiltered ``fast_sync`` succeeds. This prevents an ordinary run from treating
+an incomplete resync as a completed snapshot.
 
 .. warning::
 
    Slot preparation is not atomic. A source error, lost response, or process
    interruption after state invalidation can leave the canonical slot unchanged,
-   absent, copied, or replaced; bookmarks remain cleared. Keep scheduled
+   absent or replaced; bookmarks remain cleared. Keep scheduled
    replication stopped, resolve the error, then retry the unfiltered
    ``fast_sync`` and complete the whole-tap resync. A state backup cannot recover
    WAL discarded by a completed or uncertain canonical-slot drop. Never restore
    old LOG_BASED bookmarks after that outcome. Errors report the failed phase
    and backup path when available.
    Add ``--force`` only if the resync size limit needs to be bypassed.
+
+When an old tap ID must change to meet pgoutput naming rules, use
+:ref:`postgres_tap_rename` to preserve state and its migration source slot.
+A plain import rename follows deletion cleanup and is not that migration path.
 
 For managed Iceberg, a pending publication or conversion recovery stops the
 whole-tap reset before source or state changes. Resume the corresponding filtered

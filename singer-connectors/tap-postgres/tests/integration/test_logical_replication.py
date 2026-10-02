@@ -140,7 +140,8 @@ class TestLogicalReplication(unittest.TestCase):
         })
         self.assertEqual(messages[5]['type'], 'STATE')
 
-        self.assertDictEqual(state, messages[5]['value'])
+        self.assertDictEqual(state, next(message['value'] for message in reversed(messages)
+                                         if message['type'] == 'STATE'))
         self.assertIsNotNone(state['bookmarks']['public-awesome_table']['lsn'])
 
         conn = get_test_connection()
@@ -347,7 +348,141 @@ class TestUnselectedTableSlotAdvancement(unittest.TestCase):
 
 
 class TestPgoutputPreflightSafety(unittest.TestCase):
-    def test_publication_fence_waits_for_virtual_xid_without_backend_xid(self):
+    def test_deferrable_primary_key_is_rejected_before_publishing_or_breaking_source_updates(self):
+        table = 'deferrable_identity_review'
+        config = {**get_test_connection_config(), 'tap_id': 'deferrable_identity_review'}
+        publication = logical_replication.generate_publication_name(config['tap_id'])
+        conn = get_test_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(f'CREATE TABLE {table} (id integer PRIMARY KEY DEFERRABLE, value text)')
+                cur.execute(f"INSERT INTO {table} VALUES (1, 'before')")
+            stream = next(s for s in tap_postgres.do_discovery(config) if s['table_name'] == table)
+            stream = set_replication_method_for_stream(stream, 'LOG_BASED')
+            with self.assertRaisesRegex(logical_replication.ReplicationSlotMigrationError, 'non-deferrable'):
+                logical_replication.prepare_publication(config, [stream])
+            with conn.cursor() as cur:
+                cur.execute('SELECT 1 FROM pg_publication WHERE pubname = %s', (publication,))
+                self.assertIsNone(cur.fetchone())
+                cur.execute(f"UPDATE {table} SET value = 'after' WHERE id = 1")
+                self.assertEqual(cur.rowcount, 1)
+        finally:
+            with conn.cursor() as cur:
+                cur.execute(f'DROP PUBLICATION IF EXISTS {publication}')
+                cur.execute(f'DROP TABLE IF EXISTS {table}')
+            conn.close()
+
+    def test_publication_membership_accumulates_across_snapshot_and_cdc_subsets(self):
+        tables = ['publication_existing_review', 'publication_snapshot_review']
+        config = {**get_test_connection_config(), 'tap_id': 'publication_subset_review'}
+        publication = logical_replication.generate_publication_name(config['tap_id'])
+        conn = get_test_connection()
+        try:
+            with conn.cursor() as cur:
+                for table in tables:
+                    cur.execute(f'CREATE TABLE {table} (id integer PRIMARY KEY)')
+            streams = [set_replication_method_for_stream(s, 'LOG_BASED')
+                       for s in tap_postgres.do_discovery(config) if s['table_name'] in tables]
+            for selection in ([streams[0]], [streams[1]], [streams[0]]):
+                logical_replication.prepare_publication(config, selection)
+            with conn.cursor() as cur:
+                cur.execute('SELECT tablename FROM pg_publication_tables WHERE pubname = %s', (publication,))
+                self.assertEqual({row[0] for row in cur.fetchall()}, set(tables))
+        finally:
+            with conn.cursor() as cur:
+                cur.execute(f'DROP PUBLICATION IF EXISTS {publication}')
+                for table in tables:
+                    cur.execute(f'DROP TABLE IF EXISTS {table}')
+            conn.close()
+
+    def test_publication_lock_wait_is_bounded(self):
+        table = 'publication_lock_review'
+        config = {**get_test_connection_config(), 'tap_id': 'publication_lock_review',
+                  'publication_fence_timeout_seconds': 0.1}
+        publication = logical_replication.generate_publication_name(config['tap_id'])
+        conn = get_test_connection()
+        blocker = get_test_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(f'CREATE TABLE {table} (id integer PRIMARY KEY)')
+            stream = next(s for s in tap_postgres.do_discovery(config) if s['table_name'] == table)
+            stream = set_replication_method_for_stream(stream, 'LOG_BASED')
+            blocker.autocommit = False
+            with blocker.cursor() as cur:
+                cur.execute(f'LOCK TABLE {table} IN ACCESS EXCLUSIVE MODE')
+            started = time.monotonic()
+            with self.assertRaisesRegex(Exception, 'timeout'):
+                logical_replication.prepare_publication(config, [stream])
+            self.assertLess(time.monotonic() - started, 5)
+        finally:
+            blocker.close()
+            with conn.cursor() as cur:
+                cur.execute(f'DROP PUBLICATION IF EXISTS {publication}')
+                cur.execute(f'DROP TABLE IF EXISTS {table}')
+            conn.close()
+
+    def test_publication_fence_waits_for_existing_writer(self):
+        config = {**get_test_connection_config(), 'publication_fence_timeout_seconds': 5}
+        transaction = get_test_connection()
+        errors = []
+        try:
+            transaction.autocommit = False
+            with transaction.cursor() as cur:
+                cur.execute('SELECT txid_current()')
+            waiter = threading.Thread(target=lambda: self._run_fence(config, errors), daemon=True)
+            waiter.start()
+            time.sleep(0.25)
+            self.assertTrue(waiter.is_alive())
+            transaction.commit()
+            waiter.join(timeout=5)
+            self.assertFalse(waiter.is_alive())
+            self.assertEqual(errors, [])
+        finally:
+            transaction.close()
+
+    def test_read_only_transaction_can_write_after_publication_fence_without_losing_row(self):
+        table = 'publication_reader_upgrade'
+        config = {**get_test_connection_config(), 'tap_id': 'publication_reader_upgrade'}
+        publication = logical_replication.generate_publication_name(config['tap_id'])
+        slot = logical_replication.generate_replication_slot_name(config['tap_id'])
+        conn = get_test_connection()
+        reader = get_test_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(f'CREATE TABLE {table} (id integer PRIMARY KEY)')
+                cur.execute(f'INSERT INTO {table} VALUES (7)')
+                cur.execute('SELECT lsn::text FROM pg_create_logical_replication_slot(%s, %s)', (slot, 'pgoutput'))
+                start_lsn = logical_replication.lsn_to_int(cur.fetchone()[0])
+            stream = next(s for s in tap_postgres.do_discovery(config) if s['table_name'] == table)
+            stream = set_replication_method_for_stream(stream, 'LOG_BASED')
+            reader.autocommit = False
+            with reader.cursor() as cur:
+                cur.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ')
+                cur.execute(f'SELECT * FROM {table}')
+            logical_replication.prepare_publication(config, [stream])
+            with reader.cursor() as cur:
+                cur.execute(f'UPDATE {table} SET id = 8 WHERE id = 7')
+                cur.execute(f'INSERT INTO {table} VALUES (42)')
+            reader.commit()
+            output = SingerOutput()
+            state = {'bookmarks': {stream['tap_stream_id']: {
+                'lsn': start_lsn, 'version': 1, 'last_replication_method': 'LOG_BASED'}}}
+            with contextlib.redirect_stdout(output):
+                logical_replication.sync_tables(config, [stream], state, start_lsn, None)
+            records = [json.loads(line)['record'] for line in output.getvalue().splitlines()
+                       if json.loads(line)['type'] == 'RECORD']
+            self.assertEqual([record['id'] for record in records], [7, 8, 42])
+            self.assertIsNotNone(records[0]['_sdc_deleted_at'])
+        finally:
+            reader.close()
+            with conn.cursor() as cur:
+                cur.execute('SELECT pg_drop_replication_slot(slot_name) FROM pg_replication_slots '
+                            'WHERE slot_name = %s', (slot,))
+                cur.execute(f'DROP PUBLICATION IF EXISTS {publication}')
+                cur.execute(f'DROP TABLE IF EXISTS {table}')
+            conn.close()
+
+    def test_publication_fence_does_not_wait_for_read_only_virtual_xid(self):
         config = get_test_connection_config()
         config['publication_fence_timeout_seconds'] = 5
         transaction = get_test_connection()
@@ -372,11 +507,9 @@ class TestPgoutputPreflightSafety(unittest.TestCase):
                 daemon=True,
             )
             waiter.start()
-            time.sleep(0.25)
-            self.assertTrue(waiter.is_alive(), 'publication fence ignored the open virtual transaction')
+            waiter.join(timeout=2)
+            self.assertFalse(waiter.is_alive(), 'publication fence waited for a read-only transaction')
             transaction.commit()
-            waiter.join(timeout=5)
-            self.assertFalse(waiter.is_alive(), 'publication fence did not clear after commit')
             self.assertEqual(errors, [])
         finally:
             transaction.close()
@@ -444,14 +577,14 @@ class TestPgoutputPreflightSafety(unittest.TestCase):
             stream = set_replication_method_for_stream(stream, 'LOG_BASED')
             with self.assertRaisesRegex(
                     logical_replication.ReplicationSlotMigrationError,
-                    'REPLICA IDENTITY DEFAULT backed by a valid primary key'):
+                    'REPLICA IDENTITY DEFAULT backed by a valid non-deferrable primary key'):
                 logical_replication.prepare_publication(config, [stream])
 
             with conn.cursor() as cur:
                 cur.execute(f'ALTER TABLE public.{table_name} REPLICA IDENTITY FULL')
             with self.assertRaisesRegex(
                     logical_replication.ReplicationSlotMigrationError,
-                    'REPLICA IDENTITY DEFAULT backed by a valid primary key'):
+                    'REPLICA IDENTITY DEFAULT backed by a valid non-deferrable primary key'):
                 logical_replication.prepare_publication(config, [stream])
 
             with conn.cursor() as cur:
@@ -495,7 +628,7 @@ class TestPgoutputPreflightSafety(unittest.TestCase):
             stream = set_replication_method_for_stream(stream, 'LOG_BASED')
             with self.assertRaisesRegex(
                     logical_replication.ReplicationSlotMigrationError,
-                    'REPLICA IDENTITY DEFAULT backed by a valid primary key'):
+                    'REPLICA IDENTITY DEFAULT backed by a valid non-deferrable primary key'):
                 logical_replication.prepare_publication(config, [stream])
 
             with conn.cursor() as cur:
@@ -536,7 +669,7 @@ class TestPgoutputPreflightSafety(unittest.TestCase):
             stream = set_replication_method_for_stream(stream, 'LOG_BASED')
             with self.assertRaisesRegex(
                     logical_replication.ReplicationSlotMigrationError,
-                    'REPLICA IDENTITY DEFAULT backed by a valid primary key'):
+                    'REPLICA IDENTITY DEFAULT backed by a valid non-deferrable primary key'):
                 logical_replication.prepare_publication(config, [stream])
 
             with conn.cursor() as cur:
@@ -572,7 +705,7 @@ class TestPgoutputPreflightSafety(unittest.TestCase):
                 cur.execute(f'DROP PUBLICATION {publication}')
             with self.assertRaisesRegex(
                     logical_replication.ReplicationSlotMigrationError,
-                    'REPLICA IDENTITY DEFAULT backed by a valid primary key'):
+                    'REPLICA IDENTITY DEFAULT backed by a valid non-deferrable primary key'):
                 logical_replication.prepare_publication(config, [stream])
             with conn.cursor() as cur:
                 cur.execute(
@@ -890,7 +1023,7 @@ class TestPgoutputPreflightSafety(unittest.TestCase):
             transaction.autocommit = False
             with transaction.cursor() as cur:
                 cur.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ')
-                cur.execute('SELECT 1')
+                cur.execute('SELECT txid_current()')
 
             with control.cursor() as cur:
                 cur.execute(
@@ -1007,8 +1140,9 @@ class TestLogicalReplicaSnapshots(unittest.TestCase):
             with contextlib.redirect_stdout(output), self.assertRaisesRegex(
                     logical_replication.ReplicationSlotMigrationError, 'Timed out waiting for the secondary'):
                 tap_postgres.sync_traditional_stream(config, stream, state, 'logical_initial', boundary_lsn)
-            self.assertEqual(output.getvalue(), '')
-            self.assertEqual(state, {'bookmarks': {}})
+            self.assertFalse(any(
+                json.loads(line)['type'] in {'RECORD', 'STATE'} for line in output.getvalue().splitlines()))
+            self.assertFalse(state.get('bookmarks', {}).get(stream['tap_stream_id'], {}).get('lsn'))
 
             with secondary.cursor() as cur:
                 cur.execute('SELECT pg_wal_replay_resume()')

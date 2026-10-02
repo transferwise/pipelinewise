@@ -289,6 +289,29 @@ position is uncertain.
 PostgreSQL Errors
 '''''''''''''''''
 
+Publication setup, unsupported tables, and interrupted reset
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+Check the source version against :ref:`tap-postgres`. PostgreSQL before 14 is
+rejected. Affected 14–17 minor releases remain supported but log a warning that
+logical decoding may lose or corrupt changes. Deferrable primary keys and
+selected generated columns are rejected before publication changes. Use the
+inventory query and supported alternatives in that guide.
+
+Publication setup waits for earlier writers and applies bounded lock and
+statement timeouts. Resolve the reported transaction or conflicting DDL, then
+retry with the same state. Long read-only transactions without an assigned
+transaction ID do not block this fence. A prepared transaction requires DBA
+resolution.
+
+An incomplete PostgreSQL slot-reset intent blocks ordinary replication. Keep the
+schedule stopped and retry the unfiltered whole-tap ``fast_sync`` described in
+:ref:`resync_postgres_slot_reset`. Do not delete the reset marker or restore
+bookmarks whose required WAL may have been discarded.
+
+For an invalid historical tap ID, follow :ref:`postgres_tap_rename`. It preserves
+the state and old slot through an explicit ``previous_tap_id`` mapping.
+
 .. _troubleshooting_postgres_wal_level:
 
 requires wal_level >= logical

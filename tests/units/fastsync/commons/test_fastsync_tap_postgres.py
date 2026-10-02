@@ -124,7 +124,7 @@ class TestFastSyncTapPostgres(TestCase):
         assert FastSyncTapPostgres.validate_replication_slot_identity('source_db', valid) == (
             f'pipelinewise_{valid}',
             'pipelinewise_source_db',
-            f'pipelinewise_source_db_{valid}',
+            f'pipelinewise_source_db_{valid}'[:63],
         )
         for invalid in ('', 'UPPER', 'has-hyphen', 'has.dot', 't' * 51):
             with self.subTest(invalid=invalid), self.assertRaisesRegex(
@@ -136,6 +136,130 @@ class TestFastSyncTapPostgres(TestCase):
         """A tap cannot migrate when its canonical name aliases the legacy database slot."""
         with self.assertRaisesRegex(RuntimeError, 'collides with a historical wal2json slot'):
             FastSyncTapPostgres.validate_replication_slot_identity('same_name', 'same_name')
+
+    def test_renamed_tap_uses_truncated_historical_slot_and_validates_migration_marker(self):
+        """An alias preserves the real stored legacy identity across a tap rename."""
+        previous_tap_id = 'Old-Tap-' + 'x' * 50
+        config = {'dbname': 'source_database', 'tap_id': 'new_tap', 'previous_tap_id': previous_tap_id}
+        destination, _, source = FastSyncTapPostgres.validate_replication_slot_identity(
+            config['dbname'], config['tap_id'], config['previous_tap_id'])
+        self.assertEqual(destination, 'pipelinewise_new_tap')
+        self.assertEqual(source, ('pipelinewise_source_database_old_tap_' + 'x' * 50)[:63])
+        self.assertEqual(len(source), 63)
+        marker = {
+            'version': 1, 'phase': 'pgoutput', 'source_slot': source,
+            'destination_slot': destination, 'copy_lsn': 100, 'bridge_lsn': 200,
+        }
+        self.assertEqual(FastSyncTapPostgres.validate_migration_state_marker(config, marker),
+                         ('pgoutput', destination, source))
+        with self.assertRaisesRegex(RuntimeError, 'does not match'):
+            FastSyncTapPostgres.validate_migration_state_marker({**config, 'previous_tap_id': 'foreign'}, marker)
+
+    def test_create_replication_slot_copies_real_truncated_historical_name(self):
+        """Stored truncated names must be used for lookup and slot copying."""
+        self.postgres.connection_config['dbname'] = 'source_database'
+        self.postgres.connection_config['tap_id'] = 'x' * 50
+        source = ('pipelinewise_source_database_' + 'x' * 50)[:63]
+        connection = MagicMock()
+        cursor = connection.cursor.return_value.__enter__.return_value
+        cursor.fetchall.return_value = [(source, 'source_database', 'wal2json', False)]
+        self.postgres.primary_host_conn = connection
+
+        self.postgres.create_replication_slot()
+
+        cursor.execute.assert_called_with(
+            'SELECT * FROM pg_copy_logical_replication_slot(%s, %s, %s, %s)',
+            (source, 'pipelinewise_' + 'x' * 50, False, 'pgoutput'),
+        )
+
+    def test_capture_snapshot_boundary_returns_only_after_flushed_transaction(self):
+        """The replay fence is a committed record, not a possibly empty WAL page header."""
+        connection = MagicMock()
+        cursor = connection.cursor.return_value.__enter__.return_value
+        cursor.fetchone.return_value = ('0/64',)
+        calls = MagicMock()
+        calls.attach_mock(cursor.execute, 'execute')
+        calls.attach_mock(connection.__exit__, 'commit')
+
+        self.assertEqual(FastSyncTapPostgres.capture_snapshot_boundary(connection), 100)
+
+        self.assertEqual(calls.mock_calls, [
+            call.execute('SET LOCAL synchronous_commit = on'),
+            call.execute("SELECT pg_logical_emit_message(true, 'pipelinewise_snapshot', '')::text"),
+            call.commit(None, None, None),
+        ])
+
+    def test_snapshot_wait_uses_existing_export_connection(self):
+        """Replica catch-up must be checked on the connection that exports the rows."""
+        self.postgres.conn = MagicMock()
+        connection = self.postgres.conn.__enter__.return_value
+        cursor = connection.cursor.return_value.__enter__.return_value
+        cursor.rowcount = 1
+        cursor.fetchall.side_effect = [
+            [{'in_recovery': True, 'current_lsn': '0/32'}],
+            [{'in_recovery': True, 'current_lsn': '0/64'}],
+        ]
+        with patch.object(tap_postgres, 'sleep'), patch.object(self.postgres, 'get_connection') as connect:
+            self.assertEqual(self.postgres._wait_for_replica_replay(100), 100)
+        connect.assert_not_called()
+        self.assertEqual(cursor.execute.call_count, 2)
+
+    @patch('pipelinewise.fastsync.commons.tap_postgres.psycopg2.connect')
+    def test_get_connection_preserves_quotes_and_explicit_sslmode(self, connect):
+        """Driver keyword parameters preserve credentials without handwritten DSN escaping."""
+        connect.return_value.server_version = 150013
+        config = {'dbname': "quoted'db", 'host': 'primary', 'port': 5432, 'user': 'replication',
+                  'password': "a'b\\c", 'sslmode': 'verify-full', 'ssl': 'true'}
+        FastSyncTapPostgres.get_connection(config, prioritize_primary=True)
+        connect.assert_called_once_with(
+            dbname=config['dbname'], host='primary', port=5432, user='replication',
+            password=config['password'], sslmode='verify-full', connect_timeout=30)
+
+    @patch('pipelinewise.fastsync.commons.tap_postgres.psycopg2.connect')
+    def test_get_connection_warns_before_catalog_cache_fix_on_each_supported_major(self, connect):
+        """Affected minor releases remain supported with an explicit data-loss warning."""
+        config = {'dbname': 'source', 'host': 'primary', 'port': 5432, 'user': 'user', 'password': 'secret'}
+        with patch.object(tap_postgres.LOGGER, 'warning') as warning:
+            for version in [140000, 140017, 150012, 160008, 170004]:
+                with self.subTest(version=version):
+                    warning.reset_mock()
+                    connect.return_value.server_version = version
+                    self.assertIs(FastSyncTapPostgres.get_connection(config), connect.return_value)
+                    warning.assert_called_once()
+                    self.assertIn('may omit or misdecode changes', warning.call_args.args[0])
+                    self.assertEqual(version, warning.call_args.args[1])
+            for version in [140018, 150013, 160009, 170005, 180000, 190000]:
+                with self.subTest(version=version):
+                    warning.reset_mock()
+                    connect.return_value.server_version = version
+                    self.assertIs(FastSyncTapPostgres.get_connection(config), connect.return_value)
+                    warning.assert_not_called()
+
+    def test_acknowledgement_waits_for_server_to_release_slot(self):
+        """Target success is not failed just because walsender cleanup is still completing."""
+        connection = MagicMock()
+        cursor = connection.cursor.return_value.__enter__.return_value
+        cursor.fetchall.side_effect = [
+            [('pipelinewise_my_tap', 'my_db', 'pgoutput', True, '0/64')],
+            [('pipelinewise_my_tap', 'my_db', 'pgoutput', False, '0/64')],
+        ]
+        cursor.fetchone.return_value = ('pipelinewise_my_tap', '0/C8')
+        with patch.object(FastSyncTapPostgres, 'get_connection', return_value=connection), \
+                patch.object(tap_postgres, 'sleep') as sleep:
+            FastSyncTapPostgres.advance_canonical_replication_slot({'dbname': 'my_db', 'tap_id': 'my_tap'}, 200)
+        sleep.assert_called_once_with(0.1)
+        self.assertEqual(cursor.execute.call_count, 3)
+        self.assertIn('pg_replication_slot_advance', cursor.execute.call_args.args[0])
+
+    @patch.object(tap_postgres, 'SLOT_RELEASE_TIMEOUT_SECONDS', 0)
+    def test_unfinished_concurrent_slot_cannot_produce_a_snapshot_bookmark(self):
+        """A slot with no consistent start position must never be accepted for a snapshot."""
+        self.postgres.primary_host_conn = MagicMock()
+        cursor = self.postgres.primary_host_conn.cursor.return_value.__enter__.return_value
+        cursor.fetchall.return_value = [('pipelinewise_test_tap', 'test_database', 'pgoutput', True, None)]
+        with self.assertRaisesRegex(RuntimeError, 'Timed out'):
+            self.postgres.create_replication_slot()
+        self.assertFalse(any('pg_create_' in entry.args[0] for entry in cursor.execute.call_args_list))
 
     def test_close_connection_is_idempotent(self):
         """Close each opened connection once and clear its cursor reference."""
@@ -174,13 +298,13 @@ class TestFastSyncTapPostgres(TestCase):
         ), patch.object(
             self.postgres, 'create_replication_slot'
         ) as create_replication_slot, patch.object(
-            self.postgres, 'query', return_value=[{'current_lsn': '0/2A'}]
+            self.postgres, 'capture_snapshot_boundary', return_value=42
         ) as query:
             bookmark = self.postgres.fetch_current_log_pos()
 
         self.assertEqual({'lsn': 42, 'version': 1}, bookmark)
         create_replication_slot.assert_called_once_with()
-        query.assert_called_once_with('SELECT pg_current_wal_lsn() AS current_lsn')
+        query.assert_called_once_with(primary_connection)
         primary_connection.close.assert_called_once_with()
         self.assertIsNone(self.postgres.primary_host_conn)
 
@@ -194,14 +318,15 @@ class TestFastSyncTapPostgres(TestCase):
         ), patch.object(
             self.postgres, 'create_replication_slot'
         ), patch.object(
-            self.postgres, 'primary_host_query', return_value=[{'current_lsn': '0/2A'}]
+            self.postgres, 'capture_snapshot_boundary', return_value=42
         ), patch.object(
             self.postgres, 'query', return_value=[{'current_lsn': '0/2A'}]
         ) as query:
             bookmark = self.postgres.fetch_current_log_pos()
 
         self.assertEqual({'lsn': 42, 'version': 1}, bookmark)
-        query.assert_called_once_with('SELECT pg_last_wal_replay_lsn() AS current_lsn')
+        query.assert_called_once_with(
+            'SELECT pg_is_in_recovery() AS in_recovery, pg_last_wal_replay_lsn() AS current_lsn')
 
     def test_fetch_current_log_pos_closes_primary_connection_on_failure(self):
         """A replication-slot failure cannot leak the primary connection."""
@@ -229,7 +354,7 @@ class TestFastSyncTapPostgres(TestCase):
         ), patch.object(
             self.postgres, 'create_replication_slot'
         ), patch.object(
-            self.postgres, 'primary_host_query', return_value=[{'current_lsn': '0/40'}]
+            self.postgres, 'capture_snapshot_boundary', return_value=64
         ), patch.object(
             self.postgres, 'query', side_effect=[
                 [{'current_lsn': '0/20'}],
@@ -253,7 +378,7 @@ class TestFastSyncTapPostgres(TestCase):
         ), patch.object(
             self.postgres, 'create_replication_slot'
         ), patch.object(
-            self.postgres, 'primary_host_query', return_value=[{'current_lsn': '0/40'}]
+            self.postgres, 'capture_snapshot_boundary', return_value=64
         ), patch.object(
             self.postgres, 'query', return_value=[{'current_lsn': '0/20'}]
         ), patch.object(
@@ -352,19 +477,45 @@ class TestFastSyncTapPostgres(TestCase):
             ('pipelinewise_test_database_test_tap', 'pipelinewise_test_tap', False, 'pgoutput'),
         )
 
+    def test_new_tap_creates_slot_without_claiming_unrelated_shared_history(self):
+        """An explicit absence of logical state permits a fresh, private slot."""
+        for has_dedicated in (False, True):
+            with self.subTest(has_dedicated=has_dedicated):
+                connection = MagicMock()
+                cursor = connection.cursor.return_value.__enter__.return_value
+                cursor.fetchall.return_value = [
+                    ('pipelinewise_test_database', 'test_database', 'wal2json', False),
+                ]
+                if has_dedicated:
+                    cursor.fetchall.return_value.append(
+                        ('pipelinewise_test_database_test_tap', 'test_database', 'wal2json', False)
+                    )
+                self.postgres.primary_host_conn = connection
+
+                self.postgres.create_replication_slot(fresh_start=True)
+
+                statement = cursor.execute.call_args.args[0]
+                self.assertIn('pg_copy_logical_replication_slot' if has_dedicated else
+                              'pg_create_logical_replication_slot', statement)
+                self.assertFalse(any('pg_drop_replication_slot' in item.args[0]
+                                     for item in cursor.execute.call_args_list))
+
     def test_create_replication_slot_accepts_existing_pgoutput_slot(self):
-        """A valid canonical slot makes setup idempotent, even if it is active."""
+        """An active creator must finish its slot before snapshot setup can proceed."""
         connection = MagicMock()
         cursor = connection.cursor.return_value.__enter__.return_value
-        cursor.fetchall.return_value = [
-            ('pipelinewise_test_tap', 'test_database', 'pgoutput', True),
-            ('pipelinewise_test_database', 'test_database', 'wal2json', False),
+        cursor.fetchall.side_effect = [
+            [('pipelinewise_test_tap', 'test_database', 'pgoutput', True)],
+            [('pipelinewise_test_tap', 'test_database', 'pgoutput', True, None)],
+            [('pipelinewise_test_tap', 'test_database', 'pgoutput', False, '0/64')],
         ]
         self.postgres.primary_host_conn = connection
 
-        self.postgres.create_replication_slot()
+        with patch.object(tap_postgres, 'sleep') as sleep:
+            self.postgres.create_replication_slot()
 
-        self.assertEqual(cursor.execute.call_count, 1)
+        sleep.assert_called_once_with(0.1)
+        self.assertEqual(cursor.execute.call_count, 3)
 
     def test_create_replication_slot_rejects_incompatible_or_active_source(self):
         """Migration validates plugin, database, and inactivity before copying."""
@@ -395,7 +546,7 @@ class TestFastSyncTapPostgres(TestCase):
         cursor = connection.cursor.return_value.__enter__.return_value
         cursor.fetchall.side_effect = [
             [],
-            [('pipelinewise_test_tap', 'test_database', 'pgoutput', False)],
+            [('pipelinewise_test_tap', 'test_database', 'pgoutput', False, '0/64')],
         ]
         cursor.execute.side_effect = [None, DuplicateSlot('already exists'), None]
         self.postgres.primary_host_conn = connection
@@ -409,7 +560,7 @@ class TestFastSyncTapPostgres(TestCase):
         """
         Check that get connection uses the right credentials to connect to primary
         """
-        connect_mock.return_value.server_version = 140000
+        connect_mock.return_value.server_version = 140018
         creds = {
             'host': 'my_primary_host',
             'user': 'my_primary_user',
@@ -424,8 +575,7 @@ class TestFastSyncTapPostgres(TestCase):
         )
 
         connect_mock.assert_called_once_with(
-            f"host='{creds['host']}' port='{creds['port']}' user='{creds['user']}' password='{creds['password']}' "
-            f"dbname='{creds['dbname']}'"
+            **creds, connect_timeout=30
         )
 
         self.assertTrue(connect_mock.return_value.autocommit)
@@ -525,6 +675,7 @@ class TestFastSyncTapPostgres(TestCase):
         connection = MagicMock()
         cursor = connection.cursor.return_value.__enter__.return_value
         cursor.fetchall.return_value = [('pipelinewise_my_tap', 'my_db', 'pgoutput', False)]
+        cursor.fetchone.return_value = ('pipelinewise_my_tap', '0/64')
         creds = {'dbname': 'my_db', 'tap_id': 'my_tap'}
         before_reset = MagicMock(return_value='state.backup')
         calls = MagicMock()
@@ -543,28 +694,31 @@ class TestFastSyncTapPostgres(TestCase):
                 'WHERE slot_name IN (%s, %s, %s)',
                 ('pipelinewise_my_tap', 'pipelinewise_my_db', 'pipelinewise_my_db_my_tap'),
             ),
-            call.before_reset(),
+            call.before_reset(fresh_start_marker={
+                'version': 1, 'source_slot': None, 'destination_slot': 'pipelinewise_my_tap',
+            }),
             call.execute('SELECT pg_drop_replication_slot(%s)', ('pipelinewise_my_tap',)),
             call.execute(
-                'SELECT * FROM pg_create_logical_replication_slot(%s, %s)',
+                'SELECT slot_name, lsn::text FROM pg_create_logical_replication_slot(%s, %s)',
                 ('pipelinewise_my_tap', 'pgoutput'),
             ),
         ]
         connection.close.assert_called_once_with()
 
-    def test_reset_slot_copies_historical_slot_after_state_invalidation(self):
-        """First reset migrates one old boundary and retains its source slot."""
+    def test_reset_slot_creates_fresh_boundary_and_retains_historical_slot(self):
+        """A full resync must not copy unusable historical WAL after invalidating state."""
         legacy = ('pipelinewise_my_db_my_tap', 'my_db', 'wal2json', False)
         connection = MagicMock()
         cursor = connection.cursor.return_value.__enter__.return_value
         cursor.fetchall.return_value = [legacy]
+        cursor.fetchone.return_value = ('pipelinewise_my_tap', '0/64')
         before_reset = MagicMock(return_value='state.backup')
         calls = MagicMock()
         calls.attach_mock(cursor.execute, 'execute')
         calls.attach_mock(before_reset, 'before_reset')
 
         with patch.object(FastSyncTapPostgres, 'get_connection', return_value=connection):
-            FastSyncTapPostgres.reset_slot(
+            result = FastSyncTapPostgres.reset_slot(
                 {'dbname': 'my_db', 'tap_id': 'my_tap'}, before_reset=before_reset
             )
 
@@ -574,34 +728,42 @@ class TestFastSyncTapPostgres(TestCase):
                 'WHERE slot_name IN (%s, %s, %s)',
                 ('pipelinewise_my_tap', 'pipelinewise_my_db', 'pipelinewise_my_db_my_tap'),
             ),
-            call.before_reset(),
+            call.before_reset(fresh_start_marker={
+                'version': 1, 'source_slot': legacy[0], 'destination_slot': 'pipelinewise_my_tap',
+            }),
             call.execute(
-                'SELECT * FROM pg_copy_logical_replication_slot(%s, %s, %s, %s)',
-                ('pipelinewise_my_db_my_tap', 'pipelinewise_my_tap', False, 'pgoutput'),
+                'SELECT slot_name, lsn::text FROM pg_create_logical_replication_slot(%s, %s)',
+                ('pipelinewise_my_tap', 'pgoutput'),
             ),
         ]
         self.assertFalse(any('pg_drop_replication_slot' in call_.args[0]
                              for call_ in cursor.execute.call_args_list))
+        self.assertEqual(result, {
+            'source_slot': legacy[0], 'destination_slot': 'pipelinewise_my_tap', 'copy_lsn': 100,
+        })
         connection.close.assert_called_once_with()
 
-    def test_reset_slot_rejects_shared_database_wide_slot_before_state_invalidation(self):
-        """Reset cannot claim a database-wide slot when no tap-owned slot exists."""
+    def test_reset_slot_preserves_unrelated_shared_database_wide_slot(self):
+        """An explicit fresh snapshot needs no history from a shared slot."""
         connection = MagicMock()
         cursor = connection.cursor.return_value.__enter__.return_value
         cursor.fetchall.return_value = [
             ('pipelinewise_my_db', 'my_db', 'wal2json', False),
         ]
-        cursor.fetchone.return_value = None
+        cursor.fetchone.return_value = ('pipelinewise_my_tap', '0/64')
         before_reset = MagicMock()
 
         with patch.object(FastSyncTapPostgres, 'get_connection', return_value=connection):
-            with self.assertRaisesRegex(RuntimeError, 'database-wide PostgreSQL slot.*may be shared'):
-                FastSyncTapPostgres.reset_slot(
-                    {'dbname': 'my_db', 'tap_id': 'my_tap'}, before_reset=before_reset
-                )
+            result = FastSyncTapPostgres.reset_slot(
+                {'dbname': 'my_db', 'tap_id': 'my_tap'}, before_reset=before_reset
+            )
 
-        before_reset.assert_not_called()
-        self.assertEqual(cursor.execute.call_count, 1)
+        before_reset.assert_called_once_with(fresh_start_marker={
+            'version': 1, 'source_slot': None, 'destination_slot': 'pipelinewise_my_tap',
+        })
+        self.assertIsNone(result['source_slot'])
+        self.assertEqual(cursor.execute.call_count, 2)
+        self.assertFalse(any('pg_drop_replication_slot' in item.args[0] for item in cursor.execute.call_args_list))
         connection.close.assert_called_once_with()
 
     def test_reset_slot_rejects_active_and_incompatible_destination_before_state_changes(self):
@@ -642,13 +804,16 @@ class TestFastSyncTapPostgres(TestCase):
         connection = MagicMock()
         cursor = connection.cursor.return_value.__enter__.return_value
         cursor.fetchall.return_value = []
+        cursor.fetchone.return_value = ('pipelinewise_my_tap', '0/64')
         before_reset = MagicMock(return_value=None)
         with patch.object(FastSyncTapPostgres, 'get_connection', return_value=connection):
             FastSyncTapPostgres.reset_slot({'dbname': 'my_db', 'tap_id': 'my_tap'}, before_reset=before_reset)
-        before_reset.assert_called_once_with()
+        before_reset.assert_called_once_with(fresh_start_marker={
+            'version': 1, 'source_slot': None, 'destination_slot': 'pipelinewise_my_tap',
+        })
         self.assertEqual(cursor.execute.call_count, 2)
         cursor.execute.assert_called_with(
-            'SELECT * FROM pg_create_logical_replication_slot(%s, %s)',
+            'SELECT slot_name, lsn::text FROM pg_create_logical_replication_slot(%s, %s)',
             ('pipelinewise_my_tap', 'pgoutput'),
         )
         connection.close.assert_called_once_with()
@@ -662,6 +827,7 @@ class TestFastSyncTapPostgres(TestCase):
                 connection = MagicMock()
                 cursor = connection.cursor.return_value.__enter__.return_value
                 cursor.fetchall.return_value = []
+                cursor.fetchone.return_value = (slot_prefix + config['tap_id'], '0/64')
                 before_reset = MagicMock(return_value=None)
                 with patch.object(FastSyncTapPostgres, 'get_connection', return_value=connection):
                     if length == 64:
@@ -671,9 +837,12 @@ class TestFastSyncTapPostgres(TestCase):
                         before_reset.assert_not_called()
                     else:
                         FastSyncTapPostgres.reset_slot(config, before_reset=before_reset)
-                        before_reset.assert_called_once_with()
+                        before_reset.assert_called_once_with(fresh_start_marker={
+                            'version': 1, 'source_slot': None,
+                            'destination_slot': slot_prefix + config['tap_id'],
+                        })
                         cursor.execute.assert_called_with(
-                            'SELECT * FROM pg_create_logical_replication_slot(%s, %s)',
+                            'SELECT slot_name, lsn::text FROM pg_create_logical_replication_slot(%s, %s)',
                             (slot_prefix + config['tap_id'], 'pgoutput'),
                         )
                 connection.close.assert_called_once_with()
@@ -697,7 +866,7 @@ class TestFastSyncTapPostgres(TestCase):
         """
         Check that get connection uses the right credentials to connect to secondary if present
         """
-        connect_mock.return_value.server_version = 140000
+        connect_mock.return_value.server_version = 140018
         creds = {
             'host': 'my_primary_host',
             'replica_host': 'my_replica_host',
@@ -716,9 +885,8 @@ class TestFastSyncTapPostgres(TestCase):
         )
 
         connect_mock.assert_called_once_with(
-            f"host='{creds['replica_host']}' port='{creds['replica_port']}' user='{creds['replica_user']}' password"
-            f"='{creds['replica_password']}' "
-            f"dbname='{creds['dbname']}'"
+            host=creds['replica_host'], port=creds['replica_port'], user=creds['replica_user'],
+            password=creds['replica_password'], dbname=creds['dbname'], connect_timeout=30
         )
 
         self.assertTrue(connect_mock.return_value.autocommit)
@@ -728,7 +896,7 @@ class TestFastSyncTapPostgres(TestCase):
         """
         Check that get connection uses the primary server credentials as a fallback
         """
-        connect_mock.return_value.server_version = 140000
+        connect_mock.return_value.server_version = 140018
         creds = {
             'host': 'my_primary_host',
             'replica_host': 'my_replica_host',
@@ -744,8 +912,8 @@ class TestFastSyncTapPostgres(TestCase):
         )
 
         connect_mock.assert_called_once_with(
-            f"host='{creds['replica_host']}' port='{creds['port']}' user='{creds['user']}' password"
-            f"='{creds['password']}' dbname='{creds['dbname']}'"
+            host=creds['replica_host'], port=creds['port'], user=creds['user'],
+            password=creds['password'], dbname=creds['dbname'], connect_timeout=30
         )
 
         self.assertTrue(connect_mock.return_value.autocommit)
@@ -755,7 +923,7 @@ class TestFastSyncTapPostgres(TestCase):
         """
         Check that get connection uses ssl when present
         """
-        connect_mock.return_value.server_version = 140000
+        connect_mock.return_value.server_version = 140018
         creds = {
             'host': 'my_primary_host',
             'user': 'my_primary_user',
@@ -771,8 +939,8 @@ class TestFastSyncTapPostgres(TestCase):
         )
 
         connect_mock.assert_called_once_with(
-            f"host='{creds['host']}' port='{creds['port']}' user='{creds['user']}' password"
-            f"='{creds['password']}' dbname='{creds['dbname']}' sslmode='require'"
+            host=creds['host'], port=creds['port'], user=creds['user'], password=creds['password'],
+            dbname=creds['dbname'], connect_timeout=30, sslmode='require'
         )
 
         self.assertTrue(connect_mock.return_value.autocommit)
@@ -790,7 +958,7 @@ class TestFastSyncTapPostgres(TestCase):
             'tap_id': 'tap_test',
         }
         connection = MagicMock()
-        connection.server_version = 140000
+        connection.server_version = 140018
         cursor = connection.cursor.return_value.__enter__.return_value
         cursor.fetchall.return_value = [
             ('pipelinewise_tap_test', 'my_db', 'pgoutput', False),
@@ -840,7 +1008,7 @@ class TestFastSyncTapPostgres(TestCase):
         ):
             with self.subTest(unsafe=unsafe):
                 connection = MagicMock()
-                connection.server_version = 140000
+                connection.server_version = 140018
                 cursor = connection.cursor.return_value.__enter__.return_value
                 cursor.fetchall.return_value = [
                     ('pipelinewise_tap_test', 'my_db', 'pgoutput', False),
@@ -857,7 +1025,7 @@ class TestFastSyncTapPostgres(TestCase):
     @patch('pipelinewise.fastsync.commons.tap_postgres.psycopg2.connect')
     def test_drop_slot_preserves_shared_wal2json_name_collision(self, connect_mock):
         """Even an ambiguous old tap ID cannot prove ownership of a shared slot."""
-        connection = MagicMock(server_version=140000)
+        connection = MagicMock(server_version=140018)
         cursor = connection.cursor.return_value.__enter__.return_value
         cursor.fetchall.return_value = [
             ('pipelinewise_same_name', 'same_name', 'wal2json', False),
@@ -881,7 +1049,7 @@ class TestFastSyncTapPostgres(TestCase):
 
     def test_drop_slot_preserves_canonical_slot_for_legacy_invalid_tap_id(self):
         """A normalized legacy ID cannot claim another tap's canonical slot."""
-        connection = MagicMock(server_version=140000)
+        connection = MagicMock(server_version=140018)
         cursor = connection.cursor.return_value.__enter__.return_value
         cursor.fetchall.return_value = [
             ('pipelinewise_foo_bar', 'my_db', 'pgoutput', True),
@@ -924,7 +1092,7 @@ class TestFastSyncTapPostgres(TestCase):
     @patch('pipelinewise.fastsync.commons.tap_postgres.psycopg2.connect')
     def test_drop_slot_removes_owned_publication(self, connect_mock):
         """Deleted-tap cleanup removes the publication that affects source DML."""
-        connection = MagicMock(server_version=140000)
+        connection = MagicMock(server_version=140018)
         cursor = connection.cursor.return_value.__enter__.return_value
         cursor.fetchall.return_value = [
             ('pipelinewise_tap_test', 'my_db', 'pgoutput', False),
@@ -961,7 +1129,7 @@ class TestFastSyncTapPostgres(TestCase):
     @patch('pipelinewise.fastsync.commons.tap_postgres.psycopg2.connect')
     def test_drop_slot_rejects_foreign_publication_before_source_changes(self, connect_mock):
         """Cleanup cannot partially mutate slots when it cannot drop the publication."""
-        connection = MagicMock(server_version=140000)
+        connection = MagicMock(server_version=140018)
         cursor = connection.cursor.return_value.__enter__.return_value
         cursor.fetchall.return_value = [
             ('pipelinewise_tap_test', 'my_db', 'pgoutput', False),
@@ -1003,7 +1171,7 @@ class TestFastSyncTapPostgres(TestCase):
         )
         for comment in comments:
             with self.subTest(comment=comment):
-                connection = MagicMock(server_version=140000)
+                connection = MagicMock(server_version=140018)
                 cursor = connection.cursor.return_value.__enter__.return_value
                 cursor.fetchall.return_value = [
                     ('pipelinewise_tap_test', 'my_db', 'pgoutput', False),
@@ -1191,6 +1359,7 @@ class TestFastSyncTapPostgres(TestCase):
                 )
             get_connection.assert_not_called()
 
+    @patch.object(tap_postgres, 'SLOT_RELEASE_TIMEOUT_SECONDS', 0)
     def test_retire_migrated_replication_slot_requires_safe_catalog_rows(self):
         """Destination continuity and source inactivity are preconditions to deletion."""
         marker = {
@@ -1223,7 +1392,7 @@ class TestFastSyncTapPostgres(TestCase):
                 ), patch.object(
                     FastSyncTapPostgres, 'get_connection', return_value=connection
                 ):
-                    with self.assertRaisesRegex(RuntimeError, 'No source'):
+                    with self.assertRaisesRegex(RuntimeError, 'No source|Timed out'):
                         FastSyncTapPostgres.retire_migrated_replication_slot(
                             {'dbname': 'my_db', 'tap_id': 'my_tap'}, marker
                         )

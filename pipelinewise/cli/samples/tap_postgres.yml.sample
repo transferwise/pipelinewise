@@ -3,7 +3,8 @@
 # ------------------------------------------------------------------------------
 # General Properties
 # ------------------------------------------------------------------------------
-id: "postgres_sample"                  # Unique identifier of the tap
+id: "postgres_sample"                  # Unique across the PostgreSQL cluster; lowercase letters, digits, underscores
+#previous_tap_id: "postgres-old"        # Optional: Preserve an old wal2json tap's state and slot when renaming
 name: "Sample Postgres Database"       # Name of the tap
 type: "tap-postgres"                   # !! THIS SHOULD NOT CHANGE !!
 owner: "somebody@foo.com"              # Data owner to contact
@@ -12,7 +13,7 @@ owner: "somebody@foo.com"              # Data owner to contact
 
 # ------------------------------------------------------------------------------
 # Source (Tap) - PostgreSQL connection details
-# PostgreSQL 14 or later is required.
+# PostgreSQL 14+ is required. Older affected minors log a logical-decoding data-loss warning.
 # ------------------------------------------------------------------------------
 db_conn:
   host: "<HOST>"                       # PostgreSQL host

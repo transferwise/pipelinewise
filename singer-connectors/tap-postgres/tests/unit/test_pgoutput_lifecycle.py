@@ -317,7 +317,7 @@ def test_publication_preflight_validates_owned_slot_candidates(
 def test_prepare_publication_rejects_invalid_slot_before_publication_ddl():
     connection = MagicMock()
     connection.__enter__.return_value = connection
-    connection.server_version = 140000
+    connection.server_version = 140018
     cursor = connection.cursor.return_value.__enter__.return_value
 
     with patch.object(
@@ -343,7 +343,7 @@ def test_prepare_publication_rejects_invalid_slot_before_publication_ddl():
         logical_replication.prepare_publication(_config(), [_stream()])
 
     identity.assert_not_called()
-    cursor.execute.assert_not_called()
+    assert all('PUBLICATION' not in str(item.args[0]) for item in cursor.execute.call_args_list)
 
 
 def test_selected_generated_column_is_rejected_before_slot_work():
@@ -385,7 +385,7 @@ def test_replica_identity_rejects_non_default_or_invalid_primary_key(
 
     with pytest.raises(
             logical_replication.ReplicationSlotMigrationError,
-            match='REPLICA IDENTITY DEFAULT backed by a valid primary key'):
+            match='REPLICA IDENTITY DEFAULT backed by a valid non-deferrable primary key'):
         logical_replication._validate_replica_identity(
             cursor,
             [('public', 'payments')],
@@ -932,6 +932,140 @@ def _two_logical_streams():
     return [payments, refunds]
 
 
+def test_historical_primary_key_update_does_not_require_columns_added_later():
+    payload = {
+        '_pgoutput': True, 'action': 'U',
+        'identity': [{'name': 'id', 'value': '1'}],
+        'columns': [{'name': 'id', 'value': '2'}, {'name': 'description', 'value': 'old value'}],
+        'relation_columns': [{'name': 'id'}, {'name': 'description'}],
+    }
+    assert logical_replication._old_primary_key_for_changed_update(
+        payload, ['id'], {'id', 'description', 'added_later'}) == ['1']
+    payload['columns'].pop()
+    with pytest.raises(logical_replication.ReplicationSlotMigrationError, match='description'):
+        logical_replication._old_primary_key_for_changed_update(
+            payload, ['id'], {'id', 'description', 'added_later'})
+
+
+def test_legacy_names_follow_postgres_name_truncation_and_alias():
+    database = 'source_' + 'd' * 30
+    old_id = 'Old-Tap-' + 't' * 30
+    expected = ('pipelinewise_' + database + '_' + old_id).lower().replace('-', '_')[:63]
+    assert logical_replication.legacy_replication_slot_names(database, old_id)[1] == expected
+    rows = {expected: _slot('wal2json', database=database)}
+    cursor = Mock()
+    cursor.fetchone.return_value = ('pipelinewise_new_tap', '0/64')
+    with patch.object(logical_replication, '_slot_rows', return_value=rows):
+        slot = logical_replication.locate_replication_slot_by_cur(
+            cursor, database, 'new_tap', previous_tap_id=old_id)
+    assert slot.migration_source == expected
+
+
+def test_truncated_legacy_names_with_ambiguous_ownership_are_rejected():
+    database = 'a' * 60
+    shared = logical_replication.legacy_replication_slot_names(database, 'tap')[0]
+    with patch.object(logical_replication, '_slot_rows', return_value={shared: _slot('wal2json')}), \
+            pytest.raises(logical_replication.ReplicationSlotMigrationError, match='collide after'):
+        logical_replication._validate_replication_slot_candidates(Mock(), database, 'tap')
+
+
+@pytest.mark.parametrize('fresh_start,canonical_exists', [(True, False), (True, True), (False, True)])
+def test_fresh_or_existing_pgoutput_tap_preserves_colliding_shared_history(fresh_start, canonical_exists):
+    database = 'a' * 60
+    shared = logical_replication.legacy_replication_slot_names(database, 'tap')[0]
+    rows = {shared: _slot('wal2json', database=database, active=True)}
+    if canonical_exists:
+        rows['pipelinewise_tap'] = _slot('pgoutput', database=database)
+    cursor = Mock()
+    with patch.object(logical_replication, '_slot_rows', return_value=rows):
+        destination, migration_source, result_rows = logical_replication._validate_replication_slot_candidates(
+            cursor, database, 'tap', fresh_start=fresh_start,
+        )
+    assert destination == 'pipelinewise_tap'
+    assert migration_source is None
+    assert result_rows[shared]['active'] is True
+    cursor.execute.assert_not_called()
+
+
+def test_fresh_tap_does_not_claim_unrelated_shared_slot():
+    with patch.object(logical_replication, '_slot_rows', return_value={'pipelinewise_source': _slot('wal2json')}):
+        destination, source, _ = logical_replication._validate_replication_slot_candidates(
+            Mock(), 'source', 'orders', fresh_start=True)
+    assert destination == 'pipelinewise_orders'
+    assert source is None
+
+
+@pytest.mark.parametrize('existing_tables', [
+    [('public', 'payments'), ('public', 'other')], [('public', 'other')],
+])
+def test_publication_preparation_preserves_tables_outside_the_current_run(existing_tables):
+    connection = MagicMock()
+    connection.__enter__.return_value = connection
+    connection.server_version = 140018
+    cursor = connection.cursor.return_value.__enter__.return_value
+    cursor.fetchone.return_value = (
+        False, True, True, True, False, True,
+        logical_replication._encode_publication_fence_comment('ready', None))
+    cursor.fetchall.return_value = existing_tables
+    with patch.object(logical_replication.post_db, 'open_connection', return_value=connection), \
+            patch.object(logical_replication, '_reject_selected_generated_columns'), \
+            patch.object(logical_replication, '_validate_publication_tables', return_value=(
+                [('public', 'payments')], False, [('public', 'payments')], {}, {})), \
+            patch.object(logical_replication, '_validate_replica_identity'), \
+            patch.object(logical_replication, '_slot_rows', return_value={}), \
+            patch.object(logical_replication, '_wait_for_prepublication_transactions') as fence:
+        logical_replication.prepare_publication(_config(), [_stream()])
+    queries = [str(item.args[0]) for item in cursor.execute.call_args_list]
+    assert not any('SET TABLE' in query or 'DROP TABLE' in query for query in queries)
+    expected_add = ('public', 'payments') not in existing_tables
+    assert any('ADD TABLE' in query for query in queries) == expected_add
+    assert fence.called == expected_add
+
+
+def test_publication_fence_reuses_connection_and_waits_only_for_preexisting_writers():
+    connection = MagicMock()
+    cursor = connection.cursor.return_value.__enter__.return_value
+    cursor.fetchall.side_effect = [[('1/2',)], [('1/2',)], [], [], []]
+    with patch.object(logical_replication.post_db, 'open_connection', return_value=connection) as connect, \
+            patch.object(logical_replication.time, 'sleep'):
+        logical_replication._wait_for_prepublication_transactions(_config())
+    connect.assert_called_once()
+    connection.close.assert_called_once()
+    assert 'activity.backend_xid IS NOT NULL' in cursor.execute.call_args_list[0].args[0]
+
+
+@pytest.mark.parametrize('phase,fresh_start,allowed', [
+    ('pgoutput', False, True), ('retire', False, True),
+    ('bridge', False, False), (None, True, True), (None, False, False),
+])
+def test_partition_preflight_respects_durable_migration_phase(phase, fresh_start, allowed):
+    connection = MagicMock()
+    connection.__enter__.return_value = connection
+    connection.server_version = 140018
+    cursor = connection.cursor.return_value.__enter__.return_value
+    cursor.fetchone.return_value = (
+        False, True, True, True, False, True,
+        logical_replication._encode_publication_fence_comment('ready', None))
+    cursor.fetchall.return_value = [('public', 'payments')]
+    migration = {'version': 1, 'phase': phase, 'source_slot': 'pipelinewise_source_orders',
+                 'destination_slot': 'pipelinewise_orders', 'copy_lsn': 100, 'bridge_lsn': 200,
+                 'retire_lsn': 300}
+    state = _state(migration=migration if phase is not None else None)
+    with patch.object(logical_replication.post_db, 'open_connection', return_value=connection), \
+            patch.object(logical_replication, '_reject_selected_generated_columns'), \
+            patch.object(logical_replication, '_validate_publication_tables', return_value=(
+                [('public', 'payments')], True, [('public', 'payments')], {}, {})), \
+            patch.object(logical_replication, '_validate_replica_identity'), \
+            patch.object(logical_replication, '_slot_rows', return_value={
+                'pipelinewise_source_orders': _slot('wal2json'), 'pipelinewise_orders': _slot('pgoutput')}):
+        if allowed:
+            assert logical_replication.prepare_publication(
+                _config(), [_stream()], state=state, fresh_start=fresh_start) == 'pw_pub_orders'
+        else:
+            with pytest.raises(logical_replication.ReplicationSlotMigrationError, match='partition root'):
+                logical_replication.prepare_publication(_config(), [_stream()], state=state)
+
+
 def test_target_acknowledgement_uses_minimum_lsn_across_all_logical_streams(tmp_path):
     state_file = tmp_path / 'state.json'
     state_file.write_text(json.dumps({
@@ -1051,6 +1185,12 @@ def test_pgoutput_feedback_advances_only_to_target_persisted_state():
     assert cursor.send_feedback.call_args_list == [
         call(
             write_lsn=100,
+            flush_lsn=0,
+            reply=True,
+            force=True,
+        ),
+        call(
+            write_lsn=100,
             flush_lsn=100,
             reply=True,
             force=True,
@@ -1067,7 +1207,7 @@ def test_pgoutput_feedback_advances_only_to_target_persisted_state():
 def test_consumed_and_periodically_emitted_positions_are_not_feedback_until_target_ack():
     cursor, read_acknowledgement, write_message = _run_pgoutput_feedback(
         _feedback_messages('boundary-token'),
-        [100, 100, 100, 100],
+        [0, 0, 0, 0],
     )
 
     assert read_acknowledgement.call_count == 4
@@ -1077,7 +1217,7 @@ def test_consumed_and_periodically_emitted_positions_are_not_feedback_until_targ
     )
     cursor.send_feedback.assert_called_once_with(
         write_lsn=100,
-        flush_lsn=100,
+        flush_lsn=0,
         reply=True,
         force=True,
     )

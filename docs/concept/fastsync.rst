@@ -182,6 +182,10 @@ Filtered FastSync, automatic initial loads, and standalone PartialSync retain
 it. ``--force`` only bypasses the resync size limit; configured
 ``sync_start_from`` ranges remain in effect. See :ref:`resync_postgres_slot_reset`
 for exact commands, safety checks, pending-Iceberg guards, and failure recovery.
+An explicit reset creates a fresh pgoutput slot and records its intent durably.
+Ordinary replication stays blocked until the whole-tap FastSync completes.
+The historical tap-specific wal2json slot is retained until the target confirms
+subsequent pgoutput consumption.
 
 
 .. _defined_partial_sync:

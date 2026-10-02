@@ -69,7 +69,7 @@ CSV suite needs standard Snowflake/S3 variables,
 `TARGET_SNOWFLAKE_SCHEMA`, and `TARGET_SNOWFLAKE_FILE_FORMAT_CSV` (which may
 reuse `TARGET_SNOWFLAKE_FILE_FORMAT`); ensure the private key is readable.
 
-Run the supported 49-test suite with plaintext upload explicitly selected:
+Run the supported 51-test suite with plaintext upload explicitly selected:
 
 ```bash
 docker exec -t -e CLIENT_SIDE_ENCRYPTION_MASTER_KEY= pipelinewise bash -lc '
@@ -81,9 +81,9 @@ docker exec -t -e CLIENT_SIDE_ENCRYPTION_MASTER_KEY= pipelinewise bash -lc '
 ```
 
 This excludes successful client-side encryption while retaining CSV external
-and table-stage loads plus wrong-key rejection. Expect 49 passes, zero skips;
+and table-stage loads plus wrong-key rejection. Expect 51 passes, zero skips;
 anything else is non-green. Full `make integration_test` separately requires a
-real client-side encryption master key and expects 50 passes.
+real client-side encryption master key and expects 52 passes.
 
 ## Versioning and upstream
 
@@ -94,10 +94,11 @@ real client-side encryption master key and expects 50 passes.
 - These are upstream-derived copies. Coordinate non-trivial divergence
   upstream; keep local fixes narrow, comments limited to why divergence is
   needed, and avoid broad formatting.
-- PostgreSQL sources require version 14 or later for every Singer replication
-  method and PipelineWise FullSync/PartialSync. Keep their version checks aligned;
-  this source minimum does not constrain target-postgres or the PipelineWise
-  backend database.
+- PostgreSQL sources require 14+ for every Singer replication method and
+  PipelineWise FullSync/PartialSync. Warn below the catalog-cache fixes in
+  14.18, 15.13, 16.9, and 17.5, but allow the connection. Keep the Singer and
+  FastSync checks aligned. This source minimum does not constrain
+  target-postgres or the PipelineWise backend database.
 - PostgreSQL/Snowflake targets silently ignore retired deletion-mode options,
   enable metadata automatically, and physically process `_SDC_DELETED_AT` before
   acknowledging state. Keep this marker in Singer schemas and transport.

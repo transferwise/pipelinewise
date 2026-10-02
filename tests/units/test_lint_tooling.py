@@ -150,7 +150,9 @@ def test_root_ci_dependencies_and_policy_use_ruff():
             assert not any(fnmatch.fnmatchcase(unit_dir, pattern) for pattern in exclusions)
             if (REPOSITORY_ROOT / integration_dir).is_dir():
                 integration_excluded = any(fnmatch.fnmatchcase(integration_dir, pattern) for pattern in exclusions)
-                assert integration_excluded == (connector not in {'target-postgres', 'transform-field'})
+                assert integration_excluded == (
+                    connector not in {'tap-postgres', 'target-postgres', 'target-snowflake', 'transform-field'}
+                )
         else:
             assert is_excluded
 

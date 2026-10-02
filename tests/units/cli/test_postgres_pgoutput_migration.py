@@ -1,6 +1,8 @@
 """PostgreSQL pgoutput orchestration and durable migration state tests."""
 
 import json
+import sys
+from pathlib import Path
 
 from types import SimpleNamespace
 from unittest.mock import Mock, call, patch
@@ -8,6 +10,7 @@ from unittest.mock import Mock, call, patch
 import pytest
 
 from pipelinewise.cli import commands
+from pipelinewise.cli.config import Config
 from pipelinewise.cli.errors import PreRunChecksException
 from pipelinewise.cli.pipelinewise import PipelineWise
 from pipelinewise.fastsync.commons.tap_postgres import (
@@ -73,6 +76,97 @@ def _logical_stream(stream_id):
     }
 
 
+def test_preflight_passes_durable_phase_and_explicit_fresh_start(tmp_path):
+    runner = _runner(tmp_path)
+    state = tmp_path / 'state.json'
+    state.write_text('{}', encoding='utf-8')
+    runner.tap['files']['state'] = str(state)
+    with patch.object(commands, 'run_command_argv', return_value=[0, '', '']) as run:
+        runner._prepare_postgres_pgoutput_publication(fresh_start=True)
+    assert run.call_args.args[0][-3:] == ['--state', str(state), '--fresh-start']
+
+
+def test_hung_preflight_is_killed_with_actionable_error():
+    with pytest.raises(commands.RunCommandException, match='timed out.*source locks'):
+        commands.run_command_argv([sys.executable, '-c', 'import time; time.sleep(20)'], timeout=0.05)
+
+
+def test_logical_preparation_is_scoped_to_requested_tables(tmp_path):
+    runner = _runner(tmp_path)
+    runner.tap['type'] = 'tap-postgres'
+    path = tmp_path / 'selection.json'
+    path.write_text(json.dumps({'selection': [
+        {'tap_stream_id': 'public-logical', 'replication_method': 'LOG_BASED'},
+        {'tap_stream_id': 'public-full', 'replication_method': 'FULL_TABLE'},
+    ]}), encoding='utf-8')
+    runner.tap['files']['selection'] = str(path)
+    assert not runner._postgres_tap_has_log_based_selection({'public.full'})
+    assert runner._postgres_tap_has_log_based_selection({'public.logical'})
+
+
+@pytest.mark.parametrize('second_lsn', [None, 90, 110])
+def test_reset_retains_intent_until_all_snapshots_are_durable(tmp_path, second_lsn):
+    runner = _runner(tmp_path, [_logical_stream('a'), _logical_stream('b')])
+    state_path = tmp_path / 'state.json'
+    state = {'bookmarks': {'a': {'lsn': 120}, 'b': {'lsn': second_lsn}},
+             '_pipelinewise_pgoutput_fresh_start': {'version': 1}}
+    state_path.write_text(json.dumps(state), encoding='utf-8')
+    runner.tap['files']['state'] = str(state_path)
+    result = {'source_slot': 'pipelinewise_db_old', 'destination_slot': 'pipelinewise_new', 'copy_lsn': 100}
+    if second_lsn is None or second_lsn <= 100:
+        with pytest.raises(PreRunChecksException, match='resync is incomplete'):
+            runner._finish_postgres_slot_reset(result)
+        assert json.loads(state_path.read_text()) == state
+    else:
+        runner._finish_postgres_slot_reset(result)
+        persisted = json.loads(state_path.read_text())
+        assert '_pipelinewise_pgoutput_fresh_start' not in persisted
+        assert persisted[PGOUTPUT_MIGRATION_STATE_KEY]['phase'] == 'pgoutput'
+        assert persisted[PGOUTPUT_MIGRATION_STATE_KEY]['bridge_lsn'] == 110
+
+
+def test_rename_preserves_bookmarks_and_never_overwrites_new_progress(tmp_path):
+    config = Config(str(tmp_path))
+    old_files = Config.get_connector_files(str(tmp_path / 'target' / 'Old-id'))
+    new_files = Config.get_connector_files(str(tmp_path / 'target' / 'new_id'))
+    (tmp_path / 'target' / 'Old-id').mkdir(parents=True)
+    source = {'host': 'host', 'port': 5432, 'dbname': 'database', 'user': 'user'}
+    Path(old_files['config']).write_text(json.dumps({**source, 'tap_id': 'Old-id'}))
+    Path(old_files['state']).write_text(json.dumps({'bookmarks': {'table': {'lsn': 123}}}))
+    tap = {'id': 'new_id', 'type': 'tap-postgres', 'previous_tap_id': 'Old-id',
+           'db_conn': source, 'files': new_files}
+    target_connection = {'host': 'destination', 'port': 5432, 'dbname': 'warehouse'}
+    config.targets = {'target': {'id': 'target', 'type': 'target-postgres',
+                                 'db_conn': target_connection, 'taps': [tap]}}
+    Path(config.config_path).write_text(json.dumps({'targets': [{'id': 'target', 'type': 'target-postgres'}]}))
+    (tmp_path / 'target' / 'config.json').write_text(json.dumps(target_connection))
+    Path(old_files['inheritable_config']).write_text(json.dumps(config.generate_inheritable_config(tap)))
+    Path(old_files['selection']).write_text(json.dumps({'selection': Config.generate_selection(tap)}))
+    Path(old_files['transformation']).write_text(json.dumps({'transformations': Config.generate_transformations(tap)}))
+    runner = _runner(tmp_path)
+    with patch.object(runner, '_validate_postgres_rename_source'):
+        runner._preserve_renamed_postgres_state(config, ['new_id'])
+    assert json.loads(Path(new_files['state']).read_text()) == {'bookmarks': {'table': {'lsn': 123}}}
+    Path(new_files['state']).write_text(json.dumps({'bookmarks': {'table': {'lsn': 456}}}))
+    with patch.object(runner, '_validate_postgres_rename_source'):
+        runner._preserve_renamed_postgres_state(config, ['new_id'])
+    assert json.loads(Path(new_files['state']).read_text())['bookmarks']['table']['lsn'] == 456
+    assert Path(old_files['state']).exists()
+
+
+@pytest.mark.parametrize('aliases', [
+    {'new': {'type': 'tap-postgres', 'previous_tap_id': 'new'}},
+    {'a': {'type': 'tap-postgres', 'previous_tap_id': 'old'},
+     'b': {'type': 'tap-postgres', 'previous_tap_id': 'old'}},
+    {'a': {'type': 'tap-postgres', 'previous_tap_id': '../old'}},
+])
+def test_rename_rejects_ambiguous_or_unsafe_aliases(aliases):
+    from pipelinewise.cli.errors import InvalidConfigException
+
+    with pytest.raises(InvalidConfigException, match='previous_tap_id'):
+        Config.validate_postgres_previous_ids(aliases)
+
+
 def test_publication_preflight_uses_connector_cli_and_reports_failure(tmp_path):
     runner = _runner(tmp_path)
     expected = [
@@ -86,12 +180,12 @@ def test_publication_preflight_uses_connector_cli_and_reports_failure(tmp_path):
 
     with patch.object(commands, 'run_command_argv', return_value=[0, '', '']) as run:
         runner._prepare_postgres_pgoutput_publication()
-    run.assert_called_once_with(expected)
+    run.assert_called_once_with(expected, timeout=360)
 
     with patch.object(commands, 'run_command_argv', return_value=[2, '', 'permission denied']):
         with pytest.raises(
             PreRunChecksException,
-            match='permission denied.*No state or replication-slot changes were made',
+            match='permission denied.*State and slots are unchanged',
         ):
             runner._prepare_postgres_pgoutput_publication()
 
@@ -309,3 +403,28 @@ def test_final_target_state_is_persisted_before_post_success_cleanup(tmp_path):
         runner.run_tap_singer(tap, Mock(), Mock())
 
     assert phases == [False, True]
+
+
+@pytest.mark.parametrize('names', [('a-b', 'a_b'), ('a' * 50 + '1', 'a' * 50 + '2')])
+def test_import_rejects_ambiguous_historical_slot_ownership(names):
+    from pipelinewise.cli.errors import InvalidConfigException
+
+    taps = {
+        name: {'id': name, 'type': 'tap-postgres', 'db_conn': {'host': 'source', 'dbname': 'database'},
+               'schemas': [{'tables': [{'replication_method': 'LOG_BASED'}]}]}
+        for name in names
+    }
+    with pytest.raises(InvalidConfigException, match='share historical slot'):
+        Config.validate_postgres_legacy_slot_collisions(taps)
+    Config.validate_postgres_legacy_slot_collisions(taps, ['unrelated_tap'])
+
+
+def test_new_taps_with_long_database_name_keep_distinct_canonical_slots():
+    taps = {
+        name: {'id': name, 'type': 'tap-postgres', 'db_conn': {'host': 'source', 'dbname': 'd' * 63},
+               'schemas': [{'tables': [{'replication_method': 'LOG_BASED'}]}]}
+        for name in ('first', 'second')
+    }
+    Config.validate_postgres_legacy_slot_collisions(taps)
+    slots = {FastSyncTapPostgres.validate_replication_slot_identity('d' * 63, name)[0] for name in taps}
+    assert len(slots) == 2

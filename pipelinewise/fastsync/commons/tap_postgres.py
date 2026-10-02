@@ -23,6 +23,7 @@ from ...utils import safe_column_name
 
 LOGGER = logging.getLogger(__name__)
 MIN_SUPPORTED_POSTGRES_VERSION = 140000
+MIN_SAFE_POSTGRES_VERSIONS = {14: 140018, 15: 150013, 16: 160009, 17: 170005}
 PGOUTPUT_PLUGIN = 'pgoutput'
 WAL2JSON_PLUGIN = 'wal2json'
 MAX_REPLICATION_SLOT_NAME_LENGTH = 63
@@ -32,6 +33,7 @@ PGOUTPUT_MIGRATION_STATE_KEY = '_pipelinewise_pgoutput_migration'
 PGOUTPUT_MIGRATION_STATE_VERSION = 1
 PUBLICATION_FENCE_COMMENT_PREFIX = 'pipelinewise-publication-fence-v1:'
 REPLICA_REPLAY_TIMEOUT_SECONDS = 300
+SLOT_RELEASE_TIMEOUT_SECONDS = 30
 
 
 class UnsupportedPostgresVersionError(RuntimeError):
@@ -74,16 +76,18 @@ class FastSyncTapPostgres:
         slot_name = f'{prefix}_{dbname}{tap_id}'.lower()
 
         # Replace invalid characters to ensure replication slot name is in accordance with Postgres spec
-        return re.sub('[^a-z0-9_]', '_', slot_name)
+        return re.sub('[^a-z0-9_]', '_', slot_name)[:MAX_REPLICATION_SLOT_NAME_LENGTH]
 
     @classmethod
-    def _replication_slot_names(cls, dbname: str, tap_id: str):
+    def _replication_slot_names(cls, dbname: str, tap_id: str, previous_tap_id: Optional[str] = None):
         """Return the pgoutput destination and wal2json candidates in migration order."""
         if not isinstance(tap_id, str) or not tap_id:
             raise RuntimeError('The pgoutput replication slot requires a non-empty tap ID.')
         destination = cls.generate_replication_slot_name(tap_id)
         legacy = cls.generate_replication_slot_name(dbname)
-        current = cls.generate_replication_slot_name(dbname, tap_id)
+        if previous_tap_id is not None and (not isinstance(previous_tap_id, str) or not previous_tap_id):
+            raise RuntimeError('previous_tap_id must be a non-empty historical tap ID.')
+        current = cls.generate_replication_slot_name(dbname, previous_tap_id or tap_id)
         return destination, legacy, current
 
     @classmethod
@@ -101,10 +105,10 @@ class FastSyncTapPostgres:
             )
 
     @classmethod
-    def validate_replication_slot_identity(cls, dbname: str, tap_id: str):
+    def validate_replication_slot_identity(cls, dbname: str, tap_id: str, previous_tap_id: Optional[str] = None):
         """Validate and return the canonical and historical slot identities."""
         cls.validate_postgres_tap_id(tap_id)
-        destination, legacy, current = cls._replication_slot_names(dbname, tap_id)
+        destination, legacy, current = cls._replication_slot_names(dbname, tap_id, previous_tap_id)
         if destination in (legacy, current):
             raise RuntimeError(
                 f'PostgreSQL tap ID "{tap_id}" resolves to pgoutput slot "{destination}", '
@@ -123,11 +127,11 @@ class FastSyncTapPostgres:
         return {row[0]: row for row in cursor.fetchall()}
 
     @classmethod
-    def _historical_migration_source(cls, slots, legacy, current):
+    def _historical_migration_source(cls, slots, legacy, current, *, fresh_start=False):
         """Return the tap-owned historical slot without claiming a shared slot."""
-        if current in slots:
+        if current in slots and current != legacy:
             return current
-        if legacy in slots:
+        if legacy in slots and not fresh_start:
             raise RuntimeError(
                 f'Historical database-wide PostgreSQL slot "{legacy}" may be shared by multiple taps '
                 'and cannot be migrated automatically. A DBA must migrate it to the dedicated '
@@ -174,13 +178,29 @@ class FastSyncTapPostgres:
         """Accept a concurrent creator only after validating the resulting destination."""
         if getattr(error, 'pgcode', None) != '42710':
             raise error
-        destination = slot_names[0]
-        slots = cls._fetch_replication_slots(cursor, slot_names)
-        if destination not in slots:
-            raise error
-        cls._validate_replication_slot(
-            slots[destination], database, {PGOUTPUT_PLUGIN}, require_inactive=False
-        )
+        cls._wait_for_inactive_slots(cursor, database, {slot_names[0]: PGOUTPUT_PLUGIN}, require_ready=True)
+
+    @classmethod
+    def _wait_for_inactive_slots(cls, cursor, database, expected_plugins, *, require_ready=False, allow_missing=False):
+        """Wait for server-side slot cleanup without accepting unfinished creation."""
+        deadline = monotonic() + SLOT_RELEASE_TIMEOUT_SECONDS
+        while True:
+            cursor.execute(
+                'SELECT slot_name, database, plugin, active, confirmed_flush_lsn::text '
+                'FROM pg_replication_slots WHERE slot_name = ANY(%s)',
+                (list(expected_plugins),),
+            )
+            slots = {row[0]: row for row in cursor.fetchall()}
+            missing = set(expected_plugins) - set(slots)
+            if missing and not allow_missing:
+                raise RuntimeError(f'Cannot find PostgreSQL replication slot(s): {sorted(missing)}.')
+            for name, slot in slots.items():
+                cls._validate_replication_slot(slot[:4], database, {expected_plugins[name]}, require_inactive=False)
+            if all(not row[3] and (not require_ready or row[4] is not None) for row in slots.values()):
+                return slots
+            if monotonic() >= deadline:
+                raise RuntimeError('Timed out waiting for PostgreSQL replication slots to be inactive and initialized.')
+            sleep(0.1)
 
     @classmethod
     def validate_migration_state_marker(cls, connection_config: Dict, marker: Dict):
@@ -215,7 +235,7 @@ class FastSyncTapPostgres:
 
         database = connection_config['dbname']
         destination, _, current = cls.validate_replication_slot_identity(
-            database, connection_config['tap_id']
+            database, connection_config['tap_id'], connection_config.get('previous_tap_id')
         )
         source = marker['source_slot']
         if marker['destination_slot'] != destination or source != current:
@@ -255,26 +275,7 @@ class FastSyncTapPostgres:
         connection = cls.get_connection(connection_config, prioritize_primary=True)
         try:
             with connection.cursor() as cur:
-                cur.execute(
-                    'SELECT slot_name, database, plugin, active, confirmed_flush_lsn::text '
-                    'FROM pg_replication_slots '
-                    'WHERE slot_name = ANY(%s)',
-                    (slot_names,),
-                )
-                slots = {row[0]: row for row in cur.fetchall()}
-                missing = set(slot_names) - set(slots)
-                if missing:
-                    raise RuntimeError(
-                        f'Cannot advance missing PostgreSQL replication slot(s): {sorted(missing)}. '
-                        'No source or state changes were made.'
-                    )
-                for slot_name in slot_names:
-                    cls._validate_replication_slot(
-                        slots[slot_name][:4],
-                        database,
-                        {expected_plugins[slot_name]},
-                        require_inactive=True,
-                    )
+                slots = cls._wait_for_inactive_slots(cur, database, expected_plugins, require_ready=True)
                 for slot_name in slot_names:
                     confirmed_lsn = cls._lsn_to_int(slots[slot_name][4])
                     if confirmed_lsn >= durable_lsn:
@@ -303,7 +304,7 @@ class FastSyncTapPostgres:
     ) -> None:
         """Release canonical pgoutput WAL through the minimum target-durable bookmark."""
         destination, _, _ = cls.validate_replication_slot_identity(
-            connection_config['dbname'], connection_config['tap_id']
+            connection_config['dbname'], connection_config['tap_id'], connection_config.get('previous_tap_id')
         )
         cls._advance_replication_slots(
             connection_config, {destination: PGOUTPUT_PLUGIN}, durable_lsn
@@ -353,24 +354,21 @@ class FastSyncTapPostgres:
         connection = cls.get_connection(connection_config, prioritize_primary=True)
         try:
             with connection.cursor() as cur:
-                cur.execute(
-                    'SELECT slot_name, database, plugin, active FROM pg_replication_slots '
-                    'WHERE slot_name IN (%s, %s)',
-                    (destination, source),
+                slots = cls._wait_for_inactive_slots(
+                    cur, database, {destination: PGOUTPUT_PLUGIN, source: WAL2JSON_PLUGIN}, allow_missing=True
                 )
-                slots = {row[0]: row for row in cur.fetchall()}
                 if destination not in slots:
                     raise RuntimeError(
                         f'Cannot retire wal2json slot "{source}" without canonical pgoutput slot '
                         f'"{destination}". No source or state changes were made.'
                     )
                 cls._validate_replication_slot(
-                    slots[destination], database, {PGOUTPUT_PLUGIN}, require_inactive=True
+                    slots[destination][:4], database, {PGOUTPUT_PLUGIN}, require_inactive=True
                 )
                 if source not in slots:
                     return
                 cls._validate_replication_slot(
-                    slots[source], database, {WAL2JSON_PLUGIN}, require_inactive=True
+                    slots[source][:4], database, {WAL2JSON_PLUGIN}, require_inactive=True
                 )
                 LOGGER.info('Dropping target-acknowledged wal2json slot "%s"', source)
                 cur.execute('SELECT pg_drop_replication_slot(%s)', (source,))
@@ -408,7 +406,7 @@ class FastSyncTapPostgres:
             database = connection_config['dbname']
             tap_id = connection_config['tap_id']
             destination, legacy, current = cls._replication_slot_names(
-                database, tap_id
+                database, tap_id, connection_config.get('previous_tap_id')
             )
             slot_names = (destination, current, legacy)
             has_canonical_tap_id = (
@@ -500,7 +498,7 @@ class FastSyncTapPostgres:
             connection.close()
 
     @classmethod
-    def reset_slot(cls, connection_config: Dict, *, before_reset: Callable[[], Optional[str]]) -> None:
+    def reset_slot(cls, connection_config: Dict, *, before_reset: Callable[..., Optional[str]]) -> Dict:
         """Validate one tap-specific slot, invalidate state, then replace the slot."""
         LOGGER.info('Attempting to reset slot ...')
 
@@ -510,29 +508,27 @@ class FastSyncTapPostgres:
                 slot_name, slot_exists, source_name = cls._preflight_slot_reset(cur, connection_config)
                 # State must be durable before changing the slot boundary; a lost
                 # response cannot prove whether the source mutation completed.
-                backup_path = before_reset()
-                phase = 'drop' if slot_exists else 'copy' if source_name else 'create'
+                backup_path = before_reset(fresh_start_marker={
+                    'version': 1, 'source_slot': source_name, 'destination_slot': slot_name,
+                })
+                phase = 'drop' if slot_exists else 'create'
                 try:
                     if slot_exists:
                         LOGGER.info('Dropping the slot "%s"', slot_name)
                         cur.execute('SELECT pg_drop_replication_slot(%s)', (slot_name,))
-                    if source_name:
-                        LOGGER.info(
-                            'Copying wal2json replication slot "%s" to pgoutput slot "%s"',
-                            source_name,
-                            slot_name,
-                        )
-                        cur.execute(
-                            'SELECT * FROM pg_copy_logical_replication_slot(%s, %s, %s, %s)',
-                            (source_name, slot_name, False, PGOUTPUT_PLUGIN),
-                        )
-                    else:
-                        phase = 'create'
-                        LOGGER.info('Creating the slot "%s"', slot_name)
-                        cur.execute(
-                            'SELECT * FROM pg_create_logical_replication_slot(%s, %s)',
-                            (slot_name, PGOUTPUT_PLUGIN),
-                        )
+                    phase = 'create'
+                    LOGGER.info('Creating the slot "%s"', slot_name)
+                    cur.execute(
+                        'SELECT slot_name, lsn::text FROM pg_create_logical_replication_slot(%s, %s)',
+                        (slot_name, PGOUTPUT_PLUGIN),
+                    )
+                    created_name, copy_lsn = cur.fetchone()
+                    if created_name != slot_name:
+                        raise RuntimeError(f'PostgreSQL returned unexpected slot {created_name!r} during reset.')
+                    return {
+                        'source_slot': source_name, 'destination_slot': slot_name,
+                        'copy_lsn': cls._lsn_to_int(copy_lsn),
+                    }
                 except psycopg2.Error as exc:
                     raise RuntimeError(
                         f'PostgreSQL slot reset failed during {phase} for "{slot_name}"; '
@@ -551,20 +547,19 @@ class FastSyncTapPostgres:
         """Reject active or incompatible pgoutput slots before invalidating state."""
         database = connection_config['dbname']
         slot_name, legacy, current = cls.validate_replication_slot_identity(
-            database, connection_config['tap_id']
+            database, connection_config['tap_id'], connection_config.get('previous_tap_id')
         )
         slots = cls._fetch_replication_slots(cursor, (slot_name, legacy, current))
         if slot_name in slots:
             cls._validate_replication_slot(
                 slots[slot_name], database, {PGOUTPUT_PLUGIN}, require_inactive=True
             )
-            return slot_name, True, None
-        source_name = cls._historical_migration_source(slots, legacy, current)
+        source_name = current if current != legacy and current in slots else None
         if source_name:
             cls._validate_replication_slot(
                 slots[source_name], database, {WAL2JSON_PLUGIN}, require_inactive=True
             )
-        return slot_name, False, source_name
+        return slot_name, slot_name in slots, source_name
 
     @classmethod
     def get_connection(
@@ -586,43 +581,19 @@ class FastSyncTapPostgres:
         Returns:
             pg Connection instance
         """
-        template = "host='{}' port='{}' user='{}' password='{}' dbname='{}'"
+        connection_args = {
+            key: connection_config[key] if prioritize_primary else connection_config.get(f'replica_{key}',
+                                                                                       connection_config[key])
+            for key in ('host', 'port', 'user', 'password')
+        }
+        connection_args.update({'dbname': connection_config['dbname'], 'connect_timeout': 30})
+        if connection_config.get('sslmode'):
+            connection_args['sslmode'] = connection_config['sslmode']
+        elif connection_config.get('ssl') == 'true':
+            connection_args['sslmode'] = 'require'
+        conn = psycopg2.connect(**connection_args)
 
-        if prioritize_primary:
-            LOGGER.info('Connecting to primary server')
-            conn_string = template.format(
-                connection_config['host'],
-                connection_config['port'],
-                connection_config['user'],
-                connection_config['password'],
-                connection_config['dbname'],
-            )
-        else:
-            LOGGER.info('Connecting to replica')
-            conn_string = template.format(
-                # Fastsync is using replica_{host|port|user|password} values from the config by default
-                # to avoid making heavy load on the primary source database when syncing large tables
-                #
-                # If replica_{host|port|user|password} values are not defined in the config then it's
-                # using the normal credentials to connect
-                connection_config.get('replica_host', connection_config['host']),
-                connection_config.get('replica_port', connection_config['port']),
-                connection_config.get('replica_user', connection_config['user']),
-                connection_config.get(
-                    'replica_password', connection_config['password']
-                ),
-                connection_config['dbname'],
-            )
-
-        if 'ssl' in connection_config and connection_config['ssl'] == 'true':
-            conn_string += " sslmode='require'"
-
-        conn = psycopg2.connect(conn_string)
-
-        if (
-            not allow_unsupported_version_for_config_removal
-            and conn.server_version < MIN_SUPPORTED_POSTGRES_VERSION
-        ):
+        if not allow_unsupported_version_for_config_removal and conn.server_version < MIN_SUPPORTED_POSTGRES_VERSION:
             server_version = conn.server_version
             try:
                 conn.close()
@@ -631,6 +602,15 @@ class FastSyncTapPostgres:
                     'PostgreSQL 14 or later is required; '
                     f'connected server reports server_version_num {server_version}'
                 )
+
+        minimum_safe_version = MIN_SAFE_POSTGRES_VERSIONS.get(conn.server_version // 10000)
+        if minimum_safe_version is not None and conn.server_version < minimum_safe_version:
+            LOGGER.warning(
+                'PostgreSQL server_version_num %s predates the logical-decoding catalog-cache fixes in '
+                '14.18, 15.13, 16.9, and 17.5. wal2json and pgoutput may omit or misdecode changes; '
+                'upgrade to a fixed minor release.',
+                conn.server_version,
+            )
 
         # Set connection to autocommit
         conn.autocommit = True
@@ -711,11 +691,11 @@ class FastSyncTapPostgres:
 
                 return []
 
-    def create_replication_slot(self):
+    def create_replication_slot(self, *, fresh_start=False):
         """Create a pgoutput slot or copy an existing historical wal2json boundary."""
         database = self.connection_config['dbname']
         destination, legacy, current = self.validate_replication_slot_identity(
-            database, self.connection_config['tap_id']
+            database, self.connection_config['tap_id'], self.connection_config.get('previous_tap_id')
         )
         slot_names = (destination, legacy, current)
 
@@ -723,11 +703,16 @@ class FastSyncTapPostgres:
             slots = self._fetch_replication_slots(cur, slot_names)
             if destination in slots:
                 self._validate_replication_slot(
-                    slots[destination], database, {PGOUTPUT_PLUGIN}, require_inactive=False
+                    slots[destination][:4], database, {PGOUTPUT_PLUGIN}, require_inactive=False
+                )
+                self._wait_for_inactive_slots(
+                    cur, database, {destination: PGOUTPUT_PLUGIN}, require_ready=True
                 )
                 return
 
-            source_name = self._historical_migration_source(slots, legacy, current)
+            source_name = self._historical_migration_source(
+                slots, legacy, current, fresh_start=fresh_start
+            )
             if source_name is None:
                 LOGGER.info('Creating pgoutput replication slot "%s"', destination)
                 try:
@@ -755,6 +740,26 @@ class FastSyncTapPostgres:
             except psycopg2.Error as exc:
                 self._accept_concurrent_pgoutput_slot(cur, slot_names, database, exc)
 
+    @classmethod
+    def ensure_replication_slot(cls, connection_config, *, fresh_start=False):
+        """Finish canonical slot initialization before starting parallel snapshots."""
+        source = cls(connection_config, None)
+        source.primary_host_conn = cls.get_connection(connection_config, prioritize_primary=True)
+        try:
+            source.create_replication_slot(fresh_start=fresh_start)
+        finally:
+            source._close_primary_host_connection()
+
+    @classmethod
+    def capture_snapshot_boundary(cls, connection):
+        """Commit a flushed WAL record whose exact end can be replayed by a standby."""
+        with connection:
+            with connection.cursor() as cur:
+                cur.execute('SET LOCAL synchronous_commit = on')
+                cur.execute("SELECT pg_logical_emit_message(true, 'pipelinewise_snapshot', '')::text")
+                boundary = cls._lsn_to_int(cur.fetchone()[0])
+        return boundary
+
     def fetch_current_log_pos(self):
         """
         Get the actual wal position in Postgres
@@ -767,11 +772,7 @@ class FastSyncTapPostgres:
         try:
             # Create replication slot
             self.create_replication_slot()
-            if self.connection_config.get('replica_host'):
-                # The replica snapshot must include the publication setup and
-                # slot boundary before pgoutput can safely continue its history.
-                result = self.primary_host_query('SELECT pg_current_wal_insert_lsn() AS current_lsn')
-                primary_lsn = self._lsn_to_int(result[0]['current_lsn'])
+            primary_lsn = self.capture_snapshot_boundary(self.primary_host_conn)
         finally:
             self._close_primary_host_connection()
 
@@ -779,9 +780,7 @@ class FastSyncTapPostgres:
         if self.connection_config.get('replica_host'):
             lsn = self._wait_for_replica_replay(primary_lsn)
         else:
-            # Get current lsn from primary host
-            result = self.query('SELECT pg_current_wal_lsn() AS current_lsn')
-            lsn = self._lsn_to_int(result[0]['current_lsn'])
+            lsn = primary_lsn
 
         return {'lsn': lsn, 'version': 1}
 
@@ -790,7 +789,9 @@ class FastSyncTapPostgres:
         deadline = monotonic() + REPLICA_REPLAY_TIMEOUT_SECONDS
         LOGGER.info('Waiting for PostgreSQL replica replay through %s', self._int_to_lsn(primary_lsn))
         while True:
-            result = self.query('SELECT pg_last_wal_replay_lsn() AS current_lsn')
+            result = self.query('SELECT pg_is_in_recovery() AS in_recovery, pg_last_wal_replay_lsn() AS current_lsn')
+            if result and result[0].get('in_recovery') is False:
+                return primary_lsn
             replay_lsn = result[0].get('current_lsn') if result else None
             if replay_lsn is not None:
                 replay_lsn = self._lsn_to_int(replay_lsn)
