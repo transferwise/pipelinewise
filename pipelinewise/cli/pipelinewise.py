@@ -1203,7 +1203,7 @@ class PipelineWise:
     def _process_postgres_pgoutput_migration(
         self, tap: TapParams, *, after_success: bool
     ) -> None:
-        """Advance durable slots and perform versioned migration phase transitions."""
+        """Perform crash-safe pgoutput migration transitions around a tap run."""
         if tap.type != ConnectorType.TAP_POSTGRES.value or not os.path.exists(tap.state):
             return
         state = utils.load_json(tap.state)
@@ -1231,43 +1231,50 @@ class PipelineWise:
                         'LOG_BASED bookmark reaches the target-durable bridge boundary. '
                         'Migration state was retained and no source changes were made.'
                     )
-                state[PGOUTPUT_MIGRATION_STATE_KEY] = (
-                    FastSyncTapPostgres.advance_migrated_replication_slot(
-                        connection_config, marker
-                    )
+                promoted = FastSyncTapPostgres.promote_migrated_replication_slot(
+                    connection_config, marker
                 )
+                state[PGOUTPUT_MIGRATION_STATE_KEY] = promoted
+                # Promotion must be durable before the only wal2json recovery path
+                # is removed. A crash after this write safely retries the drop and
+                # overlap replay from the original pgoutput slot position.
                 fastsync_utils.save_dict_to_json(tap.state, state)
+                FastSyncTapPostgres.drop_promoted_wal2json_slot(
+                    connection_config, promoted
+                )
                 return
-            if not after_success:
+
+            if phase == 'pgoutput_overlap':
+                FastSyncTapPostgres.drop_promoted_wal2json_slot(
+                    connection_config, marker
+                )
+                return
+
+            if phase == 'overlap_complete':
+                durable_lsn = self._minimum_durable_postgres_lsn(state)
+                if durable_lsn is None or durable_lsn < marker['crossover_lsn']:
+                    raise RuntimeError(
+                        'Cannot complete the PostgreSQL pgoutput migration before every '
+                        'selected LOG_BASED bookmark reaches the target-durable crossover '
+                        'boundary. Migration state was retained.'
+                    )
+                FastSyncTapPostgres.drop_promoted_wal2json_slot(
+                    connection_config, marker
+                )
+                FastSyncTapPostgres.advance_canonical_replication_slot(
+                    connection_config, marker['crossover_lsn']
+                )
+                del state[PGOUTPUT_MIGRATION_STATE_KEY]
+                fastsync_utils.save_dict_to_json(tap.state, state)
                 return
         elif not after_success:
             return
 
         durable_lsn = self._minimum_durable_postgres_lsn(state)
-        if (
-            has_marker
-            and marker['phase'] == 'retire'
-            and (
-                durable_lsn is None
-                or durable_lsn < marker['retire_lsn']
-            )
-        ):
-            raise RuntimeError(
-                'Cannot retire the PostgreSQL wal2json slot before every selected '
-                'LOG_BASED bookmark reaches the target-durable pgoutput commit. '
-                'Migration state was retained and no source changes were made.'
-            )
         if durable_lsn is not None:
             FastSyncTapPostgres.advance_canonical_replication_slot(
                 connection_config, durable_lsn
             )
-
-        if has_marker and marker['phase'] == 'retire':
-            FastSyncTapPostgres.retire_migrated_replication_slot(
-                connection_config, marker
-            )
-            del state[PGOUTPUT_MIGRATION_STATE_KEY]
-            fastsync_utils.save_dict_to_json(tap.state, state)
 
     def run_tap_partialsync(self, tap: TapParams, target: TargetParams, transform: TransformParams):
         """Running the tap for partial sync table"""

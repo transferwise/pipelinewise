@@ -1,4 +1,4 @@
-0.94.0 (2026-10-02)
+0.94.0 (2026-10-03)
 -------------------
 
 **PostgreSQL sources**
@@ -9,11 +9,15 @@
 
 **PostgreSQL logical replication**
 
+- Treat 0.94.0 as the migration release from wal2json to pgoutput. Run every
+  PostgreSQL LOG_BASED tap successfully on 0.94.0 before upgrading. Version
+  0.95.0 will remove the migration path and all remaining wal2json code.
 - Use ``ppw_slot_<tap_id>`` for both native pgoutput slots and publications.
   Create a fresh slot, then bridge historical wal2json changes through a later
-  transactional logical message. Advance pgoutput only after the target
-  acknowledges the bridge. Retire the old slot after confirmed pgoutput writes.
-  Reuse interrupted migration boundaries and freeze publication selection until
+  transactional logical message. After target acknowledgement, persist the
+  promotion and immediately retire wal2json. Replay pgoutput from its original
+  position through the same boundary, keep bookmarks monotonic, and clear the
+  marker after target acknowledgement. Freeze publication selection until
   migration finishes or an unfiltered whole-tap FastSync resets it.
 - Grant the tap role permission to create, advance, consume, and remove
   its logical slots, manage its publication, and execute
@@ -45,10 +49,10 @@
   Preserve an implicitly truncated historical slot unless ``previous_tap_id``
   explicitly establishes its ownership.
   Refuse ``reset_state`` because a slot cannot rewind.
-- Preserve the old slot, WAL, and migration state after automatic-migration
-  target failure. Block ordinary replication until an interrupted whole-tap
-  resync finishes. Limit
-  slot feedback and retirement to target-acknowledged state.
+- Preserve wal2json before promotion, and preserve the original pgoutput
+  position plus migration state during overlap retries. Block ordinary
+  replication until an interrupted whole-tap resync finishes. Limit slot
+  feedback and retirement to target-acknowledged state.
 - Preserve TOAST values, dates, floats, and source encodings. Restart interrupted
   Singer snapshots from the first row with their original version and CDC
   boundary. Wait for replica replay before exporting a snapshot.

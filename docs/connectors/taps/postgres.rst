@@ -162,6 +162,12 @@ Tap IDs must be unique across every database and PipelineWise project using the
 same PostgreSQL cluster. Slot names belong to the cluster, not one database.
 A conflicting slot is rejected before use.
 
+PipelineWise 0.94.0 is the migration release from wal2json to pgoutput. Run
+every PostgreSQL LOG_BASED tap successfully on 0.94.0 and verify that its
+``ppw_slot_<tap_id>`` slot uses pgoutput and its migration marker is gone before
+upgrading. Version 0.95.0 will remove the migration path and all remaining
+wal2json code.
+
 When the pgoutput slot is absent, PipelineWise creates a fresh slot and keeps
 the historical tap-specific ``pipelinewise_<dbname>_<tap_id>`` wal2json slot for
 the bridge. It does not copy a slot or require ``pg_copy_logical_replication_slot``.
@@ -182,13 +188,15 @@ whose retry-stable identity makes interrupted or duration-limited runs continue
 toward the same commit. The message's commit is later than the new slot's start
 LSN. PipelineWise consumes wal2json from the saved target bookmark through that
 commit, so the old slot supplies the history that predates the new slot. Only
-after the target acknowledges this bridge does PipelineWise advance pgoutput to
-the same LSN and switch on the next run. Pgoutput then emits another
-retry-stable transactional message.
-A successful target acknowledgement of that boundary confirms pgoutput
-consumption and allows PipelineWise to remove the tap-specific wal2json slot.
-This works even when no selected rows changed. A failed target write preserves
-the old slot, state, and WAL for retry.
+after the target acknowledges this bridge does PipelineWise persist promotion
+and immediately remove the tap-specific wal2json slot. It does not advance the
+pgoutput slot. Pgoutput starts from its original consistent LSN and replays the
+overlap through the same transactional message. Bookmarks remain monotonic
+during the replay. After the target acknowledges the pgoutput copy of that
+boundary, PipelineWise clears the migration marker and continues normally.
+This works even when no selected rows changed and does not depend on
+``break_at_end_lsn``. A failure before promotion preserves wal2json; a later
+failure retries from the retained pgoutput position and may deliver duplicates.
 
 Publication selection and options are frozen while a migration marker exists
 or both migration slots coexist. If ``import_config`` rejects a selection

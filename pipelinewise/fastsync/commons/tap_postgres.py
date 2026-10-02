@@ -30,7 +30,7 @@ MAX_REPLICATION_SLOT_NAME_LENGTH = 63
 MAX_POSTGRES_TAP_ID_LENGTH = 50
 POSTGRES_TAP_ID_PATTERN = re.compile(r'^[a-z0-9_]+$')
 PGOUTPUT_MIGRATION_STATE_KEY = '_pipelinewise_pgoutput_migration'
-PGOUTPUT_MIGRATION_STATE_VERSION = 1
+PGOUTPUT_MIGRATION_STATE_VERSION = 2
 PUBLICATION_FENCE_COMMENT_PREFIX = 'pipelinewise-publication-fence-v1:'
 REPLICA_REPLAY_TIMEOUT_SECONDS = 300
 SLOT_RELEASE_TIMEOUT_SECONDS = 30
@@ -269,15 +269,16 @@ class FastSyncTapPostgres:
             or not common_required.issubset(marker)
             or type(marker.get('version')) is not int
             or marker['version'] != PGOUTPUT_MIGRATION_STATE_VERSION
-            or phase not in {'bridge_pending', 'bridge', 'pgoutput', 'retire'}
+            or phase not in {
+                'bridge_pending', 'bridge', 'pgoutput_overlap', 'overlap_complete'
+            }
             or not isinstance(marker.get('source_slot'), str)
             or not isinstance(marker.get('destination_slot'), str)
             or type(marker.get('slot_lsn')) is not int
             or marker['slot_lsn'] < 0
-            or (
-                bridge_pending
-                and re.fullmatch(r'[0-9a-f]{32}', marker.get('boundary_token', '')) is None
-            )
+            or re.fullmatch(
+                r'[0-9a-f]{32}', marker.get('boundary_token', '')
+            ) is None
             or (
                 not bridge_pending
                 and (
@@ -286,10 +287,10 @@ class FastSyncTapPostgres:
                 )
             )
             or (
-                phase == 'retire'
+                phase == 'overlap_complete'
                 and (
-                    type(marker.get('retire_lsn')) is not int
-                    or marker['retire_lsn'] <= marker['bridge_lsn']
+                    type(marker.get('crossover_lsn')) is not int
+                    or marker['crossover_lsn'] < marker['slot_lsn']
                 )
             )
         ):
@@ -422,51 +423,64 @@ class FastSyncTapPostgres:
         )
 
     @classmethod
-    def advance_migrated_replication_slot(cls, connection_config: Dict, marker: Dict) -> Dict:
-        """Advance both bridge slots and switch the durable state to pgoutput."""
+    def promote_migrated_replication_slot(cls, connection_config: Dict, marker: Dict) -> Dict:
+        """Validate the untouched pgoutput slot and prepare crash-safe overlap replay."""
         phase, destination, source = cls.validate_migration_state_marker(
             connection_config, marker
         )
         if phase != 'bridge':
             raise RuntimeError(
-                f'Cannot advance a PostgreSQL migration in phase "{phase}". '
-                'No source or state changes were made.'
-            )
-
-        cls._advance_replication_slots(
-            connection_config,
-            {destination: PGOUTPUT_PLUGIN, source: WAL2JSON_PLUGIN},
-            marker['bridge_lsn'],
-        )
-
-        updated = dict(marker)
-        updated['phase'] = 'pgoutput'
-        updated.pop('retire_lsn', None)
-        return updated
-
-    @classmethod
-    def retire_migrated_replication_slot(cls, connection_config: Dict, marker: Dict) -> None:
-        """Drop a target-acknowledged wal2json source while retaining retry evidence."""
-        phase, destination, source = cls.validate_migration_state_marker(
-            connection_config, marker
-        )
-        if phase != 'retire':
-            raise RuntimeError(
-                f'Cannot retire a PostgreSQL migration in phase "{phase}". '
+                f'Cannot promote a PostgreSQL migration in phase "{phase}". '
                 'No source or state changes were made.'
             )
 
         database = connection_config['dbname']
-        cls._advance_replication_slots(
-            connection_config,
-            {destination: PGOUTPUT_PLUGIN},
-            marker['retire_lsn'],
-        )
         connection = cls.get_connection(connection_config, prioritize_primary=True)
         try:
             with connection.cursor() as cur:
                 slots = cls._wait_for_inactive_slots(
-                    cur, database, {destination: PGOUTPUT_PLUGIN, source: WAL2JSON_PLUGIN}, allow_missing=True
+                    cur,
+                    database,
+                    {destination: PGOUTPUT_PLUGIN, source: WAL2JSON_PLUGIN},
+                    require_ready=True,
+                )
+                destination_lsn = cls._lsn_to_int(slots[destination][4])
+                if destination_lsn != marker['slot_lsn']:
+                    raise RuntimeError(
+                        f'Canonical pgoutput slot "{destination}" moved from its original '
+                        'migration LSN. PostgreSQL cannot replay discarded WAL; run an '
+                        'unfiltered whole-tap FastSync.'
+                    )
+        finally:
+            connection.close()
+
+        updated = dict(marker)
+        updated['phase'] = 'pgoutput_overlap'
+        updated.pop('crossover_lsn', None)
+        return updated
+
+    @classmethod
+    def drop_promoted_wal2json_slot(cls, connection_config: Dict, marker: Dict) -> None:
+        """Idempotently drop wal2json after the promoted state has been persisted."""
+        phase, destination, source = cls.validate_migration_state_marker(
+            connection_config, marker
+        )
+        if phase not in {'pgoutput_overlap', 'overlap_complete'}:
+            raise RuntimeError(
+                f'Cannot drop wal2json for a PostgreSQL migration in phase "{phase}". '
+                'No source or state changes were made.'
+            )
+
+        database = connection_config['dbname']
+        connection = cls.get_connection(connection_config, prioritize_primary=True)
+        try:
+            with connection.cursor() as cur:
+                slots = cls._wait_for_inactive_slots(
+                    cur,
+                    database,
+                    {destination: PGOUTPUT_PLUGIN, source: WAL2JSON_PLUGIN},
+                    require_ready=True,
+                    allow_missing=True,
                 )
                 if destination not in slots:
                     raise RuntimeError(
@@ -476,12 +490,20 @@ class FastSyncTapPostgres:
                 cls._validate_replication_slot(
                     slots[destination][:4], database, {PGOUTPUT_PLUGIN}, require_inactive=True
                 )
+                destination_lsn = cls._lsn_to_int(slots[destination][4])
+                if destination_lsn < marker['slot_lsn'] or (
+                    source in slots and destination_lsn != marker['slot_lsn']
+                ):
+                    raise RuntimeError(
+                        f'Canonical pgoutput slot "{destination}" no longer has the '
+                        'promoted migration position. The wal2json slot was retained.'
+                    )
                 if source not in slots:
                     return
                 cls._validate_replication_slot(
                     slots[source][:4], database, {WAL2JSON_PLUGIN}, require_inactive=True
                 )
-                LOGGER.info('Dropping target-acknowledged wal2json slot "%s"', source)
+                LOGGER.info('Dropping promoted wal2json slot "%s"', source)
                 cur.execute('SELECT pg_drop_replication_slot(%s)', (source,))
         finally:
             connection.close()

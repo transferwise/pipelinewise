@@ -67,8 +67,12 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
   targets, the backend, and data-diff connections are separate.
 - Name each PostgreSQL pgoutput slot and publication `ppw_slot_<tap_id>`.
   Automatic migration creates a fresh slot, bridges wal2json through a later
-  message commit, and advances only after target acknowledgement. Persist a
-  `bridge_pending` marker so duration-limited retries keep the same boundary.
+  message commit, and persists promotion only after target acknowledgement.
+  Drop wal2json immediately after that durable promotion. Start pgoutput from
+  its original slot LSN without advancing it, replay through the same boundary,
+  keep bookmarks monotonic, and clear the marker only after target
+  acknowledgement. Persist a `bridge_pending` marker so duration-limited
+  retries keep the boundary.
   Freeze publication selection and options while the migration marker or both
   migration slots exist. Validate the frozen publication before import can
   invalidate bookmarks, including when slot creation succeeded before the

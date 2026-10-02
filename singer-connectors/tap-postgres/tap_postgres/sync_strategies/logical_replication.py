@@ -33,6 +33,7 @@ FALLBACK_DATE = '9999-12-31T00:00:00+00:00'
 BOUNDARY_MESSAGE_PREFIX = 'pipelinewise'
 PUBLICATION_FENCE_COMMENT_PREFIX = 'pipelinewise-publication-fence-v1:'
 PGOUTPUT_MIGRATION_STATE_KEY = '_pipelinewise_pgoutput_migration'
+PGOUTPUT_MIGRATION_STATE_VERSION = 2
 
 
 class ReplicationSlotNotFoundError(Exception):
@@ -1293,7 +1294,9 @@ def prepare_publication(  # noqa: C901
                     conn_info['dbname'],
                     conn_info['tap_id'],
                     allow_wal2json_migration=(
-                        not publishes_partition_roots or migration_phase in {'pgoutput', 'retire'}),
+                        not publishes_partition_roots or migration_phase in {
+                            'pgoutput_overlap', 'overlap_complete'
+                        }),
                     fresh_start=fresh_start,
                     previous_tap_id=conn_info.get('previous_tap_id'),
                 )
@@ -1652,6 +1655,21 @@ def _write_lsn_state(state, logical_streams, lsn):
     return state
 
 
+def _write_monotonic_lsn_state(state, logical_streams, lsn):
+    """Write migration replay state without moving any stream bookmark backwards."""
+    for stream in logical_streams:
+        stream_id = stream['tap_stream_id']
+        current_lsn = get_bookmark(state, stream_id, 'lsn')
+        state = singer.write_bookmark(
+            state,
+            stream_id,
+            'lsn',
+            max(current_lsn, lsn) if type(current_lsn) is int else lsn,
+        )
+    singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
+    return state
+
+
 def _start_wal2json_replication(cur, logical_streams, slot, start_lsn, version, tap_id,
                                 physical_tables=None):
     cur.execute('SET SESSION wal_sender_timeout = 10800000')
@@ -1694,7 +1712,7 @@ def _bridge_wal2json_slot(conn_info, logical_streams, state, state_file, publica
             slot_lsn,
         )
         state[PGOUTPUT_MIGRATION_STATE_KEY] = {
-            'version': 1,
+            'version': PGOUTPUT_MIGRATION_STATE_VERSION,
             'phase': 'bridge_pending',
             'source_slot': source_slot,
             'destination_slot': str(destination_slot),
@@ -1789,12 +1807,13 @@ def _bridge_wal2json_slot(conn_info, logical_streams, state, state_file, publica
                     if boundary_transaction:
                         bridge_lsn = last_complete_lsn
                         state[PGOUTPUT_MIGRATION_STATE_KEY] = {
-                            'version': 1,
+                            'version': PGOUTPUT_MIGRATION_STATE_VERSION,
                             'phase': 'bridge',
                             'source_slot': source_slot,
                             'destination_slot': str(destination_slot),
                             'slot_lsn': slot_lsn,
                             'bridge_lsn': bridge_lsn,
+                            'boundary_token': token,
                         }
                         state = _write_lsn_state(state, logical_streams, bridge_lsn)
                         break
@@ -1882,17 +1901,16 @@ def _validate_migration_state(conn_info, migration_state):
             not isinstance(migration_state, dict)
             or not required.issubset(migration_state)
             or type(migration_state.get('version')) is not int
-            or migration_state['version'] != 1
-            or phase not in {'bridge_pending', 'bridge', 'pgoutput', 'retire'}
+            or migration_state['version'] != PGOUTPUT_MIGRATION_STATE_VERSION
+            or phase not in {'bridge_pending', 'bridge', 'pgoutput_overlap', 'overlap_complete'}
             or not isinstance(migration_state.get('source_slot'), str)
             or migration_state['source_slot'] not in allowed_sources
             or migration_state.get('destination_slot') != destination
             or type(migration_state.get('slot_lsn')) is not int
             or migration_state['slot_lsn'] < 0
-            or (
-                bridge_pending
-                and re.fullmatch(r'[0-9a-f]{32}', migration_state.get('boundary_token', '')) is None
-            )
+            or re.fullmatch(
+                r'[0-9a-f]{32}', migration_state.get('boundary_token', '')
+            ) is None
             or (
                 not bridge_pending
                 and (
@@ -1901,10 +1919,10 @@ def _validate_migration_state(conn_info, migration_state):
                 )
             )
             or (
-                phase == 'retire'
+                phase == 'overlap_complete'
                 and (
-                    type(migration_state.get('retire_lsn')) is not int
-                    or migration_state['retire_lsn'] <= migration_state['bridge_lsn']
+                    type(migration_state.get('crossover_lsn')) is not int
+                    or migration_state['crossover_lsn'] < migration_state['slot_lsn']
                 )
             )):
         raise ReplicationSlotMigrationError(
@@ -1923,10 +1941,10 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):  # noqa
         _validate_migration_state(conn_info, migration_state)
         if has_migration_state else None
     )
-    if migration_phase == 'bridge':
+    if migration_phase in {'bridge', 'overlap_complete'}:
         raise ReplicationSlotMigrationError(
-            'Persisted pgoutput bridge state must be target-acknowledged and promoted '
-            'by PipelineWise before the tap resumes'
+            f'Persisted pgoutput migration phase {migration_phase!r} must be '
+            'processed by PipelineWise before the tap resumes'
         )
 
     # Publication DDL must commit before the fresh slot is created or old history is bridged. Pgoutput
@@ -1936,7 +1954,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):  # noqa
         conn_info,
         allow_wal2json_migration=(
             not publication.has_partition_roots
-            or migration_phase in {'pgoutput', 'retire'}
+            or migration_phase in {'pgoutput_overlap', 'overlap_complete'}
         ),
     )
     migration_source = getattr(slot, 'migration_source', None)
@@ -1950,7 +1968,8 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):  # noqa
             )
         if (
             start_lsn < canonical_confirmed_lsn
-            and (migration_source is None or migration_phase in {'pgoutput', 'retire'})
+            and migration_phase != 'pgoutput_overlap'
+            and migration_source is None
         ):
             raise ReplicationSlotMigrationError(
                 f'Target bookmark {int_to_lsn(start_lsn)} predates canonical pgoutput '
@@ -1959,7 +1978,6 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):  # noqa
                 'discarded WAL; run an unfiltered whole-tap FastSync to reset the '
                 'slot and state together.'
             )
-    migration_activation_lsn = None
     start_run_timestamp = datetime.datetime.utcnow()
     max_run_seconds = conn_info['max_run_seconds']
     break_at_end_lsn = conn_info['break_at_end_lsn']
@@ -1972,17 +1990,20 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):  # noqa
             record_update_mode=sync_common.PATCH_RECORD_UPDATE_MODE)
 
     if has_migration_state:
-        migration_activation_lsn = migration_state.get('bridge_lsn')
         expected_source = migration_state['source_slot']
-        if str(slot) != migration_state['destination_slot'] or (
-                migration_phase != 'retire' and migration_source != expected_source):
+        source_matches = (
+            migration_source == expected_source
+            if migration_phase in {'bridge_pending', 'bridge'}
+            else migration_source in {None, expected_source}
+        )
+        if str(slot) != migration_state['destination_slot'] or not source_matches:
             raise ReplicationSlotMigrationError(
                 'Persisted pgoutput migration slots do not match the source database: '
                 f'{(expected_source, migration_state["destination_slot"])!r} != '
                 f'{(migration_source, str(slot))!r}'
             )
 
-    if migration_source and migration_phase not in {'pgoutput', 'retire'}:
+    if migration_source and migration_phase not in {'pgoutput_overlap', 'overlap_complete'}:
         if (isinstance(source_confirmed_lsn, bool)
                 or not isinstance(source_confirmed_lsn, int)):
             raise ReplicationSlotMigrationError(
@@ -2024,6 +2045,10 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):  # noqa
             start_lsn,
             time_extracted,
         )
+    overlap_replay = migration_phase == 'pgoutput_overlap'
+    if overlap_replay:
+        start_lsn = migration_state['slot_lsn']
+
     conn = post_db.open_connection(conn_info, True, True)
     cur = None
     finalize_state = False
@@ -2036,21 +2061,15 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):  # noqa
         cur = conn.cursor()
         _start_replication(cur, publication, slot, start_lsn, conn.server_version)
         cur.send_feedback(
-            write_lsn=target_acknowledged_lsn,
+            write_lsn=start_lsn if overlap_replay else target_acknowledged_lsn,
             flush_lsn=0,
             reply=True,
             force=True,
         )
-        boundary_token = emit_boundary_message(
-            conn_info,
-            _migration_boundary_token(
-                conn_info,
-                'retire',
-                migration_state['source_slot'],
-                migration_state['destination_slot'],
-                migration_state['slot_lsn'],
-                bridge_lsn=migration_state['bridge_lsn'],
-            ) if migration_source and migration_phase == 'pgoutput' else None,
+        boundary_token = (
+            migration_state['boundary_token']
+            if overlap_replay
+            else emit_boundary_message(conn_info)
         )
         LOGGER.info(
             'Request pgoutput streaming after startup LSN %s (slot %s, publication %s)',
@@ -2099,22 +2118,27 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):  # noqa
                     commits_since_state += 1
 
                     if transaction_has_boundary:
-                        if (migration_source
-                                and migration_phase == 'pgoutput'
-                                and migration_activation_lsn is not None
-                                and commit_lsn > migration_activation_lsn):
+                        if overlap_replay:
                             state[PGOUTPUT_MIGRATION_STATE_KEY].update({
-                                'phase': 'retire',
-                                'retire_lsn': commit_lsn,
+                                'phase': 'overlap_complete',
+                                'crossover_lsn': commit_lsn,
                             })
-                            migration_phase = 'retire'
-                        state = _write_lsn_state(state, logical_streams, commit_lsn)
+                            migration_phase = 'overlap_complete'
+                            state = _write_monotonic_lsn_state(
+                                state, logical_streams, commit_lsn
+                            )
+                        else:
+                            state = _write_lsn_state(state, logical_streams, commit_lsn)
                         state_emitted_lsn = commit_lsn
                         LOGGER.info('Reached decoded pgoutput boundary at %s', int_to_lsn(commit_lsn))
-                        if break_at_end_lsn:
+                        if overlap_replay or break_at_end_lsn:
                             break
                     elif commits_since_state >= UPDATE_BOOKMARK_PERIOD:
-                        state = _write_lsn_state(state, logical_streams, commit_lsn)
+                        writer = (
+                            _write_monotonic_lsn_state
+                            if overlap_replay else _write_lsn_state
+                        )
+                        state = writer(state, logical_streams, commit_lsn)
                         state_emitted_lsn = commit_lsn
                         commits_since_state = 0
                     transaction_has_boundary = False
@@ -2153,7 +2177,11 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):  # noqa
                 if last_complete_lsn is not None and state_emitted_lsn != last_complete_lsn:
                     LOGGER.info('Updating bookmarks for all streams to pgoutput LSN %s',
                                 int_to_lsn(last_complete_lsn))
-                    state = _write_lsn_state(state, logical_streams, last_complete_lsn)
+                    writer = (
+                        _write_monotonic_lsn_state
+                        if overlap_replay else _write_lsn_state
+                    )
+                    state = writer(state, logical_streams, last_complete_lsn)
                 elif last_complete_lsn is None:
                     singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
         finally:

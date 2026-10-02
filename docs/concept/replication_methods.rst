@@ -69,10 +69,12 @@ logical messages enabled. Releases before 14.18, 15.13, 16.9, or 17.5 log a
 warning because logical decoding may omit or misdecode changes. Each run commits
 a tap-specific transactional logical message. By default, it stops after
 decoding that transaction's commit. Automatic wal2json migration persists its
-boundary identity across retries and freezes publication selection until the
-migration finishes or an explicit whole-tap resync resets it. The
-target-acknowledged commit LSN bounds slot feedback even when no selected rows
-changed. See :ref:`tap-postgres` for publication, replica-identity,
+boundary identity across retries, drops wal2json after the target acknowledges
+the bridge, and replays pgoutput from its original position through the same
+boundary. Replay bookmarks never move backwards. Publication selection remains
+frozen until the migration finishes or an explicit whole-tap resync resets it.
+The target-acknowledged commit LSN bounds slot feedback even when no selected
+rows changed. See :ref:`tap-postgres` for publication, replica-identity,
 slot-migration, and permission requirements. Interrupted initial snapshots
 restart from the first row with their original CDC boundary. Their primary keys
 let targets merge the replayed rows.

@@ -54,18 +54,17 @@ def _tap_files(tmp_path, state):
 
 def _migration_marker(phase='bridge'):
     marker = {
-        'version': 1,
+        'version': 2,
         'phase': phase,
         'source_slot': 'pipelinewise_my_db_my_tap',
         'destination_slot': 'ppw_slot_my_tap',
         'slot_lsn': 90,
+        'boundary_token': 'a' * 32,
     }
-    if phase == 'bridge_pending':
-        marker['boundary_token'] = 'a' * 32
-    else:
+    if phase != 'bridge_pending':
         marker['bridge_lsn'] = 100
-    if phase == 'retire':
-        marker['retire_lsn'] = 120
+    if phase == 'overlap_complete':
+        marker['crossover_lsn'] = 120
     return marker
 
 
@@ -483,21 +482,31 @@ def test_publication_preflight_preserves_paths_with_spaces_and_quotes(tmp_path):
     ]
 
 
-def test_persisted_bridge_is_advanced_and_rewritten_before_next_run(tmp_path):
+def test_persisted_bridge_is_saved_as_promoted_before_wal2json_is_dropped(tmp_path):
     marker = _migration_marker()
     tap = _tap_files(tmp_path, {
         PGOUTPUT_MIGRATION_STATE_KEY: marker,
         'bookmarks': {'public-one': {'lsn': 100}},
     })
     runner = _runner(tmp_path, [_logical_stream('public-one')])
-    updated = {**marker, 'phase': 'pgoutput'}
+    updated = {**marker, 'phase': 'pgoutput_overlap'}
+
+    def assert_promoted_was_saved(_config, dropped_marker):
+        assert dropped_marker == updated
+        saved = json.loads((tmp_path / 'state.json').read_text(encoding='utf-8'))
+        assert saved[PGOUTPUT_MIGRATION_STATE_KEY] == updated
 
     with patch.object(
-        FastSyncTapPostgres, 'advance_migrated_replication_slot', return_value=updated
-    ) as advance:
+        FastSyncTapPostgres, 'promote_migrated_replication_slot', return_value=updated
+    ) as promote, patch.object(
+        FastSyncTapPostgres,
+        'drop_promoted_wal2json_slot',
+        side_effect=assert_promoted_was_saved,
+    ) as drop:
         runner._process_postgres_pgoutput_migration(tap, after_success=False)
 
-    advance.assert_called_once_with({'dbname': 'my_db', 'tap_id': 'my_tap'}, marker)
+    promote.assert_called_once_with({'dbname': 'my_db', 'tap_id': 'my_tap'}, marker)
+    drop.assert_called_once_with({'dbname': 'my_db', 'tap_id': 'my_tap'}, updated)
     assert json.loads((tmp_path / 'state.json').read_text(encoding='utf-8')) == {
         PGOUTPUT_MIGRATION_STATE_KEY: updated,
         'bookmarks': {'public-one': {'lsn': 100}},
@@ -516,12 +525,12 @@ def test_success_does_not_advance_canonical_slot_while_bridge_boundary_is_pendin
     with patch.object(
         FastSyncTapPostgres, 'advance_canonical_replication_slot'
     ) as advance_canonical, patch.object(
-        FastSyncTapPostgres, 'advance_migrated_replication_slot'
-    ) as advance_migration:
+        FastSyncTapPostgres, 'promote_migrated_replication_slot'
+    ) as promote:
         runner._process_postgres_pgoutput_migration(tap, after_success=True)
 
     advance_canonical.assert_not_called()
-    advance_migration.assert_not_called()
+    promote.assert_not_called()
     assert json.loads((tmp_path / 'state.json').read_text(encoding='utf-8')) == state
 
 
@@ -539,39 +548,39 @@ def test_bridge_is_retained_until_every_logical_bookmark_reaches_boundary(tmp_pa
     )
 
     with patch.object(
-        FastSyncTapPostgres, 'advance_migrated_replication_slot'
-    ) as advance, pytest.raises(RuntimeError, match='target-durable bridge boundary'):
+        FastSyncTapPostgres, 'promote_migrated_replication_slot'
+    ) as promote, pytest.raises(RuntimeError, match='target-durable bridge boundary'):
         runner._process_postgres_pgoutput_migration(tap, after_success=False)
 
-    advance.assert_not_called()
+    promote.assert_not_called()
     assert json.loads((tmp_path / 'state.json').read_text(encoding='utf-8'))[
         PGOUTPUT_MIGRATION_STATE_KEY
     ] == marker
 
 
-def test_pre_run_never_retires_a_source_slot(tmp_path):
-    marker = _migration_marker('retire')
+def test_pre_run_retries_idempotent_wal2json_drop_after_promotion(tmp_path):
+    marker = _migration_marker('pgoutput_overlap')
     tap = _tap_files(tmp_path, {PGOUTPUT_MIGRATION_STATE_KEY: marker})
     runner = _runner(tmp_path)
 
     with patch.object(
         FastSyncTapPostgres, 'advance_canonical_replication_slot'
     ) as advance, patch.object(
-        FastSyncTapPostgres, 'retire_migrated_replication_slot'
-    ) as retire:
+        FastSyncTapPostgres, 'drop_promoted_wal2json_slot'
+    ) as drop:
         runner._process_postgres_pgoutput_migration(tap, after_success=False)
 
     advance.assert_not_called()
-    retire.assert_not_called()
+    drop.assert_called_once_with({'dbname': 'my_db', 'tap_id': 'my_tap'}, marker)
     assert json.loads((tmp_path / 'state.json').read_text(encoding='utf-8'))[
         PGOUTPUT_MIGRATION_STATE_KEY
     ] == marker
 
 
-def test_success_advances_minimum_durable_lsn_then_retires_source(tmp_path):
+def test_overlap_completion_advances_to_crossover_and_clears_marker(tmp_path):
     streams = [_logical_stream('public-one'), _logical_stream('public-two')]
     runner = _runner(tmp_path, streams)
-    marker = _migration_marker('retire')
+    marker = _migration_marker('overlap_complete')
     tap = _tap_files(tmp_path, {
         PGOUTPUT_MIGRATION_STATE_KEY: marker,
         'bookmarks': {
@@ -584,15 +593,15 @@ def test_success_advances_minimum_durable_lsn_then_retires_source(tmp_path):
     with patch.object(
         FastSyncTapPostgres, 'advance_canonical_replication_slot'
     ) as advance, patch.object(
-        FastSyncTapPostgres, 'retire_migrated_replication_slot'
-    ) as retire:
+        FastSyncTapPostgres, 'drop_promoted_wal2json_slot'
+    ) as drop:
         calls.attach_mock(advance, 'advance')
-        calls.attach_mock(retire, 'retire')
+        calls.attach_mock(drop, 'drop')
         runner._process_postgres_pgoutput_migration(tap, after_success=True)
 
     assert calls.mock_calls == [
-        call.advance({'dbname': 'my_db', 'tap_id': 'my_tap'}, 125),
-        call.retire({'dbname': 'my_db', 'tap_id': 'my_tap'}, marker),
+        call.drop({'dbname': 'my_db', 'tap_id': 'my_tap'}, marker),
+        call.advance({'dbname': 'my_db', 'tap_id': 'my_tap'}, 120),
     ]
     state = json.loads((tmp_path / 'state.json').read_text(encoding='utf-8'))
     assert PGOUTPUT_MIGRATION_STATE_KEY not in state
@@ -603,11 +612,11 @@ def test_success_advances_minimum_durable_lsn_then_retires_source(tmp_path):
     {'public-one': {'lsn': 130}, 'public-two': {'lsn': 119}},
     {'public-one': {'lsn': 130}},
 ])
-def test_retirement_waits_for_every_logical_bookmark(tmp_path, bookmarks):
+def test_overlap_completion_waits_for_every_logical_bookmark(tmp_path, bookmarks):
     runner = _runner(
         tmp_path, [_logical_stream('public-one'), _logical_stream('public-two')]
     )
-    marker = _migration_marker('retire')
+    marker = _migration_marker('overlap_complete')
     tap = _tap_files(tmp_path, {
         PGOUTPUT_MIGRATION_STATE_KEY: marker,
         'bookmarks': bookmarks,
@@ -616,12 +625,12 @@ def test_retirement_waits_for_every_logical_bookmark(tmp_path, bookmarks):
     with patch.object(
         FastSyncTapPostgres, 'advance_canonical_replication_slot'
     ) as advance, patch.object(
-        FastSyncTapPostgres, 'retire_migrated_replication_slot'
-    ) as retire, pytest.raises(RuntimeError, match='target-durable pgoutput commit'):
+        FastSyncTapPostgres, 'drop_promoted_wal2json_slot'
+    ) as drop, pytest.raises(RuntimeError, match='target-durable crossover boundary'):
         runner._process_postgres_pgoutput_migration(tap, after_success=True)
 
     advance.assert_not_called()
-    retire.assert_not_called()
+    drop.assert_not_called()
     assert json.loads((tmp_path / 'state.json').read_text(encoding='utf-8'))[
         PGOUTPUT_MIGRATION_STATE_KEY
     ] == marker

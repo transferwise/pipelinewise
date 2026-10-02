@@ -596,16 +596,16 @@ def test_wal2json_slot_is_retired_after_pgoutput_target_checkpoint(tmp_path, fre
             assert bridge_marker is None
             assert bridged_old_slot is None
         else:
-            assert bridge_marker['phase'] == 'pgoutput'
+            assert bridge_marker['version'] == 2
+            assert bridge_marker['phase'] == 'pgoutput_overlap'
             assert bridge_marker['source_slot'] == wal2json_slot
             assert bridge_marker['destination_slot'] == pgoutput_slot
             assert bridge_marker['slot_lsn'] == new_slot['confirmed_flush_lsn']
             assert bridge_marker['bridge_lsn'] > bridge_marker['slot_lsn']
+            assert len(bridge_marker['boundary_token']) == 32
             assert bridge_lsn == bridge_marker['bridge_lsn']
-            assert bridged_old_slot is not None
-            assert bridged_old_slot['plugin'] == 'wal2json'
-            assert bridged_old_slot['confirmed_flush_lsn'] >= bridge_lsn
-            assert bridged_new_slot['confirmed_flush_lsn'] >= bridge_lsn
+            assert bridged_old_slot is None
+            assert bridged_new_slot['confirmed_flush_lsn'] == bridge_marker['slot_lsn']
         source_rows, target_rows = _source_target_rows(e2e)
         assert source_rows == target_rows
 
@@ -636,11 +636,7 @@ def test_wal2json_slot_is_retired_after_pgoutput_target_checkpoint(tmp_path, fre
         assert failed_slot is not None
         assert failed_slot['plugin'] == 'pgoutput'
         failed_old_slot = _slot_status(e2e, wal2json_slot)
-        if fresh_reset:
-            assert failed_old_slot is None
-        else:
-            assert failed_old_slot is not None
-            assert failed_old_slot['plugin'] == 'wal2json'
+        assert failed_old_slot is None
         failed_state = _read_state(state_path)
         assert failed_state.get(MIGRATION_STATE_KEY) == bridge_marker
         assert _read_state_lsn(state_path) == bridge_lsn
@@ -662,12 +658,13 @@ def test_wal2json_slot_is_retired_after_pgoutput_target_checkpoint(tmp_path, fre
         assert final_slot is not None
         assert final_slot['plugin'] == 'pgoutput'
         assert not final_slot['active']
-        assert final_slot['confirmed_flush_lsn'] > bridge_lsn
+        if not fresh_reset:
+            assert final_slot['confirmed_flush_lsn'] > bridge_marker['slot_lsn']
         assert _slot_status(e2e, wal2json_slot) is None
         final_state = _read_state(state_path)
         assert MIGRATION_STATE_KEY not in final_state
         idle_retirement_lsn = _read_state_lsn(state_path)
-        assert idle_retirement_lsn > bridge_lsn
+        assert idle_retirement_lsn >= bridge_lsn
         source_rows, target_rows = _source_target_rows(e2e)
         assert target_rows == source_rows
 

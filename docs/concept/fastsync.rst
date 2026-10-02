@@ -186,7 +186,8 @@ An explicit reset creates a fresh pgoutput slot and records its intent durably.
 Ordinary replication stays blocked until the whole-tap FastSync completes.
 It drops any dedicated historical wal2json slot before loading new snapshots.
 Shared database-wide slots remain untouched. Automatic migration instead keeps
-the old dedicated slot until the target confirms pgoutput consumption.
+the old dedicated slot until the target confirms the wal2json bridge, then
+drops it before pgoutput replays the overlap from its original slot position.
 
 
 .. _defined_partial_sync:

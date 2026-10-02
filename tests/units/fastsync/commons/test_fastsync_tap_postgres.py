@@ -184,11 +184,12 @@ class TestFastSyncTapPostgres(TestCase):
         self.assertEqual(source, ('pipelinewise_source_database_old_tap_' + 'x' * 50)[:63])
         self.assertEqual(len(source), 63)
         marker = {
-            'version': 1, 'phase': 'pgoutput', 'source_slot': source,
+            'version': 2, 'phase': 'pgoutput_overlap', 'source_slot': source,
             'destination_slot': destination, 'slot_lsn': 100, 'bridge_lsn': 200,
+            'boundary_token': 'a' * 32,
         }
         self.assertEqual(FastSyncTapPostgres.validate_migration_state_marker(config, marker),
-                         ('pgoutput', destination, source))
+                         ('pgoutput_overlap', destination, source))
         with self.assertRaisesRegex(RuntimeError, 'does not match'):
             FastSyncTapPostgres.validate_migration_state_marker({**config, 'previous_tap_id': 'foreign'}, marker)
 
@@ -233,8 +234,9 @@ class TestFastSyncTapPostgres(TestCase):
         destination, _, source = FastSyncTapPostgres.validate_replication_slot_identity(
             config['dbname'], config['tap_id'])
         marker = {
-            'version': 1, 'phase': 'bridge', 'source_slot': source,
+            'version': 2, 'phase': 'bridge', 'source_slot': source,
             'destination_slot': destination, 'slot_lsn': 100, 'bridge_lsn': 200,
+            'boundary_token': 'a' * 32,
         }
 
         with self.assertRaisesRegex(RuntimeError, 'implicitly truncated.*previous_tap_id'):
@@ -1550,49 +1552,68 @@ class TestFastSyncTapPostgres(TestCase):
         ))
         connection.close.assert_called_once_with()
 
-    def test_advance_migrated_replication_slot_advances_both_bridge_slots(self):
-        """A target-durable bridge boundary releases WAL on both retained slots."""
+    def test_promote_migrated_replication_slot_preserves_original_pgoutput_lsn(self):
+        """Promotion validates the untouched pgoutput start without advancing either slot."""
         connection = MagicMock()
         cursor = connection.cursor.return_value.__enter__.return_value
         cursor.fetchall.return_value = [
             ('ppw_slot_my_tap', 'my_db', 'pgoutput', False, '0/64'),
             ('pipelinewise_my_db_my_tap', 'my_db', 'wal2json', False, '0/65'),
         ]
-        cursor.fetchone.side_effect = [
-            ('ppw_slot_my_tap', '0/6E'),
-            ('pipelinewise_my_db_my_tap', '0/6E'),
-        ]
         marker = {
-            'version': 1,
+            'version': 2,
             'phase': 'bridge',
             'source_slot': 'pipelinewise_my_db_my_tap',
             'destination_slot': 'ppw_slot_my_tap',
-            'slot_lsn': 99,
+            'slot_lsn': 100,
             'bridge_lsn': 110,
+            'boundary_token': 'a' * 32,
         }
         with patch.object(FastSyncTapPostgres, 'get_connection', return_value=connection):
-            updated = FastSyncTapPostgres.advance_migrated_replication_slot(
+            updated = FastSyncTapPostgres.promote_migrated_replication_slot(
                 {'dbname': 'my_db', 'tap_id': 'my_tap'}, marker
             )
 
-        assert updated == {**marker, 'phase': 'pgoutput'}
+        assert updated == {**marker, 'phase': 'pgoutput_overlap'}
         assert cursor.execute.call_args_list == [
             call(
                 'SELECT slot_name, database, plugin, active, confirmed_flush_lsn::text '
                 'FROM pg_replication_slots WHERE slot_name = ANY(%s)',
                 (['ppw_slot_my_tap', 'pipelinewise_my_db_my_tap'],),
             ),
-            call(
-                'SELECT slot_name, end_lsn::text '
-                'FROM pg_replication_slot_advance(%s, %s::pg_lsn)',
-                ('ppw_slot_my_tap', '0/6E'),
-            ),
-            call(
-                'SELECT slot_name, end_lsn::text '
-                'FROM pg_replication_slot_advance(%s, %s::pg_lsn)',
-                ('pipelinewise_my_db_my_tap', '0/6E'),
-            ),
         ]
+        connection.close.assert_called_once_with()
+
+    def test_promote_migrated_replication_slot_rejects_moved_pgoutput_lsn(self):
+        """Promotion fails if unseen pgoutput WAL was already discarded."""
+        connection = MagicMock()
+        cursor = connection.cursor.return_value.__enter__.return_value
+        cursor.fetchall.return_value = [
+            ('ppw_slot_my_tap', 'my_db', 'pgoutput', False, '0/65'),
+            ('pipelinewise_my_db_my_tap', 'my_db', 'wal2json', False, '0/65'),
+        ]
+        marker = {
+            'version': 2,
+            'phase': 'bridge',
+            'source_slot': 'pipelinewise_my_db_my_tap',
+            'destination_slot': 'ppw_slot_my_tap',
+            'slot_lsn': 100,
+            'bridge_lsn': 110,
+            'boundary_token': 'a' * 32,
+        }
+
+        with patch.object(
+            FastSyncTapPostgres, 'get_connection', return_value=connection
+        ), self.assertRaisesRegex(RuntimeError, 'moved from its original migration LSN'):
+            FastSyncTapPostgres.promote_migrated_replication_slot(
+                {'dbname': 'my_db', 'tap_id': 'my_tap'}, marker
+            )
+
+        assert not any(
+            'pg_replication_slot_advance' in str(item)
+            or 'pg_drop_replication_slot' in str(item)
+            for item in cursor.execute.call_args_list
+        )
         connection.close.assert_called_once_with()
 
     def test_advance_canonical_replication_slot_is_idempotent(self):
@@ -1607,6 +1628,35 @@ class TestFastSyncTapPostgres(TestCase):
                 {'dbname': 'my_db', 'tap_id': 'my_tap'}, 100
             )
         self.assertEqual(cursor.execute.call_count, 1)
+        connection.close.assert_called_once_with()
+
+    def test_drop_promoted_wal2json_slot_retains_source_if_pgoutput_moved(self):
+        """The source remains available if pgoutput no longer has its promoted position."""
+        connection = MagicMock()
+        cursor = connection.cursor.return_value.__enter__.return_value
+        cursor.fetchall.return_value = [
+            ('ppw_slot_my_tap', 'my_db', 'pgoutput', False, '0/5B'),
+            ('pipelinewise_my_db_my_tap', 'my_db', 'wal2json', False, '0/64'),
+        ]
+        marker = {
+            'version': 2,
+            'phase': 'pgoutput_overlap',
+            'source_slot': 'pipelinewise_my_db_my_tap',
+            'destination_slot': 'ppw_slot_my_tap',
+            'slot_lsn': 90,
+            'bridge_lsn': 100,
+            'boundary_token': 'a' * 32,
+        }
+        with patch.object(
+            FastSyncTapPostgres, 'get_connection', return_value=connection
+        ), self.assertRaisesRegex(RuntimeError, 'promoted migration position'):
+            FastSyncTapPostgres.drop_promoted_wal2json_slot(
+                {'dbname': 'my_db', 'tap_id': 'my_tap'}, marker
+            )
+
+        assert not any(
+            'pg_drop_replication_slot' in str(item) for item in cursor.execute.call_args_list
+        )
         connection.close.assert_called_once_with()
 
     def test_advance_canonical_replication_slot_validates_returned_boundary(self):
@@ -1625,82 +1675,72 @@ class TestFastSyncTapPostgres(TestCase):
             )
         connection.close.assert_called_once_with()
 
-    def test_retire_migrated_replication_slot_advances_then_drops_source(self):
-        """Retirement proves canonical durability before deleting the inactive source."""
+    def test_drop_promoted_wal2json_slot_does_not_advance_pgoutput(self):
+        """The old slot is removed only after promotion, without moving pgoutput."""
         connection = MagicMock()
         cursor = connection.cursor.return_value.__enter__.return_value
         cursor.fetchall.return_value = [
-            ('ppw_slot_my_tap', 'my_db', 'pgoutput', False),
-            ('pipelinewise_my_db_my_tap', 'my_db', 'wal2json', False),
+            ('ppw_slot_my_tap', 'my_db', 'pgoutput', False, '0/5A'),
+            ('pipelinewise_my_db_my_tap', 'my_db', 'wal2json', False, '0/64'),
         ]
         marker = {
-            'version': 1,
-            'phase': 'retire',
+            'version': 2,
+            'phase': 'pgoutput_overlap',
             'source_slot': 'pipelinewise_my_db_my_tap',
             'destination_slot': 'ppw_slot_my_tap',
             'slot_lsn': 90,
             'bridge_lsn': 100,
-            'retire_lsn': 110,
+            'boundary_token': 'a' * 32,
         }
-        with patch.object(
-            FastSyncTapPostgres, '_advance_replication_slots'
-        ) as advance, patch.object(
-            FastSyncTapPostgres, 'get_connection', return_value=connection
-        ):
-            FastSyncTapPostgres.retire_migrated_replication_slot(
+        with patch.object(FastSyncTapPostgres, 'get_connection', return_value=connection):
+            FastSyncTapPostgres.drop_promoted_wal2json_slot(
                 {'dbname': 'my_db', 'tap_id': 'my_tap'}, marker
             )
 
-        advance.assert_called_once_with(
-            {'dbname': 'my_db', 'tap_id': 'my_tap'},
-            {'ppw_slot_my_tap': 'pgoutput'},
-            110,
-        )
+        assert not any('pg_replication_slot_advance' in str(item) for item in cursor.execute.call_args_list)
         assert cursor.execute.call_args_list[-1] == call(
             'SELECT pg_drop_replication_slot(%s)', ('pipelinewise_my_db_my_tap',)
         )
         connection.close.assert_called_once_with()
 
-    def test_retire_migrated_replication_slot_accepts_already_missing_source(self):
+    def test_drop_promoted_wal2json_slot_accepts_already_missing_source(self):
         """A retry after an uncertain successful drop is idempotent."""
         connection = MagicMock()
         cursor = connection.cursor.return_value.__enter__.return_value
         cursor.fetchall.return_value = [
-            ('ppw_slot_my_tap', 'my_db', 'pgoutput', False),
+            ('ppw_slot_my_tap', 'my_db', 'pgoutput', False, '0/5B'),
         ]
         marker = {
-            'version': 1,
-            'phase': 'retire',
+            'version': 2,
+            'phase': 'pgoutput_overlap',
             'source_slot': 'pipelinewise_my_db_my_tap',
             'destination_slot': 'ppw_slot_my_tap',
             'slot_lsn': 90,
             'bridge_lsn': 100,
-            'retire_lsn': 110,
+            'boundary_token': 'a' * 32,
         }
-        with patch.object(
-            FastSyncTapPostgres, '_advance_replication_slots'
-        ), patch.object(FastSyncTapPostgres, 'get_connection', return_value=connection):
-            FastSyncTapPostgres.retire_migrated_replication_slot(
+        with patch.object(FastSyncTapPostgres, 'get_connection', return_value=connection):
+            FastSyncTapPostgres.drop_promoted_wal2json_slot(
                 {'dbname': 'my_db', 'tap_id': 'my_tap'}, marker
             )
         self.assertEqual(cursor.execute.call_count, 1)
         connection.close.assert_called_once_with()
 
-    def test_retire_migrated_replication_slot_rejects_invalid_marker_before_connecting(self):
+    def test_drop_promoted_wal2json_slot_rejects_invalid_marker_before_connecting(self):
         """Malformed or foreign durable state cannot select a source slot for deletion."""
         valid = {
-            'version': 1,
-            'phase': 'retire',
+            'version': 2,
+            'phase': 'pgoutput_overlap',
             'source_slot': 'pipelinewise_my_db_my_tap',
             'destination_slot': 'ppw_slot_my_tap',
             'slot_lsn': 90,
             'bridge_lsn': 100,
-            'retire_lsn': 110,
+            'boundary_token': 'a' * 32,
         }
         invalid_markers = [
-            {**valid, 'version': 2},
+            {**valid, 'version': 1},
             {**valid, 'phase': 'unknown'},
-            {**valid, 'retire_lsn': 100},
+            {**valid, 'boundary_token': 'invalid'},
             {**valid, 'source_slot': 'pipelinewise_other_db'},
             {**valid, 'destination_slot': 'ppw_slot_other_tap'},
         ]
@@ -1708,32 +1748,32 @@ class TestFastSyncTapPostgres(TestCase):
             with self.subTest(marker=marker), patch.object(
                 FastSyncTapPostgres, 'get_connection'
             ) as get_connection, self.assertRaisesRegex(RuntimeError, 'No source or state changes'):
-                FastSyncTapPostgres.retire_migrated_replication_slot(
+                FastSyncTapPostgres.drop_promoted_wal2json_slot(
                     {'dbname': 'my_db', 'tap_id': 'my_tap'}, marker
                 )
             get_connection.assert_not_called()
 
     @patch.object(tap_postgres, 'SLOT_RELEASE_TIMEOUT_SECONDS', 0)
-    def test_retire_migrated_replication_slot_requires_safe_catalog_rows(self):
+    def test_drop_promoted_wal2json_slot_requires_safe_catalog_rows(self):
         """Destination continuity and source inactivity are preconditions to deletion."""
         marker = {
-            'version': 1,
-            'phase': 'retire',
+            'version': 2,
+            'phase': 'pgoutput_overlap',
             'source_slot': 'pipelinewise_my_db_my_tap',
             'destination_slot': 'ppw_slot_my_tap',
             'slot_lsn': 90,
             'bridge_lsn': 100,
-            'retire_lsn': 110,
+            'boundary_token': 'a' * 32,
         }
         cases = [
-            [('pipelinewise_my_db_my_tap', 'my_db', 'wal2json', False)],
+            [('pipelinewise_my_db_my_tap', 'my_db', 'wal2json', False, '0/64')],
             [
-                ('ppw_slot_my_tap', 'my_db', 'pgoutput', False),
-                ('pipelinewise_my_db_my_tap', 'my_db', 'wal2json', True),
+                ('ppw_slot_my_tap', 'my_db', 'pgoutput', False, '0/5A'),
+                ('pipelinewise_my_db_my_tap', 'my_db', 'wal2json', True, '0/64'),
             ],
             [
-                ('ppw_slot_my_tap', 'other_db', 'pgoutput', False),
-                ('pipelinewise_my_db_my_tap', 'my_db', 'wal2json', False),
+                ('ppw_slot_my_tap', 'other_db', 'pgoutput', False, '0/5A'),
+                ('pipelinewise_my_db_my_tap', 'my_db', 'wal2json', False, '0/64'),
             ],
         ]
         for rows in cases:
@@ -1741,13 +1781,9 @@ class TestFastSyncTapPostgres(TestCase):
                 connection = MagicMock()
                 cursor = connection.cursor.return_value.__enter__.return_value
                 cursor.fetchall.return_value = rows
-                with patch.object(
-                    FastSyncTapPostgres, '_advance_replication_slots'
-                ), patch.object(
-                    FastSyncTapPostgres, 'get_connection', return_value=connection
-                ):
+                with patch.object(FastSyncTapPostgres, 'get_connection', return_value=connection):
                     with self.assertRaisesRegex(RuntimeError, 'No source|Timed out'):
-                        FastSyncTapPostgres.retire_migrated_replication_slot(
+                        FastSyncTapPostgres.drop_promoted_wal2json_slot(
                             {'dbname': 'my_db', 'tap_id': 'my_tap'}, marker
                         )
                 self.assertEqual(cursor.execute.call_count, 1)

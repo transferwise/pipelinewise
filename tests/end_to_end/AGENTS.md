@@ -122,8 +122,9 @@ schema field IDs.
 
 PostgreSQL lifecycle coverage uses `ppw_slot_<tap_id>` for both the slot and
 publication. Verify fresh-slot creation before the wal2json bridge, retirement
-after target acknowledgement, and dedicated wal2json removal during explicit
-whole-tap FastSync. Persistent import must remove deselected managed publication
+immediately after target acknowledgement of the bridge, overlap replay from the
+original pgoutput position through the shared boundary, and dedicated wal2json
+removal during explicit whole-tap FastSync. Persistent import must remove deselected managed publication
 members while preserving untracked DBA members and filtered-run peers.
 Remove a logical table, change its source rows, and re-add it before any peer
 advances: a fresh snapshot must recover those changes. Removing the last LOG

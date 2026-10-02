@@ -22,7 +22,9 @@ def _singer_helpers():
     module = ast.Module(body=[node for node in tree.body if isinstance(node, ast.FunctionDef)
                               and node.name in names], type_ignores=[])
     namespace = {'re': re, 'ReplicationSlotMigrationError': RuntimeError,
-                 'PGOUTPUT_MIGRATION_STATE_KEY': fastsync.PGOUTPUT_MIGRATION_STATE_KEY}
+                 'PGOUTPUT_MIGRATION_STATE_KEY': fastsync.PGOUTPUT_MIGRATION_STATE_KEY,
+                 'PGOUTPUT_MIGRATION_STATE_VERSION':
+                     fastsync.PGOUTPUT_MIGRATION_STATE_VERSION}
     exec(compile(module, '<Singer protocol helpers>', 'exec'), namespace)
     return namespace
 
@@ -38,17 +40,18 @@ def test_canonical_and_truncated_historical_slot_names_match(dbname, old_id, new
     assert [shared, dedicated] == singer['legacy_replication_slot_names'](dbname, old_id)
 
 
-@pytest.mark.parametrize('phase', ['bridge_pending', 'bridge', 'pgoutput', 'retire'])
+@pytest.mark.parametrize(
+    'phase', ['bridge_pending', 'bridge', 'pgoutput_overlap', 'overlap_complete']
+)
 def test_persisted_migration_marker_is_accepted_by_both_runtimes(phase):
     config = {'dbname': 'orders', 'tap_id': 'new_id', 'previous_tap_id': 'Old-id'}
-    marker = {'version': 1, 'phase': phase, 'source_slot': 'pipelinewise_orders_old_id',
-              'destination_slot': 'ppw_slot_new_id', 'slot_lsn': 100}
-    if phase == 'bridge_pending':
-        marker['boundary_token'] = 'a' * 32
-    else:
+    marker = {'version': 2, 'phase': phase, 'source_slot': 'pipelinewise_orders_old_id',
+              'destination_slot': 'ppw_slot_new_id', 'slot_lsn': 100,
+              'boundary_token': 'a' * 32}
+    if phase != 'bridge_pending':
         marker['bridge_lsn'] = 200
-    if phase == 'retire':
-        marker['retire_lsn'] = 300
+    if phase == 'overlap_complete':
+        marker['crossover_lsn'] = 300
     assert fastsync.FastSyncTapPostgres.validate_migration_state_marker(config, marker)[0] == phase
     assert _singer_helpers()['_validate_migration_state'](config, marker) == phase
 

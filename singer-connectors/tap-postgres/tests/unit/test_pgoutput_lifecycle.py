@@ -676,12 +676,13 @@ def test_wal2json_bridge_emits_phase_and_exits_without_waiting_for_target():
 
     assert result['bookmarks']['public-payments']['lsn'] == 110
     assert result[logical_replication.PGOUTPUT_MIGRATION_STATE_KEY] == {
-        'version': 1,
+        'version': 2,
         'phase': 'bridge',
         'source_slot': 'pipelinewise_source_orders',
         'destination_slot': 'ppw_slot_orders',
         'slot_lsn': 105,
         'bridge_lsn': 110,
+        'boundary_token': token,
     }
 
 
@@ -746,7 +747,7 @@ def test_wal2json_bridge_retry_reuses_first_boundary():
         )
 
     assert interrupted[logical_replication.PGOUTPUT_MIGRATION_STATE_KEY] == {
-        'version': 1,
+        'version': 2,
         'phase': 'bridge_pending',
         'source_slot': 'pipelinewise_source_orders',
         'destination_slot': 'ppw_slot_orders',
@@ -873,15 +874,16 @@ def test_bridge_rejects_primary_key_changed_after_publication_preflight():
     bridge.assert_not_called()
 
 
-def test_pgoutput_boundary_after_bridge_marks_retire_without_business_dml():
-    token = 'boundary-token'
+def test_pgoutput_overlap_reuses_boundary_starts_at_original_lsn_and_is_monotonic():
+    token = 'a' * 32
     migration = {
-        'version': 1,
-        'phase': 'pgoutput',
+        'version': 2,
+        'phase': 'pgoutput_overlap',
         'source_slot': 'pipelinewise_source_orders',
         'destination_slot': 'ppw_slot_orders',
         'slot_lsn': 123,
         'bridge_lsn': 200,
+        'boundary_token': token,
     }
     messages = [
         WalMessage(json.dumps({'action': 'B'}), 201),
@@ -891,46 +893,50 @@ def test_pgoutput_boundary_after_bridge_marks_retire_without_business_dml():
             'prefix': 'pipelinewise_orders',
             'content': token,
         }), 252),
-        WalMessage(json.dumps({'action': 'C', 'end_lsn': 260}), 260),
+        WalMessage(json.dumps({'action': 'C', 'end_lsn': 160}), 160),
+        WalMessage(json.dumps({'action': 'I'}), 170),
     ]
     connection = _ReplicationConnection(messages)
     slot = logical_replication.PreparedReplicationSlot(
-        'ppw_slot_orders', 'pipelinewise_source_orders', 100, 123)
+        'ppw_slot_orders', confirmed_flush_lsn=123)
     publication = logical_replication.PreparedPublication('ppw_slot_orders')
 
     with patch.object(logical_replication, 'prepare_publication', return_value=publication), \
             patch.object(logical_replication, 'locate_replication_slot', return_value=slot), \
             patch.object(logical_replication.post_db, 'open_connection', return_value=connection), \
-            patch.object(logical_replication, 'emit_boundary_message', return_value=token), \
+            patch.object(logical_replication, 'emit_boundary_message') as emit, \
             patch.object(logical_replication, 'consume_message', side_effect=lambda _s, state, *_a, **_k: state), \
             patch.object(logical_replication.sync_common, 'send_schema_message'), \
             patch.object(logical_replication.singer, 'write_message'):
         result = logical_replication.sync_tables(
-            _config(), [_stream()], _state(lsn=200, migration=copy.deepcopy(migration)), 190, 'state.json')
+            _config(break_at_end_lsn=False), [_stream()],
+            _state(lsn=200, migration=copy.deepcopy(migration)), 190, 'state.json')
 
-    assert result[logical_replication.PGOUTPUT_MIGRATION_STATE_KEY]['phase'] == 'retire'
-    assert result[logical_replication.PGOUTPUT_MIGRATION_STATE_KEY]['retire_lsn'] == 260
-    assert result['bookmarks']['public-payments']['lsn'] == 260
+    emit.assert_not_called()
+    assert connection.cursor_instance.start_replication.call_args.kwargs['start_lsn'] == 123
+    connection.cursor_instance.send_feedback.assert_called_once_with(
+        write_lsn=123,
+        flush_lsn=0,
+        reply=True,
+        force=True,
+    )
+    assert connection.cursor_instance.read_message.call_count == 3
+    assert result[logical_replication.PGOUTPUT_MIGRATION_STATE_KEY]['phase'] == 'overlap_complete'
+    assert result[logical_replication.PGOUTPUT_MIGRATION_STATE_KEY]['crossover_lsn'] == 160
+    assert result['bookmarks']['public-payments']['lsn'] == 200
 
 
-def test_pgoutput_retirement_retry_reuses_first_boundary():
-    config = _config()
+def test_pgoutput_overlap_retry_reuses_shared_boundary():
     migration = {
-        'version': 1,
-        'phase': 'pgoutput',
+        'version': 2,
+        'phase': 'pgoutput_overlap',
         'source_slot': 'pipelinewise_source_orders',
         'destination_slot': 'ppw_slot_orders',
         'slot_lsn': 123,
         'bridge_lsn': 200,
+        'boundary_token': 'b' * 32,
     }
-    token = logical_replication._migration_boundary_token(
-        config,
-        'retire',
-        migration['source_slot'],
-        migration['destination_slot'],
-        migration['slot_lsn'],
-        bridge_lsn=migration['bridge_lsn'],
-    )
+    token = migration['boundary_token']
     interrupted_connection = _ReplicationConnection([])
     retry_connection = _ReplicationConnection([
         WalMessage(json.dumps({'action': 'B'}), 201),
@@ -944,7 +950,7 @@ def test_pgoutput_retirement_retry_reuses_first_boundary():
     ])
     publication = logical_replication.PreparedPublication('ppw_slot_orders')
     slot = logical_replication.PreparedReplicationSlot(
-        'ppw_slot_orders', 'pipelinewise_source_orders', 100, 123)
+        'ppw_slot_orders', confirmed_flush_lsn=123)
 
     with patch.object(
             logical_replication,
@@ -956,9 +962,7 @@ def test_pgoutput_retirement_retry_reuses_first_boundary():
             logical_replication.post_db,
             'open_connection',
             side_effect=[interrupted_connection, retry_connection]), patch.object(
-            logical_replication,
-            'emit_boundary_message',
-            side_effect=lambda _config, boundary_token=None: boundary_token) as emit, patch.object(
+            logical_replication, 'emit_boundary_message') as emit, patch.object(
             logical_replication,
             'consume_message',
             side_effect=lambda _streams, state, *_args, **_kwargs: state), patch.object(
@@ -974,67 +978,23 @@ def test_pgoutput_retirement_retry_reuses_first_boundary():
             'state.json',
         )
         result = logical_replication.sync_tables(
-            config,
+            _config(),
             [_stream()],
             copy.deepcopy(interrupted),
             190,
             'state.json',
         )
 
-    assert interrupted[logical_replication.PGOUTPUT_MIGRATION_STATE_KEY]['phase'] == 'pgoutput'
-    assert [item.args[1] for item in emit.call_args_list] == [token, token]
-    assert result[logical_replication.PGOUTPUT_MIGRATION_STATE_KEY]['phase'] == 'retire'
-    assert result[logical_replication.PGOUTPUT_MIGRATION_STATE_KEY]['retire_lsn'] == 260
-
-
-def test_boundary_at_bridge_lsn_does_not_mark_migration_retire():
-    token = 'boundary-token'
-    migration = {
-        'version': 1,
-        'phase': 'pgoutput',
-        'source_slot': 'pipelinewise_source_orders',
-        'destination_slot': 'ppw_slot_orders',
-        'slot_lsn': 123,
-        'bridge_lsn': 200,
-    }
-    messages = [
-        WalMessage(json.dumps({'action': 'B'}), 199),
-        WalMessage(json.dumps({
-            'action': 'M',
-            'transactional': True,
-            'prefix': 'pipelinewise_orders',
-            'content': token,
-        }), 199),
-        WalMessage(json.dumps({'action': 'C', 'end_lsn': 200}), 200),
-    ]
-    connection = _ReplicationConnection(messages)
-    slot = logical_replication.PreparedReplicationSlot(
-        'ppw_slot_orders', 'pipelinewise_source_orders', 100, 123)
-
-    with patch.object(
-            logical_replication,
-            'prepare_publication',
-            return_value=logical_replication.PreparedPublication('ppw_slot_orders')), \
-            patch.object(logical_replication, 'locate_replication_slot', return_value=slot), \
-            patch.object(logical_replication.post_db, 'open_connection', return_value=connection), \
-            patch.object(logical_replication, 'emit_boundary_message', return_value=token), \
-            patch.object(
-                logical_replication,
-                'consume_message',
-                side_effect=lambda _s, state, *_a, **_k: state), \
-            patch.object(logical_replication.sync_common, 'send_schema_message'), \
-            patch.object(logical_replication.singer, 'write_message'):
-        result = logical_replication.sync_tables(
-            _config(), [_stream()], _state(lsn=200, migration=copy.deepcopy(migration)), 190, 'state.json')
-
-    assert result[logical_replication.PGOUTPUT_MIGRATION_STATE_KEY]['phase'] == 'pgoutput'
-    assert 'retire_lsn' not in result[logical_replication.PGOUTPUT_MIGRATION_STATE_KEY]
+    emit.assert_not_called()
+    assert interrupted[logical_replication.PGOUTPUT_MIGRATION_STATE_KEY]['phase'] == 'pgoutput_overlap'
+    assert result[logical_replication.PGOUTPUT_MIGRATION_STATE_KEY]['phase'] == 'overlap_complete'
+    assert result[logical_replication.PGOUTPUT_MIGRATION_STATE_KEY]['crossover_lsn'] == 260
 
 
 @pytest.mark.parametrize('migration', [
     None,
     {
-        'version': 1,
+        'version': 2,
         'phase': 'bridge_pending',
         'source_slot': 'pipelinewise_source_orders',
         'destination_slot': 'ppw_slot_orders',
@@ -1042,29 +1002,32 @@ def test_boundary_at_bridge_lsn_does_not_mark_migration_retire():
         'boundary_token': 'not-a-token',
     },
     {
-        'version': 1,
-        'phase': 'pgoutput',
+        'version': 2,
+        'phase': 'pgoutput_overlap',
         'source_slot': 'pipelinewise_source_orders',
         'destination_slot': 'ppw_slot_orders',
         'slot_lsn': True,
         'bridge_lsn': 200,
+        'boundary_token': 'a' * 32,
     },
     {
-        'version': 1,
-        'phase': 'retire',
+        'version': 2,
+        'phase': 'overlap_complete',
         'source_slot': 'pipelinewise_source_orders',
         'destination_slot': 'ppw_slot_orders',
         'slot_lsn': 123,
         'bridge_lsn': 200,
-        'retire_lsn': 200,
+        'crossover_lsn': 100,
+        'boundary_token': 'a' * 32,
     },
     {
-        'version': 1,
-        'phase': 'pgoutput',
+        'version': 2,
+        'phase': 'pgoutput_overlap',
         'source_slot': 'foreign_slot',
         'destination_slot': 'ppw_slot_orders',
         'slot_lsn': 123,
         'bridge_lsn': 200,
+        'boundary_token': 'a' * 32,
     },
 ])
 def test_malformed_migration_state_fails_before_source_preflight(migration):
@@ -1081,16 +1044,17 @@ def test_malformed_migration_state_fails_before_source_preflight(migration):
 
 def test_persisted_bridge_phase_requires_parent_promotion_before_resume():
     migration = {
-        'version': 1,
+        'version': 2,
         'phase': 'bridge',
         'source_slot': 'pipelinewise_source_orders',
         'destination_slot': 'ppw_slot_orders',
         'slot_lsn': 123,
         'bridge_lsn': 200,
+        'boundary_token': 'a' * 32,
     }
 
     with patch.object(logical_replication, 'prepare_publication') as prepare, \
-            pytest.raises(logical_replication.ReplicationSlotMigrationError, match='promoted by PipelineWise'):
+            pytest.raises(logical_replication.ReplicationSlotMigrationError, match='processed by PipelineWise'):
         logical_replication.sync_tables(
             _config(), [_stream()], _state(migration=migration), 250, 'state.json')
 
@@ -1185,8 +1149,9 @@ def test_implicit_truncated_migration_marker_requires_explicit_previous_id():
     destination = logical_replication.generate_replication_slot_name(tap_id)
     source = logical_replication.legacy_replication_slot_names(database, tap_id)[1]
     marker = {
-        'version': 1, 'phase': 'bridge', 'source_slot': source,
+        'version': 2, 'phase': 'bridge', 'source_slot': source,
         'destination_slot': destination, 'slot_lsn': 100, 'bridge_lsn': 200,
+        'boundary_token': 'a' * 32,
     }
 
     with pytest.raises(
@@ -1279,7 +1244,7 @@ def test_selection_change_is_rejected_between_bridge_attempts(with_pending_state
     migration = None
     if with_pending_state:
         migration = {
-            'version': 1,
+            'version': 2,
             'phase': 'bridge_pending',
             'source_slot': 'pipelinewise_source_orders',
             'destination_slot': 'ppw_slot_orders',
@@ -1640,7 +1605,7 @@ def test_publication_fence_reuses_connection_and_waits_only_for_preexisting_writ
 
 
 @pytest.mark.parametrize('phase,fresh_start,allowed', [
-    ('pgoutput', False, True), ('retire', False, True),
+    ('pgoutput_overlap', False, True), ('overlap_complete', False, True),
     ('bridge', False, False), (None, True, True), (None, False, False),
 ])
 def test_partition_preflight_respects_durable_migration_phase(phase, fresh_start, allowed):
@@ -1653,9 +1618,9 @@ def test_partition_preflight_respects_durable_migration_phase(phase, fresh_start
         logical_replication._encode_publication_fence_comment(
             'ready', None, {('public', 'payments')}))
     cursor.fetchall.return_value = [('public', 'payments')]
-    migration = {'version': 1, 'phase': phase, 'source_slot': 'pipelinewise_source_orders',
+    migration = {'version': 2, 'phase': phase, 'source_slot': 'pipelinewise_source_orders',
                  'destination_slot': 'ppw_slot_orders', 'slot_lsn': 123, 'bridge_lsn': 200,
-                 'retire_lsn': 300}
+                 'crossover_lsn': 300, 'boundary_token': 'a' * 32}
     state = _state(migration=migration if phase is not None else None)
     with patch.object(logical_replication.post_db, 'open_connection', return_value=connection), \
             patch.object(logical_replication, '_reject_selected_generated_columns'), \

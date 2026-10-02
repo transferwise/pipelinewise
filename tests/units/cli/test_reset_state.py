@@ -87,12 +87,13 @@ class TestResetState(TestCase):
         state_content = {
             'bookmarks': {'foo_table': {'lsn': 54321}},
             '_pipelinewise_pgoutput_migration': {
-                'version': 1,
-                'phase': 'pgoutput',
+                'version': 2,
+                'phase': 'pgoutput_overlap',
                 'source_slot': 'pipelinewise_source_tap_pg',
                 'destination_slot': 'ppw_slot_tap_pg',
                 'slot_lsn': 100,
                 'bridge_lsn': 200,
+                'boundary_token': 'a' * 32,
             },
         }
         with open(state_path, 'w', encoding='utf-8') as state_file:

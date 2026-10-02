@@ -101,13 +101,15 @@ real client-side encryption master key and expects 52 passes.
   target-postgres or the PipelineWise backend database.
 - Use `ppw_slot_<tap_id>` for both PostgreSQL slots and publications. Automatic
   migration creates a fresh pgoutput slot, bridges wal2json through a later
-  committed message, and advances only after target acknowledgement. Persist a
-  `bridge_pending` marker and reuse migration boundary tokens across retries.
+  committed message, persists promotion after target acknowledgement, and then
+  drops wal2json immediately. Replay pgoutput from its original slot LSN through
+  the same boundary without advancing unseen WAL. Keep bookmarks monotonic and
+  clear the marker only after target acknowledgement. Persist a `bridge_pending`
+  marker and reuse migration boundary tokens across retries.
   Freeze publication selection and options while a migration marker or both
   migration slots exist, and reject import changes before state invalidation.
-  It does not copy slots. Retire wal2json after acknowledged pgoutput
-  consumption. Preserve an implicitly truncated historical tap-specific slot
-  unless `previous_tap_id` explicitly establishes its ownership.
+  It does not copy slots. Preserve an implicitly truncated historical
+  tap-specific slot unless `previous_tap_id` explicitly establishes its ownership.
 - Keep runtime publication preparation additive. Persistent `import_config`
   selection may remove only members tracked as managed in the publication
   comment; preserve untracked DBA members. An explicit whole-tap FastSync

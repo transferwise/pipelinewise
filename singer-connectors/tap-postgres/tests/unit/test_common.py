@@ -339,12 +339,13 @@ class TestLogicalProgressMarkers(TestCase):
     def test_logical_bookmark_cleanup_preserves_migration_state(self):
         stream = self._stream('selected', 'configured_db')
         migration = {
-            'version': 1,
-            'phase': 'pgoutput',
+            'version': 2,
+            'phase': 'pgoutput_overlap',
             'source_slot': 'pipelinewise_configured_db_tap',
             'destination_slot': 'ppw_slot_tap',
             'slot_lsn': 100,
             'bridge_lsn': 110,
+            'boundary_token': 'a' * 32,
         }
         state = {
             'currently_syncing': None,
