@@ -554,6 +554,10 @@ def test_fenced_migration_rejects_config_change_and_survives_ddl(tmp_path):
     """Selection stays frozen while old relation WAL replays across source DDL."""
     added_table = 'migration_added_records'
     with _simple_migration_case(tmp_path) as migration_case:
+        tap_yaml = (
+            migration_case.project_dir / 'tap_postgres_pgoutput_to_pg.yml'
+        )
+        frozen_tap_config = tap_yaml.read_text(encoding='utf-8')
         _run_success(migration_case.run_command, migration_case.command_env)
         _assert_promoted_overlap(migration_case)
 
@@ -582,7 +586,18 @@ def test_fenced_migration_rejects_config_change_and_survives_ddl(tmp_path):
             (SOURCE_SCHEMA, TABLE_NAME)
         }
 
+        tap_yaml.write_text(frozen_tap_config, encoding='utf-8')
+        _run_success(
+            [
+                'pipelinewise',
+                'import_config',
+                '--dir',
+                str(migration_case.project_dir),
+            ],
+            migration_case.command_env,
+        )
         _finish_overlap(migration_case)
+        _select_logical_table(migration_case.project_dir, added_table)
         _run_success(
             [
                 'pipelinewise',
