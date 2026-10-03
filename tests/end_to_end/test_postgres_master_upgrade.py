@@ -13,19 +13,44 @@ from .test_postgres_pgoutput_slots import (
 )
 
 
-def _persist_target_acknowledgements(output, state_path, errors):
+def _persist_target_acknowledgements(output, state_path):
     """Expose only target-emitted state to the old tap's feedback reader."""
+    for line in output:
+        state = json.loads(line)
+        pending = state_path.with_suffix('.master-ack.tmp')
+        with pending.open('w', encoding='utf-8') as state_file:
+            json.dump(state, state_file)
+            state_file.flush()
+            os.fsync(state_file.fileno())
+        pending.replace(state_path)
+
+
+def _load_master_checkpoints(output, command, case, target_log, errors):
+    """Commit each old checkpoint through the real target before acknowledging it."""
+    schemas = {}
+    pending = []
+
+    def load():
+        result = subprocess.run(command, input='\n'.join(pending) + '\n', text=True,
+                                stdout=subprocess.PIPE, stderr=target_log, env=case.command_env, timeout=30)
+        assert result.returncode == 0, 'The target failed while applying a master checkpoint'
+        _persist_target_acknowledgements(result.stdout.splitlines(), case.state_path)
+
     try:
         for line in output:
-            state = json.loads(line)
-            pending = state_path.with_suffix('.master-ack.tmp')
-            with pending.open('w', encoding='utf-8') as state_file:
-                json.dump(state, state_file)
-                state_file.flush()
-                os.fsync(state_file.fileno())
-            pending.replace(state_path)
+            message = json.loads(line)
+            pending.append(line.rstrip('\n'))
+            if message['type'] == 'SCHEMA':
+                schemas[message['stream']] = line.rstrip('\n')
+            if message['type'] == 'STATE':
+                load()
+                pending = list(schemas.values())
+        if any(json.loads(line)['type'] == 'RECORD' for line in pending):
+            load()
     except Exception as error:
         errors.append(error)
+    finally:
+        output.close()
 
 
 def _run_master_tap(case, *, idle_feedback=False):
@@ -64,32 +89,25 @@ def _run_master_tap(case, *, idle_feedback=False):
     errors = []
     with (tap_dir / 'master-tap.log').open('w+') as tap_log, \
             (tap_dir / 'master-target.log').open('w+') as target_log:
-        tap = subprocess.Popen(tap_command, stdout=subprocess.PIPE, stderr=tap_log,
+        tap = subprocess.Popen(tap_command, stdout=subprocess.PIPE, stderr=tap_log, text=True,
                                env={**case.command_env, 'PYTHONPATH': str(baseline)})
-        target = None
-        reader = None
+        # EOF makes target-postgres acknowledge quiet checkpoints. Every batch still
+        # goes through its real loader; no bookmark or replication feedback is fabricated.
+        reader = threading.Thread(target=_load_master_checkpoints,
+                                  args=(tap.stdout, target_command, case, target_log, errors), daemon=True)
+        reader.start()
         try:
-            target = subprocess.Popen(target_command, stdin=tap.stdout, stdout=subprocess.PIPE,
-                                      stderr=target_log, text=True, env=case.command_env)
-            tap.stdout.close()
-            reader = threading.Thread(target=_persist_target_acknowledgements,
-                                      args=(target.stdout, case.state_path, errors), daemon=True)
-            reader.start()
             tap.wait(timeout=65)
-            target.wait(timeout=30)
         finally:
-            for process in (tap, target):
-                if process is not None and process.poll() is None:
-                    process.kill()
-                    process.wait(timeout=10)
-            if reader is not None:
-                reader.join(timeout=10)
+            if tap.poll() is None:
+                tap.kill()
+                tap.wait(timeout=10)
+            reader.join(timeout=35)
         tap_log.seek(0)
         target_log.seek(0)
+        assert not errors, f'{errors}\n{target_log.read()}'
         assert tap.returncode == 0, tap_log.read()
-        assert target.returncode == 0, target_log.read()
         assert not reader.is_alive()
-        assert not errors, errors
     assert MIGRATION_STATE_KEY not in _read_state(case.state_path)
     assert _slot_status(case.e2e, case.pgoutput_slot) is None
     assert _source_target_rows(case.e2e)[0] == _source_target_rows(case.e2e)[1]
