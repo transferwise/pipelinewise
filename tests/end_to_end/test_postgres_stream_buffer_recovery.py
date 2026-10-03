@@ -419,6 +419,14 @@ def test_postgres_buffer_recovers_after_stop(tmp_path):
         singer_log = _wait_for(
             'the running Singer log', lambda: _find_running_log(log_dir)
         )
+        _wait_for(
+            'pgoutput replication to start',
+            lambda: 'Request pgoutput streaming after startup LSN' in singer_log.read_text(encoding='utf-8'),
+        )
+        # Cross the sampled LSN using published DML; pgoutput messages are disabled.
+        e2e.run_query_tap_postgres(
+            f'UPDATE {SOURCE_SCHEMA}.{TABLE_NAME} SET payload = payload WHERE id = 1'
+        )
         consumed_lsn = _wait_for(
             'tap-postgres to report consumed WAL ahead of target state',
             lambda: (
