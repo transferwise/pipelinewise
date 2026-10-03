@@ -60,6 +60,7 @@ run_e2e \
 
 run_e2e \
   tests/end_to_end/target_snowflake/test_native_to_iceberg_converter.py \
+  tests/end_to_end/target_snowflake/tap_postgres/test_pgoutput_migration_to_sf.py \
   tests/end_to_end/data_diff/test_mysql_to_snowflake.py
 
 run_e2e \
@@ -120,11 +121,19 @@ Do not infer one format from another. `SHOW PRIMARY KEYS` does not prove Iceberg
 identifier fields; compare raw-metadata `identifier-field-ids` with current
 schema field IDs.
 
+Required `pg_migration_smoke_15` and `pg_migration_smoke_18` jobs rebuild only
+the PostgreSQL source with `Dockerfile.version-smoke` and run the idle migration
+case. Keep these majors aligned with the oldest production major that needs
+explicit coverage and the latest stable PostgreSQL major.
+
 PostgreSQL lifecycle coverage uses `ppw_slot_<tap_id>` for both the slot and
 publication. Verify fresh-slot creation before the wal2json bridge, retirement
 immediately after target acknowledgement of the bridge, overlap replay from the
 original pgoutput position through the shared boundary, and dedicated wal2json
-removal during explicit whole-tap FastSync. Persistent import must remove deselected managed publication
+removal during explicit whole-tap FastSync. Cover idle boundaries, continuous
+traffic with `break_at_end_lsn: false`, bridge target failure, explicit reset
+during migration, source DDL during overlap, and Snowflake Native overlap
+de-duplication. Persistent import must remove deselected managed publication
 members while preserving untracked DBA members and filtered-run peers.
 Remove a logical table, change its source rows, and re-add it before any peer
 advances: a fresh snapshot must recover those changes. Removing the last LOG

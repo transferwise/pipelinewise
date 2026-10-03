@@ -97,7 +97,9 @@ real client-side encryption master key and expects 52 passes.
 - PostgreSQL sources require 14+ for every Singer replication method and
   PipelineWise FullSync/PartialSync. Warn below the catalog-cache fixes in
   14.18, 15.13, 16.9, and 17.5, but allow the connection. Keep the Singer and
-  FastSync checks aligned. This source minimum does not constrain
+  FastSync checks aligned. Required PipelineWise E2E migration smoke jobs run
+  PostgreSQL 15 and the latest stable major in addition to the PostgreSQL 14
+  connector integration suite. This source minimum does not constrain
   target-postgres or the PipelineWise backend database.
 - Use `ppw_slot_<tap_id>` for both PostgreSQL slots and publications. Automatic
   migration creates a fresh pgoutput slot, bridges wal2json through a later

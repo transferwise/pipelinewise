@@ -8,8 +8,11 @@ import shutil
 import signal
 import subprocess
 import sys
+import threading
 import time
 
+from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 
 import psycopg2
@@ -30,6 +33,24 @@ TEMPLATE_DIR = Path(__file__).parent / 'postgres_pgoutput_test_project'
 MIGRATION_STATE_KEY = '_pipelinewise_pgoutput_migration'
 PUBLICATION_NAME = f'ppw_slot_{TAP_ID}'
 PUBLICATION_FENCE_COMMENT_PREFIX = 'pipelinewise-publication-fence-v1:'
+
+
+@dataclass(frozen=True)
+class MigrationCase:
+    """Isolated PostgreSQL migration resources owned by one E2E test."""
+
+    e2e: E2EEnv
+    project_dir: Path
+    config_dir: Path
+    command_env: dict
+    state_path: Path
+    wal2json_slot: str
+    pgoutput_slot: str
+
+    @property
+    def run_command(self):
+        """Return the configured tap invocation."""
+        return ['pipelinewise', 'run_tap', '--tap', TAP_ID, '--target', TARGET_ID]
 
 
 def _start(command, env):
@@ -282,6 +303,298 @@ def _simulate_historical_tap_identity(config_dir, old_tap_id, lsn):
                 tap['id'] = old_tap_id
     root_config_path.write_text(json.dumps(root_config), encoding='utf-8')
     return state_path
+
+
+@contextmanager
+def _simple_migration_case(tmp_path, *, break_at_end_lsn=True):
+    """Prepare one filtered FastSync beside a dedicated historical slot."""
+    project_dir = tmp_path / 'project'
+    shutil.copytree(TEMPLATE_DIR, project_dir)
+    e2e = E2EEnv(project_dir)
+    tap_yaml = project_dir / 'tap_postgres_pgoutput_to_pg.yml'
+    if not break_at_end_lsn:
+        tap_config = tap_yaml.read_text(encoding='utf-8')
+        tap_config = tap_config.replace(
+            'logical_poll_total_seconds: 10', 'logical_poll_total_seconds: 45'
+        ).replace(
+            'break_at_end_lsn: true', 'break_at_end_lsn: false'
+        ).replace(
+            'max_run_seconds: 20', 'max_run_seconds: 60'
+        )
+        tap_yaml.write_text(tap_config, encoding='utf-8')
+
+    config_dir = tmp_path / 'pipelinewise-config'
+    config_dir.mkdir()
+    command_env = {**os.environ, 'PIPELINEWISE_CONFIG_DIRECTORY': str(config_dir)}
+    database = e2e.get_conn_env_var('TAP_POSTGRES', 'DB')
+    wal2json_slot = _slot_name(database, TAP_ID)
+    legacy_wal2json_slot = _slot_name(database)
+    pgoutput_slot = f'ppw_slot_{TAP_ID}'
+    state_path = config_dir / TARGET_ID / TAP_ID / 'state.json'
+    migration_case = MigrationCase(
+        e2e=e2e,
+        project_dir=project_dir,
+        config_dir=config_dir,
+        command_env=command_env,
+        state_path=state_path,
+        wal2json_slot=wal2json_slot,
+        pgoutput_slot=pgoutput_slot,
+    )
+    try:
+        _drop_slot(e2e, pgoutput_slot)
+        _drop_slot(e2e, wal2json_slot)
+        _drop_publication(e2e)
+        assert _slot_status(e2e, legacy_wal2json_slot) is None
+        e2e.run_query_tap_postgres(
+            f'DROP SCHEMA IF EXISTS {SOURCE_SCHEMA} CASCADE; '
+            f'CREATE SCHEMA {SOURCE_SCHEMA}; '
+            f'CREATE TABLE {SOURCE_SCHEMA}.{TABLE_NAME} '
+            '(id integer PRIMARY KEY, status text NOT NULL, payload text NOT NULL); '
+            f"INSERT INTO {SOURCE_SCHEMA}.{TABLE_NAME} VALUES (1, 'initial', 'payload-1')"
+        )
+        e2e.run_query_target_postgres(
+            f'DROP SCHEMA IF EXISTS {TARGET_SCHEMA} CASCADE'
+        )
+        e2e.run_query_tap_postgres(
+            'SELECT * FROM pg_create_logical_replication_slot(%s, %s)',
+            (wal2json_slot, 'wal2json'),
+        )
+        _run_success(
+            ['pipelinewise', 'validate', '--dir', str(project_dir)], command_env
+        )
+        _run_success(
+            ['pipelinewise', 'import_config', '--dir', str(project_dir)], command_env
+        )
+        _run_success(
+            [
+                'pipelinewise',
+                'fast_sync',
+                '--tap',
+                TAP_ID,
+                '--target',
+                TARGET_ID,
+                '--tables',
+                f'{SOURCE_SCHEMA}.{TABLE_NAME}',
+            ],
+            command_env,
+        )
+        assert _source_target_rows(e2e)[0] == _source_target_rows(e2e)[1]
+        assert _slot_status(e2e, wal2json_slot)['plugin'] == 'wal2json'
+        assert _slot_status(e2e, pgoutput_slot)['plugin'] == 'pgoutput'
+        yield migration_case
+    finally:
+        _drop_slot(e2e, pgoutput_slot)
+        _drop_slot(e2e, wal2json_slot)
+        _drop_publication(e2e)
+        e2e.run_query_tap_postgres(
+            f'DROP SCHEMA IF EXISTS {SOURCE_SCHEMA} CASCADE'
+        )
+        e2e.run_query_target_postgres(
+            f'DROP SCHEMA IF EXISTS {TARGET_SCHEMA} CASCADE'
+        )
+
+
+def _assert_promoted_overlap(migration_case):
+    """Require the durable promotion state and immediate wal2json retirement."""
+    marker = _read_state(migration_case.state_path)[MIGRATION_STATE_KEY]
+    assert marker['phase'] == 'pgoutput_overlap'
+    assert marker['source_slot'] == migration_case.wal2json_slot
+    assert marker['destination_slot'] == migration_case.pgoutput_slot
+    assert _slot_status(migration_case.e2e, migration_case.wal2json_slot) is None
+    pgoutput_slot = _slot_status(migration_case.e2e, migration_case.pgoutput_slot)
+    assert pgoutput_slot['confirmed_flush_lsn'] == marker['slot_lsn']
+    return marker
+
+
+def _finish_overlap(migration_case):
+    """Replay the shared pgoutput boundary and require normal durable state."""
+    _run_success(migration_case.run_command, migration_case.command_env, timeout=40)
+    assert MIGRATION_STATE_KEY not in _read_state(migration_case.state_path)
+    assert _slot_status(migration_case.e2e, migration_case.wal2json_slot) is None
+
+
+def test_idle_migration_completes_without_filling_target_batch(tmp_path):
+    """A message-only boundary retires wal2json when no source row changed."""
+    with _simple_migration_case(tmp_path) as migration_case:
+        assert len(_source_target_rows(migration_case.e2e)[0]) == 1
+        _run_success(migration_case.run_command, migration_case.command_env)
+        _assert_promoted_overlap(migration_case)
+        _finish_overlap(migration_case)
+        assert _source_target_rows(migration_case.e2e)[0] == _source_target_rows(
+            migration_case.e2e
+        )[1]
+
+
+def test_bridge_target_failure_retains_wal2json_for_retry(tmp_path):
+    """A failed bridge write cannot promote pgoutput or retire wal2json."""
+    with _simple_migration_case(tmp_path) as migration_case:
+        target_config_path = migration_case.config_dir / TARGET_ID / 'config.json'
+        original_target_config = target_config_path.read_text(encoding='utf-8')
+        broken_target_config = json.loads(original_target_config)
+        broken_target_config['password'] = 'deliberately-invalid-e2e-password'
+        target_config_path.write_text(json.dumps(broken_target_config), encoding='utf-8')
+        try:
+            failed_run = _run(migration_case.run_command, migration_case.command_env)
+        finally:
+            target_config_path.write_text(original_target_config, encoding='utf-8')
+
+        assert failed_run.returncode != 0
+        marker = _read_state(migration_case.state_path)[MIGRATION_STATE_KEY]
+        assert marker['phase'] == 'bridge_pending'
+        assert _slot_status(migration_case.e2e, migration_case.wal2json_slot) is not None
+        pgoutput_slot = _slot_status(migration_case.e2e, migration_case.pgoutput_slot)
+        assert pgoutput_slot['confirmed_flush_lsn'] == marker['slot_lsn']
+
+        _run_success(migration_case.run_command, migration_case.command_env)
+        _assert_promoted_overlap(migration_case)
+        _finish_overlap(migration_case)
+
+
+def test_unfinished_migration_can_be_replaced_by_whole_tap_fastsync(tmp_path):
+    """An explicit whole-tap reset removes migration debt before new snapshots."""
+    with _simple_migration_case(tmp_path) as migration_case:
+        _run_success(migration_case.run_command, migration_case.command_env)
+        previous_marker = _assert_promoted_overlap(migration_case)
+        previous_slot_lsn = previous_marker['slot_lsn']
+
+        _run_success(
+            ['pipelinewise', 'fast_sync', '--tap', TAP_ID, '--target', TARGET_ID],
+            migration_case.command_env,
+        )
+
+        reset_state = _read_state(migration_case.state_path)
+        assert MIGRATION_STATE_KEY not in reset_state
+        assert '_pipelinewise_pgoutput_fresh_start' not in reset_state
+        assert _slot_status(migration_case.e2e, migration_case.wal2json_slot) is None
+        reset_slot = _slot_status(migration_case.e2e, migration_case.pgoutput_slot)
+        assert reset_slot['plugin'] == 'pgoutput'
+        assert reset_slot['confirmed_flush_lsn'] > previous_slot_lsn
+
+        migration_case.e2e.run_query_tap_postgres(
+            f"UPDATE {SOURCE_SCHEMA}.{TABLE_NAME} SET status = 'after reset' WHERE id = 1"
+        )
+        _run_success(migration_case.run_command, migration_case.command_env)
+        assert _source_target_rows(migration_case.e2e)[0] == _source_target_rows(
+            migration_case.e2e
+        )[1]
+
+
+def test_continuous_source_traffic_does_not_delay_migration_boundary(tmp_path):
+    """Migration boundaries stop both decoders even when ordinary runs do not."""
+    with _simple_migration_case(tmp_path, break_at_end_lsn=False) as migration_case:
+        stop_writes = threading.Event()
+        writer_errors = []
+
+        def write_source_rows():
+            connection = _connect_source(migration_case.e2e)
+            connection.autocommit = True
+            next_id = 2
+            try:
+                with connection.cursor() as cursor:
+                    while not stop_writes.is_set():
+                        cursor.execute(
+                            f'INSERT INTO {SOURCE_SCHEMA}.{TABLE_NAME} '
+                            '(id, status, payload) VALUES (%s, %s, %s)',
+                            (next_id, f'continuous-{next_id}', f'payload-{next_id}'),
+                        )
+                        next_id += 1
+                        time.sleep(0.05)
+            except Exception as exc:
+                writer_errors.append(exc)
+            finally:
+                connection.close()
+
+        writer = threading.Thread(target=write_source_rows, daemon=True)
+        writer.start()
+        try:
+            _run_success(
+                migration_case.run_command, migration_case.command_env, timeout=40
+            )
+            _assert_promoted_overlap(migration_case)
+            assert writer.is_alive()
+            _finish_overlap(migration_case)
+            assert writer.is_alive()
+        finally:
+            stop_writes.set()
+            writer.join(timeout=10)
+
+        assert not writer.is_alive()
+        assert writer_errors == []
+        _run_success(migration_case.run_command, migration_case.command_env, timeout=70)
+        assert _source_target_rows(migration_case.e2e)[0] == _source_target_rows(
+            migration_case.e2e
+        )[1]
+
+
+def test_fenced_migration_rejects_config_change_and_survives_ddl(tmp_path):
+    """Selection stays frozen while old relation WAL replays across source DDL."""
+    added_table = 'migration_added_records'
+    with _simple_migration_case(tmp_path) as migration_case:
+        _run_success(migration_case.run_command, migration_case.command_env)
+        _assert_promoted_overlap(migration_case)
+
+        migration_case.e2e.run_query_tap_postgres(
+            f'ALTER TABLE {SOURCE_SCHEMA}.{TABLE_NAME} '
+            "ADD COLUMN detail text NOT NULL DEFAULT 'added-during-overlap'; "
+            f'CREATE TABLE {SOURCE_SCHEMA}.{added_table} '
+            '(id integer PRIMARY KEY, status text NOT NULL); '
+            f"INSERT INTO {SOURCE_SCHEMA}.{added_table} VALUES (1, 'new selection')"
+        )
+        _select_logical_table(migration_case.project_dir, added_table)
+        failed_import = _run(
+            [
+                'pipelinewise',
+                'import_config',
+                '--dir',
+                str(migration_case.project_dir),
+            ],
+            migration_case.command_env,
+        )
+        assert failed_import.returncode != 0
+        assert 'selection or options cannot change' in (
+            failed_import.stdout + failed_import.stderr
+        )
+        assert _publication_tables(migration_case.e2e) == {
+            (SOURCE_SCHEMA, TABLE_NAME)
+        }
+
+        _finish_overlap(migration_case)
+        _run_success(
+            [
+                'pipelinewise',
+                'import_config',
+                '--dir',
+                str(migration_case.project_dir),
+            ],
+            migration_case.command_env,
+        )
+        assert _publication_tables(migration_case.e2e) == {
+            (SOURCE_SCHEMA, TABLE_NAME),
+            (SOURCE_SCHEMA, added_table),
+        }
+        _run_success(
+            [
+                'pipelinewise',
+                'fast_sync',
+                '--tap',
+                TAP_ID,
+                '--target',
+                TARGET_ID,
+                '--tables',
+                f'{SOURCE_SCHEMA}.{added_table}',
+            ],
+            migration_case.command_env,
+        )
+        migration_case.e2e.run_query_tap_postgres(
+            f"UPDATE {SOURCE_SCHEMA}.{TABLE_NAME} SET detail = 'decoded after overlap' WHERE id = 1"
+        )
+        _run_success(migration_case.run_command, migration_case.command_env)
+        assert migration_case.e2e.run_query_target_postgres(
+            f'SELECT id, detail FROM {TARGET_SCHEMA}.{TABLE_NAME} ORDER BY id'
+        ) == [(1, 'decoded after overlap')]
+        assert migration_case.e2e.run_query_target_postgres(
+            f'SELECT id, status FROM {TARGET_SCHEMA}.{added_table} ORDER BY id'
+        ) == [(1, 'new selection')]
 
 
 def test_renamed_legacy_tap_preserves_checkpoint_and_retires_truncated_slot(tmp_path):

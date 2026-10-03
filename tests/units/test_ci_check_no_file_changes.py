@@ -238,6 +238,7 @@ def test_snowflake_e2e_matrix_contract():
             'e2e_tests_02',
             (
                 'tests/end_to_end/target_snowflake/test_native_to_iceberg_converter.py',
+                'tests/end_to_end/target_snowflake/tap_postgres/test_pgoutput_migration_to_sf.py',
                 'tests/end_to_end/data_diff/test_mysql_to_snowflake.py',
             ),
         ),
@@ -410,7 +411,7 @@ def test_snowflake_e2e_matrix_contract():
         for step in configured_job['steps']
         if step.get('name') == 'Wait for test containers to be ready'
     ]
-    assert len(readiness_steps) == 2
+    assert len(readiness_steps) == 3
     for readiness_step in readiness_steps:
         assert 'docker logs --tail 50 pipelinewise' in readiness_step['run']
         assert 'sleep 5' in readiness_step['run']
@@ -448,6 +449,26 @@ def test_required_e2e_status_contract():
         'e2e_tests_pg_to_sf',
         'e2e_tests_s3_to_sf',
     }.intersection(configured_names)
+
+
+def test_postgres_migration_version_smoke_contract():
+    """Supported production and latest PostgreSQL majors run required migration smoke tests."""
+    workflow = yaml.safe_load(E2E_WORKFLOW.read_text(encoding='utf-8'))
+    rules = yaml.safe_load(TW_RULES.read_text(encoding='utf-8'))
+    job = workflow['jobs']['postgres_migration_smoke']
+
+    assert job['name'] == 'pg_migration_smoke_${{ matrix.postgres_major }}'
+    assert job['strategy']['fail-fast'] is False
+    assert job['strategy']['matrix']['postgres_major'] == [15, 18]
+    commands = '\n'.join(step.get('run', '') for step in job['steps'])
+    assert 'docker-compose.pg-version-smoke.yml' in commands
+    assert (
+        'test_idle_migration_completes_without_filling_target_batch' in commands
+    )
+
+    configured_checks = rules['actions']['branch-protection-settings']['branches'][0]['checks']
+    configured_names = {check['name'] for check in configured_checks}
+    assert {'pg_migration_smoke_15', 'pg_migration_smoke_18'} <= configured_names
 
 
 def test_snowflake_e2e_matrix_preflight_once():
