@@ -94,7 +94,7 @@ class PgoutputDecoder:
         self.changed_relations = set()
         self.transaction_final_lsn = None
 
-    def decode(self, payload):  # noqa: C901
+    def decode(self, payload):
         """Decode one output-plugin payload into the tap's existing action shape."""
         if not isinstance(payload, (bytes, bytearray, memoryview)):
             raise PgoutputProtocolError('pgoutput payload must be bytes')
@@ -102,92 +102,106 @@ class PgoutputDecoder:
         reader = _Reader(payload, self.encoding)
         action = chr(reader.byte())
 
-        if action == 'B':
-            self.transaction_final_lsn = reader.uint64()
-            commit_timestamp = reader.int64()
-            xid = reader.uint32()
-            result = {
-                'action': action,
-                'final_lsn': self.transaction_final_lsn,
-                'commit_timestamp': commit_timestamp,
-                'xid': xid,
-                '_pgoutput': True,
-            }
-        elif action == 'C':
-            flags = reader.byte()
-            commit_lsn = reader.uint64()
-            end_lsn = reader.uint64()
-            commit_timestamp = reader.int64()
-            result = {
-                'action': action,
-                'flags': flags,
-                'commit_lsn': commit_lsn,
-                'end_lsn': end_lsn,
-                'commit_timestamp': commit_timestamp,
-                '_pgoutput': True,
-            }
-            self.transaction_final_lsn = None
-        elif action == 'R':
-            result = self._decode_relation(reader)
-        elif action == 'Y':
-            type_oid = reader.uint32()
-            namespace = reader.cstring()
-            name = reader.cstring()
-            self.types[type_oid] = (namespace, name)
-            result = {
-                'action': action,
-                'type_oid': type_oid,
-                'schema': namespace,
-                'name': name,
-                '_pgoutput': True,
-            }
-        elif action == 'I':
-            result = self._decode_insert(reader)
-        elif action == 'U':
-            result = self._decode_update(reader)
-        elif action == 'D':
-            result = self._decode_delete(reader)
-        elif action == 'T':
-            relation_count = reader.uint32()
-            options = reader.byte()
-            relation_ids = [reader.uint32() for _ in range(relation_count)]
-            result = {
-                'action': action,
-                'options': options,
-                'relation_ids': relation_ids,
-                '_pgoutput': True,
-            }
-        elif action == 'O':
-            result = {
-                'action': action,
-                'origin_lsn': reader.uint64(),
-                'origin': reader.cstring(),
-                '_pgoutput': True,
-            }
-        elif action == 'M':
-            flags = reader.byte()
-            message_lsn = reader.uint64()
-            prefix = reader.cstring()
-            length = reader.int32()
-            if length < 0:
-                raise PgoutputProtocolError('Negative logical message length')
-            # Logical-message content is arbitrary bytes. Decode only at the
-            # application boundary after the message prefix identifies a known
-            # PipelineWise payload.
-            content = reader.bytes(length)
-            result = {
-                'action': action,
-                'transactional': bool(flags & 1),
-                'message_lsn': message_lsn,
-                'prefix': prefix,
-                'content': content,
-                '_pgoutput': True,
-            }
-        else:
-            raise PgoutputProtocolError(f'Unsupported pgoutput message type {action!r}')
+        match action:
+            case 'B':
+                result = self._decode_begin(reader)
+            case 'C':
+                result = self._decode_commit(reader)
+            case 'R':
+                result = self._decode_relation(reader)
+            case 'Y':
+                result = self._decode_type(reader)
+            case 'I':
+                result = self._decode_insert(reader)
+            case 'U':
+                result = self._decode_update(reader)
+            case 'D':
+                result = self._decode_delete(reader)
+            case 'T':
+                result = self._decode_truncate(reader)
+            case 'O':
+                result = self._decode_origin(reader)
+            case 'M':
+                result = self._decode_message(reader)
+            case _:
+                raise PgoutputProtocolError(f'Unsupported pgoutput message type {action!r}')
 
         reader.ensure_finished()
         return result
+
+    def _decode_begin(self, reader):
+        self.transaction_final_lsn = reader.uint64()
+        return {
+            'action': 'B',
+            'final_lsn': self.transaction_final_lsn,
+            'commit_timestamp': reader.int64(),
+            'xid': reader.uint32(),
+            '_pgoutput': True,
+        }
+
+    def _decode_commit(self, reader):
+        result = {
+            'action': 'C',
+            'flags': reader.byte(),
+            'commit_lsn': reader.uint64(),
+            'end_lsn': reader.uint64(),
+            'commit_timestamp': reader.int64(),
+            '_pgoutput': True,
+        }
+        self.transaction_final_lsn = None
+        return result
+
+    def _decode_type(self, reader):
+        type_oid = reader.uint32()
+        namespace = reader.cstring()
+        name = reader.cstring()
+        self.types[type_oid] = (namespace, name)
+        return {
+            'action': 'Y',
+            'type_oid': type_oid,
+            'schema': namespace,
+            'name': name,
+            '_pgoutput': True,
+        }
+
+    @staticmethod
+    def _decode_truncate(reader):
+        relation_count = reader.uint32()
+        options = reader.byte()
+        return {
+            'action': 'T',
+            'options': options,
+            'relation_ids': [reader.uint32() for _ in range(relation_count)],
+            '_pgoutput': True,
+        }
+
+    @staticmethod
+    def _decode_origin(reader):
+        return {
+            'action': 'O',
+            'origin_lsn': reader.uint64(),
+            'origin': reader.cstring(),
+            '_pgoutput': True,
+        }
+
+    @staticmethod
+    def _decode_message(reader):
+        flags = reader.byte()
+        message_lsn = reader.uint64()
+        prefix = reader.cstring()
+        length = reader.int32()
+        if length < 0:
+            raise PgoutputProtocolError('Negative logical message length')
+        # The prefix identifies the content format; arbitrary message bytes
+        # must reach the application without text decoding.
+        return {
+            'action': 'M',
+            'transactional': bool(flags & 1),
+            'message_lsn': message_lsn,
+            'prefix': prefix,
+            'content': reader.bytes(length),
+            '_pgoutput': True,
+        }
 
     def _decode_relation(self, reader):
         relation_id = reader.uint32()

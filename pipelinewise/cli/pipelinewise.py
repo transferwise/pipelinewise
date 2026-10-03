@@ -3038,24 +3038,7 @@ TAP RUN SUMMARY
             if phase == 'bridge_pending':
                 return
             if phase == 'bridge':
-                durable_lsn = self._minimum_durable_postgres_lsn(state)
-                if durable_lsn is None or durable_lsn < marker['bridge_lsn']:
-                    raise RuntimeError(
-                        'Cannot promote the PostgreSQL pgoutput migration before every selected '
-                        'LOG_BASED bookmark reaches the target-durable bridge boundary. '
-                        'Migration state was retained and no source changes were made.'
-                    )
-                promoted = FastSyncTapPostgres.promote_migrated_replication_slot(
-                    connection_config, marker
-                )
-                state[PGOUTPUT_MIGRATION_STATE_KEY] = promoted
-                # Promotion must be durable before the only wal2json recovery path
-                # is removed. A crash after this write safely retries the drop and
-                # overlap replay from the original pgoutput slot position.
-                fastsync_utils.save_dict_to_json(tap.state, state)
-                FastSyncTapPostgres.drop_promoted_wal2json_slot(
-                    connection_config, promoted
-                )
+                self._promote_postgres_pgoutput_migration(tap, connection_config, state, marker)
                 return
 
             if phase == 'pgoutput_overlap':
@@ -3065,21 +3048,7 @@ TAP RUN SUMMARY
                 return
 
             if phase == 'overlap_complete':
-                durable_lsn = self._minimum_durable_postgres_lsn(state)
-                if durable_lsn is None or durable_lsn < marker['crossover_lsn']:
-                    raise RuntimeError(
-                        'Cannot complete the PostgreSQL pgoutput migration before every '
-                        'selected LOG_BASED bookmark reaches the target-durable crossover '
-                        'boundary. Migration state was retained.'
-                    )
-                FastSyncTapPostgres.drop_promoted_wal2json_slot(
-                    connection_config, marker
-                )
-                FastSyncTapPostgres.advance_canonical_replication_slot(
-                    connection_config, marker['crossover_lsn']
-                )
-                del state[PGOUTPUT_MIGRATION_STATE_KEY]
-                fastsync_utils.save_dict_to_json(tap.state, state)
+                self._complete_postgres_pgoutput_migration(tap, connection_config, state, marker)
                 return
         elif not after_success:
             return
@@ -3089,6 +3058,44 @@ TAP RUN SUMMARY
             FastSyncTapPostgres.advance_canonical_replication_slot(
                 connection_config, durable_lsn
             )
+
+    def _promote_postgres_pgoutput_migration(self, tap, connection_config, state, marker):
+        """Persist promotion before retiring the recoverable wal2json slot."""
+        durable_lsn = self._minimum_durable_postgres_lsn(state)
+        if durable_lsn is None or durable_lsn < marker['bridge_lsn']:
+            raise RuntimeError(
+                'Cannot promote the PostgreSQL pgoutput migration before every selected '
+                'LOG_BASED bookmark reaches the target-durable bridge boundary. '
+                'Migration state was retained and no source changes were made.'
+            )
+        promoted = FastSyncTapPostgres.promote_migrated_replication_slot(
+            connection_config, marker
+        )
+        state[PGOUTPUT_MIGRATION_STATE_KEY] = promoted
+        # A crash after this durable write can retry both the drop and
+        # overlap replay from the original pgoutput slot position.
+        fastsync_utils.save_dict_to_json(tap.state, state)
+        FastSyncTapPostgres.drop_promoted_wal2json_slot(
+            connection_config, promoted
+        )
+
+    def _complete_postgres_pgoutput_migration(self, tap, connection_config, state, marker):
+        """Release replayed WAL only after the target acknowledges the crossover."""
+        durable_lsn = self._minimum_durable_postgres_lsn(state)
+        if durable_lsn is None or durable_lsn < marker['crossover_lsn']:
+            raise RuntimeError(
+                'Cannot complete the PostgreSQL pgoutput migration before every '
+                'selected LOG_BASED bookmark reaches the target-durable crossover '
+                'boundary. Migration state was retained.'
+            )
+        FastSyncTapPostgres.drop_promoted_wal2json_slot(
+            connection_config, marker
+        )
+        FastSyncTapPostgres.advance_canonical_replication_slot(
+            connection_config, marker['crossover_lsn']
+        )
+        del state[PGOUTPUT_MIGRATION_STATE_KEY]
+        fastsync_utils.save_dict_to_json(tap.state, state)
 
     def _postgres_tap_has_log_based_selection(self, tables=None) -> bool:
         """Return whether the PostgreSQL tap owns a selected logical stream."""

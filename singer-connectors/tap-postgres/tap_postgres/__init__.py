@@ -293,6 +293,18 @@ def register_type_adapters(conn_config):
                         (enum_oid,), f'ENUM_{enum_oid}[]', psycopg2.STRING))
 
 
+def _refresh_sync_schemas(conn_config, streams, logical_streams):
+    """Read CDC schemas from primary while honoring secondary selection for snapshots."""
+    if conn_config.get('use_secondary') and logical_streams:
+        logical_ids = {stream['tap_stream_id'] for stream in logical_streams}
+        traditional_streams = [stream for stream in streams if stream['tap_stream_id'] not in logical_ids]
+        if traditional_streams:
+            refresh_streams_schema(conn_config, traditional_streams)
+        refresh_streams_schema({**conn_config, 'use_secondary': False}, logical_streams)
+    else:
+        refresh_streams_schema(conn_config, streams)
+
+
 def do_sync(conn_config, catalog, default_replication_method, state, state_file=None):
     """
     Orchestrates sync of all streams
@@ -314,14 +326,7 @@ def do_sync(conn_config, catalog, default_replication_method, state, state_file=
     else:
         end_lsn = None
 
-    if conn_config.get('use_secondary') and logical_catalog_streams:
-        logical_ids = {stream['tap_stream_id'] for stream in logical_catalog_streams}
-        traditional_catalog_streams = [stream for stream in streams if stream['tap_stream_id'] not in logical_ids]
-        if traditional_catalog_streams:
-            refresh_streams_schema(conn_config, traditional_catalog_streams)
-        refresh_streams_schema({**conn_config, 'use_secondary': False}, logical_catalog_streams)
-    else:
-        refresh_streams_schema(conn_config, streams)
+    _refresh_sync_schemas(conn_config, streams, logical_catalog_streams)
 
     sync_method_lookup, traditional_streams, logical_streams = \
         sync_method_for_streams(streams, state, default_replication_method)

@@ -84,29 +84,28 @@ def sync_table(conn_info, stream, state, desired_columns, md_map, snapshot_lsn=N
         conn.close()
 
 
-def _sync_table(conn_info, conn, stream, state, desired_columns, md_map):
-    time_extracted = utils.now()
-
-    # before writing the table version to state, check if we had one to begin with
-    first_run = singer.get_bookmark(state, stream['tap_stream_id'], 'version') is None
-
+def _prepare_snapshot_state(stream_id, state):
+    """Keep an interrupted snapshot's version and mark it before emitting state."""
+    first_run = singer.get_bookmark(state, stream_id, 'version') is None
     # Keep the version and CDC boundary when replaying an interrupted snapshot.
     # XIDs can wrap or be frozen between runs, so resume from the first row.
-    if singer.get_bookmark(state, stream['tap_stream_id'], 'xmin') is None:
-        nascent_stream_version = int(time.time() * 1000)
+    if singer.get_bookmark(state, stream_id, 'xmin') is None:
+        version = int(time.time() * 1000)
     else:
-        nascent_stream_version = singer.get_bookmark(state, stream['tap_stream_id'], 'version')
+        version = singer.get_bookmark(state, stream_id, 'version')
 
-    state = singer.write_bookmark(state,
-                                  stream['tap_stream_id'],
-                                  'version',
-                                  nascent_stream_version)
-    if singer.get_bookmark(state, stream['tap_stream_id'], 'xmin') is None:
+    state = singer.write_bookmark(state, stream_id, 'version', version)
+    if singer.get_bookmark(state, stream_id, 'xmin') is None:
         # Mark the snapshot before its first checkpoint; otherwise a restart
         # after that checkpoint could mistake it for completed CDC bootstrap.
-        state = singer.write_bookmark(state, stream['tap_stream_id'], 'xmin', 1)
+        state = singer.write_bookmark(state, stream_id, 'xmin', 1)
     singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
+    return state, version, first_run
 
+
+def _sync_table(conn_info, conn, stream, state, desired_columns, md_map):
+    time_extracted = utils.now()
+    state, nascent_stream_version, first_run = _prepare_snapshot_state(stream['tap_stream_id'], state)
     schema_name = md_map.get(()).get('schema-name')
 
     escaped_columns = map(partial(post_db.prepare_columns_for_select_sql, md_map=md_map), desired_columns)

@@ -40,6 +40,27 @@ class UnsupportedPostgresVersionError(RuntimeError):
     """The source server is older than the supported PostgreSQL version floor."""
 
 
+def _migration_positions_are_valid(marker, phase):
+    """Require each completed migration stage to cover the preceding WAL boundary."""
+    slot_lsn = marker.get('slot_lsn')
+    boundary_lsn = marker.get('boundary_lsn')
+    if type(slot_lsn) is not int or slot_lsn < 0:
+        return False
+    if type(boundary_lsn) is not int or boundary_lsn < slot_lsn:
+        return False
+    if phase == 'bridge_pending':
+        return True
+
+    bridge_lsn = marker.get('bridge_lsn')
+    if type(bridge_lsn) is not int or bridge_lsn <= slot_lsn or bridge_lsn < boundary_lsn:
+        return False
+    if phase != 'overlap_complete':
+        return True
+
+    crossover_lsn = marker.get('crossover_lsn')
+    return type(crossover_lsn) is int and crossover_lsn >= bridge_lsn
+
+
 class FastSyncTapPostgres:
     """
     Common functions for fastsync from a Postgres database
@@ -263,7 +284,6 @@ class FastSyncTapPostgres:
         """Validate a versioned migration marker against tap identity."""
         common_required = {'version', 'phase', 'source_slot', 'destination_slot', 'slot_lsn'}
         phase = marker.get('phase') if isinstance(marker, dict) else None
-        bridge_pending = phase == 'bridge_pending'
         if (
             not isinstance(marker, dict)
             or not common_required.issubset(marker)
@@ -274,25 +294,7 @@ class FastSyncTapPostgres:
             }
             or not isinstance(marker.get('source_slot'), str)
             or not isinstance(marker.get('destination_slot'), str)
-            or type(marker.get('slot_lsn')) is not int
-            or marker['slot_lsn'] < 0
-            or type(marker.get('boundary_lsn')) is not int
-            or marker['boundary_lsn'] < marker['slot_lsn']
-            or (
-                not bridge_pending
-                and (
-                    type(marker.get('bridge_lsn')) is not int
-                    or marker['bridge_lsn'] <= marker['slot_lsn']
-                    or marker['bridge_lsn'] < marker['boundary_lsn']
-                )
-            )
-            or (
-                phase == 'overlap_complete'
-                and (
-                    type(marker.get('crossover_lsn')) is not int
-                    or marker['crossover_lsn'] < marker['bridge_lsn']
-                )
-            )
+            or not _migration_positions_are_valid(marker, phase)
         ):
             raise RuntimeError(
                 f'Invalid {PGOUTPUT_MIGRATION_STATE_KEY} state marker. '
@@ -510,6 +512,28 @@ class FastSyncTapPostgres:
             connection.close()
 
     @classmethod
+    def _validate_retired_publication(cls, cur, destination):
+        """Require ready, empty managed membership before retiring logical slots."""
+        cur.execute(
+            "SELECT pg_catalog.obj_description(oid, 'pg_publication') "
+            'FROM pg_catalog.pg_publication WHERE pubname = %s',
+            (destination,),
+        )
+        publication = cur.fetchone()
+        if publication is not None:
+            metadata = cls._decode_managed_publication_comment(publication[0])
+            if (
+                metadata is None
+                or metadata.get('state') != 'ready'
+                or metadata.get('managed_tables') != []
+            ):
+                raise RuntimeError(
+                    f'PostgreSQL publication "{destination}" must contain ready '
+                    'PipelineWise managed metadata with no managed tables before '
+                    'logical slots can be retired. No source or state changes were made.'
+                )
+
+    @classmethod
     def retire_logical_slots(cls, connection_config: Dict, *, before_drop: Callable[[], None]) -> None:
         """Retire tap-owned slots after the managed publication becomes empty."""
         database = connection_config['dbname']
@@ -556,24 +580,7 @@ class FastSyncTapPostgres:
                     before_drop()
                     return
 
-                cur.execute(
-                    "SELECT pg_catalog.obj_description(oid, 'pg_publication') "
-                    'FROM pg_catalog.pg_publication WHERE pubname = %s',
-                    (destination,),
-                )
-                publication = cur.fetchone()
-                if publication is not None:
-                    metadata = cls._decode_managed_publication_comment(publication[0])
-                    if (
-                        metadata is None
-                        or metadata.get('state') != 'ready'
-                        or metadata.get('managed_tables') != []
-                    ):
-                        raise RuntimeError(
-                            f'PostgreSQL publication "{destination}" must contain ready '
-                            'PipelineWise managed metadata with no managed tables before '
-                            'logical slots can be retired. No source or state changes were made.'
-                        )
+                cls._validate_retired_publication(cur, destination)
 
                 # The local state must stop advertising reusable LOG_BASED bookmarks
                 # before PostgreSQL forgets the corresponding WAL history.
@@ -595,6 +602,33 @@ class FastSyncTapPostgres:
                     )
         finally:
             connection.close()
+
+    @classmethod
+    def _publication_for_removal(cls, cur, publication_name):
+        """Check database ownership and PipelineWise metadata before any drops."""
+        cur.execute(
+            'SELECT publication.pubname, owner.rolname, actor.rolsuper, current_user, '
+            "pg_catalog.obj_description(publication.oid, 'pg_publication') "
+            'FROM pg_catalog.pg_publication AS publication '
+            'JOIN pg_catalog.pg_roles AS owner ON owner.oid = publication.pubowner '
+            'JOIN pg_catalog.pg_roles AS actor ON actor.rolname = current_user '
+            'WHERE publication.pubname = %s',
+            (publication_name,),
+        )
+        publication = cur.fetchone()
+        if publication and publication[1] != publication[3] and not publication[2]:
+            raise RuntimeError(
+                f'PostgreSQL publication "{publication_name}" is owned by '
+                f'"{publication[1]}" and cannot be removed by "{publication[3]}". '
+                'No source changes were made.'
+            )
+        if publication and not cls._is_managed_publication_comment(publication[4]):
+            raise RuntimeError(
+                f'PostgreSQL publication "{publication_name}" does not contain valid '
+                'PipelineWise managed metadata. Preserve it and complete manual review '
+                'before removal. No source changes were made.'
+            )
+        return publication
 
     @classmethod
     def drop_slot(
@@ -691,28 +725,7 @@ class FastSyncTapPostgres:
                         require_inactive=True,
                     )
                 if publication_name:
-                    cur.execute(
-                        'SELECT publication.pubname, owner.rolname, actor.rolsuper, current_user, '
-                        "pg_catalog.obj_description(publication.oid, 'pg_publication') "
-                        'FROM pg_catalog.pg_publication AS publication '
-                        'JOIN pg_catalog.pg_roles AS owner ON owner.oid = publication.pubowner '
-                        'JOIN pg_catalog.pg_roles AS actor ON actor.rolname = current_user '
-                        'WHERE publication.pubname = %s',
-                        (publication_name,),
-                    )
-                    publication = cur.fetchone()
-                    if publication and publication[1] != publication[3] and not publication[2]:
-                        raise RuntimeError(
-                            f'PostgreSQL publication "{publication_name}" is owned by '
-                            f'"{publication[1]}" and cannot be removed by "{publication[3]}". '
-                            'No source changes were made.'
-                        )
-                    if publication and not cls._is_managed_publication_comment(publication[4]):
-                        raise RuntimeError(
-                            f'PostgreSQL publication "{publication_name}" does not contain valid '
-                            'PipelineWise managed metadata. Preserve it and complete manual review '
-                            'before removal. No source changes were made.'
-                        )
+                    publication = cls._publication_for_removal(cur, publication_name)
                 dropped = 0
                 for slot_name in dict.fromkeys((destination, current)):
                     if slot_name not in managed_slots:

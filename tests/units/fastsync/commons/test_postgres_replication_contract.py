@@ -18,7 +18,7 @@ def _singer_helpers():
     tree = ast.parse((TAP / 'sync_strategies/logical_replication.py').read_text())
     names = {'_replication_identifier', 'validate_tap_id', 'generate_replication_slot_name',
              'legacy_replication_slot_names', '_implicit_historical_slot_is_truncated',
-             '_validate_migration_state'}
+             '_validate_migration_state', '_migration_positions_are_valid'}
     module = ast.Module(body=[node for node in tree.body if isinstance(node, ast.FunctionDef)
                               and node.name in names], type_ignores=[])
     namespace = {'re': re, 'ReplicationSlotMigrationError': RuntimeError,

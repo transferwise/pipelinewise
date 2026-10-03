@@ -13,6 +13,10 @@ from psycopg import pq, sql
 
 ReplicationMessage = namedtuple('ReplicationMessage', ['payload', 'data_start', 'wal_end'])
 POSTGRES_EPOCH = datetime.datetime(2000, 1, 1, tzinfo=datetime.timezone.utc)
+_KEEPALIVE_BODY = struct.Struct('!QqB')
+_WAL_DATA_HEADER = struct.Struct('!QQq')
+_FEEDBACK_MESSAGE = struct.Struct('!cQQQqB')
+_WAL_PAYLOAD_OFFSET = 1 + _WAL_DATA_HEADER.size
 
 
 class ReplicationConnection:
@@ -87,7 +91,7 @@ class ReplicationCursor:
         if not (force or reply or time.monotonic() - self.last_feedback >= self.status_interval):
             return
         timestamp = int((datetime.datetime.now(datetime.timezone.utc) - POSTGRES_EPOCH).total_seconds() * 1000000)
-        feedback = struct.pack('!cQQQqB', b'r', self.write_lsn, self.flush_lsn, self.apply_lsn, timestamp, int(reply))
+        feedback = _FEEDBACK_MESSAGE.pack(b'r', self.write_lsn, self.flush_lsn, self.apply_lsn, timestamp, int(reply))
         deadline = time.monotonic() + 30
         while self.pgconn.put_copy_data(feedback) == 0:
             self._flush_output(deadline)
@@ -120,13 +124,13 @@ class ReplicationCursor:
             # cannot accumulate an unbounded second copy of the WAL stream.
             consumed_input = True
             payload = bytes(buffer)
-            if payload[:1] == b'k' and len(payload) == 18:
-                self.wal_end, _, reply = struct.unpack('!QqB', payload[1:])
+            if payload[:1] == b'k' and len(payload) == 1 + _KEEPALIVE_BODY.size:
+                self.wal_end, _, reply = _KEEPALIVE_BODY.unpack(payload[1:])
                 if reply:
                     self.send_feedback(force=True)
-            elif payload[:1] == b'w' and len(payload) > 25:
-                data_start, self.wal_end, _ = struct.unpack('!QQq', payload[1:25])
-                data = payload[25:]
+            elif payload[:1] == b'w' and len(payload) > _WAL_PAYLOAD_OFFSET:
+                data_start, self.wal_end, _ = _WAL_DATA_HEADER.unpack(payload[1:_WAL_PAYLOAD_OFFSET])
+                data = payload[_WAL_PAYLOAD_OFFSET:]
                 if self.decode:
                     data = data.decode(self.connection.encoding)
                 return ReplicationMessage(data, data_start, self.wal_end)
