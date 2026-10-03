@@ -81,7 +81,7 @@ Global configuration
    * - ``switch_over_data_file``
      - No
      - None
-     - Supplies state mapping used by ``reset_state``.
+     - Supplies MariaDB/MySQL state mapping used by ``reset_state``.
    * - ``backend_db``
      - For data-diff
      - Disabled
@@ -101,7 +101,8 @@ Tap configuration
 
 .. code-block:: yaml
 
-   id: "orders"
+   id: "orders_ingest"
+   # previous_tap_id: "orders-old"  # Only for a historical PostgreSQL tap rename.
    name: "Orders PostgreSQL"
    type: "tap-postgres"
    owner: "data-platform@example.com"
@@ -137,6 +138,12 @@ Tap configuration
      - Yes
      - —
      - Identify the pipeline and source connector.
+   * - ``previous_tap_id``
+     - No
+     - None
+     - PostgreSQL only. Copies the old tap's saved state before discovery and
+       preserves its historical wal2json slot during a rename. Keep the same
+       source connection and target. See :ref:`postgres_tap_rename`.
    * - ``owner``
      - Operationally required
      - None
@@ -367,14 +374,19 @@ After every change:
 
 ``validate`` checks YAML and references but not connectivity. ``import_config``
 discovers the source and replaces generated runtime configuration only after the
-project passes validation.
+project passes validation. A targeted ``import_config --taps <id>`` applies
+PostgreSQL tap-ID checks to those selected taps. ``validate`` checks every tap
+in the project.
 
 .. warning::
 
    ``import_config`` treats a missing tap or target YAML file as a deletion. It
    removes that connector's generated directory, including every ``state.json``
    bookmark; removing a target removes all of its taps. Removing a PostgreSQL
-   tap also drops its replication slot. Renaming an ``id`` has the same effect
-   as deleting the old connector and adding a new one. Stop the pipeline, back
-   up its generated state, and plan a full initial sync before removing or
-   renaming imported configuration.
+   tap also drops its managed tap-specific replication slots and publication.
+   Renaming an ``id`` has the same effect as deleting the old connector and
+   adding a new one. Stop the pipeline, back up its generated state, and plan a
+   full initial sync before removing or renaming imported configuration.
+   For a historical PostgreSQL wal2json tap, the explicit
+   :ref:`previous_tap_id procedure <postgres_tap_rename>` preserves the old state,
+   runtime files, and migration slot instead.

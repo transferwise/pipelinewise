@@ -3,7 +3,8 @@
 # ------------------------------------------------------------------------------
 # General Properties
 # ------------------------------------------------------------------------------
-id: "postgres_sample"                  # Unique identifier of the tap
+id: "postgres_sample"                  # Unique across the PostgreSQL cluster; lowercase letters, digits, underscores
+#previous_tap_id: "postgres-old"        # Optional: Preserve an old wal2json tap's state and slot when renaming
 name: "Sample Postgres Database"       # Name of the tap
 type: "tap-postgres"                   # !! THIS SHOULD NOT CHANGE !!
 owner: "somebody@foo.com"              # Data owner to contact
@@ -12,6 +13,7 @@ owner: "somebody@foo.com"              # Data owner to contact
 
 # ------------------------------------------------------------------------------
 # Source (Tap) - PostgreSQL connection details
+# PostgreSQL 14+ is required. Older affected minors log a logical-decoding data-loss warning.
 # ------------------------------------------------------------------------------
 db_conn:
   host: "<HOST>"                       # PostgreSQL host
@@ -28,8 +30,11 @@ db_conn:
   #logical_poll_total_seconds:         # Optional: Stop running the tap when no data
                                        #           received from wal after certain number of seconds
                                        #           Default: 10800
-  #break_at_end_lsn:                   # Optional: Stop running the tap if the newly received lsn
-                                       #           is after the max lsn that was detected when the tap started
+  #publication_fence_timeout_seconds: 300
+                                       # Optional: Timeout for publication setup and replica catch-up
+                                       #           before Singer initial LOG_BASED snapshots
+  #break_at_end_lsn:                   # Optional: Stop after the transactional logical message
+                                       #           that bounds the current replication run
                                        #           Default: true
   #ssl: "true"                         # Optional: Using SSL via postgres sslmode 'require' option.
                                        #           If the server does not accept SSL connections or the client

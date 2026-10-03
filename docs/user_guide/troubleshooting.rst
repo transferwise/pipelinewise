@@ -35,10 +35,6 @@ Symptom index
    * - :ref:`PGRES_COPY_BOTH <troubleshooting_postgres_pgres_copy_both>`
      - PostgreSQL LOG_BASED
      - Source logs, network, timeout, and target backpressure.
-   * - :ref:`stream_abort_cb callback missing
-       <troubleshooting_postgres_stream_abort_callback>`
-     - PostgreSQL LOG_BASED
-     - ``logical_decoding_work_mem`` and large or concurrent transactions.
    * - :ref:`LOG_BASED throughput falls behind without errors
        <troubleshooting_postgres_logical_decoding_spill>`
      - PostgreSQL LOG_BASED
@@ -250,10 +246,10 @@ retention period.
 Changing the binlog position in state.json
 """"""""""""""""""""""""""""""""""""""""""
 
-Prefer :ref:`cli_reset_state` for a controlled failover with an exact position
-mapping. If no supported mapping is available and manual recovery is unavoidable,
-stop the tap and back up the state first. Never edit a state file while its tap is
-running.
+For MariaDB/MySQL, prefer :ref:`cli_reset_state` for a controlled failover with
+an exact position mapping. If no supported mapping is available and manual
+recovery is unavoidable, stop the tap and back up the state first. Never edit a
+state file while its tap is running.
 
 .. code-block:: bash
 
@@ -292,6 +288,29 @@ position is uncertain.
 
 PostgreSQL Errors
 '''''''''''''''''
+
+Publication setup, unsupported tables, and interrupted reset
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+Check the source version against :ref:`tap-postgres`. PostgreSQL before 14 is
+rejected. Affected 14–17 minor releases remain supported but log a warning that
+logical decoding may lose or corrupt changes. Deferrable primary keys and
+selected generated columns are rejected before publication changes. Use the
+inventory query and supported alternatives in that guide.
+
+Publication setup waits for earlier writers and applies bounded lock and
+statement timeouts. Resolve the reported transaction or conflicting DDL, then
+retry with the same state. Long read-only transactions without an assigned
+transaction ID do not block this fence. A prepared transaction requires DBA
+resolution.
+
+An incomplete PostgreSQL slot-reset intent blocks ordinary replication. Keep the
+schedule stopped and retry the unfiltered whole-tap ``fast_sync`` described in
+:ref:`resync_postgres_slot_reset`. Do not delete the reset marker or restore
+bookmarks whose required WAL may have been discarded.
+
+For an invalid historical tap ID, follow :ref:`postgres_tap_rename`. It preserves
+the state and old slot through an explicit ``previous_tap_id`` mapping.
 
 .. _troubleshooting_postgres_wal_level:
 
@@ -337,9 +356,6 @@ interval before changing timeouts or state.
 * **If the source or network terminated the connection,** correct that cause and
   restart the same tap without advancing state.
 
-* **For PostgreSQL 11, consider upgrading.** PostgreSQL 12 and
-  later support the session-level ``wal_sender_timeout`` that PipelineWise sets.
-
 * **If the PostgreSQL log reports a sender timeout,** check the effective value:
 
   .. code-block:: sql
@@ -351,40 +367,13 @@ interval before changing timeouts or state.
   compensate indefinitely for a blocked target or an unsuitable timeout, so fix
   those causes first.
 
-.. _troubleshooting_postgres_stream_abort_callback:
-
-logical streaming requires a stream_abort_cb callback
-"""""""""""""""""""""""""""""""""""""""""""""""""""""
-
-*Log message:*
-
-.. code-block:: text
-
-    psycopg2.errors.ObjectNotInPrerequisiteState:
-    logical streaming requires a stream_abort_cb callback
-
-*Why it happens:*
-PostgreSQL can start streaming an in-progress transaction when decoded changes
-exceed ``logical_decoding_work_mem``. On affected PostgreSQL and wal2json
-combinations, aborting that transaction can expose a missing wal2json streaming
-callback and stop replication.
-
-*How to fix:*
-Work with the source database administrator to increase
-``logical_decoding_work_mem`` above the decoded working set of large or concurrent
-transactions. Use the incremental tuning and memory guidance in
-:ref:`troubleshooting_postgres_logical_decoding_spill`, then restart and retry the
-same tap so its replication connection receives the new value. Do not drop,
-recreate, or advance the slot; that can discard changes that PipelineWise has not
-acknowledged.
-
 .. _troubleshooting_postgres_logical_decoding_spill:
 
 LOG_BASED replication is slow or falling behind
 """""""""""""""""""""""""""""""""""""""""""""""
 
 *Why it happens:*
-On PostgreSQL 13 and later, ``logical_decoding_work_mem`` limits the memory used
+``logical_decoding_work_mem`` limits the memory used
 by each logical replication connection. When decoded changes exceed the limit,
 PostgreSQL writes them to local disk. A value that is too low for the source
 workload can therefore cause frequent disk spill and substantially reduce
@@ -395,8 +384,7 @@ or concurrent transactions, or several PipelineWise replications consuming slots
 on the same PostgreSQL cluster can increase both spill I/O and total memory demand.
 
 *How to diagnose:*
-Check the configured value. PostgreSQL 11 and 12 return no row because they do
-not provide this setting:
+Check the configured value:
 
 .. code-block:: sql
 
@@ -542,7 +530,8 @@ pending-Iceberg recovery before proceeding.
 
 .. warning::
 
-    This command drops an existing tap-specific slot, with or without ``--force``.
+    This command drops an existing canonical pgoutput slot, with or without
+    ``--force``.
     Slot replacement is not atomic: a failure during drop or recreation leaves
     bookmarks invalidated, and the slot may be absent or replaced.
     Stop scheduled replication and complete

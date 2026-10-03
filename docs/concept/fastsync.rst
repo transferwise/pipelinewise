@@ -176,12 +176,18 @@ Explicit FullSync
 This operation can replace target data and reset replication bookmarks. Review
 :ref:`resync` before running it against a large or actively written table.
 
-An unfiltered PostgreSQL ``fast_sync`` containing LOG_BASED tables resets the
-tap-specific slot once before workers start, with or without ``--force``.
+An unfiltered PostgreSQL ``fast_sync`` containing LOG_BASED tables prepares the
+tap-specific pgoutput slot once before workers start, with or without ``--force``.
 Filtered FastSync, automatic initial loads, and standalone PartialSync retain
 it. ``--force`` only bypasses the resync size limit; configured
 ``sync_start_from`` ranges remain in effect. See :ref:`resync_postgres_slot_reset`
 for exact commands, safety checks, pending-Iceberg guards, and failure recovery.
+An explicit reset creates a fresh pgoutput slot and records its intent durably.
+Ordinary replication stays blocked until the whole-tap FastSync completes.
+It drops any dedicated historical wal2json slot before loading new snapshots.
+Shared database-wide slots remain untouched. Automatic migration instead keeps
+the old dedicated slot until the target confirms the wal2json bridge, then
+drops it before pgoutput replays the overlap from its original slot position.
 
 
 .. _defined_partial_sync:

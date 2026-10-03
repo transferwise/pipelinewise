@@ -83,7 +83,7 @@ services:
 
   ### TAP (Data source) containers
   # PostgreSQL service container used as test source database
-  # Using Debezium image with wal2json plugin for logical decoding
+  # Using a Debezium image with native pgoutput plus wal2json for migration tests
   pipelinewise-postgres-source:
     build:
       context: ./pg
@@ -94,12 +94,13 @@ services:
     container_name: pipelinewise-postgres-source
     volumes:
       - ./pg/pg_hba.conf:/var/lib/postgresql/pg_hba.conf
-    # Enable logical decoding, including wal2json in the base-image allowlist, and SSL.
+    # Enable logical decoding. wal2json remains available only to exercise automatic
+    # migration of historical slots; all newly created slots use pgoutput.
     command: >
       -c "wal_level=logical"
       -c "output_plugin_libraries=pgoutput,test_decoding,decoderbufs,wal2json"
-      -c "max_replication_slots=5"
-      -c "max_wal_senders=5"
+      -c "max_replication_slots=10"
+      -c "max_wal_senders=10"
       -c "ssl=on"
       -c "ssl_cert_file=/var/lib/postgresql/server.crt"
       -c "ssl_key_file=/var/lib/postgresql/server.key"

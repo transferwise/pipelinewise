@@ -48,7 +48,8 @@ schemas:
     # List of tables to replicate from Postgres to destination Data Warehouse
     #
     # Please check the Replication Strategies section in the documentation to understand the differences.
-    # LOG_BASED requires wal2json plugin and other postgres adjustments.
+    # LOG_BASED requires PostgreSQL 14+, wal_level=logical, replication access,
+    # and permission to manage the tap's pgoutput publication.
     tables:
 
       ### Table with INCREMENTAL replication

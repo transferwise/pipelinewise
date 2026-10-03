@@ -12,7 +12,10 @@ A table configured with ``sync_start_from`` also uses PartialSync during
 size limit; it does not override the configured range or request a full-table
 reload. An unfiltered whole-tap PostgreSQL ``fast_sync`` still resets its
 LOG_BASED source slot before workers start; standalone ``partial_sync_table``
-retains it. See :ref:`resync_postgres_slot_reset`.
+retains it. A PostgreSQL PartialSync of a LOG_BASED table prepares publication
+membership before capturing a logical boundary. An operation limited to
+FULL_TABLE tables does not require unrelated LOG_BASED tables to pass
+publication checks. See :ref:`resync_postgres_slot_reset`.
 
 
 Range semantics

@@ -4,9 +4,21 @@ PostgreSQL source
 =================
 
 ``tap-postgres`` extracts tables with full-table, key-based incremental, or
-wal2json logical replication from PostgreSQL 11.2 or later. This source minimum
-applies to every Singer replication method and PipelineWise FullSync/PartialSync;
-it does not constrain PostgreSQL targets or the PipelineWise backend database.
+native pgoutput logical replication. Sources require PostgreSQL **14 or later**.
+Releases before 14.18, 15.13, 16.9, or 17.5 remain supported but log a warning.
+Those earlier minor releases have a catalog-cache defect that can omit changes
+after publication updates or decode values incorrectly after type changes. The
+defect also affects wal2json and does not depend on using logical messages for
+run boundaries.
+PipelineWise executes ``ALTER PUBLICATION ... ADD TABLE`` on the source
+when extending publication membership. If this overlaps source writes, the
+defect can suppress row-change events before PipelineWise receives them.
+Target schema comparison cannot recover those omitted events. See the
+`PostgreSQL fix <https://github.com/postgres/postgres/commit/9f21be08e884c75089e939bae86a47eca176e0af>`_.
+
+The PostgreSQL 14 minimum applies to every Singer replication method and
+PipelineWise FullSync/PartialSync. It does not constrain PostgreSQL targets or
+the backend database.
 
 .. list-table:: Support
    :header-rows: 1
@@ -34,13 +46,209 @@ LOG_BASED replication also requires:
 - a connection to the writable primary;
 - ``wal_level=logical`` and sufficient ``max_replication_slots`` and
   ``max_wal_senders`` capacity;
-- the `wal2json <https://github.com/eulerto/wal2json>`_ plugin with format
-  version 2 support; and
-- permission to create and consume a logical replication slot.
+- permission to create, advance, consume, and remove the tap's logical
+  replication slots;
+- ``EXECUTE`` on
+  ``pg_catalog.pg_logical_emit_message(boolean, text, text)``;
+- permission to create and manage the tap publication; and
+- a valid, non-deferrable primary key with ``REPLICA IDENTITY DEFAULT`` on every selected table
+  and every physical leaf of a selected partition root.
 
-PipelineWise creates one tap-specific slot in the source database. PostgreSQL retains WAL needed
-by that slot, so monitor retained WAL and do not remove the slot while the tap is
-active.
+PipelineWise creates or validates ``ppw_slot_<tap_id>``. It adds every selected
+LOG_BASED table before creating a snapshot boundary or consuming WAL. Normal
+runs, filtered FastSync, and switches between snapshot and CDC phases only add
+members; they never remove tables needed by another selected stream.
+
+``import_config`` reconciles an existing publication with the saved YAML selection
+while the tap is stopped. It leaves publication creation to the first sync.
+It removes deselected tables only when PipelineWise has
+recorded them as managed members. Tables added separately by a DBA remain in
+the publication unless they were also selected and tracked by PipelineWise.
+This ownership list is stored with the transaction fence in the publication
+comment. Existing metadata without a list does not prove ownership of old
+unselected members; remove those separately after checking their use.
+
+Before removing a logical table from the publication, ``import_config`` durably
+removes its old logical bookmark. Re-adding that table therefore takes a fresh
+snapshot, including changes made while it was absent from the publication.
+Selected logical streams and FULL_TABLE/INCREMENTAL progress remain unchanged.
+
+After automatic migration finishes, removing the final LOG_BASED selection
+also clears reset markers, then drops the canonical pgoutput slot and dedicated
+historical wal2json slot. An import that changes the selection during migration
+is rejected before bookmark or marker invalidation. Revert the selection and
+re-import it, finish migration, and then import the removal again.
+It preserves the shared database-wide slot and the publication, including any
+untracked DBA-added members. Re-enabling LOG_BASED creates a fresh slot and takes
+new snapshots. If import fails partway through cleanup, retry the same import;
+invalidated logical bookmarks remain cleared and completed slot drops are safe
+to repeat. Do not restore old logical bookmarks after this cleanup.
+Keep a deleted tap absent until one ``import_config`` completes its pending
+local cleanup. Only then re-add that ID. PipelineWise also rejects changing a
+PostgreSQL tap's source, connector type, or target in place. Remove and import
+the old tap first, then add and import the replacement.
+For a historical tap ID outside the LOG_BASED naming rules, nonlogical import
+clears stale logical state but leaves source cleanup to the DBA or rename path.
+
+The publication publishes ``insert``, ``update``, and ``delete``. It excludes
+``truncate`` and uses ``publish_via_partition_root = true``. Row filters and
+column lists are not supported. The runtime role must be able to update the
+publication comment because PipelineWise stores transaction-fence state there.
+It preserves an existing comment inside that metadata.
+
+A DBA can pre-create the publication when the runtime role cannot add tables.
+The runtime role must still own the publication so it can maintain the fence
+comment. A new selection requires the DBA to add its tables before retrying if
+the runtime role does not own those tables.
+
+PipelineWise uses the primary key as both the pgoutput row identity and the
+Singer target merge key. Replica-identity indexes and ``REPLICA IDENTITY FULL``
+are rejected because they can identify a different row from the target key. A
+primary-key-changing update emits a delete for the old key before the new row.
+An unchanged toasted key is recovered from the event's old identity when present.
+INCLUDE columns in a primary-key index are ordinary data columns, not merge keys.
+If PostgreSQL omits an unchanged selected non-key TOAST value from that update,
+PipelineWise fails and requires a full resync instead of creating an incomplete
+row under the new key. Changing a table's primary-key definition also requires
+a whole-table full resync; an in-run identity change is rejected before the
+tap refreshes its schema. Historical events are checked against the columns in
+their Relation message, so a later added column does not invalidate an earlier
+primary-key update.
+
+PipelineWise does not replicate generated columns through pgoutput. It rejects
+LOG_BASED selection of these columns on every supported PostgreSQL version before
+changing the publication. Use FULL_TABLE or INCREMENTAL for an affected table. A standalone
+Singer deployment can exclude the column in its catalog if the destination does
+not need it. PipelineWise YAML has no column-exclusion setting. Do not remove
+this guard to force replication: the destination value would become stale.
+Inspect each source before upgrading:
+
+.. code-block:: sql
+
+   SHOW server_version;
+   SHOW server_encoding;
+   SELECT namespace.nspname AS schema_name, relation.relname AS table_name,
+          attribute.attname AS generated_column
+   FROM pg_attribute AS attribute
+   JOIN pg_class AS relation ON relation.oid = attribute.attrelid
+   JOIN pg_namespace AS namespace ON namespace.oid = relation.relnamespace
+   WHERE attribute.attgenerated <> '' AND NOT attribute.attisdropped
+   ORDER BY 1, 2, 3;
+
+Refresh discovery for tables whose primary key has INCLUDE columns. If an
+existing destination used an INCLUDE column as part of its merge key, perform
+a full table resync to rebuild it with the corrected key.
+
+Before attaching or writing to a new partition, give that leaf the same primary
+key and ``REPLICA IDENTITY DEFAULT``. Attach an empty leaf, then write through
+the partition root. PostgreSQL
+does not publish rows that already existed in a table when it was attached. If a
+non-empty table must become a partition, separately resync those existing rows
+before relying on ongoing CDC. PipelineWise validates current leaves during
+preflight, but PostgreSQL can attach another leaf after the check.
+
+LOG_BASED selection rejects ordinary PostgreSQL inheritance parents because
+their child changes would not use the selected parent stream identity. A
+partition root may contain only local ordinary or partitioned descendants;
+foreign-table partitions are outside the local WAL stream. Select supported
+physical tables separately or resync them through another supported route.
+
+PipelineWise creates a native pgoutput slot and publication with the same name,
+``ppw_slot_<tap_id>``. A LOG_BASED PostgreSQL tap ID must
+contain only lowercase letters, digits, and underscores and be at most 50
+characters. PostgreSQL retains WAL needed by the slot, so monitor retained WAL
+and do not remove it while the tap is active.
+Tap IDs must be unique across every database and PipelineWise project using the
+same PostgreSQL cluster. Slot names belong to the cluster, not one database.
+A conflicting slot is rejected before use.
+
+PipelineWise 0.94.0 is the migration release from wal2json to pgoutput. Run
+every PostgreSQL LOG_BASED tap successfully on 0.94.0 and verify that its
+``ppw_slot_<tap_id>`` slot uses pgoutput and its migration marker is gone before
+upgrading. Version 0.95.0 will remove the migration path and all remaining
+wal2json code.
+
+When the pgoutput slot is absent, PipelineWise creates a fresh slot and keeps
+the historical tap-specific ``pipelinewise_<dbname>_<tap_id>`` wal2json slot for
+the bridge. It does not copy a slot or require ``pg_copy_logical_replication_slot``.
+Historical names use PostgreSQL's 63-byte truncation rule. PipelineWise will
+not infer ownership of a tap-specific name that was truncated. It preserves
+that slot when a canonical slot already exists, during an explicit fresh start,
+and after final LOG_BASED deselection. To migrate it, verify ownership and use
+the explicit ``previous_tap_id`` rename path. PipelineWise will not claim
+``pipelinewise_<dbname>``
+because that older database-wide slot may serve another tap. A new tap with no
+saved history can create its own slot while preserving the shared slot. An
+existing tap whose bookmarks depend on the shared slot needs DBA coordination
+or an explicit whole-tap resync.
+
+PipelineWise prepares the publication and creates the fresh pgoutput slot
+before emitting a transactional logical message. It persists a pending marker
+whose retry-stable identity makes interrupted or duration-limited runs continue
+toward the same commit. The message's commit is later than the new slot's start
+LSN. PipelineWise consumes wal2json from the saved target bookmark through that
+commit, so the old slot supplies the history that predates the new slot. Only
+after the target acknowledges this bridge does PipelineWise persist promotion
+and immediately remove the tap-specific wal2json slot. It does not advance the
+pgoutput slot. Pgoutput starts from its original consistent LSN and replays the
+overlap through the same transactional message. Bookmarks remain monotonic
+during the replay. After the target acknowledges the pgoutput copy of that
+boundary, PipelineWise clears the migration marker and continues normally.
+This works even when no selected rows changed and does not depend on
+``break_at_end_lsn``. A failure before promotion preserves wal2json; a later
+failure retries from the retained pgoutput position and may deliver duplicates.
+
+Publication selection and options are frozen while a migration marker exists
+or both migration slots coexist. If ``import_config`` rejects a selection
+change, finish the migration or revert the selection and re-import it. Use an
+unfiltered whole-tap FastSync when the migration must be explicitly reset.
+
+Migration temporarily needs one additional replication-slot entry. Keep
+wal2json installed until all old slots have been retired. On servers with
+``output_plugin_libraries``, keep both ``pgoutput`` and ``wal2json`` in that
+allowlist during migration. PostgreSQL 14.24 introduced this setting with only
+the bundled plugins allowed by default; see the
+`PostgreSQL release notes <https://www.postgresql.org/docs/release/14.24/>`_.
+Automatic migration
+is rejected when a selected table is a partition root because a new leaf could
+otherwise appear while the fixed wal2json bridge filter is running. Coordinate
+an explicit whole-tap resync instead. A verified migration that has already
+reached pgoutput can continue without replaying the wal2json bridge.
+
+Publication setup records a pending fence in the publication comment and waits
+for transactions with an assigned transaction ID that predate the publication
+change. Long readers without a transaction ID do not block it. Prepared
+transactions must be resolved by the DBA. The wait reuses one connection and
+reports blockers. PipelineWise records the ready fence before creating the
+fresh slot boundary.
+
+``publication_fence_timeout_seconds`` bounds this wait and publication DDL lock
+and statement timeouts. A timeout leaves preparation retryable. Resolve the
+reported writer or conflicting DDL and retry without advancing bookmarks.
+
+When FastSync reads from ``replica_host``, it waits up to 300 seconds for the
+replica to replay the primary's publication and slot boundary before exporting.
+A Singer initial LOG_BASED load with ``use_secondary`` also waits for its
+primary snapshot bookmark. That wait uses ``publication_fence_timeout_seconds``.
+The wait and snapshot use the same connection, including when the replica
+endpoint balances connections. The boundary is a committed, flushed logical
+message, so an idle primary does not leave the wait beyond the last replayable
+record. A timeout stops before exporting or saving a new snapshot bookmark.
+Resolve replica lag and retry. Logical schema refreshes read from the primary.
+
+Interrupted Singer snapshots restart from the first row. They retain the table
+version and original CDC start LSN. This avoids relying on transaction IDs that
+can wrap or be frozen between runs. LOG_BASED tables have primary keys, so
+replayed rows merge into their existing target rows. The first checkpoint marks
+the snapshot incomplete even before its first row. For standalone FULL_TABLE
+streams without a key, repeated records can be appended; use FullSync when the
+destination needs replacement semantics.
+
+The pgoutput connection uses ISO date output, PostgreSQL interval output, and
+round-trip floating-point output. Source role formatting defaults cannot swap
+day and month or reduce the precision of replicated floating-point values.
+Pgoutput uses UTF8 on the wire. The wal2json bridge decodes its output using the
+source database encoding, including databases that use LATIN1.
 
 An explicit, unfiltered ``fast_sync`` on a tap containing LOG_BASED tables
 resets the tap-specific slot once before workers start, with or without
@@ -49,12 +257,42 @@ retain it. See :ref:`resync_postgres_slot_reset` for exact commands, legacy-slot
 safety, state backups, pending-Iceberg guards, and non-atomic reset recovery.
 
 
+.. _postgres_tap_rename:
+
+Renaming a historical tap ID
+----------------------------
+
+Use ``previous_tap_id`` when an existing wal2json tap ID does not meet the new
+naming rules. Stop scheduling both identities before importing the change.
+Keep the source host, port, database, user, and target unchanged.
+The target account or host, database, schema mapping, table format, selected
+streams, and transformations must also stay unchanged. Import checks these
+against the old generated configuration on the first import and on retries.
+Missing old configuration or a changed destination prevents state adoption.
+Change credentials independently if needed, but finish the rename before
+changing the data selection or destination layout.
+
+1. Replace the YAML ``id`` with a valid, cluster-unique value.
+2. Add top-level ``previous_tap_id`` with the exact old ID. Remove the old tap's
+   YAML definition from the project, but preserve its generated runtime files.
+3. Run ``pipelinewise import_config --dir <project> --taps <new_id>``. It copies
+   the old state before discovery and preserves the old runtime files and slot.
+   Repeating import preserves any progress already made under the new identity.
+4. Run the new tap through migration. Keep ``previous_tap_id`` until pgoutput
+   consumption has been acknowledged and the old slot has been retired.
+
+An existing migration or incomplete whole-tap reset must finish before renaming.
+Do not run both identities concurrently. A plain rename without
+``previous_tap_id`` retains the usual deletion behaviour described in
+:ref:`yaml_configuration`.
+
 Configuration
 -------------
 
 .. code-block:: yaml
 
-   id: "orders"
+   id: "orders_ingest"
+   # previous_tap_id: "orders-old"  # Only for an existing wal2json tap rename.
    name: "Orders PostgreSQL"
    type: "tap-postgres"
    owner: "data-platform@example.com"
@@ -83,6 +321,11 @@ Configuration
      - Required
      - Default
      - Effect
+   * - ``previous_tap_id``
+     - No
+     - None
+     - Preserves the old state and identifies its wal2json slot during an explicit
+       tap rename. See :ref:`postgres_tap_rename`.
    * - ``replica_host``
      - No
      - Primary host
@@ -99,10 +342,17 @@ Configuration
      - No
      - ``10800``
      - Stops after this total idle polling period.
+   * - ``publication_fence_timeout_seconds``
+     - No
+     - ``300``
+     - Bounds publication DDL and the wait for earlier writers. Also bounds
+       replica catch-up before Singer initial LOG_BASED loads. Must be positive
+       and finite.
    * - ``break_at_end_lsn``
      - No
      - ``true``
-     - Stops after reaching the WAL boundary captured at startup.
+     - Stops after decoding the transaction commit containing this run's
+       logical boundary message.
    * - ``ssl``
      - No
      - Connector default
@@ -138,20 +388,22 @@ Acknowledgement and recovery
 Consuming WAL does not by itself advance the slot's safe flush position.
 PipelineWise sends feedback only up to the minimum target-acknowledged LSN stored
 in ``state.json``. Missing, unreadable, invalid, or regressing state retains the
-previous safe LSN.
+previous safe LSN. Server keepalives do not implicitly advance that position.
+PostgreSQL and Snowflake targets establish an initial durable checkpoint by
+flushing pending streams, then continue per-stream checkpoints. A failed flush
+cannot acknowledge incomplete target data.
 
-After logical replication starts, PipelineWise attempts to emit one transactional
-``pg_logical_emit_message`` in each tap database. It checks the available function
-signature and execution privilege before emission, avoiding an expected source
-error when the marker is unavailable or inaccessible. The returned marker LSN
-identifies the fence, and the first decoded transaction commit at or beyond that
-position provides a safe bookmark boundary even when the selected tables are
-idle. Slot feedback advances through that boundary only after the target
-acknowledges the state.
+After logical replication starts, PipelineWise emits one unique transactional
+``pg_logical_emit_message`` in each tap database. It starts pgoutput with logical
+messages enabled and matches the tap-specific prefix and unique token. The
+transaction's commit end LSN becomes the run boundary even when the selected
+tables are idle. With the default ``break_at_end_lsn: true``, the tap stops after
+decoding that commit. Slot feedback advances through the boundary only after the
+target acknowledges the state.
 
-If the function is unavailable or inaccessible, replication continues using
-the captured current-WAL boundary. Fully filtered idle WAL may then require a
-later decodable message before the bookmark and acknowledgement can advance.
+If the function is unavailable, the role cannot execute it, or the matching
+message cannot be decoded, the run fails. PipelineWise does not substitute a
+sampled WAL position because that would not prove a decoded transaction boundary.
 
 After an unexpected termination, restart the same tap without advancing state.
 Unacknowledged WAL remains replayable while the slot exists. Resync only when the

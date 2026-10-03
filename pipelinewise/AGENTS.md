@@ -60,10 +60,40 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
 
 ## Runtime and data-diff constraints
 
-- PostgreSQL replication sources require 11.2 or later across Singer,
-  FullSync, and PartialSync. Keep the Singer and FastSync connection gates
-  aligned; only deleted-tap slot cleanup may bypass the floor. PostgreSQL
+- PostgreSQL replication sources require 14+ across Singer, FullSync, and
+  PartialSync. Warn below the catalog-cache fixes in 14.18, 15.13, 16.9, and
+  17.5, but allow the connection. Keep Singer and FastSync aligned; only
+  deleted-tap slot cleanup may bypass the major-version floor. PostgreSQL
   targets, the backend, and data-diff connections are separate.
+- Name each PostgreSQL pgoutput slot and publication `ppw_slot_<tap_id>`.
+  Automatic migration creates a fresh slot, bridges wal2json through a later
+  message commit, and persists promotion only after target acknowledgement.
+  Drop wal2json immediately after that durable promotion. Start pgoutput from
+  its original slot LSN without advancing it, replay through the same boundary,
+  keep bookmarks monotonic, and clear the marker only after target
+  acknowledgement. Persist a `bridge_pending` marker so duration-limited
+  retries keep the boundary.
+  Freeze publication selection and options while the migration marker or both
+  migration slots exist. Validate the frozen publication before import can
+  invalidate bookmarks, including when slot creation succeeded before the
+  marker became durable. Never infer ownership of an implicitly truncated
+  historical tap-specific slot. Preserve it during a fresh start or final
+  deselection, and require explicit `previous_tap_id` for migration. An explicit
+  whole-tap FastSync drops dedicated old slots after invalidating state.
+- Reconcile publication removals only during persistent `import_config` and
+  only for members tracked in its management comment. Runtime and filtered
+  preparation remain additive; preserve untracked DBA-added members.
+  Invalidate deselected LOG bookmarks durably before membership removal. After
+  the final LOG selection is removed, clear migration/reset state and retire
+  owned slots under the same tap lock. Re-adding LOG requires a new snapshot.
+- Deleted-tap cleanup must preserve every slot and publication candidate when a
+  historical tap ID fails canonical naming rules. Its normalized names are
+  non-injective and cannot prove ownership without manual review.
+- Journal deleted-tap cleanup before replacing generated config. Persist source
+  cleanup before deleting retained credentials, and cancel ownership only after
+  config save. A local-phase tombstone requires a cleanup-only import before
+  reusing the tap ID. Reject PostgreSQL source, connector-type, or target moves
+  in place.
 - Source deletes are always physical. Silently ignore retired deletion-mode
   options in YAML and bundled PostgreSQL/Snowflake target JSON; do not require
   reimport or warn. Keep `_SDC_DELETED_AT` as the internal deletion marker,

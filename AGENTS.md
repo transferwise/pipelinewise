@@ -53,13 +53,22 @@ pytest --cov=pipelinewise --cov-fail-under=77 -v tests/units
 ```
 
 An unavoidable host run must activate `.virtualenvs/pipelinewise/`. Keep paths
-and flags exact: Ruff checks all repository Python except connector tests outside
-existing GitHub connector CI, including integration suites, legacy tests, and
-spikes. This includes data-diff, root E2E, vendored connector source, and the
-tap-mysql, tap-postgres, and target-snowflake unit suites run by connector CI.
+and flags exact: Ruff checks repository Python except the legacy connector
+suites listed in `pyproject.toml`. It includes data-diff, root E2E, vendored
+connector source, all connector CI unit suites, and the target-postgres and
+transform-field integration suites.
 Never run bare `pytest tests/` because it collects credentialed E2E. Collect
 nested data-diff/backend-db tests from `tests/units`, narrowing with `-k` to
 avoid import failures.
+
+Run E2E tests locally only when the user specifically asks to run E2E tests.
+If a pull request already exists, prefer its GitHub Actions E2E jobs and inspect
+their exact pass, skip, and failure results instead of polling a duplicate local
+run. This keeps feedback fast and avoids spending Codex allowance on long-running
+local test monitoring.
+When monitoring GitHub tests, poll only workflow and job status/conclusion. Do
+not stream or download logs for jobs that are running or passing. Inspect logs
+only after a job fails, and limit inspection to the failed job and step.
 
 After implementation, schema, example-config, or connector-config changes,
 validate in Docker (Compose loads `dev-project/.env`):
@@ -139,7 +148,9 @@ severity; if there are no concerns, say so explicitly.
 
 Before completion:
 
-1. Run every applicable lint, unit, config, scoped E2E, connector, and docs check.
+1. Run every applicable lint, unit, config, connector, and docs check. Run local
+   E2E only when specifically requested; for an existing pull request, prefer
+   the applicable GitHub Actions E2E jobs.
 2. Update validated docs for user-facing behavior/config changes and the root
    changelog for release-visible connector changes.
 3. Report pass/skip/fail counts by group; skips, failures, and unavailable checks

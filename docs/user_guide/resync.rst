@@ -29,9 +29,9 @@ Choose an operation
      - Merges the selected range.
      - Can capture current position when no end is supplied.
    * - ``reset_state``
-     - A controlled database switchover has an exact position mapping.
+     - A controlled MariaDB/MySQL switchover has an exact position mapping.
      - No rows copied.
-     - Rewrites CDC bookmarks.
+     - Rewrites binlog bookmarks.
 
 
 Preflight
@@ -70,12 +70,16 @@ configured PartialSync into a full-table reload.
 PostgreSQL source-slot reset
 ''''''''''''''''''''''''''''
 
-For a PostgreSQL tap containing LOG_BASED tables, this command drops and
-recreates the tap-specific source slot once before any worker starts:
+For a PostgreSQL tap containing LOG_BASED tables, this command prepares the
+tap-specific pgoutput source slot once before any worker starts:
 
 .. code-block:: bash
 
    pipelinewise fast_sync --tap <tap_id> --target <target_id>
+
+The ``reset_state`` command is refused for PostgreSQL LOG_BASED taps because a
+pgoutput slot cannot rewind to a fabricated bookmark. The unfiltered whole-tap
+FastSync resets the slot and state together.
 
 Omit ``--tables`` and leave ``--replication_method_only`` at its ``*`` default
 so every selected table is rebuilt. The deprecated ``sync_tables`` alias has
@@ -88,7 +92,8 @@ the resync size limit. Taps without LOG_BASED tables do not reset a slot.
    * - Command or operation
      - Source slot
    * - Unfiltered ``fast_sync`` (with or without ``--force``)
-     - Drop and recreate once, after safety checks.
+     - Drop the canonical pgoutput slot and any dedicated wal2json slot, then
+       create a fresh pgoutput slot.
    * - ``fast_sync --tables ...`` (even if every table is listed, or ``--force`` is supplied)
      - Retain.
    * - ``fast_sync --replication_method_only log_based`` (or another non-default filter, with or without ``--force``)
@@ -97,39 +102,72 @@ the resync size limit. Taps without LOG_BASED tables do not reset a slot.
      - Retain.
 
 PipelineWise validates local configuration, preflights the FullSync size limit
-unless ``--force`` is supplied, and checks the source connection and slot before
-changing state. A preflight size-limit rejection leaves the slot and bookmarks
-unchanged. An active slot or a slot with an unexpected database
-or output plugin blocks the reset. Any legacy database-wide slot
-(``pipelinewise_<dbname>``) also blocks it, even if a tap-specific slot exists:
-the legacy slot may serve other taps and is preferred by the replication reader.
-Coordinate any legacy-slot migration with your DBA and all affected taps; this
-command does not migrate or delete a legacy slot.
+unless ``--force`` is supplied, and checks the source connection and candidate
+slots before changing state. It also prepares and validates the tap's pgoutput
+publication and transaction fence before establishing any new WAL boundary. A
+preflight size-limit or publication rejection leaves the slots and bookmarks
+unchanged. An active slot, a slot for another database, or an unexpected output
+plugin blocks the operation.
 
 After these checks, PipelineWise saves a unique
-``state.json.before-slot-reset-<id>.bak`` alongside the state file, clears every
-tap bookmark, then drops and recreates the tap-specific slot. Backups are retained
-across retries. No FullSync or configured PartialSync worker starts until slot
-creation succeeds.
+``state.json.before-slot-reset-<id>.bak`` alongside the state file. It records
+a durable reset intent and clears every tap bookmark before dropping
+``ppw_slot_<tap_id>`` and any dedicated historical wal2json slot. It then creates
+a fresh pgoutput slot. This explicit whole-tap resync replaces the old history
+with new snapshots; it does not bridge or copy the old slot. It can recover
+when the old slot's WAL is no longer usable. Potentially shared database-wide
+slots remain untouched. PipelineWise also preserves an implicitly truncated
+historical tap-specific slot because its 63-byte name does not prove ownership.
+Use :ref:`postgres_tap_rename` with ``previous_tap_id`` when that slot contains
+history which must be migrated.
+
+After every worker succeeds, the reset intent is cleared and normal pgoutput
+consumption can resume. This also works for selected partition roots, whose
+automatic wal2json bridge is unsupported. A failed target load does not restore
+the dropped wal2json slot; complete the whole-tap resync before ordinary runs.
+
+Backups are retained across retries. No FullSync or configured PartialSync worker
+starts until slot preparation succeeds. A failed or interrupted whole-tap reset
+retains its durable intent; ordinary replication refuses to run until the
+unfiltered ``fast_sync`` succeeds. This prevents an ordinary run from treating
+an incomplete resync as a completed snapshot.
 
 .. warning::
 
-   Dropping and recreating a slot is not atomic. A source error, lost response,
-   or process interruption after state invalidation can leave the slot unchanged,
-   absent, or replaced; bookmarks remain cleared. Keep scheduled replication
-   stopped, resolve the error, then retry the unfiltered ``fast_sync``
-   and complete the whole-tap resync. A state backup cannot recover discarded
-   WAL: never restore old LOG_BASED bookmarks after a completed or uncertain drop.
-   Reset errors report the failed phase and backup path when available.
+   Slot preparation is not atomic. A source error, lost response, or process
+   interruption after state invalidation can leave the canonical slot unchanged,
+   absent or replaced; bookmarks remain cleared. Keep scheduled
+   replication stopped, resolve the error, then retry the unfiltered
+   ``fast_sync`` and complete the whole-tap resync. A state backup cannot recover
+   WAL discarded by a completed or uncertain slot drop. Never restore
+   old LOG_BASED bookmarks after that outcome. Errors report the failed phase
+   and backup path when available.
    Add ``--force`` only if the resync size limit needs to be bypassed.
+
+When an old tap ID must change to meet pgoutput naming rules, use
+:ref:`postgres_tap_rename` to preserve state and its migration source slot.
+A plain import rename follows deletion cleanup and is not that migration path.
 
 For managed Iceberg, a pending publication or conversion recovery stops the
 whole-tap reset before source or state changes. Resume the corresponding filtered
 FastSync or conversion command to finish recovery, then retry the unfiltered
 ``fast_sync``.
 
-Separately, ``import_config`` removes a deleted PostgreSQL tap's source slot
-when it removes that tap's runtime configuration; this is cleanup, not a resync.
+Separately, ``import_config`` removes a deleted PostgreSQL tap's canonical
+pgoutput slot, tap-specific wal2json slot, and ``ppw_slot_<tap_id>`` publication
+when it removes that tap's runtime configuration. It leaves the database-wide
+historical slot unchanged. It validates each owned slot and verifies that the
+current role can remove the publication before changing the source. The
+publication must also carry valid PipelineWise management metadata. Otherwise,
+cleanup preserves the publication and slots and requires manual review. This is
+cleanup, not a resync. For an old tap ID that does not meet the current naming
+rules, cleanup preserves every canonical and normalized historical slot candidate
+and the publication. Those non-injective names may belong to another valid tap.
+Cleanup is journaled before the generated project config changes. If a retry
+reports pending local cleanup, keep that tap absent for one successful
+``import_config`` before adding it again. Changing a PostgreSQL tap's source,
+connector type, or target in place is rejected; use the same remove, import,
+add, and import sequence.
 
 
 Configured PartialSync and replicas
@@ -138,6 +176,11 @@ Configured PartialSync and replicas
 A table with ``sync_start_from`` uses PartialSync instead of FullSync. MariaDB,
 MySQL, and PostgreSQL sources can use ``replica_host`` for the FastSync read while
 ongoing LOG_BASED replication remains on the primary.
+
+PostgreSQL FastSync waits up to 300 seconds for the replica to replay the
+primary's publication and slot boundary before exporting. If the replica stays
+behind, the export stops. Resolve replica lag and retry. See :ref:`tap-postgres`
+for the corresponding Singer initial-load check.
 
 ``--force`` preserves that configured range and loading method. Existing rows
 outside the range remain unless ``drop_target_table: true`` is configured.

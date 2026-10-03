@@ -53,8 +53,8 @@ Command summary
      - Build or promote one managed Iceberg v3 copy.
      - Creates companion tables; can rename the live table.
    * - ``reset_state``
-     - Move CDC state after a controlled switchover.
-     - Changes bookmarks without copying data.
+     - Move MariaDB/MySQL CDC state after a controlled switchover.
+     - Changes binlog bookmarks without copying data.
    * - ``encrypt_string``
      - Produce an Ansible Vault YAML value.
      - No pipeline state.
@@ -141,8 +141,9 @@ is a deprecated alias.
 
    Removing or renaming a tap or target in project YAML makes
    ``import_config`` delete its generated runtime directory and saved state.
-   Removing a PostgreSQL tap also drops its replication slot. Back up state and
-   plan a new initial sync before importing that change.
+   Removing a PostgreSQL tap also drops its managed tap-specific replication
+   slots and publication. Back up state and plan a new initial sync before
+   importing that change.
 
 
 Inspect and test
@@ -252,7 +253,8 @@ remains a deprecated alias. Supplying ``--tables`` or setting
 ``--replication_method_only`` to anything other than ``*`` makes the resync
 filtered and retains the PostgreSQL replication slot, even if ``--tables`` lists
 every table. An unfiltered whole-tap PostgreSQL run with LOG_BASED tables resets
-its tap-specific slot once before workers start, with or without ``--force``.
+its tap-specific pgoutput slot once before workers start, with or without
+``--force``.
 See :ref:`resync_postgres_slot_reset` for safety checks, backups, pending-Iceberg
 guards, and non-atomic reset recovery.
 
@@ -287,13 +289,23 @@ available only from MariaDB/MySQL or PostgreSQL to Snowflake. See
 
    pipelinewise reset_state --tap <tap_id> --target <target_id>
 
-Use this only after a controlled MariaDB/MySQL or PostgreSQL switchover whose old
-and new replication positions are known. The command changes state without
-copying rows; an incorrect mapping can skip data permanently.
+Use this only after a controlled MariaDB/MySQL switchover whose old and new
+replication positions are known. ``switch_over_data_file`` in ``config.yml``
+points to JSON that maps the new host to the old/new identifiers, hosts,
+timestamp, and binlog positions. The command changes state without copying
+rows; an incorrect mapping can skip data permanently. Back up state and verify
+target continuity after the first run.
 
-For MariaDB/MySQL, ``switch_over_data_file`` in ``config.yml`` points to JSON
-that maps the new host to the old/new identifiers, hosts, timestamp, and binlog
-positions. Back up state and verify target continuity after the first run.
+PipelineWise refuses ``reset_state`` for PostgreSQL LOG_BASED taps because a
+pgoutput replication slot cannot rewind to a fabricated bookmark. Reset the
+slot and state together with an unfiltered whole-tap FastSync instead:
+
+.. code-block:: bash
+
+   pipelinewise fast_sync --tap <tap_id> --target <target_id>
+
+Do not add ``--tables`` or ``--replication_method_only``. See
+:ref:`resync_postgres_slot_reset` for the preflight and backup behaviour.
 
 
 Target maintenance

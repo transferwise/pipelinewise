@@ -80,7 +80,7 @@ def test_unsupported_postgres_is_a_prerequisite_failure_with_a_safe_reason(capsy
     assert isinstance(error, RuntimeError)
     assert result['error_kind'] == 'metadata'
     assert result['error_type'] == 'UnsupportedPostgresVersionError'
-    assert result['reason'] == 'PostgreSQL 11.2 or later is required'
+    assert result['reason'] == 'PostgreSQL 14 or later is required'
     output = capsys.readouterr()
     assert json.loads(output.err) == result
     assert 'secret' not in json.dumps(result) + output.err

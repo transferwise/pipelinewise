@@ -49,7 +49,7 @@ data_diff_defaults:
 
 # ------------------------------------------------------------------------------
 # Source to target Schema mapping for LOG_BASED replication
-#   requires wal2json plugin and other source adjustments
+#   requires PostgreSQL 14+, native pgoutput, and logical replication access
 #   LOG_BASED is the default replication_method
 # ------------------------------------------------------------------------------
 schemas:

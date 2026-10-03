@@ -5,16 +5,19 @@ Read root `AGENTS.md` and relevant implementation, test, E2E, and docs guides.
 ## Environments and CI
 
 These are vendored sources, not submodules. The root Ruff gate checks connector
-source packages plus the tap-mysql, tap-postgres, and target-snowflake unit
-suites run by connector CI. Connector tests outside GitHub connector CI,
-including integration suites, legacy tests, and spikes, remain excluded; root
-unit tests exclude connectors. Prefer the ready `pipelinewise` container; report
-host fallbacks.
+source packages plus all unit suites run by connector CI, and target-postgres
+and transform-field integration suites. Other legacy tests listed in
+`pyproject.toml` remain excluded; root unit tests exclude connectors. Prefer
+the ready `pipelinewise` container; report host fallbacks.
 
 Connector CI installs all connectors and runs Python 3.12 units for tap-mysql
-(`make unit_test_cov`, 47%), tap-postgres (`make unit_test_cov`, 58%), and
-target-snowflake (`make unit_test`, 67%). It excludes integration; behavior
-changes need local connector tests and an available E2E route.
+(`make unit_test_cov`, 47%), tap-postgres (`make unit_test_cov`, 58%),
+target-postgres (`make unit_test`, 44%), target-snowflake (`make unit_test`,
+67%), and transform-field (`make unit_test integration_test`). Tap-postgres
+integration runs on PostgreSQL 14 with unit, integration, and combined coverage
+gates. Target-postgres integration runs on an isolated PostgreSQL 14 service
+with its 87% coverage gate. Other integration remains local and needs an
+available E2E route for behavior changes.
 
 Root `make connectors -e pw_connector=<name>` creates runtime
 `.virtualenvs/<name>/`; connector Makefiles often test in `./venv/`. Never mix
@@ -24,10 +27,10 @@ PipelineWise, runtime-connector, connector-test, host, or container interpreters
 
 Ruff is the only supported connector linter. Where present, the owning
 Makefile's `lint` target runs the connector environment's Ruff binary from the
-repository root so the root `pyproject.toml` applies. The tap-mysql,
-tap-postgres, and target-snowflake targets lint source, their GitHub-tested unit
-suites, and shared unit helpers; other connector targets lint source only. Unit
-and integration targets remain the behavioral validation. Do not add
+repository root so the root `pyproject.toml` applies. CI-tested connectors lint
+source, unit suites, and shared unit helpers. Target-postgres and transform-field
+also lint their integration suites; other connector targets lint source only.
+Unit and integration targets remain the behavioral validation. Do not add
 connector-local lint configuration, another Python linter, or an automatic
 formatter. Line length, docstring quoting, lambda assignment, and complexity
 rules apply to all connector source. Keep unavoidable legacy ignores inline,
@@ -39,10 +42,9 @@ without lowering thresholds; integration may need containers or credentials.
 
 - Most use `venv`, `lint`, `unit_test`, and `integration_test`; inspect the
   Makefile for variants.
-- PostgreSQL also requires `integration_test_cov` >=63 and `total_cov` >=85;
+- PostgreSQL also requires `integration_test_cov` >=63 and `total_cov` >=84;
   MySQL uses Pytest for unit and integration tests.
-- Without Makefiles: GitHub uses `tests/`, Zendesk uses Nose, and
-  transform-field uses direct suites and Singer E2E. Jira is an external pin
+- Without Makefiles: GitHub uses `tests/` and Zendesk uses Nose. Jira is an external pin
   without local source/tests; Salesforce has a Makefile but no tests. GitHub,
   Jira, and Zendesk lack repository E2E.
 
@@ -67,7 +69,7 @@ CSV suite needs standard Snowflake/S3 variables,
 `TARGET_SNOWFLAKE_SCHEMA`, and `TARGET_SNOWFLAKE_FILE_FORMAT_CSV` (which may
 reuse `TARGET_SNOWFLAKE_FILE_FORMAT`); ensure the private key is readable.
 
-Run the supported 49-test suite with plaintext upload explicitly selected:
+Run the supported 51-test suite with plaintext upload explicitly selected:
 
 ```bash
 docker exec -t -e CLIENT_SIDE_ENCRYPTION_MASTER_KEY= pipelinewise bash -lc '
@@ -79,9 +81,9 @@ docker exec -t -e CLIENT_SIDE_ENCRYPTION_MASTER_KEY= pipelinewise bash -lc '
 ```
 
 This excludes successful client-side encryption while retaining CSV external
-and table-stage loads plus wrong-key rejection. Expect 49 passes, zero skips;
+and table-stage loads plus wrong-key rejection. Expect 51 passes, zero skips;
 anything else is non-green. Full `make integration_test` separately requires a
-real client-side encryption master key and expects 50 passes.
+real client-side encryption master key and expects 52 passes.
 
 ## Versioning and upstream
 
@@ -92,10 +94,31 @@ real client-side encryption master key and expects 50 passes.
 - These are upstream-derived copies. Coordinate non-trivial divergence
   upstream; keep local fixes narrow, comments limited to why divergence is
   needed, and avoid broad formatting.
-- PostgreSQL sources require version 11.2 or later for every Singer replication
-  method and PipelineWise FullSync/PartialSync. Keep their version checks aligned;
-  this source minimum does not constrain target-postgres or the PipelineWise
-  backend database.
+- PostgreSQL sources require 14+ for every Singer replication method and
+  PipelineWise FullSync/PartialSync. Warn below the catalog-cache fixes in
+  14.18, 15.13, 16.9, and 17.5, but allow the connection. Keep the Singer and
+  FastSync checks aligned. Required PipelineWise E2E migration smoke jobs run
+  PostgreSQL 15 and the latest stable major in addition to the PostgreSQL 14
+  connector integration suite. This source minimum does not constrain
+  target-postgres or the PipelineWise backend database.
+- Use `ppw_slot_<tap_id>` for both PostgreSQL slots and publications. Automatic
+  migration creates a fresh pgoutput slot, bridges wal2json through a later
+  committed message, persists promotion after target acknowledgement, and then
+  drops wal2json immediately. Replay pgoutput from its original slot LSN through
+  the same boundary without advancing unseen WAL. Keep bookmarks monotonic and
+  clear the marker only after target acknowledgement. Persist a `bridge_pending`
+  marker and reuse migration boundary tokens across retries.
+  Freeze publication selection and options while a migration marker or both
+  migration slots exist, and reject import changes before state invalidation.
+  It does not copy slots. Preserve an implicitly truncated historical
+  tap-specific slot unless `previous_tap_id` explicitly establishes its ownership.
+- Keep runtime publication preparation additive. Persistent `import_config`
+  selection may remove only members tracked as managed in the publication
+  comment; preserve untracked DBA members. An explicit whole-tap FastSync
+  invalidates state and drops dedicated old slots before taking new snapshots.
+  Persistent deselection invalidates each removed logical bookmark before
+  publication removal. Zero LOG selections also retire dedicated slots and
+  clear migration/reset state; preserve shared database-wide slots.
 - PostgreSQL/Snowflake targets silently ignore retired deletion-mode options,
   enable metadata automatically, and physically process `_SDC_DELETED_AT` before
   acknowledging state. Keep this marker in Singer schemas and transport.
