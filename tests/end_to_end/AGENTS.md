@@ -33,6 +33,16 @@ step ran and report pass/skip/fail counts.
 
 ## E2E matrix
 
+Run this local E2E matrix only when the user specifically asks to run E2E tests.
+When a pull request already exists, prefer the corresponding GitHub Actions E2E
+jobs and inspect their exact pass, skip, and failure results. Avoid duplicating
+those jobs locally and polling them through Codex, which slows validation and
+uses Codex allowance. A user-requested local run remains authoritative for that
+task even when it is long-running.
+Monitor GitHub E2E with status/conclusion polling only. Do not stream or download
+logs for running or passing jobs. Inspect logs only after a job fails, scoped to
+that failed job and step.
+
 These groups mirror `.github/workflows/e2e_tests.yml` in required-check order
 `e2e_tests_01` through `e2e_tests_11`; update both together. CI runs ten
 Snowflake groups concurrently on isolated runners; local groups share/reset
@@ -42,23 +52,26 @@ fixtures/config and must run serially:
 run_e2e() { docker exec -t pipelinewise pytest "$@" -vx --timer-top-n 10; }
 
 run_e2e \
+  tests/end_to_end/test_postgres_master_upgrade.py \
   tests/end_to_end/test_target_postgres.py \
+  tests/end_to_end/test_postgres_pgoutput_slots.py \
   tests/end_to_end/test_postgres_stream_buffer_recovery.py \
   tests/end_to_end/data_diff/test_postgres_to_postgres.py \
   tests/end_to_end/data_diff/test_mysql_to_postgres.py
 
 run_e2e \
   tests/end_to_end/target_snowflake/test_native_to_iceberg_converter.py \
+  tests/end_to_end/target_snowflake/tap_postgres/test_pgoutput_migration_to_sf.py \
   tests/end_to_end/data_diff/test_mysql_to_snowflake.py
 
 run_e2e \
   tests/end_to_end/target_snowflake/tap_postgres/test_snowflake_iceberg_publisher.py \
-  tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_replica_to_sf.py
+  tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_replica_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_with_custom_buffer_size.py
 
 run_e2e \
   tests/end_to_end/target_snowflake/tap_postgres/test_partial_sync_pg_to_sf.py \
   tests/end_to_end/target_snowflake/tap_postgres/test_multiline_native_pg_to_sf.py \
-  tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_with_custom_buffer_size.py \
   tests/end_to_end/data_diff/test_postgres_to_snowflake.py
 
 run_e2e \
@@ -108,6 +121,32 @@ PostgreSQL, and genuine MySQL cover native and explicit v3.
 Do not infer one format from another. `SHOW PRIMARY KEYS` does not prove Iceberg
 identifier fields; compare raw-metadata `identifier-field-ids` with current
 schema field IDs.
+
+Required `pg_migration_smoke_15` and `pg_migration_smoke_18` jobs rebuild only
+the PostgreSQL source with `Dockerfile.version-smoke` and run the idle migration
+case. Keep these majors aligned with the oldest production major that needs
+explicit coverage and the latest stable PostgreSQL major.
+
+PostgreSQL lifecycle coverage uses `ppw_slot_<tap_id>` for both the slot and
+publication. Verify fresh-slot creation before the wal2json bridge, retirement
+immediately after target acknowledgement of the bridge, overlap replay from the
+original pgoutput position through the shared boundary, and dedicated wal2json
+removal during explicit whole-tap FastSync. Cover idle polling without premature completion, continuous
+traffic with `break_at_end_lsn: false`, bridge target failure, explicit reset
+during migration, source DDL during overlap, and Snowflake Native overlap
+de-duplication. Persistent import must remove deselected managed publication
+members while preserving untracked DBA members and filtered-run peers.
+Remove a logical table, change its source rows, and re-add it before any peer
+advances: a fresh snapshot must recover those changes. Removing the last LOG
+selection must clear old logical state and retire dedicated slots; re-adding it
+must create a fresh slot and snapshot.
+
+For a requested local master-upgrade E2E run, first execute the workflow's
+`Prepare the pre-migration master tap` archive commands on the host. The pinned
+baseline is mounted into Docker at `dev-project/.upgrade-baseline/`. Those tests
+run the unmodified old tap and persist real target acknowledgements, then check
+successful migration or safe rejection and whole-tap recovery. Remove this
+baseline preparation and the wal2json upgrade tests with wal2json in 0.95.0.
 
 ### Multiline coverage
 

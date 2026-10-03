@@ -98,6 +98,28 @@ class TransformField:
                 trans.get('field_paths')
             ))
 
+    @staticmethod
+    def _validate_patch_conditions(record, transformations):
+        """Reject incomplete conditional updates before any unmasked value can escape."""
+        for transformation in transformations:
+            if not transformation.when:
+                continue
+            if record.get('_sdc_deleted_at') is not None and transformation.field_id not in record:
+                continue
+            required = {transformation.field_id} | {
+                condition['column'] for condition in transformation.when
+            }
+            if not required.intersection(record):
+                continue
+            missing = required.difference(record)
+            if missing:
+                raise TransformFieldException(
+                    'Cannot safely apply conditional transformation to a PATCH record: '
+                    f'missing fields {sorted(missing)}. Use unconditional masking or a '
+                    'replication method that supplies complete records. No raw record or '
+                    'checkpoint for this update was emitted.'
+                )
+
     # todo: simplify this method
     def flush(self):
         """Give batch to handlers to process"""
@@ -117,6 +139,8 @@ class TransformField:
 
             for i, message in enumerate(messages):
                 if isinstance(message, singer.RecordMessage):
+                    if schema.get('x-pipelinewise-record-update-mode') == 'PATCH':
+                        self._validate_patch_conditions(message.record, trans_meta)
 
                     # Do transformation on every column where it is required
                     for trans in trans_meta:

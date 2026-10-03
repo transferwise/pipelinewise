@@ -10,24 +10,54 @@ import singer
 
 from typing import List
 from dateutil.parser import parse
+from tap_postgres.replication import ReplicationConnection
 
 LOGGER = singer.get_logger('tap_postgres')
 
 CURSOR_ITER_SIZE = 20000
-MIN_SUPPORTED_POSTGRES_VERSION = 110002
+MIN_SUPPORTED_POSTGRES_VERSION = 140000
+MIN_SAFE_POSTGRES_VERSIONS = {14: 140018, 15: 150013, 16: 160009, 17: 170005}
 
 
 class UnsupportedPostgresVersionError(RuntimeError):
     """Raised when a source is older than the connector support floor."""
 
 
+def require_logical_message_privilege(cursor):
+    """Check the text overload used to capture durable snapshot boundaries."""
+    cursor.execute("""
+        SELECT pg_catalog.has_function_privilege(
+            current_user,
+            COALESCE(
+                pg_catalog.to_regprocedure('pg_catalog.pg_logical_emit_message(boolean,text,text,boolean)'),
+                pg_catalog.to_regprocedure('pg_catalog.pg_logical_emit_message(boolean,text,text)')
+            ),
+            'EXECUTE'
+        )
+    """)
+    permission = cursor.fetchone()
+    if not permission or permission[0] is not True:
+        raise RuntimeError(
+            'PostgreSQL LOG_BASED replication requires EXECUTE on the text overload of '
+            'pg_catalog.pg_logical_emit_message. Ask a DBA to grant it to the replication role and retry.'
+        )
+
+
 def validate_server_version(connection):
-    """Reject PostgreSQL source versions older than 11.2."""
+    """Require PostgreSQL 14 and warn when logical-decoding fixes are absent."""
     server_version = connection.server_version
     if server_version < MIN_SUPPORTED_POSTGRES_VERSION:
         raise UnsupportedPostgresVersionError(
-            'PostgreSQL 11.2 or later is required; '
+            'PostgreSQL 14 or later is required; '
             f'connected server reports server_version_num {server_version}'
+        )
+    minimum = MIN_SAFE_POSTGRES_VERSIONS.get(server_version // 10000, MIN_SUPPORTED_POSTGRES_VERSION)
+    if server_version < minimum:
+        LOGGER.warning(
+            'PostgreSQL server_version_num %s predates the logical-decoding catalog-cache fixes in '
+            '14.18, 15.13, 16.9, and 17.5. wal2json and pgoutput may omit or misdecode changes; '
+            'upgrade to a fixed minor release.',
+            server_version,
         )
 
 
@@ -50,7 +80,7 @@ def fully_qualified_table_name(schema, table):
     return f'"{canonicalize_identifier(schema)}"."{canonicalize_identifier(table)}"'
 
 
-def open_connection(conn_config, logical_replication=False, prioritize_primary=False):
+def open_connection(conn_config, logical_replication=False, prioritize_primary=False, replication_plugin='pgoutput'):
     cfg = {
         'application_name': 'pipelinewise',
         'host': conn_config['host'],
@@ -73,16 +103,44 @@ def open_connection(conn_config, logical_replication=False, prioritize_primary=F
         cfg['sslmode'] = conn_config['sslmode']
 
     if logical_replication:
-        cfg['connection_factory'] = psycopg2.extras.LogicalReplicationConnection
+        # pgoutput text fields use the replication session's output settings.
+        # Pin stable, lossless formats that match PostgreSQL's logical receiver.
+        cfg['options'] = (
+            '-crow_security=off '
+            '-cdatestyle=ISO -cintervalstyle=postgres -cextra_float_digits=3'
+        )
+        if replication_plugin == 'pgoutput':
+            cfg['options'] += ' -cclient_encoding=UTF8'
 
-    conn = psycopg2.connect(**cfg)
+    conn = ReplicationConnection(**cfg) if logical_replication else psycopg2.connect(**cfg)
     try:
         validate_server_version(conn)
     except UnsupportedPostgresVersionError:
         conn.close()
         raise
 
+    if logical_replication and replication_plugin == 'wal2json':
+        # wal2json emits bytes in the database encoding, unlike pgoutput's
+        # client-encoding conversion. psycopg must decode the same encoding.
+        conn.set_client_encoding(conn.get_parameter_status('server_encoding'))
+
     return conn
+
+
+def capture_snapshot_boundary(conn_config):
+    """Return a flushed WAL record boundary that an idle replica can reach."""
+    conn = open_connection(conn_config, prioritize_primary=True)
+    try:
+        with conn.cursor() as cur:
+            require_logical_message_privilege(cur)
+            cur.execute('SET LOCAL synchronous_commit = on')
+            cur.execute("SELECT pg_logical_emit_message(true, 'pipelinewise_snapshot', '')::text")
+            lsn = cur.fetchone()[0]
+        conn.commit()
+        high, low = lsn.split('/')
+        return (int(high, 16) << 32) + int(low, 16)
+    finally:
+        conn.close()
 
 
 def prepare_columns_for_select_sql(c, md_map):
@@ -160,14 +218,14 @@ def selected_value_to_singer_value_impl(elem, sql_datatype):  # noqa: C901
     elif isinstance(elem, str):
         cleaned_elem = elem
     elif isinstance(elem, decimal.Decimal):
-        # NB> We cast NaN's to NULL as wal2json does not support them and now we are at least consistent(ly wrong)
+        # Keep full-table and incremental output consistent with logical replication:
+        # non-finite numeric values cannot be represented safely in Singer JSON.
         if elem.is_nan():
             cleaned_elem = None
         else:
             cleaned_elem = elem
     elif isinstance(elem, float):
-        # NB> We cast NaN's, +Inf, -Inf to NULL as wal2json does not support them and
-        # now we are at least consistent(ly wrong)
+        # Keep full-table and incremental output consistent with logical replication.
         if math.isnan(elem):
             cleaned_elem = None
         elif math.isinf(elem):
@@ -217,14 +275,18 @@ def selected_row_to_singer_message(stream, row, version, columns, time_extracted
         time_extracted=time_extracted)
 
 
-def hstore_available(conn_info):
-    with open_connection(conn_info) as conn:
+def hstore_available(conn_info, connection=None):
+    conn = connection if connection is not None else open_connection(conn_info)
+    try:
         with conn.cursor(cursor_factory=psycopg2.extras.DictCursor, name='stitch_cursor') as cur:
             cur.execute(""" SELECT installed_version FROM pg_available_extensions WHERE name = 'hstore' """)
             res = cur.fetchone()
             if res and res[0]:
                 return True
             return False
+    finally:
+        if connection is None:
+            conn.close()
 
 
 def compute_tap_stream_id(schema_name, table_name):

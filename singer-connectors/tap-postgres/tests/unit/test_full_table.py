@@ -1,7 +1,8 @@
 from unittest import TestCase
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from tap_postgres.sync_strategies.full_table import sync_view
+from tap_postgres.sync_strategies import full_table
 
 from tests.utils import MockedConnect
 
@@ -14,7 +15,7 @@ class TestFullTable(TestCase):
         super(TestFullTable, cls).setUpClass()
         cls.patcher = patch('psycopg2.connect')
         mocked_connect = cls.patcher.start()
-        mocked_connect.return_value.server_version = 110002
+        mocked_connect.return_value.server_version = 140018
         mocked_connect.return_value.__enter__.return_value = MockedConnect()
 
     @classmethod
@@ -57,3 +58,32 @@ class TestFullTable(TestCase):
             mocked_time.return_value = mocked_time_value
             actual_output = sync_view(self.conn_config, stream, state, desired_columns, md_map)
             self.assertEqual(expected_output_without_version, actual_output)
+
+    @patch('tap_postgres.sync_strategies.full_table.post_db.open_connection')
+    @patch('tap_postgres.sync_strategies.logical_replication.wait_for_replica_replay')
+    @patch('tap_postgres.sync_strategies.full_table._sync_table')
+    def test_replica_wait_uses_the_snapshot_connection(self, snapshot, wait, connect):
+        connection = connect.return_value
+        calls = MagicMock()
+        calls.attach_mock(wait, 'wait')
+        calls.attach_mock(snapshot, 'snapshot')
+
+        stream = {'tap_stream_id': 'test'}
+        state = {}
+        full_table.sync_table(self.conn_config, stream, state, [], {}, snapshot_lsn=123)
+
+        wait.assert_called_once_with(self.conn_config, 123, connection=connection)
+        snapshot.assert_called_once_with(self.conn_config, connection, stream, state, [], {})
+        self.assertEqual(state, {'bookmarks': {'test': {'lsn': 123}}})
+        self.assertEqual(['wait', 'snapshot'], [call[0] for call in calls.mock_calls])
+        connection.close.assert_called_once_with()
+
+    @patch('tap_postgres.sync_strategies.full_table.post_db.open_connection')
+    @patch('tap_postgres.sync_strategies.logical_replication.wait_for_replica_replay')
+    @patch('tap_postgres.sync_strategies.full_table._sync_table')
+    def test_replica_timeout_does_not_emit_snapshot_or_state(self, snapshot, wait, connect):
+        wait.side_effect = TimeoutError('replica has not caught up')
+        with self.assertRaises(TimeoutError):
+            full_table.sync_table(self.conn_config, {}, {}, [], {}, snapshot_lsn=123)
+        snapshot.assert_not_called()
+        connect.return_value.close.assert_called_once_with()

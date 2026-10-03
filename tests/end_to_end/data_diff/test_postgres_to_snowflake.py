@@ -170,6 +170,8 @@ class TestPostgresToSnowflakeDataDiff:
         if not self.e2e.env['TARGET_SNOWFLAKE']['is_configured']:
             pytest.skip('TARGET_SNOWFLAKE credentials are not configured')
 
+        # Every case recreates source relations and the target, so their old bookmarks are invalid.
+        self.e2e.remove_dir_from_config_dir(f'{TARGET_ID}/{TAP_ID}')
         self.run_source_query = self.e2e.run_query_tap_postgres
         self.run_target_query = self.e2e.run_query_target_snowflake
         self.run_backend_query = self.e2e.run_query_pipelinewise_backend

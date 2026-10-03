@@ -238,6 +238,7 @@ def test_snowflake_e2e_matrix_contract():
             'e2e_tests_02',
             (
                 'tests/end_to_end/target_snowflake/test_native_to_iceberg_converter.py',
+                'tests/end_to_end/target_snowflake/tap_postgres/test_pgoutput_migration_to_sf.py',
                 'tests/end_to_end/data_diff/test_mysql_to_snowflake.py',
             ),
         ),
@@ -246,6 +247,7 @@ def test_snowflake_e2e_matrix_contract():
             (
                 'tests/end_to_end/target_snowflake/tap_postgres/test_snowflake_iceberg_publisher.py',
                 'tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_replica_to_sf.py',
+                'tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_with_custom_buffer_size.py',
             ),
         ),
         'pg-partial': (
@@ -253,7 +255,6 @@ def test_snowflake_e2e_matrix_contract():
             (
                 'tests/end_to_end/target_snowflake/tap_postgres/test_partial_sync_pg_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_postgres/test_multiline_native_pg_to_sf.py',
-                'tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_with_custom_buffer_size.py',
                 'tests/end_to_end/data_diff/test_postgres_to_snowflake.py',
             ),
         ),
@@ -404,13 +405,17 @@ def test_snowflake_e2e_matrix_contract():
         '-e PIPELINEWISE_E2E_NAMESPACE=$PIPELINEWISE_E2E_NAMESPACE'
         in target_pg_commands
     )
+    assert 'tests/end_to_end/test_postgres_master_upgrade.py' in target_pg_commands
+    baseline_step = next(step for step in target_pg_job['steps']
+                         if step.get('name') == 'Prepare the pre-migration master tap')
+    assert 'git archive 6d7a02b5e6965eb03937f6de1946c207d1be2c1c:' in baseline_step['run']
     readiness_steps = [
         step
         for configured_job in jobs.values()
         for step in configured_job['steps']
         if step.get('name') == 'Wait for test containers to be ready'
     ]
-    assert len(readiness_steps) == 2
+    assert len(readiness_steps) == 3
     for readiness_step in readiness_steps:
         assert 'docker logs --tail 50 pipelinewise' in readiness_step['run']
         assert 'sleep 5' in readiness_step['run']
@@ -448,6 +453,26 @@ def test_required_e2e_status_contract():
         'e2e_tests_pg_to_sf',
         'e2e_tests_s3_to_sf',
     }.intersection(configured_names)
+
+
+def test_postgres_migration_version_smoke_contract():
+    """Supported production and latest PostgreSQL majors run required migration smoke tests."""
+    workflow = yaml.safe_load(E2E_WORKFLOW.read_text(encoding='utf-8'))
+    rules = yaml.safe_load(TW_RULES.read_text(encoding='utf-8'))
+    job = workflow['jobs']['postgres_migration_smoke']
+
+    assert job['name'] == 'pg_migration_smoke_${{ matrix.postgres_major }}'
+    assert job['strategy']['fail-fast'] is False
+    assert job['strategy']['matrix']['postgres_major'] == [15, 18]
+    commands = '\n'.join(step.get('run', '') for step in job['steps'])
+    assert 'docker-compose.pg-version-smoke.yml' in commands
+    assert (
+        'test_idle_migration_promotes_then_waits_for_published_commit' in commands
+    )
+
+    configured_checks = rules['actions']['branch-protection-settings']['branches'][0]['checks']
+    configured_names = {check['name'] for check in configured_checks}
+    assert {'pg_migration_smoke_15', 'pg_migration_smoke_18'} <= configured_names
 
 
 def test_snowflake_e2e_matrix_preflight_once():

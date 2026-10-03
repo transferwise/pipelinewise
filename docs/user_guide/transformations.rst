@@ -147,6 +147,13 @@ Conditions can inspect a top-level column. Nested ``field_path`` conditions are
 subject to the FastSync-route restriction above. Multiple entries use logical
 AND.
 
+PostgreSQL LOG_BASED updates can omit unchanged large columns. Conditional
+Singer transformations reject an incomplete update if its transformed field or
+any condition column changes without all required columns. This prevents raw
+values from passing through when a condition cannot be evaluated. Use
+unconditional masking or a replication method that reads complete rows. See
+:ref:`tap-postgres` for PATCH limitations and recovery.
+
 
 Snowflake FastSync semantics
 ----------------------------

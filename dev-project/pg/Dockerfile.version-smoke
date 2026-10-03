@@ -1,0 +1,11 @@
+ARG POSTGRES_MAJOR=16
+FROM postgres:${POSTGRES_MAJOR}-bookworm
+
+ARG POSTGRES_MAJOR
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-${POSTGRES_MAJOR}-wal2json \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --chown=postgres:postgres server.crt /var/lib/postgresql/server.crt
+COPY --chown=postgres:postgres --chmod=600 server.key /var/lib/postgresql/server.key

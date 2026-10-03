@@ -11,6 +11,10 @@ from collections.abc import MutableMapping
 from singer import get_logger
 
 
+RECORD_UPDATE_MODE_SCHEMA_KEY = 'x-pipelinewise-record-update-mode'
+RECORD_UPDATE_MODE_PATCH = 'PATCH'
+
+
 def validate_config(config):
     errors = []
     required_config_keys = [
@@ -202,6 +206,7 @@ class DbSync:
         """
         self.connection_config = connection_config
         self.stream_schema_message = stream_schema_message
+        self.record_update_mode = None
 
         # logger to be used across the class's methods
         self.logger = get_logger('target_postgres')
@@ -283,6 +288,7 @@ class DbSync:
             self.data_flattening_max_level = self.connection_config.get('data_flattening_max_level', 0)
             self.flatten_schema = flatten_schema(stream_schema_message['schema'],
                                                  max_level=self.data_flattening_max_level)
+            self.record_update_mode = stream_schema_message['schema'].get(RECORD_UPDATE_MODE_SCHEMA_KEY)
 
     def open_connection(self):
         conn_string = "host='{}' dbname='{}' user='{}' password='{}' port='{}'".format(
@@ -329,14 +335,16 @@ class DbSync:
         if len(self.stream_schema_message['key_properties']) == 0:
             return None
         flatten = flatten_record(record, self.flatten_schema, max_level=self.data_flattening_max_level)
-        try:
-            key_props = [str(flatten[p]) for p in self.stream_schema_message['key_properties']]
-        except Exception as exc:
-            self.logger.info("Cannot find %s primary key(s) in record: %s",
-                             self.stream_schema_message['key_properties'],
-                             flatten)
-            raise exc
-        return ','.join(key_props)
+        key_props = []
+        for key_prop in self.stream_schema_message['key_properties']:
+            if key_prop not in flatten or flatten[key_prop] is None:
+                raise ValueError(
+                    f"Primary key '{key_prop}' is missing or null. Available fields: {list(flatten)}"
+                )
+            key_props.append(str(flatten[key_prop]))
+
+        # Delimiters inside values must not merge records with different composite keys.
+        return json.dumps(key_props, ensure_ascii=False, separators=(',', ':'))
 
     def record_to_csv_line(self, record):
         flatten = flatten_record(record, self.flatten_schema, max_level=self.data_flattening_max_level)
@@ -348,7 +356,23 @@ class DbSync:
             ]
         )
 
-    def load_csv(self, file, count, size_bytes):
+    def present_column_names(self, record):
+        """Return flattened schema columns represented by a PATCH record."""
+        schema_properties = self.stream_schema_message['schema'].get('properties', {})
+        present_schema = {
+            'properties': {
+                name: schema_properties[name]
+                for name in record
+                if name in schema_properties
+            }
+        }
+        present_flatten_schema = flatten_schema(
+            present_schema,
+            max_level=self.data_flattening_max_level,
+        )
+        return tuple(name for name in self.flatten_schema if name in present_flatten_schema)
+
+    def load_csv(self, file, count, size_bytes, update_column_names=None):
         stream_schema_message = self.stream_schema_message
         stream = stream_schema_message['stream']
         self.logger.info("Loading %d rows into '%s'", count, self.table_name(stream, False))
@@ -369,7 +393,7 @@ class DbSync:
                 with open(file, "rb") as f:
                     cur.copy_expert(copy_sql, f)
                 if len(self.stream_schema_message['key_properties']) > 0:
-                    cur.execute(self.update_from_temp_table(temp_table))
+                    cur.execute(self.update_from_temp_table(temp_table, update_column_names))
                     updates = cur.rowcount
                 cur.execute(self.insert_from_temp_table(temp_table))
                 inserts = cur.rowcount
@@ -399,9 +423,17 @@ class DbSync:
                    self.primary_key_condition('t'),
                    self.primary_key_null_condition('t'))
 
-    def update_from_temp_table(self, temp_table):
+    def update_from_temp_table(self, temp_table, update_column_names=None):
         stream_schema_message = self.stream_schema_message
-        columns = self.column_names()
+        if update_column_names is None:
+            columns = self.column_names()
+        else:
+            primary_key_names = set(stream_schema_message['key_properties'])
+            columns = [
+                safe_column_name(name)
+                for name in self.flatten_schema
+                if name in update_column_names and name not in primary_key_names
+            ]
         table = self.table_name(stream_schema_message['stream'])
 
         return """UPDATE {} SET {} FROM {} s

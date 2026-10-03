@@ -364,6 +364,7 @@ logical streaming requires a stream_abort_cb callback
     logical streaming requires a stream_abort_cb callback
 
 *Why it happens:*
+This applies to the wal2json bridge during the 0.94.0 migration.
 PostgreSQL can start streaming an in-progress transaction when decoded changes
 exceed ``logical_decoding_work_mem``. On affected PostgreSQL and wal2json
 combinations, aborting that transaction can expose a missing wal2json streaming
