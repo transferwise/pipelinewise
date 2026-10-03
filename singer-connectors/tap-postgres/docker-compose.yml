@@ -1,36 +1,38 @@
-version: "3.3"
-
 services:
   db_primary:
-    container_name: "primary"
     build:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "5432:5432"
+      - "${TAP_POSTGRES_TEST_PRIMARY_PORT:-5432}:5432"
     environment:
-      - POSTGRESQL_REPLICATION_MODE=master
-      - POSTGRESQL_REPLICATION_USER=repl_user
-      - POSTGRESQL_REPLICATION_PASSWORD=repl_password
-      - POSTGRES_USER=test_user
-      - POSTGRES_PASSWORD=my-secret-passwd
-      - POSTGRESQL_POSTGRES_PASSWORD=my-secret-passwd
-      - POSTGRESQL_DATABASE=tap_postgres_test
-      - ALLOW_EMPTY_PASSWORD=yes
+      POSTGRES_PASSWORD: my-secret-passwd
+      POSTGRES_DB: tap_postgres_test
+    command: [postgres, -c, config_file=/etc/postgresql/postgresql.conf]
     volumes:
-      -  ./db_setup/config:/bitnami/postgresql/conf
+      - ./db_setup/config/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - ./db_setup/initialize-primary.sh:/docker-entrypoint-initdb.d/initialize-primary.sh:ro
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -h 127.0.0.1 -U postgres -d tap_postgres_test && test -f "$${PGDATA}/primary_ready"']
+      interval: 2s
+      timeout: 5s
+      retries: 60
 
   db_replica:
-    image: "docker.io/bitnami/postgresql:12"
-    container_name: replica
+    image: postgres:14-bookworm
     ports:
-      - "5433:5432"
+      - "${TAP_POSTGRES_TEST_SECONDARY_PORT:-5433}:5432"
     depends_on:
-      - db_primary
+      db_primary:
+        condition: service_healthy
     environment:
-      - POSTGRESQL_REPLICATION_MODE=slave
-      - POSTGRESQL_REPLICATION_USER=repl_user
-      - POSTGRESQL_REPLICATION_PASSWORD=repl_password
-      - POSTGRESQL_MASTER_HOST=db_primary
-      - POSTGRESQL_MASTER_PORT_NUMBER=5432
-      - ALLOW_EMPTY_PASSWORD=yes
+      PGPASSWORD: repl_password
+    entrypoint: [bash, /initialize-replica.sh]
+    volumes:
+      - ./db_setup/initialize-replica.sh:/initialize-replica.sh:ro
+      - ./db_setup/config/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U repl_user -d tap_postgres_test']
+      interval: 2s
+      timeout: 5s
+      retries: 60

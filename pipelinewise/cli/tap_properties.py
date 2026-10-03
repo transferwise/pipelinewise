@@ -113,6 +113,7 @@ def get_tap_properties(tap=None, temp_dir=None):
                 'tap_id': tap['id']
                 if tap
                 else None,
+                **({'previous_tap_id': tap['previous_tap_id']} if tap and tap.get('previous_tap_id') else {}),
             },
             'tap_stream_id_pattern': '{{schema_name}}-{{table_name}}',
             'tap_stream_name_pattern': '{{schema_name}}-{{table_name}}',

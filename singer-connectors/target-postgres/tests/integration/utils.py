@@ -1,5 +1,4 @@
 import os
-import json
 
 
 def get_db_config():
@@ -19,7 +18,6 @@ def get_db_config():
     config['dbname'] = os.environ.get('TARGET_POSTGRES_DBNAME')
     config['default_target_schema'] = os.environ.get("TARGET_POSTGRES_SCHEMA")
 
-
     # --------------------------------------------------------------------------
     # The following variables needs to be empty.
     # The tests cases will set them automatically whenever it's needed
@@ -28,7 +26,6 @@ def get_db_config():
     config['schema_mapping'] = None
     config['add_metadata_columns'] = None
     config['flush_all_streams'] = None
-
 
     return config
 

@@ -375,6 +375,7 @@ project passes validation.
    removes that connector's generated directory, including every ``state.json``
    bookmark; removing a target removes all of its taps. Removing a PostgreSQL
    tap also drops its replication slot. Renaming an ``id`` has the same effect
-   as deleting the old connector and adding a new one. Stop the pipeline, back
+   as deleting the old connector and adding a new one, except for the explicit
+   PostgreSQL ``previous_tap_id`` migration in :ref:`postgres_tap_rename`. Stop the pipeline, back
    up its generated state, and plan a full initial sync before removing or
    renaming imported configuration.

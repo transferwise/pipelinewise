@@ -64,6 +64,11 @@ stream's acknowledged history. Unsupported binlog encodings and selected-table
 ``TRUNCATE`` stop replication; see :ref:`tap-mysql` for source settings and
 legacy-checkpoint recovery requirements.
 
+PostgreSQL uses pgoutput with commit-based LSN checkpoints. Release 0.94.0
+migrates dedicated wal2json slots; complete this before 0.95.0 removes wal2json.
+See :ref:`tap-postgres` for publication privileges, overlap replay and quiet-source
+run boundaries.
+
 .. warning::
 
    Losing a binlog, logical replication slot, WAL range, or change-stream token

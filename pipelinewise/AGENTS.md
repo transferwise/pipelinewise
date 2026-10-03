@@ -60,10 +60,22 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
 
 ## Runtime and data-diff constraints
 
-- PostgreSQL replication sources require 11.2 or later across Singer,
+- PostgreSQL replication sources require 14 or later across Singer,
   FullSync, and PartialSync. Keep the Singer and FastSync connection gates
   aligned; only deleted-tap slot cleanup may bypass the floor. PostgreSQL
   targets, the backend, and data-diff connections are separate.
+- Use `ppw_slot_<tap_id>` for pgoutput slots and publications. Bridge wal2json
+  to a numeric commit boundary, promote only after target acknowledgement, then
+  drop wal2json. Replay from the original pgoutput position without advancing
+  its feedback during overlap. Keep bookmarks monotonic. Clear migration state
+  only after a decoded commit crosses the bridge and the target acknowledges it.
+- Keep the existing LSN/commit and idle-timeout run boundaries. Do not enable
+  pgoutput `messages=true` in this release. Quiet sources may retain the overlap
+  marker until a later published transaction commits.
+- Freeze publication changes during migration. Reconcile persistent selection
+  on import, removing only tracked members after invalidating their bookmarks.
+  Prepare publication additions before FastSync. Whole-tap FastSync resets both
+  dedicated slot types and state together.
 - Source deletes are always physical. Silently ignore retired deletion-mode
   options in YAML and bundled PostgreSQL/Snowflake target JSON; do not require
   reimport or warn. Keep `_SDC_DELETED_AT` as the internal deletion marker,

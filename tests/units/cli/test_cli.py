@@ -20,6 +20,7 @@ from pipelinewise.cli.config import Config
 from pipelinewise.cli.fastsync_capabilities import FastSyncCapabilities
 from pipelinewise.cli.pipelinewise import FASTSYNC_PAIRS, PipelineWise
 from pipelinewise.fastsync.commons import utils as fastsync_utils
+from pipelinewise.fastsync.commons.tap_postgres import PGOUTPUT_MIGRATION_STATE_KEY
 from pipelinewise.fastsync import postgres_to_snowflake
 from pipelinewise.cli.errors import (
     DuplicateConfigException,
@@ -116,25 +117,37 @@ class TestCli:
             pipelinewise.sync_tables_fast_sync(selected_tables)
         mocked_fastsync.assert_called_once()
 
-    def _assert_import_command(self, args):
+    def _assert_import_command(self, args, tmp_path):
         if '*' in args.taps.split(','):
             expected_taps = ['tap_one', 'tap_two', 'tap_three']
             expected_save_arg = ['*']
         else:
             expected_save_arg = expected_taps = args.taps.split(',')
 
+        config_dir = tmp_path / 'runtime'
+        config_dir.mkdir()
+        (config_dir / 'config.json').write_text('{"targets": []}', encoding='utf-8')
+        config_save = Config.save
         with patch.object(PipelineWise, '_discover_tap') as mocked_parallel:
-            with patch.object(Config, 'save') as mocked_config_save:
-                pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
+            with patch.object(Config, 'save', autospec=True) as mocked_config_save, patch.object(
+                PipelineWise, '_reconcile_postgres_pgoutput_publication'
+            ) as reconcile_publication:
+                mocked_config_save.side_effect = config_save
+                pipelinewise = PipelineWise(args, str(config_dir), VIRTUALENVS_DIR)
                 mocked_parallel.return_value = None
 
                 pipelinewise.import_project()
 
-                mocked_config_save.assert_called_with(expected_save_arg)
+                assert mocked_config_save.call_args.args[1] == expected_save_arg
 
                 assert mocked_parallel.call_count == len(expected_taps)
                 for call_arg in mocked_parallel.call_args_list:
                     assert call_arg[1]['tap']['id'] in expected_taps
+                reconcile_publication.assert_has_calls([
+                    call(call_arg.kwargs['tap'])
+                    for call_arg in mocked_parallel.call_args_list
+                    if call_arg.kwargs['tap']['type'] == ConnectorType.TAP_POSTGRES.value
+                ])
 
     @staticmethod
     def _import_salesforce_iceberg(config_dir: Path) -> PipelineWise:
@@ -644,23 +657,23 @@ class TestCli:
         assert pytest_wrapped_e.type is SystemExit
         assert pytest_wrapped_e.value.code == 1
 
-    def test_command_import_all_taps(self):
+    def test_command_import_all_taps(self, tmp_path):
         """Test import_config command for all taps"""
         args = CliArgs(dir=f'{os.path.dirname(__file__)}/resources/test_import_command')
-        self._assert_import_command(args)
+        self._assert_import_command(args, tmp_path)
 
-    def test_command_import_selected_taps(self):
+    def test_command_import_selected_taps(self, tmp_path):
         """Test import_config command for selected taps"""
         args = CliArgs(dir=f'{os.path.dirname(__file__)}/resources/test_import_command', taps='tap_one,tap_three')
-        self._assert_import_command(args)
+        self._assert_import_command(args, tmp_path)
 
-    def test_command_import_wildcard_with_selected_tap(self):
+    def test_command_import_wildcard_with_selected_tap(self, tmp_path):
         """A wildcard combined with a tap still imports every tap."""
         args = CliArgs(
             dir=f'{os.path.dirname(__file__)}/resources/test_import_command',
             taps='*,tap_one',
         )
-        self._assert_import_command(args)
+        self._assert_import_command(args, tmp_path)
 
     def test_import_accepts_salesforce_iceberg_and_generates_target_runtime(self, tmp_path):
         """Singer-only Iceberg settings are generated for target-snowflake, not the tap."""
@@ -970,12 +983,17 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         with patch('pipelinewise.cli.pipelinewise.pidfile.PIDFile'), patch.object(
             pipelinewise, '_preflight_postgres_slot_reset', return_value=({'tap': 'config'}, {}),
         ), patch.object(
+            pipelinewise, '_prepare_postgres_pgoutput_publication',
+        ) as prepare_publication, patch.object(
+            pipelinewise, '_postgres_tap_has_log_based_selection', return_value=True,
+        ), patch.object(
             pipelinewise, '_clear_tap_bookmarks_before_postgres_slot_reset',
-        ) as clear_bookmarks, patch(
+        ) as clear_bookmarks, patch.object(pipelinewise, '_finish_postgres_slot_reset'), patch(
             'pipelinewise.cli.pipelinewise.FastSyncTapPostgres.reset_slot',
         ) as reset_slot, patch(
             'pipelinewise.cli.pipelinewise.Process',
         ) as process:
+            calls.attach_mock(prepare_publication, 'prepare_publication')
             calls.attach_mock(clear_bookmarks, 'clear_bookmarks')
             calls.attach_mock(reset_slot, 'reset_slot')
             calls.attach_mock(process, 'process')
@@ -985,7 +1003,8 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
             pipelinewise.fast_sync()
 
         reset_slot.assert_called_once_with({'tap': 'config'}, before_reset=clear_bookmarks)
-        assert calls.mock_calls[:2] == [
+        assert calls.mock_calls[:3] == [
+            call.prepare_publication(fresh_start=True),
             call.reset_slot({'tap': 'config'}, before_reset=clear_bookmarks),
             call.clear_bookmarks(),
         ]
@@ -1009,7 +1028,8 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         state_path = pipelinewise.tap['files']['state']
         self._make_sample_state_file(state_path)
         original_state = fastsync_utils.load_json(state_path)
-        with patch.object(pipelinewise, '_check_if_complete_tap_configuration') as check_executable, patch.object(
+        with patch.object(pipelinewise, '_postgres_tap_has_log_based_selection', return_value=True), patch.object(
+            pipelinewise, '_check_if_complete_tap_configuration') as check_executable, patch.object(
             pipelinewise, '_get_sync_tables_setting_from_selection_file', return_value=selected,
         ), patch.object(
             pipelinewise, '_load_required_json_object',
@@ -1020,13 +1040,16 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
             'pipelinewise.fastsync.postgres_to_snowflake.get_tables_size',
             return_value=[{'table_name': 'public.full', 'table_size': 11},
                           {'table_name': 'public.partial', 'table_size': 100}],
-        ) as sizes, patch('pipelinewise.cli.pipelinewise.FastSyncTapPostgres.reset_slot') as reset_slot, patch(
+        ) as sizes, patch('pipelinewise.cli.pipelinewise.FastSyncTapPostgres.reset_slot', return_value=None) as reset_slot, patch(
+            'pipelinewise.cli.pipelinewise.PipelineWise._prepare_postgres_pgoutput_publication',
+        ) as prepare_publication, patch(
             'pipelinewise.cli.pipelinewise.Process',
         ) as process:
             process.return_value.exception = None
             process.return_value.exitcode = 0
             if force:
                 pipelinewise.do_sync_tables(reset_postgres_slot=True)
+                prepare_publication.assert_called_once_with(fresh_start=True)
                 reset_slot.assert_called_once()
                 sizes.assert_not_called()
                 assert process.call_count == 2
@@ -1034,6 +1057,7 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
                 with pytest.raises(PreRunChecksException, match='No source or state changes were made'):
                     pipelinewise.do_sync_tables(reset_postgres_slot=True)
                 sizes.assert_called_once()
+                prepare_publication.assert_not_called()
                 reset_slot.assert_not_called()
                 process.assert_not_called()
                 assert fastsync_utils.load_json(state_path) == original_state
@@ -1046,8 +1070,10 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
     @pytest.mark.parametrize(
         'failure, invalidated, statement_count',
         [
-            ('connect', False, 0), ('inspect', False, 1), ('legacy', False, 1),
+            ('connect', False, 0), ('inspect', False, 1), ('plugin', False, 1),
             ('active', False, 1), ('backup', False, 1), ('save_state', False, 1),
+            ('fresh_drop', True, 2), ('fresh_drop_response', True, 2),
+            ('fresh_create', True, 3), ('fresh_create_response', True, 3),
             ('drop', True, 2), ('drop_response', True, 2), ('create', True, 3), ('create_response', True, 3),
         ],
     )
@@ -1063,9 +1089,23 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         fastsync_utils.save_dict_to_json(state_path, original)
         connection = MagicMock()
         cursor = connection.cursor.return_value.__enter__.return_value
-        cursor.fetchall.return_value = [('pipelinewise_my_db_my_tap', 'my_db', 'wal2json', failure == 'active')]
-        if failure == 'legacy':
-            cursor.fetchall.return_value.append(('pipelinewise_my_db', 'my_db', 'wal2json', False))
+        if failure.startswith('fresh_'):
+            cursor.fetchall.return_value = [('pipelinewise_my_db_my_tap', 'my_db', 'wal2json', False)]
+        else:
+            cursor.fetchall.return_value = [(
+                'ppw_slot_my_tap', 'my_db',
+                'wal2json' if failure == 'plugin' else 'pgoutput',
+                failure == 'active',
+            )]
+
+        reset_state = {
+            'bookmarks': {}, 'currently_syncing': None,
+            '_pipelinewise_pgoutput_fresh_start': {
+                'version': 1, 'destination_slot': 'ppw_slot_my_tap',
+                'wal2json_slot': 'pipelinewise_my_db_my_tap' if failure.startswith('fresh_') else None,
+            },
+        }
+        source_failure = failure.removeprefix('fresh_')
 
         def execute(sql, _params):
             state = fastsync_utils.load_json(state_path)
@@ -1074,15 +1114,15 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
                 if failure == 'inspect':
                     raise psycopg2.OperationalError('source inspection failed')
             else:
-                assert state == {'bookmarks': {}, 'currently_syncing': None}
+                assert state == reset_state
                 backups = list(tmp_path.glob('state.json.before-slot-reset-*.bak'))
                 assert len(backups) == 1
                 assert fastsync_utils.load_json(backups[0]) == original
-                if failure == 'drop' and 'pg_drop_' in sql:
+                if source_failure == 'drop' and 'pg_drop_' in sql:
                     raise psycopg2.errors.ObjectInUse('slot became active after preflight')
-                if failure == 'create' and 'pg_create_' in sql:
+                if source_failure == 'create' and 'pg_create_' in sql:
                     raise psycopg2.errors.InsufficientPrivilege('creation denied')
-                if failure.removesuffix('_response') in sql and failure.endswith('_response'):
+                if source_failure.removesuffix('_response') in sql and source_failure.endswith('_response'):
                     raise psycopg2.OperationalError('server response lost')
 
         def save_state(path, state):
@@ -1095,6 +1135,8 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         with patch.object(
             pipelinewise, '_preflight_postgres_slot_reset',
             return_value=({'dbname': 'my_db', 'tap_id': 'my_tap'}, {}),
+        ), patch.object(
+            pipelinewise, '_prepare_postgres_pgoutput_publication',
         ), patch(
             'pipelinewise.cli.pipelinewise.FastSyncTapPostgres.get_connection', return_value=connection,
         ) as connect, patch(
@@ -1108,11 +1150,11 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         process.assert_not_called()
         assert cursor.execute.call_count == statement_count
         state = fastsync_utils.load_json(state_path)
-        assert state == ({'bookmarks': {}, 'currently_syncing': None} if invalidated else original)
+        assert state == (reset_state if invalidated else original)
         backups = list(tmp_path.glob('state.json.before-slot-reset-*.bak'))
         assert len(backups) == int(invalidated or failure == 'save_state')
         if invalidated:
-            assert f'failed during {failure.split("_")[0]}' in str(error.value)
+            assert f'failed during {source_failure.split("_")[0]}' in str(error.value)
             assert 'Do not restore old LOG_BASED bookmarks' in str(error.value)
             assert str(backups[0]) in str(error.value)
         if failure != 'connect':
@@ -1127,7 +1169,7 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         with patch.object(
             pipelinewise, '_clear_tap_bookmarks_before_postgres_slot_reset'
         ) as clear_bookmarks, patch(
-            'pipelinewise.cli.pipelinewise.FastSyncTapPostgres.reset_slot'
+            'pipelinewise.cli.pipelinewise.FastSyncTapPostgres.reset_slot', return_value=None
         ) as reset_slot, patch(
             'pipelinewise.cli.pipelinewise.Process'
         ) as process:
@@ -1203,20 +1245,24 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         ), patch.object(
             pipelinewise, '_preflight_postgres_slot_reset', return_value=({}, target_config),
         ), patch.object(
+            pipelinewise, '_prepare_postgres_pgoutput_publication',
+        ) as prepare_publication, patch.object(
             pipelinewise, '_clear_tap_bookmarks_before_postgres_slot_reset'
         ) as clear_bookmarks, patch(
-            'pipelinewise.cli.pipelinewise.FastSyncTapPostgres.reset_slot'
+            'pipelinewise.cli.pipelinewise.FastSyncTapPostgres.reset_slot', return_value=None
         ) as reset_slot, patch('pipelinewise.cli.pipelinewise.Process') as process:
             process.return_value.exception = None
             process.return_value.exitcode = 0
             if pending:
                 with pytest.raises(PreRunChecksException, match='Iceberg publication or conversion attempt is pending'):
                     pipelinewise.do_sync_tables(reset_postgres_slot=True)
+                prepare_publication.assert_not_called()
                 clear_bookmarks.assert_not_called()
                 reset_slot.assert_not_called()
                 process.assert_not_called()
             else:
                 pipelinewise.do_sync_tables(reset_postgres_slot=True)
+                prepare_publication.assert_called_once_with(fresh_start=True)
                 reset_slot.assert_called_once()
                 assert process.call_count == 2
 
@@ -1231,12 +1277,38 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         assert store.load_fastsync_target_pointer.call_count == pointer_reads
         assert coordinator.table_lock.return_value.__exit__.call_count == 2
 
+    def test_publication_failure_aborts_before_slot_state_or_workers_change(self):
+        """Connector preflight failure leaves both reset boundary and workers untouched."""
+        pipelinewise = self._init_for_sync_tables_states_cleanup()
+        pipelinewise.tap['type'] = ConnectorType.TAP_POSTGRES.value
+        with patch.object(
+            pipelinewise, '_preflight_postgres_slot_reset', return_value=({}, {}),
+        ), patch.object(
+            pipelinewise,
+            '_prepare_postgres_pgoutput_publication',
+            side_effect=PreRunChecksException('publication failed'),
+        ), patch.object(
+            pipelinewise, '_clear_tap_bookmarks_before_postgres_slot_reset',
+        ) as clear_bookmarks, patch(
+            'pipelinewise.cli.pipelinewise.FastSyncTapPostgres.reset_slot',
+        ) as reset_slot, patch(
+            'pipelinewise.cli.pipelinewise.Process',
+        ) as process:
+            with pytest.raises(PreRunChecksException, match='publication failed'):
+                pipelinewise.do_sync_tables(reset_postgres_slot=True)
+
+        clear_bookmarks.assert_not_called()
+        reset_slot.assert_not_called()
+        process.assert_not_called()
+
     def test_clear_tap_bookmarks_before_postgres_slot_reset(self):
         """A failed worker launch cannot leave state pointing before the new slot."""
         pipelinewise = self._init_for_sync_tables_states_cleanup()
         state_path = pipelinewise.tap['files']['state']
         self._make_sample_state_file(state_path)
         original = fastsync_utils.load_json(state_path)
+        original[PGOUTPUT_MIGRATION_STATE_KEY] = {'phase': 'retire'}
+        fastsync_utils.save_dict_to_json(state_path, original)
 
         backup_path = pipelinewise._clear_tap_bookmarks_before_postgres_slot_reset()
 
@@ -1254,9 +1326,11 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         pipelinewise = self._init_for_sync_tables_states_cleanup()
         pipelinewise.tap['type'] = ConnectorType.TAP_POSTGRES.value
 
-        with patch(
-            'pipelinewise.cli.pipelinewise.FastSyncTapPostgres.reset_slot'
+        with patch('pipelinewise.cli.pipelinewise.FastSyncTapPostgres.ensure_replication_slot'), patch(
+            'pipelinewise.cli.pipelinewise.FastSyncTapPostgres.reset_slot', return_value=None
         ) as reset_slot, patch(
+            'pipelinewise.cli.pipelinewise.PipelineWise._prepare_postgres_pgoutput_publication',
+        ) as prepare_publication, patch(
             'pipelinewise.cli.pipelinewise.Process'
         ) as process:
             process.return_value.exception = None
@@ -1269,18 +1343,21 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
             )
 
         reset_slot.assert_not_called()
+        prepare_publication.assert_called_once_with()
 
     def test_partial_sync_retains_postgres_slot(self):
         """Standalone PartialSync never resets the logical replication slot."""
         pipelinewise = self._init_for_sync_tables_states_cleanup()
         pipelinewise.tap['type'] = ConnectorType.TAP_POSTGRES.value
 
-        with patch.object(
+        with patch('pipelinewise.cli.pipelinewise.FastSyncTapPostgres.ensure_replication_slot'), patch.object(
+            pipelinewise, '_prepare_postgres_pgoutput_publication',
+        ), patch.object(
             pipelinewise, '_check_if_complete_tap_configuration'
         ), patch.object(
             pipelinewise, 'run_tap_partialsync'
         ), patch(
-            'pipelinewise.cli.pipelinewise.FastSyncTapPostgres.reset_slot'
+            'pipelinewise.cli.pipelinewise.FastSyncTapPostgres.reset_slot', return_value=None
         ) as reset_slot:
             pipelinewise.sync_tables_partial_sync(
                 {

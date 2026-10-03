@@ -89,11 +89,12 @@ def test_filtered_flush_never_acknowledges_an_unloaded_stream(initial_state):
             {'parallelism': 1, 'batch_size_rows': 2, 'flush_all_streams': False}, interrupted_input(),
         )
 
-    assert [entry.args[0] for entry in load.call_args_list] == ['db-fast']
     emitted = [json.loads(line) for line in output.getvalue().splitlines()]
     if initial_state is None:
-        assert emitted == []
+        assert [entry.args[0] for entry in load.call_args_list] == ['db-slow', 'db-fast']
+        assert emitted == [{'bookmarks': {'db-slow': {'log_pos': 10}, 'db-fast': {'log_pos': 10}}}]
     else:
+        assert [entry.args[0] for entry in load.call_args_list] == ['db-fast']
         expected = copy.deepcopy(initial_state)
         expected['bookmarks']['db-fast']['log_pos'] = 10
         assert emitted == [expected]
@@ -127,11 +128,12 @@ def test_first_durable_checkpoint_uses_latest_state_not_first_buffered_state():
     messages = [schema_message(stream, ['id']) for stream in ['db-fast', 'db-slow']]
     messages.extend([
         record('db-fast', '1'),
+        record('db-slow', '1'),
         {'type': 'STATE', 'value': state(4)},
         record('db-fast', '2'),
         {'type': 'STATE', 'value': state(10)},
         record('db-fast', '3'),
-        record('db-slow', '1'),
+        record('db-slow', '2'),
         record('db-fast', '4'),
         record('db-fast', '5'),
         {'type': 'STATE', 'value': state(20)},
@@ -153,8 +155,46 @@ def test_first_durable_checkpoint_uses_latest_state_not_first_buffered_state():
     # The first flush drains all buffers; the second must retain the slow stream's safe baseline.
     expected = state(10)
     expected['bookmarks']['db-fast']['log_pos'] = 20
-    assert [entry.args[0] for entry in load.call_args_list] == ['db-fast', 'db-fast']
+    assert [entry.args[0] for entry in load.call_args_list] == ['db-fast', 'db-slow', 'db-fast']
     assert [json.loads(line) for line in output.getvalue().splitlines()] == [state(10), expected]
+
+
+@pytest.mark.parametrize('failure_stage', ['load', 'delete'])
+def test_initial_filtered_checkpoint_requires_every_pending_stream_to_succeed(failure_stage):
+    """A first filtered flush cannot acknowledge another stream whose load failed."""
+    messages = [schema_message(stream, ['id']) for stream in ['db-fast', 'db-slow']]
+    messages.extend([
+        {'type': 'RECORD', 'stream': 'db-fast', 'record': {'id': '1'}},
+        {'type': 'RECORD', 'stream': 'db-slow', 'record': {'id': '1'}},
+        {'type': 'STATE', 'value': {'bookmarks': {
+            'db-fast': {'lsn': 10}, 'db-slow': {'lsn': 10},
+        }}},
+        {'type': 'RECORD', 'stream': 'db-fast', 'record': {'id': '2'}},
+    ])
+
+    def create_db(config, schema, *args):
+        db = mock_db_sync(config, schema, *args)
+        if schema['stream'] == 'db-slow' and failure_stage == 'delete':
+            db.delete_rows.side_effect = RuntimeError('target unavailable')
+        return db
+
+    def load(stream, *_args):
+        if stream == 'db-slow' and failure_stage == 'load':
+            raise RuntimeError('target unavailable')
+
+    def interrupted_input():
+        yield from map(json.dumps, messages)
+        raise AssertionError('The first checkpoint must flush the slow stream before reading more input')
+
+    output = io.StringIO()
+    with patch('target_snowflake.DbSync', side_effect=create_db), \
+            patch('target_snowflake.flush_records', side_effect=load), redirect_stdout(output), \
+            pytest.raises(RuntimeError, match='target unavailable'):
+        target_snowflake.persist_lines(
+            {'parallelism': 1, 'batch_size_rows': 2, 'flush_all_streams': False}, interrupted_input(),
+        )
+
+    assert output.getvalue() == ''
 
 
 @pytest.mark.parametrize('failure_stage', ['load', 'delete'])

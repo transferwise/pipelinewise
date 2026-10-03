@@ -1,3 +1,27 @@
+0.94.0 (2026-10-03)
+-------------------
+
+- Switch PostgreSQL LOG_BASED replication to built-in pgoutput on PostgreSQL 14+.
+  Name slots and publications `ppw_slot_<tap_id>` and maintain selected tables
+  before FastSync and during configuration import
+- Migrate dedicated wal2json slots through a target-acknowledged bridge. Retire
+  wal2json after durable promotion, then replay overlap from the original
+  pgoutput position. Preserve unchanged large values and durable target state
+- Keep numeric LSN/commit boundaries without `messages=true`. Quiet sources can
+  wait for the idle timeout and a later published transaction to finish overlap
+- Reset dedicated wal2json slots during whole-tap FastSync. Support historical
+  tap-ID renames through `previous_tap_id` and reject unsafe migration inputs
+- Warn on PostgreSQL minors below 14.18, 15.13, 16.9 and 17.5, while allowing
+  connections. Require publication privileges and valid source primary keys
+- Add connector CI and PostgreSQL 15/18 migration E2E coverage. Rebalance E2E
+  shards to reduce completion time
+
+**Upgrade:** 0.94.0 is the migration release. Complete migration before 0.95.0,
+which will remove the migration and all wal2json code. Keep wal2json installed
+until migration finishes. This transition supports roll-forward recovery only.
+See the [PostgreSQL guide](docs/connectors/taps/postgres.rst) for privileges,
+publication changes, naming limits, quiet-source behaviour and recovery.
+
 0.93.0 (2026-09-28)
 -------------------
 

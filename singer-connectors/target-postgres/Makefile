@@ -5,20 +5,21 @@ venv:
 	pip install -e .[test]
 
 lint:
-	cd ../.. && singer-connectors/target-postgres/venv/bin/ruff check singer-connectors/target-postgres/target_postgres/
+	cd ../.. && singer-connectors/target-postgres/venv/bin/ruff check \
+		singer-connectors/target-postgres/target_postgres/ singer-connectors/target-postgres/tests/unit/ \
+		singer-connectors/target-postgres/tests/integration/
 
 unit_test:
 	. ./venv/bin/activate ;\
 	pytest --cov=target_postgres  --cov-fail-under=44 tests/unit -v
 
-env:
-  	export TARGET_POSTGRES_PORT=5432
-  	export TARGET_POSTGRES_DBNAME=target_db
-  	export TARGET_POSTGRES_USER=my_user
-  	export TARGET_POSTGRES_PASSWORD=secret
-  	export TARGET_POSTGRES_HOST=localhost
-  	export TARGET_POSTGRES_SCHEMA=public
+integration_test: export TARGET_POSTGRES_PORT ?= 5432
+integration_test: export TARGET_POSTGRES_DBNAME ?= target_db
+integration_test: export TARGET_POSTGRES_USER ?= my_user
+integration_test: export TARGET_POSTGRES_PASSWORD ?= secret
+integration_test: export TARGET_POSTGRES_HOST ?= localhost
+integration_test: export TARGET_POSTGRES_SCHEMA ?= target_postgres_ci
 
-integration_test: env
+integration_test:
 	. ./venv/bin/activate ;\
 	pytest tests/integration --cov=target_postgres  --cov-fail-under=87 -v

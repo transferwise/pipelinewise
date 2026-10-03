@@ -1,0 +1,25 @@
+services:
+  pipelinewise-postgres-source:
+    build:
+      context: ./pg
+      dockerfile: Dockerfile.version-smoke
+      args:
+        POSTGRES_MAJOR: ${POSTGRES_MAJOR}
+    command:
+      - postgres
+      - -c
+      - wal_level=logical
+      - -c
+      - max_replication_slots=10
+      - -c
+      - max_wal_senders=10
+      - -c
+      - output_plugin_libraries=pgoutput,wal2json
+      - -c
+      - ssl=on
+      - -c
+      - ssl_cert_file=/var/lib/postgresql/server.crt
+      - -c
+      - ssl_key_file=/var/lib/postgresql/server.key
+      - -c
+      - hba_file=/var/lib/postgresql/pg_hba.conf

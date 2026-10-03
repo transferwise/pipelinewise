@@ -26,8 +26,8 @@ RECORD_COUNT = 12050
 PAYLOAD_REPETITIONS = 4
 MIN_BUFFERED_BYTES = 1024 * 1024
 TEMPLATE_DIR = Path(__file__).parent / 'postgres_stream_buffer_test_project'
-LATEST_WAL_MESSAGE = re.compile(
-    r'La(?:s)?test wal message received was ([0-9A-F]+/[0-9A-F]+)',
+DECODED_BOUNDARY_MESSAGE = re.compile(
+    r'Reached pgoutput commit boundary at ([0-9A-F]+/[0-9A-F]+)',
     re.IGNORECASE,
 )
 
@@ -142,17 +142,29 @@ def _read_state(state_path):
         return json.load(state_file)
 
 
-def _slot_name(e2e):
+def _slot_name(_e2e):
     """Return the tap-specific PostgreSQL replication slot name."""
+    return f'ppw_slot_{TAP_ID}'
+
+
+def _wal2json_slot_name(e2e):
+    """Return the pre-pgoutput tap-specific replication slot name."""
     database = e2e.get_conn_env_var('TAP_POSTGRES', 'DB')
     return re.sub('[^a-z0-9_]', '_', f'pipelinewise_{database}_{TAP_ID}'.lower())
+
+
+def _legacy_wal2json_slot_name(e2e):
+    """Return the old database-wide slot name, which this test never owns."""
+    database = e2e.get_conn_env_var('TAP_POSTGRES', 'DB')
+    return re.sub('[^a-z0-9_]', '_', f'pipelinewise_{database}'.lower())
 
 
 def _slot_status(e2e, slot_name):
     """Return the slot boundary and sender high-water mark, if the slot exists."""
     rows = e2e.run_query_tap_postgres(
         """
-        SELECT slot.active,
+        SELECT slot.plugin,
+               slot.active,
                slot.active_pid,
                (slot.confirmed_flush_lsn - '0/0'::pg_lsn)::bigint,
                CASE WHEN sender.sent_lsn IS NULL THEN NULL
@@ -166,8 +178,9 @@ def _slot_status(e2e, slot_name):
     )
     if not rows:
         return None
-    active, active_pid, confirmed_flush_lsn, sent_lsn = rows[0]
+    plugin, active, active_pid, confirmed_flush_lsn, sent_lsn = rows[0]
     return {
+        'plugin': plugin,
         'active': active,
         'active_pid': active_pid,
         'confirmed_flush_lsn': int(confirmed_flush_lsn),
@@ -229,13 +242,11 @@ def _find_running_log(log_dir):
     return logs[0] if len(logs) == 1 else None
 
 
-def _latest_consumed_lsn(log_path, minimum_reports=1):
-    """Read WAL only after enough complete feedback polling cycles."""
-    matches = LATEST_WAL_MESSAGE.findall(
+def _latest_consumed_lsn(log_path):
+    """Return the latest exact pgoutput boundary decoded by the tap."""
+    matches = DECODED_BOUNDARY_MESSAGE.findall(
         log_path.read_text(encoding='utf-8')
     )
-    if len(matches) < minimum_reports:
-        return None
     return max(map(_lsn_to_int, matches)) if matches else None
 
 
@@ -306,12 +317,19 @@ def test_postgres_buffer_recovers_after_stop(tmp_path):
     pid_path = config_dir / TARGET_ID / TAP_ID / 'pipelinewise.pid'
     log_dir = config_dir / TARGET_ID / TAP_ID / 'log'
     slot_name = _slot_name(e2e)
+    wal2json_slot_name = _wal2json_slot_name(e2e)
+    legacy_wal2json_slot_name = _legacy_wal2json_slot_name(e2e)
     supervisor = None
     lock_connection = None
     captured_processes = []
 
     try:
         _drop_slot(e2e, slot_name)
+        _drop_slot(e2e, wal2json_slot_name)
+        assert _slot_status(e2e, legacy_wal2json_slot_name) is None, (
+            f'Shared legacy slot {legacy_wal2json_slot_name} must be migrated '
+            'outside this isolated E2E before it can run'
+        )
         e2e.run_query_tap_postgres(
             f'DROP SCHEMA IF EXISTS {SOURCE_SCHEMA} CASCADE; '
             f'CREATE SCHEMA {SOURCE_SCHEMA}; '
@@ -345,6 +363,8 @@ def test_postgres_buffer_recovers_after_stop(tmp_path):
         )
         initial_slot = _slot_status(e2e, slot_name)
         assert initial_slot is not None
+        assert initial_slot['plugin'] == 'pgoutput'
+        assert _slot_status(e2e, wal2json_slot_name) is None
         assert initial_slot['confirmed_flush_lsn'] <= baseline_lsn
         assert e2e.run_query_target_postgres(
             f'SELECT COUNT(*) FROM {TARGET_SCHEMA}.{TABLE_NAME}'
@@ -404,8 +424,7 @@ def test_postgres_buffer_recovers_after_stop(tmp_path):
             lambda: (
                 lsn
                 if (
-                    lsn := _latest_consumed_lsn(
-                        singer_log, minimum_reports=2)
+                    lsn := _latest_consumed_lsn(singer_log)
                 ) is not None
                 and lsn > baseline_lsn
                 else None
@@ -493,6 +512,7 @@ def test_postgres_buffer_recovers_after_stop(tmp_path):
         final_slot = _slot_status(e2e, slot_name)
         final_source_lsn = _current_source_lsn(e2e)
         assert final_slot is not None
+        assert final_slot['plugin'] == 'pgoutput'
         assert not final_slot['active']
         assert baseline_lsn < final_slot['confirmed_flush_lsn'] <= final_state_lsn
         assert final_state_lsn <= final_source_lsn
@@ -547,6 +567,10 @@ def test_postgres_buffer_recovers_after_stop(tmp_path):
             _drop_slot(e2e, slot_name)
 
         attempt_cleanup('drop replication slot', cleanup_slot)
+        attempt_cleanup(
+            'drop old wal2json replication slot',
+            lambda: _drop_slot(e2e, wal2json_slot_name),
+        )
         attempt_cleanup(
             'drop source schema',
             lambda: e2e.run_query_tap_postgres(

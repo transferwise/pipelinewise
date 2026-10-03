@@ -1,0 +1,8 @@
+{
+    "selection": [
+        {
+            "tap_stream_id": "public-foo_table",
+            "replication_method": "LOG_BASED"
+        }
+    ]
+}

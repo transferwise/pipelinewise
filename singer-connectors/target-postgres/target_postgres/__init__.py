@@ -14,7 +14,7 @@ from joblib import Parallel, delayed, parallel_backend
 from jsonschema import Draft7Validator, FormatChecker
 from singer import get_logger
 
-from target_postgres.db_sync import DbSync
+from target_postgres.db_sync import DbSync, RECORD_UPDATE_MODE_PATCH
 
 LOGGER = get_logger('target_postgres')
 
@@ -142,7 +142,12 @@ def persist_lines(config, lines) -> None:  # noqa: C901
                 total_row_count[stream] += 1
 
             # append record
-            records_to_load[stream][primary_key_string] = add_metadata_values_to_record(o)
+            store_record(
+                records_to_load[stream],
+                primary_key_string,
+                add_metadata_values_to_record(o),
+                stream_to_sync[stream],
+            )
 
             row_count[stream] = len(records_to_load[stream])
 
@@ -169,8 +174,8 @@ def persist_lines(config, lines) -> None:  # noqa: C901
             LOGGER.debug('Setting state to %s', o['value'])
             state = o['value']
 
-            # Initially set flushed state
-            if not flushed_state:
+            # A first state received after records is not durable until those records are loaded.
+            if sum(row_count.values()) == 0:
                 flushed_state = copy.deepcopy(state)
 
         elif t == 'SCHEMA':
@@ -217,10 +222,6 @@ def persist_lines(config, lines) -> None:  # noqa: C901
         elif t == 'ACTIVATE_VERSION':
             LOGGER.debug('ACTIVATE_VERSION message')
 
-            # Initially set flushed state
-            if not flushed_state:
-                flushed_state = copy.deepcopy(state)
-
         else:
             raise Exception("Unknown message type {} in message {}"
                             .format(o['type'], o))
@@ -257,6 +258,11 @@ def flush_streams(
     parallelism = config.get("parallelism", DEFAULT_PARALLELISM)
     max_parallelism = config.get("max_parallelism", DEFAULT_MAX_PARALLELISM)
 
+    # Establish a durable baseline once, so continuously busy streams can then
+    # acknowledge independent flushes without advancing unflushed bookmarks.
+    if flushed_state is None and state is not None:
+        filter_streams = None
+
     # Parallelism 0 means auto parallelism:
     #
     # Auto parallelism trying to flush streams efficiently with auto defined number
@@ -290,7 +296,7 @@ def flush_streams(
         streams[stream] = {}
 
         # Update flushed streams
-        if filter_streams:
+        if filter_streams and flushed_state is not None:
             # update flushed_state position if we have state information for the stream
             if state is not None and stream in state.get('bookmarks', {}):
                 # Create bookmark key if not exists
@@ -299,11 +305,10 @@ def flush_streams(
                 # Copy the stream bookmark from the latest state
                 flushed_state['bookmarks'][stream] = copy.deepcopy(state['bookmarks'][stream])
 
-        # If we flush every bucket use the latest state
-        else:
-            flushed_state = copy.deepcopy(state)
+    if not filter_streams or (flushed_state is None and not any(row_count.values())):
+        return copy.deepcopy(state)
 
-    # Return with state message with flushed positions
+    # Without a durable baseline, a partial flush cannot acknowledge the first state.
     return flushed_state
 
 
@@ -323,8 +328,47 @@ def load_stream_batch(stream, records_to_load, row_count, db_sync, temp_dir=None
     row_count[stream] = 0
 
 
+def store_record(records, primary_key_string, record, db_sync):
+    """Buffer a record, coalescing repeated PATCH events for the same primary key."""
+    if db_sync.record_update_mode == RECORD_UPDATE_MODE_PATCH and primary_key_string in records:
+        records[primary_key_string].update(record)
+    else:
+        records[primary_key_string] = record
+
+
+def group_records_by_update_columns(records, db_sync):
+    """Group PATCH records by the columns their PostgreSQL UPDATE may change."""
+    if db_sync.record_update_mode != RECORD_UPDATE_MODE_PATCH:
+        return [(None, records)]
+
+    grouped_records = {}
+    for primary_key_string, record in records.items():
+        update_column_names = db_sync.present_column_names(record)
+        grouped_records.setdefault(update_column_names, {})[primary_key_string] = record
+
+    return list(grouped_records.items())
+
+
 def flush_records(stream, records_to_load, row_count, db_sync, temp_dir=None):
     """Take a list of records and load into database"""
+    record_groups = group_records_by_update_columns(records_to_load, db_sync)
+    if len(record_groups) > 1:
+        LOGGER.info("Splitting PATCH batch for '%s' into %d column-presence groups", stream, len(record_groups))
+
+    for update_column_names, grouped_records in record_groups:
+        group_row_count = len(grouped_records) if update_column_names is not None else row_count
+        flush_record_group(
+            stream,
+            grouped_records,
+            group_row_count,
+            db_sync,
+            update_column_names,
+            temp_dir,
+        )
+
+
+def flush_record_group(stream, records_to_load, row_count, db_sync, update_column_names, temp_dir=None):
+    """Write and load records sharing one PATCH update-column signature."""
     if temp_dir:
         temp_dir = os.path.expanduser(temp_dir)
         os.makedirs(temp_dir, exist_ok=True)
@@ -337,7 +381,7 @@ def flush_records(stream, records_to_load, row_count, db_sync, temp_dir=None):
             f.write(bytes(csv_line + '\n', 'UTF-8'))
 
     size_bytes = os.path.getsize(csv_file)
-    db_sync.load_csv(csv_file, row_count, size_bytes)
+    db_sync.load_csv(csv_file, row_count, size_bytes, update_column_names=update_column_names)
 
     # Delete temp file
     os.remove(csv_file)
