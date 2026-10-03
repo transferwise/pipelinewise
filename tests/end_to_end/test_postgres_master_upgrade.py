@@ -6,6 +6,8 @@ import subprocess
 import threading
 from pathlib import Path
 
+import psycopg2
+
 from .test_postgres_pgoutput_slots import (
     MIGRATION_STATE_KEY, SOURCE_SCHEMA, STREAM_ID, TABLE_NAME, TAP_ID, TARGET_ID,
     _assert_promoted_overlap, _finish_overlap, _read_state, _read_state_lsn,
@@ -25,7 +27,20 @@ def _persist_target_acknowledgements(output, state_path):
         pending.replace(state_path)
 
 
-def _load_master_checkpoints(output, command, case, target_log, errors):
+def _emit_other_database_wal(case):
+    """Move cluster WAL without creating another message in this tap's database."""
+    config = _read_state(case.state_path.parent / 'config.json')
+    connection_config = {key: config[key] for key in ('host', 'port', 'user', 'password', 'dbname')}
+    connection_config['dbname'] = 'template1' if config['dbname'] == 'postgres' else 'postgres'
+    connection = psycopg2.connect(**connection_config)
+    try:
+        with connection, connection.cursor() as cursor:
+            cursor.execute("SELECT pg_logical_emit_message(false, 'master_upgrade_background_wal', '')")
+    finally:
+        connection.close()
+
+
+def _load_master_checkpoints(output, command, case, target_log, errors, background_wal):
     """Commit each old checkpoint through the real target before acknowledging it."""
     schemas = {}
     pending = []
@@ -35,6 +50,8 @@ def _load_master_checkpoints(output, command, case, target_log, errors):
                                 stdout=subprocess.PIPE, stderr=target_log, env=case.command_env, timeout=30)
         assert result.returncode == 0, 'The target failed while applying a master checkpoint'
         _persist_target_acknowledgements(result.stdout.splitlines(), case.state_path)
+        if background_wal:
+            _emit_other_database_wal(case)
 
     try:
         for line in output:
@@ -93,8 +110,10 @@ def _run_master_tap(case, *, idle_feedback=False):
                                env={**case.command_env, 'PYTHONPATH': str(baseline)})
         # EOF makes target-postgres acknowledge quiet checkpoints. Every batch still
         # goes through its real loader; no bookmark or replication feedback is fabricated.
-        reader = threading.Thread(target=_load_master_checkpoints,
-                                  args=(tap.stdout, target_command, case, target_log, errors), daemon=True)
+        reader = threading.Thread(
+            target=_load_master_checkpoints,
+            args=(tap.stdout, target_command, case, target_log, errors, idle_feedback), daemon=True,
+        )
         reader.start()
         try:
             tap.wait(timeout=65)

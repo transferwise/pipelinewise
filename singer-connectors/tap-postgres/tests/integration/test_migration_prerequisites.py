@@ -1,7 +1,11 @@
 """Exercise migration prerequisites against a real source without shared ACL changes."""
 
 import uuid
+import json
+import time
 
+import psycopg2
+from psycopg2.extras import LogicalReplicationConnection
 from psycopg2 import sql
 import pytest
 
@@ -63,3 +67,56 @@ def test_primary_endpoint_cannot_masquerade_as_a_snapshot_secondary():
     with pytest.raises(logical_replication.ReplicationSlotMigrationError, match='secondary is not in recovery'):
         full_table.sync_table(config, {'tap_stream_id': 'public-unused'}, state, [], {}, snapshot_lsn=1)
     assert state == {}
+
+
+def test_legacy_driver_keepalive_can_advance_beyond_its_explicit_acknowledgement():
+    name = f'legacy_keepalive_{uuid.uuid4().hex[:12]}'
+    config = get_test_connection_config()
+    primary = get_test_connection()
+    unrelated = get_test_connection(target_db='template1')
+    replication = None
+    try:
+        with primary.cursor() as cursor:
+            cursor.execute(sql.SQL('CREATE TABLE {} (id integer PRIMARY KEY)').format(sql.Identifier(name)))
+            cursor.execute("SELECT lsn::text FROM pg_create_logical_replication_slot(%s, 'wal2json')", (name,))
+            start_lsn = cursor.fetchone()[0]
+            cursor.execute(sql.SQL('INSERT INTO {} VALUES (1)').format(sql.Identifier(name)))
+        replication = psycopg2.connect(
+            **{key: config[key] for key in ('host', 'port', 'user', 'password', 'dbname')},
+            connection_factory=LogicalReplicationConnection,
+        )
+        cursor = replication.cursor()
+        cursor.start_replication(slot_name=name, start_lsn=start_lsn, decode=True, status_interval=1, options={
+            'format-version': 2, 'include-transaction': True, 'add-tables': f'public.{name}',
+        })
+        deadline = time.monotonic() + 10
+        while True:
+            assert time.monotonic() < deadline, 'Legacy transport did not deliver the initial transaction'
+            message = cursor.read_message()
+            if message and json.loads(message.payload)['action'] == 'C':
+                acknowledged_lsn = message.data_start
+                break
+            time.sleep(0.01)
+        cursor.send_feedback(write_lsn=acknowledged_lsn, flush_lsn=acknowledged_lsn, reply=True, force=True)
+        with unrelated.cursor() as noise:
+            noise.execute("SELECT pg_logical_emit_message(false, 'legacy_keepalive_test', '')")
+        deadline = time.monotonic() + 10
+        while True:
+            assert time.monotonic() < deadline, 'Legacy keepalive did not advance beyond its explicit acknowledgement'
+            assert cursor.read_message() is None
+            cursor.send_feedback(reply=True, force=True)
+            with primary.cursor() as query:
+                query.execute('SELECT confirmed_flush_lsn::text FROM pg_replication_slots WHERE slot_name = %s',
+                              (name,))
+                if logical_replication.lsn_to_int(query.fetchone()[0]) > acknowledged_lsn:
+                    break
+            time.sleep(0.01)
+    finally:
+        if replication is not None:
+            replication.close()
+        unrelated.close()
+        with primary.cursor() as cursor:
+            cursor.execute('SELECT pg_drop_replication_slot(slot_name) FROM pg_replication_slots WHERE slot_name = %s',
+                           (name,))
+            cursor.execute(sql.SQL('DROP TABLE IF EXISTS {}').format(sql.Identifier(name)))
+        primary.close()

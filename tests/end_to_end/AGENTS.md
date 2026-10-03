@@ -52,9 +52,9 @@ fixtures/config and must run serially:
 run_e2e() { docker exec -t pipelinewise pytest "$@" -vx --timer-top-n 10; }
 
 run_e2e \
+  tests/end_to_end/test_postgres_master_upgrade.py \
   tests/end_to_end/test_target_postgres.py \
   tests/end_to_end/test_postgres_pgoutput_slots.py \
-  tests/end_to_end/test_postgres_master_upgrade.py \
   tests/end_to_end/test_postgres_stream_buffer_recovery.py \
   tests/end_to_end/data_diff/test_postgres_to_postgres.py \
   tests/end_to_end/data_diff/test_mysql_to_postgres.py
