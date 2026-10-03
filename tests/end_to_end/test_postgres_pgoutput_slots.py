@@ -565,6 +565,11 @@ def test_fenced_migration_rejects_config_change_and_survives_ddl(tmp_path):
         frozen_tap_config = tap_yaml.read_text(encoding='utf-8')
         _run_success(migration_case.run_command, migration_case.command_env)
         _assert_promoted_overlap(migration_case)
+        runtime_dir = migration_case.state_path.parent
+        retained_files = {
+            filename: (runtime_dir / filename).read_bytes()
+            for filename in ('config.json', 'selection.json', 'properties.json', 'state.json')
+        }
 
         migration_case.e2e.run_query_tap_postgres(
             f'ALTER TABLE {SOURCE_SCHEMA}.{TABLE_NAME} '
@@ -584,12 +589,16 @@ def test_fenced_migration_rejects_config_change_and_survives_ddl(tmp_path):
             migration_case.command_env,
         )
         assert failed_import.returncode != 0
-        assert 'selection or options cannot change' in (
+        assert 'before changing its selection' in (
             failed_import.stdout + failed_import.stderr
         )
         assert _publication_tables(migration_case.e2e) == {
             (SOURCE_SCHEMA, TABLE_NAME)
         }
+        assert {
+            filename: (runtime_dir / filename).read_bytes()
+            for filename in retained_files
+        } == retained_files
 
         tap_yaml.write_text(frozen_tap_config, encoding='utf-8')
         _run_success(
