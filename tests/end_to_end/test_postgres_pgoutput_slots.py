@@ -428,26 +428,50 @@ def test_idle_migration_completes_without_filling_target_batch(tmp_path):
 def test_bridge_target_failure_retains_wal2json_for_retry(tmp_path):
     """A failed bridge write cannot promote pgoutput or retire wal2json."""
     with _simple_migration_case(tmp_path) as migration_case:
-        target_config_path = migration_case.config_dir / TARGET_ID / 'config.json'
-        original_target_config = target_config_path.read_text(encoding='utf-8')
-        broken_target_config = json.loads(original_target_config)
-        broken_target_config['password'] = 'deliberately-invalid-e2e-password'
-        target_config_path.write_text(json.dumps(broken_target_config), encoding='utf-8')
+        initial_target_rows = _source_target_rows(migration_case.e2e)[1]
+        original_pgoutput_lsn = _slot_status(
+            migration_case.e2e, migration_case.pgoutput_slot
+        )['confirmed_flush_lsn']
+        original_wal2json_lsn = _slot_status(
+            migration_case.e2e, migration_case.wal2json_slot
+        )['confirmed_flush_lsn']
+        migration_case.e2e.run_query_tap_postgres(
+            f"INSERT INTO {SOURCE_SCHEMA}.{TABLE_NAME} "
+            "VALUES (2, 'must retry', 'payload-2')"
+        )
+        migration_case.e2e.run_query_target_postgres(
+            f'CREATE FUNCTION {TARGET_SCHEMA}.reject_bridge_write() '
+            'RETURNS trigger LANGUAGE plpgsql AS $$ '
+            "BEGIN RAISE EXCEPTION 'deliberate bridge target failure'; END $$; "
+            f'CREATE TRIGGER reject_bridge_write BEFORE INSERT OR UPDATE '
+            f'ON {TARGET_SCHEMA}.{TABLE_NAME} FOR EACH ROW '
+            f'EXECUTE FUNCTION {TARGET_SCHEMA}.reject_bridge_write()'
+        )
         try:
             failed_run = _run(migration_case.run_command, migration_case.command_env)
         finally:
-            target_config_path.write_text(original_target_config, encoding='utf-8')
+            migration_case.e2e.run_query_target_postgres(
+                f'DROP TRIGGER IF EXISTS reject_bridge_write '
+                f'ON {TARGET_SCHEMA}.{TABLE_NAME}; '
+                f'DROP FUNCTION IF EXISTS {TARGET_SCHEMA}.reject_bridge_write()'
+            )
 
         assert failed_run.returncode != 0
-        marker = _read_state(migration_case.state_path)[MIGRATION_STATE_KEY]
-        assert marker['phase'] == 'bridge_pending'
-        assert _slot_status(migration_case.e2e, migration_case.wal2json_slot) is not None
+        assert MIGRATION_STATE_KEY not in _read_state(migration_case.state_path)
+        wal2json_slot = _slot_status(
+            migration_case.e2e, migration_case.wal2json_slot
+        )
+        assert wal2json_slot['confirmed_flush_lsn'] == original_wal2json_lsn
         pgoutput_slot = _slot_status(migration_case.e2e, migration_case.pgoutput_slot)
-        assert pgoutput_slot['confirmed_flush_lsn'] == marker['slot_lsn']
+        assert pgoutput_slot['confirmed_flush_lsn'] == original_pgoutput_lsn
+        assert _source_target_rows(migration_case.e2e)[1] == initial_target_rows
 
         _run_success(migration_case.run_command, migration_case.command_env)
         _assert_promoted_overlap(migration_case)
         _finish_overlap(migration_case)
+        assert _source_target_rows(migration_case.e2e)[0] == _source_target_rows(
+            migration_case.e2e
+        )[1]
 
 
 def test_unfinished_migration_can_be_replaced_by_whole_tap_fastsync(tmp_path):
