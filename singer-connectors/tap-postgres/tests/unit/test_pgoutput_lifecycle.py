@@ -13,6 +13,12 @@ from tap_postgres.sync_strategies import logical_replication
 WalMessage = namedtuple('WalMessage', ['payload', 'data_start'])
 
 
+@pytest.fixture
+def permitted_boundary_messages():
+    with patch.object(logical_replication.post_db, 'require_logical_message_privilege') as permission:
+        yield permission
+
+
 def _slot(plugin, database='source', active=False, lsn='0/64'):
     return {
         'plugin': plugin,
@@ -317,7 +323,7 @@ def test_publication_preflight_validates_owned_slot_candidates(
             Mock(), 'source', 'orders')
 
 
-def test_prepare_publication_rejects_invalid_slot_before_publication_ddl():
+def test_prepare_publication_rejects_invalid_slot_before_publication_ddl(permitted_boundary_messages):
     connection = MagicMock()
     connection.__enter__.return_value = connection
     connection.server_version = 140018
@@ -1183,7 +1189,7 @@ def test_fresh_tap_does_not_claim_unrelated_shared_slot():
     assert source is None
 
 
-def test_filtered_publication_preparation_is_additive_and_tracks_managed_tables():
+def test_filtered_publication_preparation_is_additive_and_tracks_managed_tables(permitted_boundary_messages):
     connection = MagicMock()
     connection.__enter__.return_value = connection
     connection.server_version = 140018
@@ -1217,7 +1223,7 @@ def test_filtered_publication_preparation_is_additive_and_tracks_managed_tables(
 
 
 @pytest.mark.parametrize('with_pending_state', [False, True])
-def test_selection_change_is_rejected_between_bridge_attempts(with_pending_state):
+def test_selection_change_is_rejected_between_bridge_attempts(with_pending_state, permitted_boundary_messages):
     connection = MagicMock()
     connection.__enter__.return_value = connection
     connection.server_version = 140018
@@ -1280,7 +1286,7 @@ def test_selection_change_is_rejected_between_bridge_attempts(with_pending_state
     fence.assert_not_called()
 
 
-def test_publication_option_change_is_rejected_between_bridge_attempts():
+def test_publication_option_change_is_rejected_between_bridge_attempts(permitted_boundary_messages):
     connection = MagicMock()
     connection.__enter__.return_value = connection
     connection.server_version = 140018
@@ -1329,7 +1335,7 @@ def test_publication_option_change_is_rejected_between_bridge_attempts():
     fence.assert_not_called()
 
 
-def test_explicit_publication_reconcile_removes_only_stale_managed_tables():
+def test_explicit_publication_reconcile_removes_only_stale_managed_tables(permitted_boundary_messages):
     connection = MagicMock()
     connection.__enter__.return_value = connection
     connection.server_version = 140018
@@ -1368,7 +1374,8 @@ def test_explicit_publication_reconcile_removes_only_stale_managed_tables():
     ) == ('ready', None, {('public', 'payments')})
 
 
-def test_empty_publication_reconcile_removes_all_managed_tables_without_dropping_publication():
+def test_empty_publication_reconcile_removes_all_managed_tables_without_dropping_publication(
+        permitted_boundary_messages):
     connection = MagicMock()
     connection.__enter__.return_value = connection
     connection.server_version = 140018
@@ -1404,7 +1411,7 @@ def test_empty_publication_reconcile_removes_all_managed_tables_without_dropping
     ) == ('ready', None, set())
 
 
-def test_final_log_deselection_reconciles_managed_tables_while_migration_slots_coexist():
+def test_final_log_deselection_reconciles_managed_tables_while_migration_slots_coexist(permitted_boundary_messages):
     """Durably abandoned LOG state may empty the publication before slot retirement."""
     connection = MagicMock()
     connection.__enter__.return_value = connection
@@ -1441,7 +1448,7 @@ def test_final_log_deselection_reconciles_managed_tables_while_migration_slots_c
     ) == ('ready', None, set())
 
 
-def test_empty_reconcile_remains_frozen_without_final_log_deselection():
+def test_empty_reconcile_remains_frozen_without_final_log_deselection(permitted_boundary_messages):
     """An ordinary import cannot discard a live migration's entire topology."""
     connection = MagicMock()
     connection.__enter__.return_value = connection
@@ -1478,7 +1485,7 @@ def test_empty_reconcile_remains_frozen_without_final_log_deselection():
     {'bookmarks': {}, logical_replication.PGOUTPUT_MIGRATION_STATE_KEY: {'phase': 'bridge'}},
     {'bookmarks': {}, '_pipelinewise_pgoutput_fresh_start': {'version': 1}},
 ])
-def test_final_log_deselection_requires_durable_state_invalidation(state):
+def test_final_log_deselection_requires_durable_state_invalidation(state, permitted_boundary_messages):
     """The exceptional frozen reconcile is unavailable while LOG state is reusable."""
     with patch.object(logical_replication.post_db, 'open_connection') as connect, pytest.raises(
             logical_replication.ReplicationSlotMigrationError,
@@ -1490,7 +1497,7 @@ def test_final_log_deselection_requires_durable_state_invalidation(state):
 
 
 @pytest.mark.parametrize('streams', [[_stream()], []], ids=['selected', 'empty'])
-def test_reconcile_does_not_create_an_absent_publication(streams):
+def test_reconcile_does_not_create_an_absent_publication(streams, permitted_boundary_messages):
     connection = MagicMock()
     connection.__enter__.return_value = connection
     connection.server_version = 140018
@@ -1520,7 +1527,7 @@ def test_reconcile_does_not_create_an_absent_publication(streams):
     fence.assert_not_called()
 
 
-def test_reconcile_does_not_recreate_a_publication_removed_during_preflight():
+def test_reconcile_does_not_recreate_a_publication_removed_during_preflight(permitted_boundary_messages):
     connection = MagicMock()
     connection.__enter__.return_value = connection
     connection.server_version = 140018
@@ -1545,7 +1552,7 @@ def test_reconcile_does_not_recreate_a_publication_removed_during_preflight():
     fence.assert_not_called()
 
 
-def test_postgres15_schema_publication_is_rejected_before_membership_changes():
+def test_postgres15_schema_publication_is_rejected_before_membership_changes(permitted_boundary_messages):
     connection = MagicMock()
     connection.__enter__.return_value = connection
     connection.server_version = 150000
@@ -1595,7 +1602,7 @@ def test_publication_fence_reuses_connection_and_waits_only_for_preexisting_writ
     ('pgoutput_overlap', False, True), ('overlap_complete', False, True),
     ('bridge', False, False), (None, True, True), (None, False, False),
 ])
-def test_partition_preflight_respects_durable_migration_phase(phase, fresh_start, allowed):
+def test_partition_preflight_respects_durable_migration_phase(phase, fresh_start, allowed, permitted_boundary_messages):
     connection = MagicMock()
     connection.__enter__.return_value = connection
     connection.server_version = 140018
@@ -1727,7 +1734,7 @@ def _run_pgoutput_feedback(messages, acknowledged_lsn):
                 logical_replication.singer,
                 'write_message') as write_message, \
             patch.object(logical_replication, 'FEEDBACK_POLL_INTERVAL', 0), \
-            patch.object(logical_replication, 'UPDATE_BOOKMARK_PERIOD', 1):
+            patch.object(logical_replication, 'CHECKPOINT_INTERVAL_SECONDS', 0):
         logical_replication.sync_tables(
             _config(), [_stream()], _state(), 90, 'state.json')
     return connection.cursor_instance, read_acknowledgement, write_message
@@ -1782,7 +1789,7 @@ def test_consumed_and_periodically_emitted_positions_are_not_feedback_until_targ
 
 
 @pytest.mark.parametrize('publication_missing', [False, True])
-def test_missing_managed_publication_history_requires_resync(publication_missing):
+def test_missing_managed_publication_history_requires_resync(publication_missing, permitted_boundary_messages):
     connection = MagicMock()
     connection.__enter__.return_value = connection
     connection.server_version = 140018

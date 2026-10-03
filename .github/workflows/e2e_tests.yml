@@ -48,6 +48,14 @@ jobs:
         continue-on-error: true
         run: ./scripts/ci_check_no_file_changes.sh python config e2e
 
+      - name: Prepare the pre-migration master tap
+        if: steps.check.outcome == 'failure'
+        run: |
+          git fetch --no-tags --depth=1 origin 6d7a02b5e6965eb03937f6de1946c207d1be2c1c
+          mkdir -p dev-project/.upgrade-baseline/tap_postgres
+          git archive 6d7a02b5e6965eb03937f6de1946c207d1be2c1c:singer-connectors/tap-postgres/tap_postgres |
+            tar -x -C dev-project/.upgrade-baseline/tap_postgres
+
       - name: Setup test containers
         if: steps.check.outcome == 'failure'
         run: |
@@ -85,6 +93,7 @@ jobs:
           pipelinewise pytest \
           tests/end_to_end/test_target_postgres.py \
           tests/end_to_end/test_postgres_pgoutput_slots.py \
+          tests/end_to_end/test_postgres_master_upgrade.py \
           tests/end_to_end/test_postgres_stream_buffer_recovery.py \
           tests/end_to_end/data_diff/test_postgres_to_postgres.py \
           tests/end_to_end/data_diff/test_mysql_to_postgres.py \

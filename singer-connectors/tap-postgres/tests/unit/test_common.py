@@ -158,8 +158,8 @@ class TestLogicalSecondarySnapshots(TestCase):
 
                 self.assertEqual([False, 'snapshot'], events)
 
-    def test_replica_replay_wait_accepts_catchup_and_primary_fallback(self):
-        for replay_positions in [[(True, None), (True, '0/64'), (True, '0/C8')], [(False, None)]]:
+    def test_replica_replay_wait_accepts_catchup(self):
+        for replay_positions in [[(True, None), (True, '0/64'), (True, '0/C8')]]:
             with self.subTest(replay_positions=replay_positions):
                 conn = Mock()
                 cursor = Mock()

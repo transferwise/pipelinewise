@@ -93,7 +93,7 @@ class TestDbFunctions(unittest.TestCase):
     def test_snapshot_boundary_is_committed_before_returning(self, connect):
         connection = connect.return_value
         cursor = connection.cursor.return_value.__enter__.return_value
-        cursor.fetchone.return_value = ('1/20',)
+        cursor.fetchone.side_effect = [(True,), ('1/20',)]
         calls = MagicMock()
         calls.attach_mock(cursor, 'cursor')
         calls.attach_mock(connection.commit, 'commit')
@@ -105,9 +105,10 @@ class TestDbFunctions(unittest.TestCase):
         self.assertEqual(
             ["SET LOCAL synchronous_commit = on",
              "SELECT pg_logical_emit_message(true, 'pipelinewise_snapshot', '')::text"],
-            [call.args[0] for call in cursor.execute.call_args_list],
+            [call.args[0] for call in cursor.execute.call_args_list[1:]],
         )
-        self.assertEqual(['cursor.execute', 'cursor.execute', 'cursor.fetchone', 'commit', 'close'],
+        self.assertEqual(['cursor.execute', 'cursor.fetchone', 'cursor.execute', 'cursor.execute',
+                          'cursor.fetchone', 'commit', 'close'],
                          [call[0] for call in calls.mock_calls])
 
     @patch('tap_postgres.db.open_connection')

@@ -307,7 +307,7 @@ def _simulate_historical_tap_identity(config_dir, old_tap_id, lsn):
 
 
 @contextmanager
-def _simple_migration_case(tmp_path, *, break_at_end_lsn=True):
+def _simple_migration_case(tmp_path, *, break_at_end_lsn=True, bootstrap_fastsync=True):
     """Prepare one filtered FastSync beside a dedicated historical slot."""
     project_dir = tmp_path / 'project'
     shutil.copytree(TEMPLATE_DIR, project_dir)
@@ -366,22 +366,23 @@ def _simple_migration_case(tmp_path, *, break_at_end_lsn=True):
         _run_success(
             ['pipelinewise', 'import_config', '--dir', str(project_dir)], command_env
         )
-        _run_success(
-            [
-                'pipelinewise',
-                'fast_sync',
-                '--tap',
-                TAP_ID,
-                '--target',
-                TARGET_ID,
-                '--tables',
-                f'{SOURCE_SCHEMA}.{TABLE_NAME}',
-            ],
-            command_env,
-        )
-        assert _source_target_rows(e2e)[0] == _source_target_rows(e2e)[1]
+        if bootstrap_fastsync:
+            _run_success(
+                [
+                    'pipelinewise',
+                    'fast_sync',
+                    '--tap',
+                    TAP_ID,
+                    '--target',
+                    TARGET_ID,
+                    '--tables',
+                    f'{SOURCE_SCHEMA}.{TABLE_NAME}',
+                ],
+                command_env,
+            )
+            assert _source_target_rows(e2e)[0] == _source_target_rows(e2e)[1]
+            assert _slot_status(e2e, pgoutput_slot)['plugin'] == 'pgoutput'
         assert _slot_status(e2e, wal2json_slot)['plugin'] == 'wal2json'
-        assert _slot_status(e2e, pgoutput_slot)['plugin'] == 'pgoutput'
         yield migration_case
     finally:
         _drop_slot(e2e, pgoutput_slot)

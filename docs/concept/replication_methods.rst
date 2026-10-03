@@ -65,9 +65,11 @@ stream's acknowledged history. Unsupported binlog encodings and selected-table
 legacy-checkpoint recovery requirements.
 
 PostgreSQL uses pgoutput with commit-based LSN checkpoints. Release 0.94.0
-migrates dedicated wal2json slots; complete this before 0.95.0 removes wal2json.
-See :ref:`tap-postgres` for publication privileges, overlap replay and quiet-source
-run boundaries.
+migrates dedicated wal2json slots; complete this before 0.95.0 removes wal2json
+and its tests. Migration checks that saved bookmarks are still covered by the
+old slot. Unrecoverable bookmarks require an explicit whole-tap resync.
+See :ref:`tap-postgres` for publication and boundary privileges, overlap replay,
+conditional transformation limits and quiet-source run boundaries.
 
 .. warning::
 

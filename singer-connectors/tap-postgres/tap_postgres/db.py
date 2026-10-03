@@ -23,6 +23,26 @@ class UnsupportedPostgresVersionError(RuntimeError):
     """Raised when a source is older than the connector support floor."""
 
 
+def require_logical_message_privilege(cursor):
+    """Check the text overload used to capture durable snapshot boundaries."""
+    cursor.execute("""
+        SELECT pg_catalog.has_function_privilege(
+            current_user,
+            COALESCE(
+                pg_catalog.to_regprocedure('pg_catalog.pg_logical_emit_message(boolean,text,text,boolean)'),
+                pg_catalog.to_regprocedure('pg_catalog.pg_logical_emit_message(boolean,text,text)')
+            ),
+            'EXECUTE'
+        )
+    """)
+    permission = cursor.fetchone()
+    if not permission or permission[0] is not True:
+        raise RuntimeError(
+            'PostgreSQL LOG_BASED replication requires EXECUTE on the text overload of '
+            'pg_catalog.pg_logical_emit_message. Ask a DBA to grant it to the replication role and retry.'
+        )
+
+
 def validate_server_version(connection):
     """Require PostgreSQL 14 and warn when logical-decoding fixes are absent."""
     server_version = connection.server_version
@@ -112,6 +132,7 @@ def capture_snapshot_boundary(conn_config):
     conn = open_connection(conn_config, prioritize_primary=True)
     try:
         with conn.cursor() as cur:
+            require_logical_message_privilege(cur)
             cur.execute('SET LOCAL synchronous_commit = on')
             cur.execute("SELECT pg_logical_emit_message(true, 'pipelinewise_snapshot', '')::text")
             lsn = cur.fetchone()[0]

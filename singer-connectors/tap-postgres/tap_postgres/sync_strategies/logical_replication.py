@@ -12,7 +12,7 @@ import singer
 import time
 import warnings
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from select import select
 from typing import NamedTuple
 from psycopg2 import sql
@@ -28,6 +28,7 @@ from tap_postgres.stream_utils import refresh_streams_schema
 LOGGER = singer.get_logger('tap_postgres')
 
 UPDATE_BOOKMARK_PERIOD = 10000
+CHECKPOINT_INTERVAL_SECONDS = 60
 FEEDBACK_POLL_INTERVAL = 10
 FALLBACK_DATETIME = '9999-12-31T23:59:59.999+00:00'
 FALLBACK_DATE = '9999-12-31T00:00:00+00:00'
@@ -177,7 +178,13 @@ def wait_for_replica_replay(conn_info, boundary_lsn, connection=None):
             while True:
                 cur.execute('SELECT pg_is_in_recovery(), pg_last_wal_replay_lsn()::text')
                 in_recovery, replay_lsn = cur.fetchone()
-                if not in_recovery or (lsn_to_int(replay_lsn) or 0) >= boundary_lsn:
+                if not in_recovery:
+                    raise ReplicationSlotMigrationError(
+                        'The configured PostgreSQL secondary is not in recovery. '
+                        'Point it at a physical standby of the configured primary, or disable '
+                        'use_secondary and retry. No snapshot was read.'
+                    )
+                if (lsn_to_int(replay_lsn) or 0) >= boundary_lsn:
                     return
                 if time.monotonic() >= deadline:
                     raise ReplicationSlotMigrationError(
@@ -1464,6 +1471,8 @@ def prepare_publication(
     migration_slots_exist = False
     with post_db.open_connection(conn_info, False, True) as conn:
         with conn.cursor() as cur:
+            if logical_streams:
+                post_db.require_logical_message_privilege(cur)
             timeout = str(max(1, int(conn_info.get('publication_fence_timeout_seconds', 300) * 1000)))
             cur.execute("SELECT set_config('lock_timeout', %s, TRUE), "
                         "set_config('statement_timeout', %s, TRUE)", (timeout, timeout))
@@ -1727,7 +1736,7 @@ def _bridge_wal2json_slot(conn_info, logical_streams, state, state_file, publica
             force=True,
         )
         last_complete_lsn = None
-        commits_since_state = 0
+        checkpoint_cadence = _CheckpointCadence()
         last_message_at = datetime.datetime.utcnow()
         started_at = datetime.datetime.utcnow()
         poll_timestamp = datetime.datetime.utcnow()
@@ -1766,9 +1775,9 @@ def _bridge_wal2json_slot(conn_info, logical_streams, state, state_file, publica
                     conn_info,
                     message_payload=message_payload,
                 )
+                checkpoint_cadence.observe(message_payload)
                 if message_payload.get('action') == 'C':
                     last_complete_lsn = int(msg.data_start)
-                    commits_since_state += 1
                     if last_complete_lsn >= boundary_lsn:
                         bridge_lsn = last_complete_lsn
                         state[PGOUTPUT_MIGRATION_STATE_KEY] = {
@@ -1782,9 +1791,9 @@ def _bridge_wal2json_slot(conn_info, logical_streams, state, state_file, publica
                         }
                         state = _write_lsn_state(state, logical_streams, bridge_lsn)
                         break
-                    if commits_since_state >= UPDATE_BOOKMARK_PERIOD:
+                    if checkpoint_cadence.due():
                         state = _write_lsn_state(state, logical_streams, last_complete_lsn)
-                        commits_since_state = 0
+                        checkpoint_cadence.reset()
                 last_message_at = datetime.datetime.utcnow()
 
             if datetime.datetime.utcnow() >= (
@@ -1875,10 +1884,9 @@ def _validate_migration_state(conn_info, migration_state):
             'Persisted pgoutput migration state refers to an implicitly truncated historical '
             'slot name. Verify ownership and set previous_tap_id explicitly before continuing.'
         )
-    allowed_sources = {
-        legacy_replication_slot_names(
-            conn_info['dbname'], conn_info.get('previous_tap_id') or conn_info['tap_id'])[1]
-    } - {destination}
+    shared_slot, dedicated_slot = legacy_replication_slot_names(
+        conn_info['dbname'], conn_info.get('previous_tap_id') or conn_info['tap_id'])
+    allowed_sources = {dedicated_slot} - {destination, shared_slot}
     phase = migration_state.get('phase') if isinstance(migration_state, dict) else None
     if (
             not isinstance(migration_state, dict)
@@ -1952,7 +1960,9 @@ def _validate_bridge_slot_position(slot, start_lsn, migration_state, migration_p
         raise ReplicationSlotMigrationError(
             f'Target bookmark {int_to_lsn(start_lsn)} predates legacy slot '
             f'{migration_source} confirmed flush LSN {int_to_lsn(source_confirmed_lsn)}; '
-            'a full resync is required to avoid skipping unacknowledged WAL'
+            'a full resync is required to avoid skipping unacknowledged WAL. '
+            'Older releases could produce this state during idle keepalives. '
+            'Run an explicit, unfiltered whole-tap fast_sync; do not advance the bookmark.'
         )
     if (
             migration_phase == 'bridge_pending'
@@ -1961,6 +1971,27 @@ def _validate_bridge_slot_position(slot, start_lsn, migration_state, migration_p
             f'Canonical pgoutput slot {slot} moved from the persisted bridge start LSN; '
             'a full resync is required to avoid skipping unacknowledged WAL'
         )
+
+
+class _CheckpointCadence:
+    """Bound backlog replay between checkpoints without acknowledging partial transactions."""
+
+    def __init__(self):
+        self.reset()
+
+    def observe(self, payload):
+        if payload.get('_record_emitted'):
+            self.rows_since_state += 1
+
+    def due(self):
+        return (
+            self.rows_since_state >= UPDATE_BOOKMARK_PERIOD
+            or time.monotonic() - self.last_state_at >= CHECKPOINT_INTERVAL_SECONDS
+        )
+
+    def reset(self):
+        self.rows_since_state = 0
+        self.last_state_at = time.monotonic()
 
 
 @dataclass
@@ -1972,12 +2003,13 @@ class _PgoutputCheckpoint:
     overlap_replay: bool
     last_complete_lsn: int | None = None
     emitted_lsn: int | None = None
-    commits_since_state: int = 0
+    cadence: _CheckpointCadence = field(default_factory=_CheckpointCadence)
 
     def write(self, lsn):
         writer = _write_monotonic_lsn_state if self.overlap_replay else _write_lsn_state
         self.state = writer(self.state, self.streams, lsn)
         self.emitted_lsn = lsn
+        self.cadence.reset()
 
     def record_commit(self, payload, boundary_lsn, break_at_end_lsn):
         """Checkpoint a complete transaction and report whether this run must stop."""
@@ -1985,7 +2017,6 @@ class _PgoutputCheckpoint:
         if commit_lsn is None:
             raise PgoutputProtocolError('pgoutput Commit message has no end LSN')
         self.last_complete_lsn = commit_lsn
-        self.commits_since_state += 1
 
         if commit_lsn >= boundary_lsn:
             if self.overlap_replay:
@@ -1997,9 +2028,8 @@ class _PgoutputCheckpoint:
             LOGGER.info('Reached pgoutput commit boundary at %s', int_to_lsn(commit_lsn))
             return self.overlap_replay or break_at_end_lsn
 
-        if self.commits_since_state >= UPDATE_BOOKMARK_PERIOD:
+        if self.cadence.due():
             self.write(commit_lsn)
-            self.commits_since_state = 0
         return False
 
     def finalize(self):
@@ -2141,6 +2171,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):  # noqa
                     conn_info,
                     message_payload=message_payload,
                 )
+                checkpoint.cadence.observe(message_payload)
                 if action == 'C' and checkpoint.record_commit(message_payload, boundary_lsn, break_at_end_lsn):
                     break
                 lsn_received_timestamp = datetime.datetime.utcnow()

@@ -307,7 +307,7 @@ class FastSyncTapPostgres:
             database, connection_config['tap_id'], previous_tap_id
         )
         source = marker['source_slot']
-        if marker['destination_slot'] != destination or source != current:
+        if marker['destination_slot'] != destination or source != current or source == legacy:
             raise RuntimeError(
                 f'{PGOUTPUT_MIGRATION_STATE_KEY} does not match the configured PostgreSQL tap. '
                 'No source or state changes were made.'
@@ -1021,10 +1021,31 @@ class FastSyncTapPostgres:
             source._close_primary_host_connection()
 
     @classmethod
+    def require_logical_message_privilege(cls, cursor):
+        """Check the text overload used to capture durable snapshot boundaries."""
+        cursor.execute("""
+            SELECT pg_catalog.has_function_privilege(
+                current_user,
+                COALESCE(
+                    pg_catalog.to_regprocedure('pg_catalog.pg_logical_emit_message(boolean,text,text,boolean)'),
+                    pg_catalog.to_regprocedure('pg_catalog.pg_logical_emit_message(boolean,text,text)')
+                ),
+                'EXECUTE'
+            )
+        """)
+        permission = cursor.fetchone()
+        if not permission or permission[0] is not True:
+            raise RuntimeError(
+                'PostgreSQL LOG_BASED replication requires EXECUTE on the text overload of '
+                'pg_catalog.pg_logical_emit_message. Ask a DBA to grant it to the replication role and retry.'
+            )
+
+    @classmethod
     def capture_snapshot_boundary(cls, connection):
         """Commit a flushed WAL record whose exact end can be replayed by a standby."""
         with connection:
             with connection.cursor() as cur:
+                cls.require_logical_message_privilege(cur)
                 cur.execute('SET LOCAL synchronous_commit = on')
                 cur.execute("SELECT pg_logical_emit_message(true, 'pipelinewise_snapshot', '')::text")
                 boundary = cls._lsn_to_int(cur.fetchone()[0])
@@ -1041,6 +1062,8 @@ class FastSyncTapPostgres:
         )
         try:
             # Create replication slot
+            with self.primary_host_conn.cursor() as cur:
+                self.require_logical_message_privilege(cur)
             self.create_replication_slot()
             primary_lsn = self.capture_snapshot_boundary(self.primary_host_conn)
         finally:
@@ -1061,7 +1084,11 @@ class FastSyncTapPostgres:
         while True:
             result = self.query('SELECT pg_is_in_recovery() AS in_recovery, pg_last_wal_replay_lsn() AS current_lsn')
             if result and result[0].get('in_recovery') is False:
-                return primary_lsn
+                raise RuntimeError(
+                    'The configured PostgreSQL replica_host is not in recovery. '
+                    'Point it at a physical standby of the configured primary, or remove '
+                    'replica_host and retry. No snapshot was exported.'
+                )
             replay_lsn = result[0].get('current_lsn') if result else None
             if replay_lsn is not None:
                 replay_lsn = self._lsn_to_int(replay_lsn)

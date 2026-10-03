@@ -81,3 +81,26 @@ def test_safe_minor_release_warning_thresholds_match():
                        and any(isinstance(name, ast.Name) and name.id == 'MIN_SAFE_POSTGRES_VERSIONS'
                                for name in node.targets))
     assert ast.literal_eval(declaration) == fastsync.MIN_SAFE_POSTGRES_VERSIONS
+
+
+@pytest.mark.parametrize('phase', ['bridge_pending', 'bridge', 'pgoutput_overlap', 'overlap_complete'])
+def test_shared_slot_is_never_valid_migration_state_even_with_an_explicit_alias(phase):
+    config = {'dbname': 'd' * 50, 'tap_id': 'new_id', 'previous_tap_id': 'old_id'}
+    destination, shared, dedicated = fastsync.FastSyncTapPostgres._replication_slot_names(
+        config['dbname'], config['tap_id'], config['previous_tap_id'])
+    assert shared == dedicated
+    marker = {'version': 2, 'phase': phase, 'source_slot': shared, 'destination_slot': destination,
+              'slot_lsn': 100, 'boundary_lsn': 150, 'bridge_lsn': 200, 'crossover_lsn': 300}
+    with pytest.raises(RuntimeError, match='does not match'):
+        fastsync.FastSyncTapPostgres.validate_migration_state_marker(config, marker)
+    with pytest.raises(RuntimeError, match='Invalid'):
+        _singer_helpers()['_validate_migration_state'](config, marker)
+
+
+def test_documented_tap_id_limit_matches_both_runtimes():
+    guide = (ROOT / 'docs/connectors/taps/postgres.rst').read_text()
+    limit = int(re.search(r'most (\d+) characters', guide).group(1))
+    assert limit == fastsync.MAX_POSTGRES_TAP_ID_LENGTH
+    assert _singer_helpers()['validate_tap_id']('t' * limit)
+    with pytest.raises(ValueError, match='at most'):
+        _singer_helpers()['validate_tap_id']('t' * (limit + 1))

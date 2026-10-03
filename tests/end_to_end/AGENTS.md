@@ -54,6 +54,7 @@ run_e2e() { docker exec -t pipelinewise pytest "$@" -vx --timer-top-n 10; }
 run_e2e \
   tests/end_to_end/test_target_postgres.py \
   tests/end_to_end/test_postgres_pgoutput_slots.py \
+  tests/end_to_end/test_postgres_master_upgrade.py \
   tests/end_to_end/test_postgres_stream_buffer_recovery.py \
   tests/end_to_end/data_diff/test_postgres_to_postgres.py \
   tests/end_to_end/data_diff/test_mysql_to_postgres.py
@@ -139,6 +140,13 @@ Remove a logical table, change its source rows, and re-add it before any peer
 advances: a fresh snapshot must recover those changes. Removing the last LOG
 selection must clear old logical state and retire dedicated slots; re-adding it
 must create a fresh slot and snapshot.
+
+For a requested local master-upgrade E2E run, first execute the workflow's
+`Prepare the pre-migration master tap` archive commands on the host. The pinned
+baseline is mounted into Docker at `dev-project/.upgrade-baseline/`. Those tests
+run the unmodified old tap and persist real target acknowledgements, then check
+successful migration or safe rejection and whole-tap recovery. Remove this
+baseline preparation and the wal2json upgrade tests with wal2json in 0.95.0.
 
 ### Multiline coverage
 

@@ -34,7 +34,9 @@ LOG_BASED replication also requires:
 - a connection to the writable primary;
 - ``wal_level=logical`` and sufficient ``max_replication_slots`` and
   ``max_wal_senders`` capacity;
-- permission to create and consume a logical replication slot; and
+- permission to create and consume a logical replication slot;
+- ``EXECUTE`` on the text overload of ``pg_catalog.pg_logical_emit_message``
+  for durable snapshot and progress boundaries; and
 - permission to create a publication (database ``CREATE``), own its selected
   tables, and update its membership and comment. A DBA may precreate an exact
   publication, but the runtime still needs permission to maintain it.
@@ -46,10 +48,16 @@ catalog-cache fixes. Upgrade to a patched minor version where possible.
 
 PipelineWise names both the slot and publication ``ppw_slot_<tap_id>``. Tap IDs
 must contain only lowercase ASCII letters, digits and underscores, and be at
-most 54 characters. They must be unique across databases on the same cluster.
+most 50 characters. They must be unique across databases on the same cluster.
 PipelineWise creates one tap-specific slot in the source database. PostgreSQL retains WAL needed
 by that slot, so monitor retained WAL and do not remove the slot while the tap is
 active.
+
+PipelineWise checks boundary permission before preparing the publication or
+creating a slot. If your DBA revoked the default public grant, ask them to grant
+``EXECUTE`` on the text overload present on your server to the replication role.
+This permission is required even though this release does not decode messages.
+An ordinary current-WAL position cannot safely replace a durable snapshot fence.
 
 An explicit, unfiltered ``fast_sync`` on a tap containing LOG_BASED tables
 resets the tap-specific slot once before workers start, with or without
@@ -100,7 +108,8 @@ Configuration
    * - ``replica_host``
      - No
      - Primary host
-     - Offloads FastSync reads; logical replication remains on the primary.
+     - Offloads FastSync reads to a physical standby of the configured primary.
+       A non-recovering endpoint is rejected; logical replication stays on the primary.
    * - ``filter_schemas``
      - No
      - All visible schemas
@@ -155,15 +164,22 @@ PipelineWise sends feedback only up to the minimum target-acknowledged LSN store
 in ``state.json``. Missing, unreadable, invalid, or regressing state retains the
 previous safe LSN.
 
-Run boundaries still use decoded commits and numeric LSNs. The tap attempts to
-emit the existing transactional progress marker, falling back to the sampled
-current-WAL LSN if emission is unavailable. Pgoutput does not request
+Run boundaries still use decoded commits and numeric LSNs. The tap emits the
+existing transactional progress marker. Startup and snapshot preparation require
+permission to emit it; a later emission failure can reuse the sampled run
+boundary. Pgoutput does not request
 ``messages=true`` in this release, so the marker itself is not decoded.
 PostgreSQL 15+ can filter transactions without published row changes. Quiet
 sources can therefore wait until ``logical_poll_total_seconds`` (default three
 hours) or ``max_run_seconds`` expires. Neither keepalives nor a timeout prove
 that a commit was delivered to the target, and they do not advance bookmarks.
 Set an appropriate idle timeout for scheduled taps.
+
+Before the startup boundary, the tap checkpoints at completed transactions after
+10,000 emitted row changes or 60 seconds. Large transactions must finish before
+a checkpoint can be emitted. After the boundary, every commit can checkpoint.
+Feedback still waits for target acknowledgement, and overlap replay retains its
+original slot position until the shared boundary is acknowledged.
 
 After an unexpected termination, restart the same tap without advancing state.
 Unacknowledged WAL remains replayable while the slot exists. Resync only when the
@@ -175,7 +191,7 @@ Migration from wal2json
 -----------------------
 
 Release 0.94.0 is the migration release. Release 0.95.0 will remove the migration
-and all remaining wal2json code. Complete migration on 0.94.0 before upgrading.
+and all remaining wal2json code and tests. Complete migration on 0.94.0 before upgrading.
 This is a roll-forward transition; restoring an old state file does not restore
 WAL discarded when a slot was dropped.
 
@@ -208,6 +224,53 @@ identity. Selected generated columns, ordinary inheritance parents and foreign
 partitions are rejected. Resolve the reported incompatibility or use another
 replication method before migration.
 
+Check existing bookmarks before rollout
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Stop the tap's schedule and wait for its run to finish. Back up its generated
+configuration and ``state.json``. Compare the minimum integer ``lsn`` bookmark
+across its selected LOG_BASED streams with the dedicated wal2json slot's
+``confirmed_flush_lsn``. This read-only query lists those positions as integers:
+
+.. code-block:: sql
+
+   SELECT slot_name, active,
+          confirmed_flush_lsn - '0/0'::pg_lsn AS confirmed_flush_lsn_integer
+   FROM pg_replication_slots
+   WHERE database = current_database() AND plugin = 'wal2json';
+
+Previous releases could advance the slot past saved bookmarks during idle
+keepalives. Such state can be produced by a successful old run. PipelineWise
+rejects migration when a selected bookmark predates the slot's confirmed
+position because it cannot prove that the missing interval reached the target.
+Do not raise bookmarks or advance the slot to bypass this check.
+
+Use an explicit, unfiltered whole-tap ``fast_sync`` to replace the old slot and
+take fresh snapshots when this check fails. See :ref:`resync_postgres_slot_reset`.
+Plan for the full reload; a restart alone cannot recover discarded history.
+The upgrade tests exercise both accepted and rejected state produced by the
+previous master tap, followed by migration or whole-tap recovery respectively.
+
+Snapshot and update limitations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A configured Singer secondary or FastSync ``replica_host`` must be a physical
+standby in recovery. A promoted or mistakenly configured primary is rejected
+before reading the snapshot. Correct the endpoint, or remove the secondary
+configuration to read from the primary.
+
+Pgoutput can omit unchanged large values (TOAST). Ordinary updates preserve
+them. A primary-key change that omits values needed to create the replacement
+row stops replication without acknowledging that transaction. Use a full resync
+to recover the row and avoid such key changes, or choose a replication method
+that reads complete rows. A resync does not prevent the next such change.
+
+Conditional Singer transformations require the transformed field and all
+condition columns whenever any of them changes. An incomplete PATCH stops before
+emitting that raw record or its checkpoint. Use unconditional masking or a
+replication method that supplies complete rows. Fetching the current source row
+would not reliably reconstruct its value at the WAL event. See :ref:`transformations`.
+
 Publication membership
 ----------------------
 
@@ -222,6 +285,11 @@ If discovery or publication cleanup fails during import, retry the same import.
 PipelineWise keeps ``postgres_publication_pending.json`` beside the tap config
 until reconciliation succeeds. Keep this file when retrying; it does not change
 replication bookmarks or the migration boundary.
+
+Publication preflight has an overall timeout as well as individual database
+timeouts. Several slow steps can exhaust the overall timeout even when each
+step remains within its limit. Retry the same command after resolving long-running
+writers or locks; retained fence metadata makes this retry safe.
 
 Do not change publication membership, table identity or options manually while
 replication has retained history. A missing managed table or publication can

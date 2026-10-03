@@ -5,7 +5,7 @@ import unittest
 from contextlib import redirect_stdout
 from unittest.mock import patch
 
-from transform_field import TransformField
+from transform_field import TransformField, TransformFieldException
 
 
 class TestPatchPassthrough(unittest.TestCase):
@@ -22,6 +22,7 @@ class TestPatchPassthrough(unittest.TestCase):
                     'id': {'type': ['integer']},
                     'email': {'type': ['null', 'string']},
                     'profile': {'type': ['null', 'object']},
+                    'classification': {'type': ['null', 'string']},
                     '_sdc_deleted_at': {'type': ['null', 'string'], 'format': 'date-time'},
                 },
             },
@@ -123,3 +124,54 @@ class TestPatchPassthrough(unittest.TestCase):
             output = self.consume([self.schema, first_record, self.state, second_record, second_state])
 
         self.assertEqual([self.schema, first_record, second_record, self.state, second_state], output)
+
+    def conditional_config(self, column='classification'):
+        return {'transformations': [{
+            'tap_stream_name': 'public-accounts', 'field_id': 'email', 'type': 'SET-NULL',
+            'when': [{'column': column, 'regex_match': '^private'}],
+        }]}
+
+    def test_incomplete_conditional_patch_emits_neither_raw_record_nor_later_state(self):
+        for values in ({'id': 1, 'email': 'sensitive@example.com'}, {'id': 1, 'classification': 'private'}):
+            with self.subTest(values=values):
+                messages = [self.schema, self.record(values), self.state]
+                reader = (json.dumps(message) + '\n' for message in messages)
+                with io.TextIOWrapper(io.BytesIO(), encoding='utf-8') as output:
+                    with redirect_stdout(output), self.assertRaisesRegex(
+                            TransformFieldException, 'Cannot safely apply conditional transformation') as error:
+                        TransformField(self.conditional_config()).consume(reader)
+                    output.seek(0)
+                    emitted = [json.loads(line) for line in output.read().splitlines()]
+                self.assertFalse(any(message['type'] in ('RECORD', 'STATE') for message in emitted))
+                self.assertNotIn('sensitive@example.com', str(error.exception))
+
+    def test_present_conditions_keep_configured_masking_and_null_semantics(self):
+        records = [
+            self.record({'id': 1, 'email': 'sensitive@example.com', 'classification': 'private'}),
+            self.record({'id': 2, 'email': 'public@example.com', 'classification': 'public'}),
+            self.record({'id': 3, 'email': 'null@example.com', 'classification': None}),
+            self.record({'id': 4}),
+        ]
+        output = self.consume([self.schema, *records, self.state], self.conditional_config())
+        self.assertIsNone(output[1]['record']['email'])
+        self.assertEqual('public@example.com', output[2]['record']['email'])
+        self.assertEqual('null@example.com', output[3]['record']['email'])
+        self.assertEqual({'id': 4}, output[4]['record'])
+        self.assertEqual(self.state, output[-1])
+
+    def test_sparse_delete_does_not_require_a_missing_transformed_value(self):
+        deletion = self.record({'id': 1, '_sdc_deleted_at': '2026-10-01T12:00:01Z'})
+        output = self.consume([self.schema, deletion, self.state], self.conditional_config(column='id'))
+        self.assertEqual([self.schema, deletion, self.state], output)
+
+    def test_delete_with_sensitive_value_still_requires_its_condition(self):
+        deletion = self.record({
+            'id': 1, 'email': 'sensitive@example.com', '_sdc_deleted_at': '2026-10-01T12:00:01Z',
+        })
+        with self.assertRaisesRegex(TransformFieldException, 'missing fields'):
+            self.consume([self.schema, deletion, self.state], self.conditional_config())
+
+    def test_non_patch_conditional_behavior_is_unchanged(self):
+        del self.schema['schema']['x-pipelinewise-record-update-mode']
+        record = self.record({'id': 1, 'email': 'public@example.com'})
+        self.assertEqual([self.schema, record], self.consume([self.schema, record], self.conditional_config()))

@@ -246,18 +246,47 @@ class TestFastSyncTapPostgres(TestCase):
         """The replay fence is a committed record, not a possibly empty WAL page header."""
         connection = MagicMock()
         cursor = connection.cursor.return_value.__enter__.return_value
-        cursor.fetchone.return_value = ('0/64',)
+        cursor.fetchone.side_effect = [(True,), ('0/64',)]
         calls = MagicMock()
         calls.attach_mock(cursor.execute, 'execute')
         calls.attach_mock(connection.__exit__, 'commit')
 
         self.assertEqual(FastSyncTapPostgres.capture_snapshot_boundary(connection), 100)
 
-        self.assertEqual(calls.mock_calls, [
+        self.assertIn('has_function_privilege', str(calls.mock_calls[0]))
+        self.assertEqual(calls.mock_calls[1:], [
             call.execute('SET LOCAL synchronous_commit = on'),
             call.execute("SELECT pg_logical_emit_message(true, 'pipelinewise_snapshot', '')::text"),
             call.commit(None, None, None),
         ])
+
+    def test_denied_boundary_permission_does_not_create_a_slot(self):
+        connection = MagicMock()
+        connection.cursor.return_value.__enter__.return_value.fetchone.return_value = (False,)
+        with patch.object(self.postgres, 'get_connection', return_value=connection), \
+                patch.object(self.postgres, 'create_replication_slot') as create, \
+                self.assertRaisesRegex(RuntimeError, 'requires EXECUTE'):
+            self.postgres.fetch_current_log_pos()
+        create.assert_not_called()
+        connection.close.assert_called_once()
+
+    def test_nonrecovering_replica_cannot_supply_a_primary_bookmark(self):
+        for replay_lsn in [None, '0/FFFF']:
+            with self.subTest(replay_lsn=replay_lsn), patch.object(
+                self.postgres, 'query', return_value=[{'in_recovery': False, 'current_lsn': replay_lsn}]
+            ), self.assertRaisesRegex(RuntimeError, 'replica_host is not in recovery'):
+                self.postgres._wait_for_replica_replay(100)
+
+    def test_forged_shared_slot_marker_cannot_reach_source_cleanup(self):
+        config = {'dbname': 'd' * 50, 'tap_id': 'new_id', 'previous_tap_id': 'old_id'}
+        destination, shared, _ = FastSyncTapPostgres._replication_slot_names(
+            config['dbname'], config['tap_id'], config['previous_tap_id'])
+        marker = {'version': 2, 'phase': 'pgoutput_overlap', 'source_slot': shared,
+                  'destination_slot': destination, 'slot_lsn': 100, 'boundary_lsn': 150, 'bridge_lsn': 200}
+        with patch.object(FastSyncTapPostgres, 'get_connection') as connect, \
+                self.assertRaisesRegex(RuntimeError, 'does not match'):
+            FastSyncTapPostgres.drop_promoted_wal2json_slot(config, marker)
+        connect.assert_not_called()
 
     def test_snapshot_wait_uses_existing_export_connection(self):
         """Replica catch-up must be checked on the connection that exports the rows."""
@@ -334,7 +363,8 @@ class TestFastSyncTapPostgres(TestCase):
     def test_close_connection_is_idempotent(self):
         """Close each opened connection once and clear its cursor reference."""
         connection = Mock()
-        primary_connection = Mock()
+        primary_connection = MagicMock()
+        primary_connection.cursor.return_value.__enter__.return_value.fetchone.return_value = (True,)
         self.postgres.conn = connection
         self.postgres.curr = Mock()
         self.postgres.primary_host_conn = primary_connection
@@ -361,7 +391,8 @@ class TestFastSyncTapPostgres(TestCase):
 
     def test_fetch_current_log_pos_closes_primary_connection_on_success(self):
         """The dedicated primary connection is released before reading the source LSN."""
-        primary_connection = Mock()
+        primary_connection = MagicMock()
+        primary_connection.cursor.return_value.__enter__.return_value.fetchone.return_value = (True,)
 
         with patch.object(
             self.postgres, 'get_connection', return_value=primary_connection
@@ -381,7 +412,8 @@ class TestFastSyncTapPostgres(TestCase):
     def test_fetch_current_log_pos_uses_current_wal_function_on_replica(self):
         """Supported replicas use the current WAL function name."""
         self.postgres.connection_config['replica_host'] = 'replica'
-        primary_connection = Mock()
+        primary_connection = MagicMock()
+        primary_connection.cursor.return_value.__enter__.return_value.fetchone.return_value = (True,)
 
         with patch.object(
             self.postgres, 'get_connection', return_value=primary_connection
@@ -400,7 +432,8 @@ class TestFastSyncTapPostgres(TestCase):
 
     def test_fetch_current_log_pos_closes_primary_connection_on_failure(self):
         """A replication-slot failure cannot leak the primary connection."""
-        primary_connection = Mock()
+        primary_connection = MagicMock()
+        primary_connection.cursor.return_value.__enter__.return_value.fetchone.return_value = (True,)
 
         with patch.object(
             self.postgres, 'get_connection', return_value=primary_connection
@@ -417,7 +450,8 @@ class TestFastSyncTapPostgres(TestCase):
     def test_replica_bookmark_waits_for_primary_slot_and_publication_boundary(self):
         """A lagging snapshot must not start before pgoutput can publish its changes."""
         self.postgres.connection_config['replica_host'] = 'replica'
-        primary_connection = Mock()
+        primary_connection = MagicMock()
+        primary_connection.cursor.return_value.__enter__.return_value.fetchone.return_value = (True,)
 
         with patch.object(
             self.postgres, 'get_connection', return_value=primary_connection
@@ -441,7 +475,8 @@ class TestFastSyncTapPostgres(TestCase):
     def test_replica_replay_timeout_prevents_snapshot_bookmark(self):
         """A stopped replica cannot establish a bookmark behind the publication."""
         self.postgres.connection_config['replica_host'] = 'replica'
-        primary_connection = Mock()
+        primary_connection = MagicMock()
+        primary_connection.cursor.return_value.__enter__.return_value.fetchone.return_value = (True,)
 
         with patch.object(
             self.postgres, 'get_connection', return_value=primary_connection

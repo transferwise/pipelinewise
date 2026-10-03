@@ -124,9 +124,10 @@ to the tap for the next sync.
 
 * **pgoutput plugin**: Built into PostgreSQL. PipelineWise creates and maintains
   `ppw_slot_<tap_id>` as both the slot and publication name. The runtime needs
-  replication privileges, database CREATE, and ownership of published tables.
+  replication privileges, database CREATE, ownership of published tables, and
+  EXECUTE on the text overload of `pg_catalog.pg_logical_emit_message`.
   Keep wal2json installed while existing slots migrate in release 0.94.0.
-  Release 0.95.0 will remove wal2json support and its migration code.
+  Release 0.95.0 will remove wal2json support and all related code and tests.
 
 * **postgres config file**: Locate the database configuration file (usually `postgresql.conf`) and define
   the parameters as follows:
@@ -149,6 +150,10 @@ to the tap for the next sync.
   This release retains numeric LSN/commit boundaries without `messages=true`.
   Quiet sources may wait for the idle timeout; overlap completion may need a
   later published transaction. Do not manually advance a migrating slot.
+  Old keepalives could advance wal2json beyond saved bookmarks; this requires
+  an explicit whole-tap resync. A configured snapshot secondary must be a
+  physical standby in recovery. Incomplete conditional PATCH transformations
+  stop before emitting raw values or acknowledging the update.
   See the [PostgreSQL source guide](../../docs/connectors/taps/postgres.rst) for
   prerequisites, publication reconciliation, supported tables and rename recovery.
 

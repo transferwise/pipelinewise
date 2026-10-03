@@ -405,6 +405,10 @@ def test_snowflake_e2e_matrix_contract():
         '-e PIPELINEWISE_E2E_NAMESPACE=$PIPELINEWISE_E2E_NAMESPACE'
         in target_pg_commands
     )
+    assert 'tests/end_to_end/test_postgres_master_upgrade.py' in target_pg_commands
+    baseline_step = next(step for step in target_pg_job['steps']
+                         if step.get('name') == 'Prepare the pre-migration master tap')
+    assert 'git archive 6d7a02b5e6965eb03937f6de1946c207d1be2c1c:' in baseline_step['run']
     readiness_steps = [
         step
         for configured_job in jobs.values()
