@@ -218,6 +218,11 @@ preserved. Filtered runs retain other configured tables. Re-adding a removed
 logical table requires a fresh snapshot. Removing the final LOG_BASED selection
 also clears migration state and retires dedicated slots.
 
+If discovery or publication cleanup fails during import, retry the same import.
+PipelineWise keeps ``postgres_publication_pending.json`` beside the tap config
+until reconciliation succeeds. Keep this file when retrying; it does not change
+replication bookmarks or the migration boundary.
+
 Do not change publication membership, table identity or options manually while
 replication has retained history. A missing managed table or publication can
 represent an unrecoverable gap; PipelineWise requires a whole-tap FastSync when

@@ -4,6 +4,8 @@ import time
 import unittest
 import uuid
 
+import psycopg2
+
 from tap_postgres import db
 from tap_postgres.pgoutput import PgoutputDecoder
 from tap_postgres.sync_strategies.logical_replication import int_to_lsn, lsn_to_int
@@ -12,6 +14,35 @@ from ..utils import get_test_connection, get_test_connection_config
 
 
 class TestReplicationTransport(unittest.TestCase):
+    def test_missing_publication_reports_postgresql_error_during_streaming(self):
+        name = 'transport_error_' + uuid.uuid4().hex[:12]
+        primary = get_test_connection()
+        replication = None
+        try:
+            with primary.cursor() as cur:
+                cur.execute(f'CREATE TABLE {name} (id integer PRIMARY KEY)')
+                cur.execute('SELECT lsn::text FROM pg_create_logical_replication_slot(%s, %s)', (name, 'pgoutput'))
+                initial_lsn = lsn_to_int(cur.fetchone()[0])
+                cur.execute(f'INSERT INTO {name} VALUES (1)')
+            replication = db.open_connection(get_test_connection_config(), True, True)
+            cursor = replication.cursor()
+            cursor.start_replication(
+                slot_name=name, start_lsn=initial_lsn,
+                options={'proto_version': '1', 'publication_names': name})
+            deadline = time.monotonic() + 10
+            with self.assertRaisesRegex(psycopg2.OperationalError, f'publication "{name}" does not exist'):
+                while time.monotonic() < deadline:
+                    cursor.read_message()
+                    time.sleep(0.01)
+        finally:
+            if replication is not None:
+                replication.close()
+            with primary.cursor() as cur:
+                cur.execute('SELECT pg_drop_replication_slot(slot_name) FROM pg_replication_slots '
+                            'WHERE slot_name = %s', (name,))
+                cur.execute(f'DROP TABLE IF EXISTS {name}')
+            primary.close()
+
     def test_keepalive_progress_survives_crash_without_advancing_durable_slot_position(self):
         name = 'transport_' + uuid.uuid4().hex[:12]
         primary = get_test_connection()

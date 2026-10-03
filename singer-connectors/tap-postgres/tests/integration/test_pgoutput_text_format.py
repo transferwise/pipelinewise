@@ -17,6 +17,21 @@ class TestPgoutputTextFormat(unittest.TestCase):
     publication = 'pgoutput_text_format_test_publication'
     slot = 'pgoutput_text_format_test_slot'
 
+    def test_array_values_cannot_terminate_the_conversion_sql_literal(self):
+        config = get_test_connection_config(self.database)
+        values = ["literal $stitch_quote$ and ' quotes", 'backslash \\ and comma ,', 'NULL']
+        source = get_test_connection(self.database)
+        try:
+            with source.cursor() as cursor:
+                cursor.execute('SELECT %s::text[]::text', (values,))
+                encoded = cursor.fetchone()[0]
+            self.assertEqual(
+                logical_replication.selected_value_to_singer_value(encoded, 'text[]', config),
+                values,
+            )
+        finally:
+            source.close()
+
     @classmethod
     def _cleanup(cls, admin, replication_connection=None):
         if replication_connection is not None:

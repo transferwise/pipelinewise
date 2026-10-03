@@ -11,6 +11,8 @@
   wait for the idle timeout and a later published transaction to finish overlap
 - Reset dedicated wal2json slots during whole-tap FastSync. Support historical
   tap-ID renames through `previous_tap_id` and reject unsafe migration inputs
+- Retry unfinished publication changes on identical imports. Preserve array
+  values containing SQL delimiters and report PostgreSQL streaming errors
 - Warn on PostgreSQL minors below 14.18, 15.13, 16.9 and 17.5, while allowing
   connections. Require publication privileges and valid source primary keys
 - Add connector CI and PostgreSQL 15/18 migration E2E coverage. Rebalance E2E

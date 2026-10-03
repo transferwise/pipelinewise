@@ -15,6 +15,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
+import pidfile
 import psycopg2
 import pytest
 
@@ -787,7 +788,17 @@ def test_import_removes_only_deselected_managed_publication_tables(tmp_path):
                 f'      - table_name: "{TABLE_NAME}"\n        replication_method: "LOG_BASED"\n', ''),
             encoding='utf-8',
         )
+        pending_path = state_path.with_name('postgres_publication_pending.json')
+        with pidfile.PIDFile(str(state_path.with_name('pipelinewise.pid'))):
+            failed_import = _run(import_command, command_env)
+            assert failed_import.returncode != 0
+            assert 'Cannot reconcile PostgreSQL publication for running tap' in (
+                failed_import.stdout + failed_import.stderr)
+        assert pending_path.exists()
+        assert _publication_tables(e2e) == expected_managed | {(SOURCE_SCHEMA, unmanaged_table)}
+        assert STREAM_ID in _read_state(state_path)['bookmarks']
         _run_success(import_command, command_env)
+        assert not pending_path.exists()
         assert _publication_tables(e2e) == {
             (SOURCE_SCHEMA, retained_table), (SOURCE_SCHEMA, unmanaged_table),
         }

@@ -1909,6 +1909,7 @@ class PipelineWise:
         data_diff_definitions = config.get_data_diff_definitions(selected_taps_id)
         self._validate_postgres_migration_import(config, selected_taps_id)
         self._preserve_renamed_postgres_state(config, selected_taps_id)
+        self._mark_pending_postgres_publication_changes(config)
         config.save(selected_taps_id)
 
         # Activating tap stream selections
@@ -2037,6 +2038,8 @@ class PipelineWise:
                     continue
                 if selected_taps != ['*'] and tap['id'] not in selected_taps:
                     continue
+                if os.path.exists(self._postgres_publication_pending_path(tap)):
+                    self._postgres_publication_changes.add(tap['id'])
                 old_connection = utils.load_json(tap['files']['config']) or {}
                 state = utils.load_json(tap['files']['state']) or {}
                 marker = state.get(PGOUTPUT_MIGRATION_STATE_KEY)
@@ -2053,6 +2056,19 @@ class PipelineWise:
                         f'Finish PostgreSQL migration for {tap["id"]!r} before changing its selection. '
                         'The active generated configuration and bookmarks were left unchanged.'
                     )
+
+    @staticmethod
+    def _postgres_publication_pending_path(tap):
+        return os.path.join(os.path.dirname(tap['files']['config']), 'postgres_publication_pending.json')
+
+    def _mark_pending_postgres_publication_changes(self, config):
+        """Remember import work before generated selection files can replace the old selection."""
+        for target in config.targets.values():
+            for tap in target.get('taps', []):
+                if tap['id'] in self._postgres_publication_changes:
+                    pending_path = self._postgres_publication_pending_path(tap)
+                    os.makedirs(os.path.dirname(pending_path), exist_ok=True)
+                    fastsync_utils.save_dict_to_json(pending_path, {'version': 1})
 
     def _data_diff_repository(self):
         backend_config = self.config.get('backend_db')
@@ -3242,6 +3258,7 @@ TAP RUN SUMMARY
             return None
         try:
             self._reconcile_postgres_pgoutput_publication(tap)
+            utils.silentremove(self._postgres_publication_pending_path(tap))
         except Exception as exc:
             return f'{target_id} - {tap["id"]}: {exc}'
         return None

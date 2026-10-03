@@ -269,7 +269,7 @@ def test_final_log_deselection_uses_explicit_connector_retirement_mode(tmp_path)
 def test_import_reconciles_only_successfully_discovered_postgres_taps(tmp_path):
     """Discovery failure or another tap type must not mutate a publication."""
     runner = _runner(tmp_path)
-    postgres = {'id': 'pg', 'type': 'tap-postgres'}
+    postgres = {'id': 'pg', 'type': 'tap-postgres', 'files': runner.tap['files']}
     mysql = {'id': 'mysql', 'type': 'tap-mysql'}
 
     with patch.object(runner, '_reconcile_postgres_pgoutput_publication') as reconcile:
@@ -284,6 +284,39 @@ def test_import_reconciles_only_successfully_discovered_postgres_taps(tmp_path):
         ) is None
 
     reconcile.assert_called_once_with(postgres)
+
+
+@pytest.mark.parametrize('discovery_error', [None, 'source unavailable'])
+def test_identical_import_retries_unfinished_publication_reconciliation(tmp_path, discovery_error):
+    runner = _runner(tmp_path)
+    files = Config.get_connector_files(str(tmp_path))
+    tap = {'id': 'pg', 'type': 'tap-postgres', 'files': files, 'schemas': []}
+    config = SimpleNamespace(targets={'target': {'id': 'target', 'taps': [tap]}})
+    Path(files['config']).write_text(json.dumps({'dbname': 'my_db', 'tap_id': 'pg'}))
+    Path(files['selection']).write_text(json.dumps({'selection': [
+        {'tap_stream_id': 'public-old', 'replication_method': 'LOG_BASED'},
+    ]}))
+    runner._validate_postgres_migration_import(config, ['pg'])
+    runner._mark_pending_postgres_publication_changes(config)
+    pending = Path(runner._postgres_publication_pending_path(tap))
+    assert pending.exists()
+    Path(files['selection']).write_text(json.dumps({'selection': Config.generate_selection(tap)}))
+
+    with patch.object(runner, '_reconcile_postgres_pgoutput_publication', side_effect=RuntimeError('source busy')):
+        error = runner._reconcile_postgres_publication_after_discovery('target', tap, discovery_error)
+    assert error and pending.exists()
+
+    retry = _runner(tmp_path)
+    retry._validate_postgres_migration_import(config, ['pg'])
+    with patch.object(retry, '_reconcile_postgres_pgoutput_publication') as reconcile:
+        assert retry._reconcile_postgres_publication_after_discovery('target', tap, None) is None
+    reconcile.assert_called_once_with(tap)
+    assert not pending.exists()
+
+    retry._validate_postgres_migration_import(config, ['pg'])
+    with patch.object(retry, '_reconcile_postgres_pgoutput_publication') as reconcile:
+        assert retry._reconcile_postgres_publication_after_discovery('target', tap, None) is None
+    reconcile.assert_not_called()
 
 
 def test_partial_logical_deselection_invalidates_only_removed_log_history(tmp_path):

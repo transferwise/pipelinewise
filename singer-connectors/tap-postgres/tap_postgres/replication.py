@@ -115,7 +115,7 @@ class ReplicationCursor:
                 consumed_input = True
                 continue
             if length < 0:
-                raise psycopg2.OperationalError('Logical replication connection ended before the run boundary')
+                self._raise_stream_error()
             # Drain buffered messages before reading the socket so slow targets
             # cannot accumulate an unbounded second copy of the WAL stream.
             consumed_input = True
@@ -132,6 +132,18 @@ class ReplicationCursor:
                 return ReplicationMessage(data, data_start, self.wal_end)
             else:
                 raise psycopg2.OperationalError('Invalid logical replication transport message')
+
+    def _raise_stream_error(self):
+        """Preserve server diagnostics without blocking for more protocol data."""
+        detail = self.pgconn.error_message
+        if not self.pgconn.is_busy():
+            result = self.pgconn.get_result()
+            if result is not None and result.error_message:
+                detail = result.error_message
+        message = 'Logical replication connection ended before the run boundary'
+        if detail:
+            message += ': ' + detail.decode(self.connection.encoding, errors='replace').strip()
+        raise psycopg2.OperationalError(message)
 
     def close(self):
         # Closing the owning connection ends COPY BOTH and releases its slot.

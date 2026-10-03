@@ -15,6 +15,9 @@ def _cursor(*messages):
     cursor = ReplicationCursor(connection)
     cursor.pgconn.flush.return_value = 0
     cursor.pgconn.put_copy_data.return_value = 1
+    cursor.pgconn.error_message = b''
+    cursor.pgconn.is_busy.return_value = False
+    cursor.pgconn.get_result.return_value = None
     cursor.pgconn.get_copy_data.side_effect = [
         *((len(message), memoryview(message)) for message in messages), (0, b'')]
     return cursor
@@ -70,6 +73,25 @@ def test_connection_closure_does_not_look_like_idle_success():
     cursor.pgconn.get_copy_data.side_effect = [(-1, b'')]
     with pytest.raises(psycopg2.OperationalError, match='ended before the run boundary'):
         cursor.read_message()
+
+
+def test_stream_failure_includes_postgresql_error_detail():
+    cursor = _cursor()
+    cursor.pgconn.get_copy_data.side_effect = [(-1, b'')]
+    cursor.pgconn.get_result.return_value = Mock(
+        error_message=b'ERROR: publication "ppw_slot_orders" does not exist\n')
+    with pytest.raises(psycopg2.OperationalError, match='publication "ppw_slot_orders" does not exist'):
+        cursor.read_message()
+
+
+def test_broken_connection_reports_libpq_error_without_waiting_for_a_result():
+    cursor = _cursor()
+    cursor.pgconn.get_copy_data.side_effect = [(-2, b'')]
+    cursor.pgconn.is_busy.return_value = True
+    cursor.pgconn.error_message = b'SSL connection has been closed unexpectedly\n'
+    with pytest.raises(psycopg2.OperationalError, match='SSL connection has been closed unexpectedly'):
+        cursor.read_message()
+    cursor.pgconn.get_result.assert_not_called()
 
 
 def test_feedback_retries_when_output_buffer_is_full_without_losing_acknowledgement():

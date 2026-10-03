@@ -281,8 +281,7 @@ def create_array_elem(elem, sql_datatype, conn_info):  # noqa: C901
                 # custom datatypes like enums
                 cast_datatype = 'text[]'
 
-            sql_stmt = f"""SELECT $stitch_quote${elem}$stitch_quote$::{cast_datatype}"""
-            cur.execute(sql_stmt)
+            cur.execute(f'SELECT %s::{cast_datatype}', (elem,))
             res = cur.fetchone()[0]
             return res
 
@@ -1902,13 +1901,14 @@ def _validate_migration_state(conn_info, migration_state):
                 and (
                     type(migration_state.get('bridge_lsn')) is not int
                     or migration_state['bridge_lsn'] <= migration_state['slot_lsn']
+                    or migration_state['bridge_lsn'] < migration_state['boundary_lsn']
                 )
             )
             or (
                 phase == 'overlap_complete'
                 and (
                     type(migration_state.get('crossover_lsn')) is not int
-                    or migration_state['crossover_lsn'] < migration_state['slot_lsn']
+                    or migration_state['crossover_lsn'] < migration_state['bridge_lsn']
                 )
             )):
         raise ReplicationSlotMigrationError(

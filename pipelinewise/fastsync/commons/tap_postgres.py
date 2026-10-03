@@ -283,13 +283,14 @@ class FastSyncTapPostgres:
                 and (
                     type(marker.get('bridge_lsn')) is not int
                     or marker['bridge_lsn'] <= marker['slot_lsn']
+                    or marker['bridge_lsn'] < marker['boundary_lsn']
                 )
             )
             or (
                 phase == 'overlap_complete'
                 and (
                     type(marker.get('crossover_lsn')) is not int
-                    or marker['crossover_lsn'] < marker['slot_lsn']
+                    or marker['crossover_lsn'] < marker['bridge_lsn']
                 )
             )
         ):

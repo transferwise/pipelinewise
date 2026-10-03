@@ -56,6 +56,25 @@ def test_persisted_migration_marker_is_accepted_by_both_runtimes(phase):
     assert _singer_helpers()['_validate_migration_state'](config, marker) == phase
 
 
+@pytest.mark.parametrize('phase,positions', [
+    ('bridge', {'bridge_lsn': 149}),
+    ('pgoutput_overlap', {'bridge_lsn': 149}),
+    ('overlap_complete', {'crossover_lsn': 199}),
+    ('overlap_complete', {'bridge_lsn': 149, 'crossover_lsn': 149}),
+])
+def test_migration_boundaries_cannot_skip_unreplayed_history(phase, positions):
+    config = {'dbname': 'orders', 'tap_id': 'orders'}
+    marker = {
+        'version': 2, 'phase': phase, 'source_slot': 'pipelinewise_orders_orders',
+        'destination_slot': 'ppw_slot_orders', 'slot_lsn': 100,
+        'boundary_lsn': 150, 'bridge_lsn': 200, 'crossover_lsn': 300, **positions,
+    }
+    with pytest.raises(RuntimeError, match='Invalid'):
+        fastsync.FastSyncTapPostgres.validate_migration_state_marker(config, marker)
+    with pytest.raises(RuntimeError, match='Invalid'):
+        _singer_helpers()['_validate_migration_state'](config, marker)
+
+
 def test_safe_minor_release_warning_thresholds_match():
     tree = ast.parse((TAP / 'db.py').read_text())
     declaration = next(node.value for node in tree.body if isinstance(node, ast.Assign)
