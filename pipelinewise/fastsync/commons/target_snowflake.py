@@ -383,14 +383,18 @@ class FastSyncTargetSnowflake(SnowflakeSqlClient):
 
         stage = self.connection_config['stage']
         source = f"'@{stage}/{s3_key}'"
-        if columns and any(re.search(r'\sFLOAT$', column, re.IGNORECASE) for column in columns):
+        floating_type = re.compile(
+            r'\s(?:FLOAT(?:4|8)?|DOUBLE(?:\s+PRECISION)?|REAL)(?:\s+NOT\s+NULL)?$',
+            re.IGNORECASE,
+        )
+        if columns and any(floating_type.search(column) for column in columns):
             source_columns = [
                 column for column in columns
                 if not column.startswith((utils.SDC_EXTRACTED_AT, utils.SDC_BATCHED_AT, utils.SDC_DELETED_AT))
             ]
             source_columns += ['TIMESTAMP_NTZ', 'TIMESTAMP_NTZ', 'VARCHAR']
             expressions = [
-                snowflake_float_expression(f'${position}') if re.search(r'\sFLOAT$', column, re.IGNORECASE)
+                snowflake_float_expression(f'${position}') if floating_type.search(column)
                 else f'${position}'
                 for position, column in enumerate(source_columns, start=1)
             ]

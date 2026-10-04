@@ -394,6 +394,16 @@ class TestFastSyncTargetSnowflake(TestCase):
         assert '$6' not in query
         assert 'empty_field_as_null=TRUE' in query
 
+    def test_double_copy_projection_saturates_iceberg_float_overflow(self):
+        """Iceberg's canonical DOUBLE uses the same guarded CSV conversion as FLOAT."""
+        columns = ['"ID" NUMBER(38,0)', '"AMOUNT" DOUBLE', '_SDC_EXTRACTED_AT TIMESTAMP_NTZ',
+                   '_SDC_BATCHED_AT TIMESTAMP_NTZ', '_SDC_DELETED_AT VARCHAR']
+        self.snowflake.copy_to_table('key', 'schema', 'items', 1, is_temporary=True, columns=columns)
+        query = self.snowflake.executed_queries[-1]
+        assert 'SELECT $1, CASE WHEN $2 IS NULL THEN NULL' in query
+        assert 'TRY_TO_DOUBLE($2)' in query
+        assert "IFF(SUBSTR($2, 1, 1) = '-', -1.7976931348623157e308, 1.7976931348623157e308)" in query
+
     def test_numeric_copy_uses_existing_direct_stage_sql(self):
         """Supplying exact numeric columns does not change the established COPY form."""
         self.snowflake.copy_to_table('key', 'schema', 'items', 1, is_temporary=True)
