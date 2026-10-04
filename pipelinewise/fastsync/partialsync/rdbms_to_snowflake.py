@@ -60,6 +60,20 @@ class _PartialSyncRun:
     native_target_exists: bool = False
 
 
+def _source_column_definitions(spec):
+    """Return staging definitions without PipelineWise metadata columns."""
+    metadata_columns = {
+        common_utils.SDC_EXTRACTED_AT,
+        common_utils.SDC_BATCHED_AT,
+        common_utils.SDC_DELETED_AT,
+    }
+    return [
+        column.definition
+        for column in spec.columns
+        if column.name not in metadata_columns
+    ]
+
+
 def partial_sync_table(
     table: tuple,
     args,
@@ -259,7 +273,7 @@ def _prepare_iceberg_partial_export(run: _PartialSyncRun) -> bool:
                 'force_precision_columns', False
             ),
         )
-        run.source_columns = [column.definition for column in current_spec.columns]
+        run.source_columns = _source_column_definitions(current_spec)
     if run.attempt is not None:
         run.spec = run.attempt.table_spec
         iceberg_routes.validate_recovery_source_spec(run.spec, current_spec)

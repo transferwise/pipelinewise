@@ -18,6 +18,7 @@ from pipelinewise.fastsync.commons.snowflake_iceberg import SnowflakeIcebergPubl
 from pipelinewise.fastsync.commons.partial_sync_boundary import PartialSyncBoundary
 from pipelinewise.fastsync.partialsync.utils import diff_source_target_columns, NativePartialSyncCompatibilityError
 from pipelinewise.fastsync.partialsync import utils
+from pipelinewise.fastsync.partialsync import rdbms_to_snowflake
 from tests.units.fastsync.commons.snowflake_iceberg_test_helpers import FakeSnowflake, RECOVERY_IDENTITY, v3_snapshot
 
 
@@ -73,6 +74,19 @@ def test_iceberg_postgres_decimal_key_always_retains_float_staging_type(force_pr
     assert partial_preparation(
         expected, actual, {}, decimal_columns=('AMOUNT',),
     ) == ()
+
+
+def test_retained_iceberg_staging_definitions_exclude_pipelinewise_metadata():
+    retained = with_retained_decimal_types(
+        _spec('NUMERIC(38,18)'),
+        _spec('FLOAT'),
+        decimal_columns=('AMOUNT',),
+    )
+
+    assert rdbms_to_snowflake._source_column_definitions(retained) == [
+        '"ID" NUMBER(38,0) NOT NULL',
+        '"AMOUNT" DOUBLE',
+    ]
 
 
 @pytest.mark.parametrize(('current', 'mapped'), (
