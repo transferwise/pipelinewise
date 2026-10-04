@@ -1,31 +1,33 @@
-0.94.0 (2026-10-03)
+0.94.0 (2026-10-04)
 -------------------
 
 - Switch PostgreSQL LOG_BASED replication to built-in pgoutput on PostgreSQL 14+.
-  Name slots and publications `ppw_slot_<tap_id>` and maintain selected tables
-  before FastSync and during configuration import
-- Migrate dedicated wal2json slots through a target-acknowledged bridge. Retire
-  wal2json after durable promotion, then replay overlap from the original
-  pgoutput position. Preserve unchanged large values and durable target state
+  Retire dedicated wal2json slots after target acknowledgement and durable
+  promotion. Replay overlap from the original pgoutput position without moving
+  bookmarks backwards or acknowledging data before the target commits it
+- Name slots and publications `ppw_slot_<tap_id>`. Add selected tables before
+  FastSync. Remove deselected managed tables during `import_config`, preserve
+  DBA-added members, and retry unfinished publication changes
+- Reset dedicated pgoutput and wal2json slots during unfiltered whole-tap
+  FastSync. Support historical tap-ID renames through `previous_tap_id`
 - Keep numeric LSN/commit boundaries without `messages=true`. Quiet sources can
   wait for the idle timeout and a later published transaction to finish overlap
-- Reset dedicated wal2json slots during whole-tap FastSync. Support historical
-  tap-ID renames through `previous_tap_id` and reject unsafe migration inputs
-- Retry unfinished publication changes on identical imports. Preserve array
-  values containing SQL delimiters and report PostgreSQL streaming errors
-- Warn on PostgreSQL minors below 14.18, 15.13, 16.9 and 17.5, while allowing
-  connections. Require publication and boundary-message privileges, valid source
-  primary keys, and recovering standby endpoints for secondary snapshots
-- Checkpoint backlogs by row count or elapsed time at complete commits. Reject
-  incomplete conditional PATCH transformations before raw values reach the target
-- Add connector CI, real wal2json upgrade tests and PostgreSQL 15/18 migration
-  E2E coverage. Rebalance E2E shards to reduce completion time
+- Checkpoint backlogs after 10,000 emitted row changes or 60 seconds, only at
+  completed transactions. Preserve unchanged large values in sparse updates and
+  array values containing SQL delimiters
+- Reject incomplete conditional PATCH transformations before raw values reach
+  the target. Report PostgreSQL server diagnostics on streaming failures
+- Require publication and boundary-message privileges, valid source primary keys,
+  and recovering standby endpoints for secondary snapshots. Warn, but continue,
+  on PostgreSQL minors below 14.18, 15.13, 16.9 and 17.5
 
 **Upgrade:** 0.94.0 is the migration release. Complete migration before 0.95.0,
-which will remove the migration and all wal2json code and tests. Keep wal2json installed
-until migration finishes. This transition supports roll-forward recovery only.
-See the [PostgreSQL guide](docs/connectors/taps/postgres.rst) for privileges,
-publication changes, naming limits, quiet-source behaviour and recovery.
+which will remove the migration and all wal2json code and tests. Keep wal2json
+installed until migration finishes. Recovery is roll-forward only. Migration
+rejects saved bookmarks behind the old slot's confirmed position; use an explicit,
+unfiltered whole-tap `fast_sync` to recover. Do not advance bookmarks to bypass
+this check. See the [PostgreSQL guide](docs/connectors/taps/postgres.rst) for
+prerequisites, supported tables, naming limits and recovery.
 
 0.93.0 (2026-09-28)
 -------------------
