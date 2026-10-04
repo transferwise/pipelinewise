@@ -425,7 +425,7 @@ def test_mysql_extended_types_snowflake(source_export, tmp_path):
             (4, 5, None, None, None, None, None, None),
         )
         messages = _tap_extract(source, 'snowflake', args, dimensions=None, start=3, end=5)
-        assert {message['record']['id'] for message in messages if message['type'] == 'RECORD'} == {1, 4}
+        assert {message['record']['id'] for message in messages if message['type'] == 'RECORD'} == {1, 3, 4}
         _load_singer(config, 'snowflake', messages)
         assert rows()[0] == {
             'ID': 1, 'LABELS': '', 'TINY_PAYLOAD': '', 'PAYLOAD': '',
