@@ -72,10 +72,12 @@ required merely because an old target column remains.
 Decimal mapping
 ---------------
 
-MariaDB/MySQL ``DECIMAL(p,s)`` and PostgreSQL ``NUMERIC(p,s)`` retain their
-declared precision and scale where supported by Snowflake native, Snowflake managed
-Iceberg v3, and PostgreSQL targets. This applies to Singer and supported FullSync/PartialSync
-routes. Snowflake reports ``NUMERIC`` as its equivalent ``NUMBER`` type.
+MariaDB/MySQL ``DECIMAL(p,s)`` or ``NUMERIC(p,s)`` and PostgreSQL
+``NUMERIC(p,s)`` or ``DECIMAL(p,s)`` retain their declared precision and scale
+where supported by Snowflake native, Snowflake managed Iceberg v3, and PostgreSQL
+targets. This applies to Singer and supported FullSync/PartialSync routes. New
+columns always use this mapping. Snowflake reports ``NUMERIC`` as its equivalent
+``NUMBER`` type.
 Approximate ``FLOAT``, ``DOUBLE``, and ``REAL`` columns keep their existing mapping.
 Other sources and destination combinations keep their existing behavior.
 PostgreSQL numeric primary keys use canonical text on Snowflake so a ``NaN``
@@ -121,12 +123,14 @@ or scale greater than precision. This preserves values without requiring syntax
 that the older server does not support.
 
 The mapping is computed before loading from the source declaration and target
-capabilities. It needs no fallback flag or history in ``properties.json`` or
-``state.json``. Source dimensions remain unchanged in the catalog even when the
-destination uses FLOAT. This upgrade is intended for roll-forward deployment.
+capabilities. Source dimensions remain unchanged in the catalog even when the
+destination uses FLOAT. The migration setting is tap configuration propagated to
+the Snowflake loader; it adds no history to ``properties.json`` or ``state.json``.
+This upgrade is intended for roll-forward deployment.
 
-When a source non-key decimal type, precision, or scale changes, Singer targets and
-Snowflake PartialSync rename the old column and add the newly mapped column.
+When a source non-key fixed-point decimal type, precision, or scale changes,
+Singer targets and Snowflake PartialSync rename the old column and add the newly
+mapped column.
 Names use a UTC timestamp including microseconds, for example
 ``AMOUNT_20260929_120000_123456``. Historical rows have ``NULL`` in the new column
 until those rows are replicated again. No resync or backfill is required.
@@ -137,8 +141,23 @@ FastSync only authorizes this versioning for source decimal columns. A genuine
 source floating-point or integer column with a mismatched target numeric type
 remains incompatible and needs FullSync.
 
-Automatic versioning of primary-key columns is rejected before target schema
-changes. PartialSync also rejects versioning its range column, because empty
+Existing Snowflake ``FLOAT``, ``DOUBLE``, or ``REAL`` columns created by the
+legacy decimal mapping remain in place by default, so replication continues with
+its existing floating-point precision. This includes primary keys whose new
+precision-preserving mapping is text. Their load projection continues to use the
+existing floating-point type. Set
+``force_precision_columns: true`` at the MariaDB/MySQL or
+PostgreSQL tap root to archive each eligible non-key legacy column and add its
+precision-preserving replacement. This opt-in applies to native and managed Iceberg tables
+and to Singer and supported PartialSync routes. It does not affect new columns.
+Legacy floating-point decimal primary keys remain floating-point even when the
+option is enabled, so one such table cannot stop the other streams in its tap.
+Run ``import_config`` after changing the setting. A retained Iceberg PartialSync
+attempt records the setting and its source-decimal columns in its internal
+recovery manifest so a retry cannot silently change the planned schema action.
+
+Other primary-key type changes are rejected before target schema changes.
+PartialSync also rejects versioning its range column, because empty
 values in the new column cannot identify historical rows in that range. Use
 FullSync to replace the table in either case. The range restriction also applies
 when Singer already versioned that column. A decimal range column that requires
@@ -146,7 +165,8 @@ FLOAT or text fallback also needs FullSync, because its target ordering cannot
 represent the source range exactly. Newly created PostgreSQL numeric primary
 keys on Snowflake, and other decimal primary keys that would require FLOAT,
 use canonical, lossless text instead, preserving distinct row identities.
-Changing an existing key's type still requires FullSync.
+Changing an existing key's type still requires FullSync; leaving the option at
+its default does not require one.
 
 Legacy floating-point decimal bookmarks trigger a warning and conservative
 source-side replay from below the rounded boundary. Nonfinite boundaries request

@@ -586,6 +586,10 @@
       "type": "integer",
       "enum": [3]
     },
+    "force_precision_columns": {
+      "type": "boolean",
+      "default": false
+    },
     "split_large_files": {
       "type": "boolean"
     },

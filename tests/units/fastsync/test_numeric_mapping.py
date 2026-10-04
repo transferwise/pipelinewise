@@ -17,17 +17,19 @@ from pipelinewise.fastsync.partialsync.rdbms_to_snowflake import _resolved_bound
 
 
 @pytest.mark.parametrize('route', (mysql_to_postgres, mysql_to_snowflake))
+@pytest.mark.parametrize('source_type', ('decimal', 'numeric'))
 @pytest.mark.parametrize('precision,scale', ((1, 0), (18, 2), (38, 18), (38, 37)))
-def test_mysql_decimal_mapping_preserves_declared_dimensions(route, precision, scale):
-    declaration = f'decimal({precision},{scale}) unsigned zerofill'
-    assert route.tap_type_to_target_type('decimal', declaration) == f'NUMERIC({precision},{scale})'
+def test_mysql_decimal_mapping_preserves_declared_dimensions(route, source_type, precision, scale):
+    declaration = f'{source_type}({precision},{scale}) unsigned zerofill'
+    assert route.tap_type_to_target_type(source_type, declaration) == f'NUMERIC({precision},{scale})'
     assert 'FLOAT' in route.tap_type_to_target_type('float', 'float') or route == mysql_to_postgres
 
 
 @pytest.mark.parametrize('route', (postgres_to_postgres, postgres_to_snowflake))
-def test_postgres_fastsync_metadata_reaches_mapper(route):
+@pytest.mark.parametrize('source_type', ('numeric', 'decimal'))
+def test_postgres_fastsync_metadata_reaches_mapper(route, source_type):
     source = FastSyncTapPostgres({}, route.tap_type_to_target_type)
-    assert source.map_table_columns([('amount', 'numeric', '"amount"', None, 38, 18)]) == [
+    assert source.map_table_columns([('amount', source_type, '"amount"', None, 38, 18)]) == [
         '"AMOUNT" NUMERIC(38,18)',
     ]
 

@@ -269,13 +269,17 @@ class SnowflakeIcebergPublisher:
             iceberg_version,
         )
 
-    def _partial_method(self, spec, snapshot, drop_target, iceberg_version, decimal_columns=()):
+    def _partial_method(
+        self, spec, snapshot, drop_target, iceberg_version, decimal_columns=(),
+        force_precision_columns=False,
+    ):
         return self.publication_service._partial_method(
             spec,
             snapshot,
             drop_target,
             iceberg_version,
             decimal_columns=decimal_columns,
+            force_precision_columns=force_precision_columns,
         )
 
     def _preflight_replacement(self, target, destination_spec=None):
@@ -501,15 +505,19 @@ class SnowflakeIcebergPublisher:
         staging_config: Optional[Dict[str, Any]] = None,
         resolved_source_engine: Optional[str] = None,
         decimal_columns: Iterable[str] = (),
+        force_precision_columns: bool = False,
     ) -> IcebergPublicationAttempt:
         """Persist a PartialSync boundary, range evidence, and publication decision."""
         if not spec.primary_key:
             raise TableCompatibilityError('Iceberg PartialSync requires a primary key')
+        decimal_columns = tuple(sorted(set(decimal_columns)))
         payload_context = boundary.as_context()
         if staging_config is not None:
             payload_context['staging_config'] = dict(staging_config)
         if resolved_source_engine is not None:
             payload_context['resolved_source_engine'] = resolved_source_engine
+        payload_context['decimal_columns'] = list(decimal_columns)
+        payload_context['force_precision_columns'] = force_precision_columns
         return self._prepare(
             'partial',
             spec,
@@ -518,6 +526,7 @@ class SnowflakeIcebergPublisher:
             recovery_identity,
             PartialSyncManifestPayload.from_context(payload_context),
             decimal_columns=decimal_columns,
+            force_precision_columns=force_precision_columns,
         )
 
     def _prepare(
@@ -529,6 +538,7 @@ class SnowflakeIcebergPublisher:
         recovery_identity,
         payload,
         decimal_columns=(),
+        force_precision_columns=False,
     ):
         validate_recovery_identity(recovery_identity)
         with self.table_lock(spec.name, recovery_identity):
@@ -555,6 +565,7 @@ class SnowflakeIcebergPublisher:
                 payload,
                 recovery_identity['iceberg_version'],
                 decimal_columns=decimal_columns,
+                force_precision_columns=force_precision_columns,
             )
             attempt = IcebergPublicationAttempt(
                 load_id=load_id,
@@ -579,7 +590,10 @@ class SnowflakeIcebergPublisher:
         """Create the target pointer before publishing the stream manifest."""
         self.recovery_coordinator.persist_new_attempt(attempt)
 
-    def _method_for_snapshot(self, kind, spec, snapshot, payload, iceberg_version, decimal_columns=()):
+    def _method_for_snapshot(
+        self, kind, spec, snapshot, payload, iceberg_version, decimal_columns=(),
+        force_precision_columns=False,
+    ):
         if kind == 'full':
             method, _ = self._full_method(spec, snapshot, iceberg_version)
         else:
@@ -589,6 +603,7 @@ class SnowflakeIcebergPublisher:
                 bool(payload.drop_target),
                 iceberg_version,
                 decimal_columns=decimal_columns,
+                force_precision_columns=force_precision_columns,
             )
             if method == PUBLICATION_PARTIAL_MERGE:
                 from .snowflake_decimal_evolution import plan_column_versions
@@ -596,6 +611,7 @@ class SnowflakeIcebergPublisher:
                 context = payload.as_context()
                 context['column_versions'] = plan_column_versions(
                     spec, snapshot.spec, payload.column_name, decimal_columns=decimal_columns,
+                    force_precision_columns=force_precision_columns,
                 )
                 source_names = {column.name for column in spec.columns}
                 context['historical_columns'] = {

@@ -23,6 +23,7 @@ from pipelinewise.fastsync.commons.snowflake_iceberg import (
     [
         ({}, None),
         ({'target_table_format': 'native'}, None),
+        ({'force_precision_columns': True}, None),
         ({
             'target_table_format': 'iceberg',
             'iceberg_version': 3,
@@ -49,6 +50,9 @@ def test_validate_route_config(target_config, expected):
         ({'iceberg_query_history_poll_timeout_seconds': -1}, 'query_history'),
         ({'iceberg_query_history_poll_timeout_seconds': 900.0}, 'query_history'),
         ({'iceberg_query_history_poll_timeout_seconds': '900'}, 'query_history'),
+        ({'force_precision_columns': None}, 'force_precision_columns'),
+        ({'force_precision_columns': 1}, 'force_precision_columns'),
+        ({'force_precision_columns': 'true'}, 'force_precision_columns'),
     ],
 )
 def test_validate_route_config_rejects_unsupported_iceberg_settings(
@@ -298,6 +302,41 @@ def test_fastsync_recovery_identity_detects_execution_contract_drift(changed_arg
 
     assert changed['stream_fingerprint'] == original['stream_fingerprint']
     assert changed['fingerprint'] != original['fingerprint']
+
+
+def test_fastsync_recovery_identity_keeps_default_precision_config_legacy_compatible():
+    captured = []
+
+    def capture_identity(_scope, identity, **_kwargs):
+        captured.append(identity)
+        return {}
+
+    with mock.patch.object(routes, 'build_recovery_identity', side_effect=capture_identity):
+        _recovery_identity(_recovery_args())
+        _recovery_identity(
+            _recovery_args(),
+            partial_boundary={
+                'column_name': 'id', 'start_value': '1', 'end_value': '2', 'drop_target': False,
+            },
+        )
+
+    assert all('force_precision_columns' not in identity['target'] for identity in captured)
+
+
+def test_partial_recovery_identity_detects_precision_opt_in_without_affecting_fullsync():
+    boundary = {'column_name': 'id', 'start_value': '1', 'end_value': '2', 'drop_target': False}
+    default_partial = _recovery_identity(_recovery_args(), partial_boundary=boundary)
+    opted_in_partial = _recovery_identity(
+        _recovery_args(target_override={'force_precision_columns': True}),
+        partial_boundary=boundary,
+    )
+    default_full = _recovery_identity(_recovery_args())
+    opted_in_full = _recovery_identity(
+        _recovery_args(target_override={'force_precision_columns': True})
+    )
+
+    assert opted_in_partial['fingerprint'] != default_partial['fingerprint']
+    assert opted_in_full['fingerprint'] == default_full['fingerprint']
 
 
 def test_fastsync_recovery_identity_keeps_server_detected_timeout_non_semantic():

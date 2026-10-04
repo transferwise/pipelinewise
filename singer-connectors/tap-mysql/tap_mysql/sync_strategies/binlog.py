@@ -11,8 +11,10 @@ import pytz
 import singer
 import tzlocal
 
+from functools import wraps
 from typing import Dict, Set, Union, Optional, Any, Tuple
 from plpygis import Geometry
+from pymysqlreplication.bitmap import BitGet
 from pymysqlreplication import BinLogStreamReader
 from pymysqlreplication.constants import FIELD_TYPE
 from pymysqlreplication.event import (
@@ -21,6 +23,7 @@ from pymysqlreplication.event import (
 from pymysqlreplication.gtid import Gtid, GtidSet
 from pymysqlreplication.row_event import (
     DeleteRowsEvent,
+    RowsEvent,
     UpdateRowsEvent,
     WriteRowsEvent,
     TableMapEvent,
@@ -56,6 +59,38 @@ MYSQL_TIMESTAMP_TYPES = {
     FIELD_TYPE.TIMESTAMP,
     FIELD_TYPE.TIMESTAMP2
 }
+
+
+def preserve_empty_binlog_sets():
+    """Keep mysql-replication 0.46 from collapsing an empty SET into SQL NULL."""
+    method_name = '_RowsEvent__read_values_name'
+    read_value = getattr(RowsEvent, method_name)
+    if getattr(read_value, '_pipelinewise_preserves_empty_sets', False):
+        return
+
+    @wraps(read_value)
+    def set_aware_read_value(
+        event, column, null_bitmap, null_bitmap_index, cols_bitmap, unsigned, zerofill,
+        fixed_binary_length, index,
+    ):
+        is_present = BitGet(cols_bitmap, index) != 0
+        is_null = is_present and event._is_null(null_bitmap, null_bitmap_index)
+        value = read_value(
+            event, column, null_bitmap, null_bitmap_index, cols_bitmap, unsigned, zerofill,
+            fixed_binary_length, index,
+        )
+        if is_present and not is_null:
+            if column.type == FIELD_TYPE.SET and value is None:
+                return set()
+            if column.type == FIELD_TYPE.YEAR and value == 1900:
+                return 0
+        return value
+
+    set_aware_read_value._pipelinewise_preserves_empty_sets = True
+    setattr(RowsEvent, method_name, set_aware_read_value)
+
+
+preserve_empty_binlog_sets()
 
 
 def binlog_filename_key(filename: str) -> Tuple[str, int]:
@@ -227,8 +262,24 @@ def json_bytes_to_string(data):
     return data
 
 
-def row_to_singer_record(catalog_entry, version, db_column_map, row, time_extracted):  # noqa: C901
+def serialize_set(value, declared_values):
+    """Render a decoded SET in declaration order, matching source SELECT output."""
+    if value is None or isinstance(value, str):
+        return value
+    if not isinstance(value, (set, frozenset)):
+        raise ValueError(f'Unexpected SET value: {value!r}')
+    declared_values = tuple(declared_values or ())
+    unexpected = value.difference(declared_values)
+    if unexpected:
+        raise ValueError(f'SET contains values absent from its source declaration: {sorted(unexpected)!r}')
+    return ','.join(item for item in declared_values if item in value)
+
+
+def row_to_singer_record(  # noqa: C901
+    catalog_entry, version, db_column_map, row, time_extracted, set_column_values=None,
+):
     row_to_persist = {}
+    set_column_values = set_column_values or {}
     for column_name, val in row.items():
         property_schema = catalog_entry.schema.properties[column_name]
         property_type = property_schema.type
@@ -276,6 +327,9 @@ def row_to_singer_record(catalog_entry, version, db_column_map, row, time_extrac
 
         elif property_format == 'date-time' and common.is_invalid_mysql_datetime(val):
             row_to_persist[column_name] = None
+
+        elif db_column_type == FIELD_TYPE.SET:
+            row_to_persist[column_name] = serialize_set(val, set_column_values.get(column_name))
 
         elif isinstance(val, bytes):
             # encode bytes as hex bytes then to utf8 string
@@ -722,9 +776,18 @@ def get_db_column_types(event):
     return {c.name: c.type for c in event.columns}
 
 
+def get_set_column_values(event):
+    return {
+        column.name: tuple(column.set_values)
+        for column in event.columns
+        if column.type == FIELD_TYPE.SET
+    }
+
+
 def handle_write_rows_event(event, catalog_entry, state, columns, rows_saved, time_extracted):
     stream_version = common.get_stream_version(catalog_entry.tap_stream_id, state)
     db_column_types = get_db_column_types(event)
+    set_column_values = get_set_column_values(event)
 
     for row in event.rows:
         filtered_vals = {k: v for k, v in row['values'].items()
@@ -734,7 +797,8 @@ def handle_write_rows_event(event, catalog_entry, state, columns, rows_saved, ti
                                               stream_version,
                                               db_column_types,
                                               filtered_vals,
-                                              time_extracted)
+                                              time_extracted,
+                                              set_column_values)
 
         singer.write_message(record_message)
         rows_saved += 1
@@ -745,6 +809,7 @@ def handle_write_rows_event(event, catalog_entry, state, columns, rows_saved, ti
 def handle_update_rows_event(event, catalog_entry, state, columns, rows_saved, time_extracted):
     stream_version = common.get_stream_version(catalog_entry.tap_stream_id, state)
     db_column_types = get_db_column_types(event)
+    set_column_values = get_set_column_values(event)
     key_properties = common.get_key_properties(catalog_entry)
 
     for row in event.rows:
@@ -755,7 +820,7 @@ def handle_update_rows_event(event, catalog_entry, state, columns, rows_saved, t
             deleted_values[SDC_DELETED_AT] = datetime.datetime.fromtimestamp(
                 event.timestamp, tz=pytz.UTC).isoformat()
             singer.write_message(row_to_singer_record(
-                catalog_entry, stream_version, db_column_types, deleted_values, time_extracted))
+                catalog_entry, stream_version, db_column_types, deleted_values, time_extracted, set_column_values))
             rows_saved += 1
 
         filtered_vals = {k: v for k, v in row['after_values'].items() if k in columns}
@@ -764,7 +829,8 @@ def handle_update_rows_event(event, catalog_entry, state, columns, rows_saved, t
                                               stream_version,
                                               db_column_types,
                                               filtered_vals,
-                                              time_extracted)
+                                              time_extracted,
+                                              set_column_values)
 
         singer.write_message(record_message)
 
@@ -776,6 +842,7 @@ def handle_update_rows_event(event, catalog_entry, state, columns, rows_saved, t
 def handle_delete_rows_event(event, catalog_entry, state, columns, rows_saved, time_extracted):
     stream_version = common.get_stream_version(catalog_entry.tap_stream_id, state)
     db_column_types = get_db_column_types(event)
+    set_column_values = get_set_column_values(event)
 
     event_ts = datetime.datetime.utcfromtimestamp(event.timestamp) \
         .replace(tzinfo=pytz.UTC).isoformat()
@@ -791,7 +858,8 @@ def handle_delete_rows_event(event, catalog_entry, state, columns, rows_saved, t
                                               stream_version,
                                               db_column_types,
                                               filtered_vals,
-                                              time_extracted)
+                                              time_extracted,
+                                              set_column_values)
 
         singer.write_message(record_message)
 

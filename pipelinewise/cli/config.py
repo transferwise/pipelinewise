@@ -25,6 +25,7 @@ class Config:
     TABLE_FORMAT_NATIVE = fastsync_capabilities.TABLE_FORMAT_NATIVE
     TABLE_FORMAT_ICEBERG = fastsync_capabilities.TABLE_FORMAT_ICEBERG
     ICEBERG_VERSION = 3
+    FORCE_PRECISION_COLUMNS_SETTING = 'force_precision_columns'
     TARGET_FORMAT_KEYS = {
         'iceberg_create',
         'iceberg_version',
@@ -78,6 +79,7 @@ class Config:
                 os.path.join(yaml_dir, yaml_file), vault_secret
             )
             cls.validate_target_table_format_placement(target_data)
+            cls.validate_snowflake_decimal_versioning_placement(target_data)
             cls.validate_snowflake_query_history_poll_timeout(target_data)
             utils.validate(instance=target_data, schema=target_schema)
 
@@ -124,6 +126,7 @@ class Config:
                 sys.exit(1)
 
             cls.validate_target_table_format(tap_data, targets[target_id])
+            cls.validate_snowflake_decimal_versioning(tap_data, targets[target_id])
             cls.validate_source_transformations(tap_data, targets[target_id])
 
             # Add generated extra keys that not available in the YAML
@@ -249,7 +252,11 @@ class Config:
                         'send_alert': tap.get('send_alert', True),
                         'enabled': True,
                     }
-                for key in ('target_table_format', 'iceberg_version'):
+                for key in (
+                    'target_table_format',
+                    'iceberg_version',
+                    self.FORCE_PRECISION_COLUMNS_SETTING,
+                ):
                     if key in tap:
                         tap_setting[key] = tap[key]
                 if tap.get('slack_alert_channel'):
@@ -553,10 +560,54 @@ class Config:
                 ),
                 'target_table_format': tap.get('target_table_format'),
                 'iceberg_version': tap.get('iceberg_version'),
+                self.FORCE_PRECISION_COLUMNS_SETTING: (
+                    tap.get(self.FORCE_PRECISION_COLUMNS_SETTING, False)
+                    if target_type == 'target-snowflake'
+                    and tap.get('type') in {'tap-mysql', 'tap-postgres'}
+                    else None
+                ),
             }
         )
 
         return tap_inheritable_config
+
+    @classmethod
+    def validate_snowflake_decimal_versioning_placement(cls, target: Dict) -> None:
+        """Keep the per-tap decimal migration choice out of shared targets."""
+        if not isinstance(target, dict):
+            return
+        connection = target.get('db_conn')
+        if cls.FORCE_PRECISION_COLUMNS_SETTING in target or (
+            isinstance(connection, dict)
+            and cls.FORCE_PRECISION_COLUMNS_SETTING in connection
+        ):
+            raise InvalidConfigException(
+                f'Target "{target.get("id")}" cannot set '
+                f'{cls.FORCE_PRECISION_COLUMNS_SETTING}. Configure it on each '
+                'MariaDB, MySQL, or PostgreSQL tap that writes to Snowflake.'
+            )
+
+    @classmethod
+    def validate_snowflake_decimal_versioning(cls, tap: Dict, target: Dict) -> None:
+        """Limit the opt-in migration to supported SQL-to-Snowflake routes."""
+        setting = cls.FORCE_PRECISION_COLUMNS_SETTING
+        connection = tap.get('db_conn')
+        if isinstance(connection, dict) and setting in connection:
+            raise InvalidConfigException(
+                f'Tap "{tap.get("id")}" must configure {setting} at the tap root.'
+            )
+        if setting not in tap:
+            return
+        if target.get('type') != 'target-snowflake':
+            raise InvalidConfigException(
+                f'Tap "{tap.get("id")}" sets {setting}, but target '
+                f'"{target.get("id")}" is not target-snowflake.'
+            )
+        if tap.get('type') not in {'tap-mysql', 'tap-postgres'}:
+            raise InvalidConfigException(
+                f'Tap "{tap.get("id")}" sets {setting}, but only MariaDB, MySQL, '
+                'and PostgreSQL sources support this option.'
+            )
 
     @classmethod
     def validate_target_table_format_placement(cls, target: Dict) -> None:

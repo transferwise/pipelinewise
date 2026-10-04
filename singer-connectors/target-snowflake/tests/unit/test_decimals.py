@@ -8,7 +8,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 import target_snowflake
-from target_snowflake.db_sync import DbSync
+from target_snowflake.db_sync import DbSync, validate_config
 from target_snowflake.exceptions import TableFormatDiscoveryException, TableFormatMismatchException
 from target_snowflake.file_formats.csv import create_copy_sql, create_merge_sql, record_to_csv_line
 from target_snowflake.managed_iceberg import column_type, plan_column_changes
@@ -20,6 +20,21 @@ def decimal_schema(precision=29, scale=9):
         'format': 'singer.decimal',
         'decimal': {'precision': precision, 'scale': scale},
     }
+
+
+@pytest.mark.parametrize('value', [False, True])
+def test_decimal_float_versioning_config_accepts_exact_booleans(value):
+    assert not any(
+        'force_precision_columns' in error
+        for error in validate_config({'force_precision_columns': value})
+    )
+
+
+@pytest.mark.parametrize('value', [None, 0, 1, 'false'])
+def test_decimal_float_versioning_config_rejects_non_booleans(value):
+    assert 'force_precision_columns must be true or false' in validate_config({
+        'force_precision_columns': value,
+    })
 
 
 @pytest.mark.parametrize('iceberg_version', [None, 3])
@@ -41,13 +56,77 @@ def test_decimal_mapping_falls_back_to_supported_domain(precision, scale, expect
 
 
 @pytest.mark.parametrize('iceberg_version', [None, 3])
-@pytest.mark.parametrize('existing', ['FLOAT', 'NUMBER(29,8)', 'NUMBER(28,9)', 'NUMBER(30,9)'])
+@pytest.mark.parametrize('existing', ['NUMBER(29,8)', 'NUMBER(28,9)', 'NUMBER(30,9)'])
 def test_decimal_type_or_dimension_change_versions_column(existing, iceberg_version):
     plan = plan_column_changes(
         {'amount': decimal_schema()}, {'AMOUNT': existing}, iceberg_version == 3, iceberg_version,
     )
     assert plan.additions == ()
     assert plan.replacements == (('"AMOUNT"', '"AMOUNT" NUMERIC(29,9)'),)
+
+
+@pytest.mark.parametrize('iceberg_version', [None, 3])
+def test_legacy_decimal_float_requires_explicit_versioning(iceberg_version):
+    arguments = {'is_iceberg_table': iceberg_version == 3, 'iceberg_version': iceberg_version}
+    existing = 'DOUBLE' if iceberg_version else 'FLOAT'
+
+    assert plan_column_changes(
+        {'amount': decimal_schema()}, {'AMOUNT': existing}, **arguments,
+    ).replacements == ()
+    assert plan_column_changes(
+        {'amount': decimal_schema()}, {'AMOUNT': existing}, **arguments,
+        force_precision_columns=True,
+    ).replacements == (('"AMOUNT"', '"AMOUNT" NUMERIC(29,9)'),)
+
+
+@pytest.mark.parametrize('iceberg_version', [None, 3])
+@pytest.mark.parametrize('force_precision_columns', [False, True])
+def test_existing_float_postgres_decimal_key_is_always_retained(iceberg_version, force_precision_columns):
+    arguments = {'is_iceberg_table': iceberg_version == 3, 'iceberg_version': iceberg_version}
+    existing = 'DOUBLE' if iceberg_version else 'FLOAT'
+    plan = plan_column_changes(
+        {'id': decimal_schema(10, 2)},
+        {'ID': existing},
+        **arguments,
+        key_properties=['id'],
+        source='postgres',
+        force_precision_columns=force_precision_columns,
+    )
+
+    assert plan.replacements == ()
+    assert plan.retained_decimal_types == (('ID', 'FLOAT'),)
+
+
+@pytest.mark.parametrize('iceberg_version', [None, 3])
+@pytest.mark.parametrize('force_precision_columns', [False, True])
+def test_existing_float_postgres_decimal_key_uses_float_load_projection(
+    iceberg_version, force_precision_columns,
+):
+    sync = object.__new__(DbSync)
+    sync.connection_config = {
+        'source_tap_type': 'tap-postgres',
+        'force_precision_columns': force_precision_columns,
+    }
+    sync.stream_schema_message = {'stream': 'public-items', 'key_properties': ['id']}
+    sync.flatten_schema = {'id': decimal_schema(10, 2)}
+    sync.schema_name = 'PUBLIC'
+    sync.table_cache = [{
+        'SCHEMA_NAME': 'PUBLIC',
+        'TABLE_NAME': 'ITEMS',
+        'COLUMN_NAME': 'ID',
+        'DATA_TYPE': 'DOUBLE' if iceberg_version else 'FLOAT',
+    }]
+    sync.query = Mock()
+    sync.get_table_columns = Mock(return_value=sync.table_cache)
+    sync.add_column = Mock()
+    sync.version_column = Mock()
+
+    sync.update_columns(iceberg_version == 3, iceberg_version)
+
+    assert sync.decimal_load_type('id', sync.flatten_schema['id']) == 'FLOAT'
+    sync.query.assert_not_called()
+    sync.add_column.assert_not_called()
+    sync.version_column.assert_not_called()
 
 
 @pytest.mark.parametrize('existing', ['NUMBER(29,9)', 'NUMERIC(29, 9)', 'DECIMAL(29,9)', 'FIXED(29,9)'])
@@ -67,12 +146,18 @@ def test_unmarked_key_evolution_keeps_legacy_behavior():
 
 
 @pytest.mark.parametrize('iceberg_version', [None, 3])
-def test_decimal_key_change_refused_before_other_columns_are_added(iceberg_version):
+def test_legacy_decimal_float_key_does_not_block_other_column_changes(iceberg_version):
     sync = object.__new__(DbSync)
-    sync.stream_schema_message = {'stream': 'public-items', 'key_properties': ['amount']}
-    sync.flatten_schema = {'new_column': {'type': ['string']}, 'amount': decimal_schema()}
+    sync.connection_config = {'force_precision_columns': True}
+    sync.stream_schema_message = {'stream': 'public-items', 'key_properties': ['id']}
+    sync.flatten_schema = {
+        'new_column': {'type': ['string']},
+        'id': decimal_schema(),
+        'amount': decimal_schema(),
+    }
     sync.schema_name = 'PUBLIC'
     sync.table_cache = [
+        {'SCHEMA_NAME': 'PUBLIC', 'TABLE_NAME': 'ITEMS', 'COLUMN_NAME': 'ID', 'DATA_TYPE': 'FLOAT'},
         {'SCHEMA_NAME': 'PUBLIC', 'TABLE_NAME': 'ITEMS', 'COLUMN_NAME': 'AMOUNT', 'DATA_TYPE': 'FLOAT'},
     ]
     sync.query = Mock()
@@ -80,17 +165,24 @@ def test_decimal_key_change_refused_before_other_columns_are_added(iceberg_versi
     sync.add_column = Mock()
     sync.version_column = Mock()
 
-    with pytest.raises(TableFormatMismatchException, match='primary-key'):
-        sync.update_columns(iceberg_version == 3, iceberg_version)
+    sync.update_columns(iceberg_version == 3, iceberg_version)
 
     sync.query.assert_not_called()
-    sync.add_column.assert_not_called()
-    sync.version_column.assert_not_called()
+    assert [entry.args for entry in sync.add_column.call_args_list] == [
+        ('"NEW_COLUMN" varchar(134217728)', 'public-items', iceberg_version == 3),
+        ('"AMOUNT" NUMERIC(29,9)', 'public-items', iceberg_version == 3),
+    ]
+    sync.version_column.assert_called_once()
+    assert sync.version_column.call_args.args[:3] == (
+        '"AMOUNT"', 'public-items', iceberg_version == 3,
+    )
+    assert sync._retained_decimal_types == {'ID': 'FLOAT'}
 
 
 @pytest.mark.parametrize('iceberg_version', [None, 3])
 def test_reimport_of_matching_decimal_metadata_keeps_column(iceberg_version):
     sync = object.__new__(DbSync)
+    sync.connection_config = {}
     sync.stream_schema_message = {'stream': 'public-items', 'key_properties': ['amount']}
     sync.flatten_schema = {'amount': decimal_schema()}
     sync.schema_name = 'PUBLIC'
@@ -106,7 +198,9 @@ def test_reimport_of_matching_decimal_metadata_keeps_column(iceberg_version):
     sync.query.assert_not_called()
 
 
-def run_cached_schema_sequence(initial_type, schemas, iceberg_version):
+def run_cached_schema_sequence(
+    initial_type, schemas, iceberg_version, *, force_precision_columns=False,
+):
     """Keep the startup cache while applying DDL to a separate simulated table."""
     physical_columns = {'AMOUNT': initial_type}
     versioned_columns = []
@@ -120,8 +214,9 @@ def run_cached_schema_sequence(initial_type, schemas, iceberg_version):
             columns.append(row)
         return columns
 
-    def create_sync(_config, message, cache, _file_format):
+    def create_sync(config, message, cache, _file_format):
         sync = object.__new__(DbSync)
+        sync.connection_config = config
         sync.stream_schema_message = message
         sync.flatten_schema = {
             name: schema for name, schema in message['schema']['properties'].items()
@@ -156,7 +251,11 @@ def run_cached_schema_sequence(initial_type, schemas, iceberg_version):
     startup_cache = current_columns()
     with patch('target_snowflake.DbSync', side_effect=create_sync):
         target_snowflake.persist_lines(
-            {'primary_key_required': False}, [json.dumps(message) for message in messages], startup_cache,
+            {
+                'primary_key_required': False,
+                'force_precision_columns': force_precision_columns,
+            },
+            [json.dumps(message) for message in messages], startup_cache,
         )
     return physical_columns, versioned_columns
 
@@ -172,12 +271,25 @@ def test_persist_lines_versions_precision_reversal_with_startup_cache(iceberg_ve
 
 @pytest.mark.parametrize('iceberg_version', [None, 3])
 def test_persist_lines_unrelated_addition_does_not_reversion_decimal(iceberg_version):
-    columns, archives = run_cached_schema_sequence('FLOAT', [
+    floating_type = 'DOUBLE' if iceberg_version else 'FLOAT'
+    columns, archives = run_cached_schema_sequence(floating_type, [
         {'amount': decimal_schema(10, 2)},
         {'amount': decimal_schema(10, 2), 'added': {'type': ['string']}},
     ], iceberg_version)
+    assert columns['AMOUNT'] == floating_type
+    assert archives == []
+    assert 'ADDED' in columns
+
+
+@pytest.mark.parametrize('iceberg_version', [None, 3])
+def test_persist_lines_opt_in_versions_legacy_decimal_float_once(iceberg_version):
+    floating_type = 'DOUBLE' if iceberg_version else 'FLOAT'
+    columns, archives = run_cached_schema_sequence(floating_type, [
+        {'amount': decimal_schema(10, 2)},
+        {'amount': decimal_schema(10, 2), 'added': {'type': ['string']}},
+    ], iceberg_version, force_precision_columns=True)
     assert columns['AMOUNT'] == 'NUMERIC(10,2)'
-    assert len(archives) == 1
+    assert [columns[name] for name in archives] == [floating_type]
     assert 'ADDED' in columns
 
 
@@ -190,7 +302,7 @@ def test_persist_lines_decimal_then_float_does_not_reuse_pre_decimal_cache(icebe
         {'amount': decimal_schema(10, 2)},
         {'amount': floating_schema},
         {'amount': floating_schema, 'added': {'type': ['string']}},
-    ], iceberg_version)
+    ], iceberg_version, force_precision_columns=True)
     assert columns['AMOUNT'] == floating_type
     assert [columns[name] for name in archives] == [floating_type, 'NUMERIC(10,2)']
 
@@ -357,7 +469,7 @@ def test_persist_lines_fallback_and_exact_transitions_are_stable(iceberg_version
         {'amount': decimal_schema(29, 9)},
         {'amount': decimal_schema(65, 30)},
         {'amount': decimal_schema(65, 30), 'added': {'type': ['string']}},
-    ], iceberg_version)
+    ], iceberg_version, force_precision_columns=True)
     assert columns['AMOUNT'] == ('DOUBLE' if iceberg_version else 'FLOAT')
     assert [columns[name] for name in archives] == ['FLOAT', 'NUMERIC(29,9)']
 

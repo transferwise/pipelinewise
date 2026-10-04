@@ -445,6 +445,7 @@ def assert_iceberg_partial_sync_workflow(
                 staging_config=staging_config,
                 resolved_source_engine='mysql' if source_class_name == 'FastSyncTapMySql' else None,
                 decimal_columns=(),
+                force_precision_columns=False,
             )
         publisher.plan_partial_sync.assert_called_once_with(
             attempt, publication_spec

@@ -32,6 +32,7 @@ pymysql.converters.conversions[pendulum.DateTime] = pymysql.converters.escape_da
 STRING_TYPES = {
     'char',
     'enum',
+    'set',
     'tinytext',
     'longtext',
     'mediumtext',
@@ -57,6 +58,10 @@ DATETIME_TYPES = {'datetime', 'timestamp', 'time', 'date'}
 
 BINARY_TYPES = {'binary', 'varbinary'}
 
+BLOB_TYPES = {'tinyblob', 'blob', 'mediumblob', 'longblob'}
+
+YEAR_TYPES = {'year'}
+
 SPATIAL_TYPES = {'geometry', 'point', 'linestring',
                  'polygon', 'multipoint', 'multilinestring',
                  'multipolygon', 'geometrycollection', 'geomcollection'}
@@ -67,6 +72,8 @@ SUPPORTED_COLUMN_TYPES_AGGREGATED = \
         .union(FLOAT_TYPES) \
         .union(DATETIME_TYPES) \
         .union(BINARY_TYPES) \
+        .union(BLOB_TYPES) \
+        .union(YEAR_TYPES) \
         .union(SPATIAL_TYPES) \
         .union(BOOL_TYPES) \
         .union(JSON_TYPES) \
@@ -83,6 +90,25 @@ def is_supported_column_type(column_datatype: str) -> bool:
     Returns: True if column type is supported, False otherwise
     """
     return column_datatype in SUPPORTED_COLUMN_TYPES_AGGREGATED
+
+
+def integer_schema(column, inclusion):
+    """Build integer constraints, including MySQL's dedicated YEAR domain."""
+    result = Schema(type=['null', 'integer'], inclusion=inclusion)
+    data_type = column.data_type.lower()
+    if data_type in YEAR_TYPES:
+        result.format = 'singer.year'
+        result.minimum = 0
+        result.maximum = 2155
+        return result
+    bits = BYTES_FOR_INTEGER_TYPE[data_type] * 8
+    if 'unsigned' in column.column_type.lower():
+        result.minimum = 0
+        result.maximum = 2 ** bits - 1
+    else:
+        result.minimum = 0 - 2 ** (bits - 1)
+        result.maximum = 2 ** (bits - 1) - 1
+    return result
 
 
 def mariadb_json_aliases_enabled(config: Dict) -> bool:
@@ -295,15 +321,8 @@ def schema_for_column(column, decimal_target=None):
     if data_type in BOOL_TYPES or column_type.startswith('tinyint(1)'):
         result.type = ['null', 'boolean']
 
-    elif data_type in BYTES_FOR_INTEGER_TYPE:
-        result.type = ['null', 'integer']
-        bits = BYTES_FOR_INTEGER_TYPE[data_type] * 8
-        if 'unsigned' in column_type:
-            result.minimum = 0
-            result.maximum = 2 ** bits - 1
-        else:
-            result.minimum = 0 - 2 ** (bits - 1)
-            result.maximum = 2 ** (bits - 1) - 1
+    elif data_type in BYTES_FOR_INTEGER_TYPE or data_type in YEAR_TYPES:
+        result = integer_schema(column, inclusion)
 
     elif data_type == 'decimal' and decimal_target:
         result = Schema.from_dict(decimal_schema(column.numeric_precision, column.numeric_scale))
@@ -334,7 +353,7 @@ def schema_for_column(column, decimal_target=None):
         else:
             result.format = 'date-time'
 
-    elif data_type in BINARY_TYPES:
+    elif data_type in BINARY_TYPES or data_type in BLOB_TYPES:
         result.type = ['null', 'string']
         result.format = 'binary'
 

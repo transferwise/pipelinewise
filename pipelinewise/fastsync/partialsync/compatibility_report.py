@@ -153,7 +153,10 @@ def mapped_source_columns(connection, source, table, primary_keys=()):
     return MappedSourceColumns(source.map_table_columns(columns, primary_keys), decimal_columns)
 
 
-def _table_report(connection, source, target, table, primary_keys=(), boundary_column=None):
+def _table_report(
+    connection, source, target, table, primary_keys=(), boundary_column=None,
+    force_precision_columns=False,
+):
     result = {'source_table': table}
     operation = 'target_format'
     try:
@@ -177,6 +180,7 @@ def _table_report(connection, source, target, table, primary_keys=(), boundary_c
             {'schema': schema, 'table': table_name}, mapped, columns,
             primary_keys=primary_keys, boundary_column=boundary_column,
             decimal_columns=getattr(mapped, 'decimal_columns', ()),
+            force_precision_columns=force_precision_columns,
         )
         status = 'incompatible' if any(row['status'] == 'incompatible' for row in column_report) else 'compatible'
         return {**result, 'status': status, 'columns': column_report}
@@ -232,6 +236,9 @@ def build_report(tap_type, tap, target, properties, selection, tables=None, targ
                 try:
                     results.append(_table_report(
                         connection, source, snowflake, table,
+                        force_precision_columns=target.get(
+                            'force_precision_columns', False
+                        ),
                         **_column_guards(properties, selection, catalog[table]),
                     ))
                 except Exception as exc:

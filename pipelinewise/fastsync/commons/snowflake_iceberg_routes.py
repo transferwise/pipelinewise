@@ -70,6 +70,8 @@ def query_history_poll_timeout_seconds(target_config):
 def validate_route_config(target_config):
     """Reject unsupported direct FastSync Iceberg configurations."""
     query_history_poll_timeout_seconds(target_config)
+    if not isinstance(target_config.get('force_precision_columns', False), bool):
+        raise ValueError('force_precision_columns must be true or false')
     if 'iceberg_create' in target_config:
         raise ValueError(
             'Snowflake FastSync no longer supports iceberg_create; configure '
@@ -213,18 +215,22 @@ def fastsync_recovery_identity(
     if _uses_source_transformations(args.transform or {}, source_table):
         source_identity['transformation_execution'] = 'source_select_v1'
 
+    target_identity = {
+        'account': target_config.get('account'),
+        'database': target_config.get('dbname'),
+        'schema': target_schema,
+        'table': target_table,
+        'user': target_config.get('user'),
+        'role': target_config.get('role'),
+        'target_table_format': target_config['target_table_format'],
+        'iceberg_version': iceberg_version,
+    }
+    if partial_boundary is not None and target_config.get('force_precision_columns', False):
+        target_identity['force_precision_columns'] = True
+
     identity = {
         'source': source_identity,
-        'target': {
-            'account': target_config.get('account'),
-            'database': target_config.get('dbname'),
-            'schema': target_schema,
-            'table': target_table,
-            'user': target_config.get('user'),
-            'role': target_config.get('role'),
-            'target_table_format': target_config['target_table_format'],
-            'iceberg_version': iceberg_version,
-        },
+        'target': target_identity,
         'staging': dict(staging_config),
     }
     if partial_boundary is not None:

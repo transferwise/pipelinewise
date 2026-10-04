@@ -1,13 +1,16 @@
-0.94.0 (2026-10-01)
+0.94.0 (2026-10-04)
 -------------------
 
-- Preserve declared decimal precision and scale from MariaDB, MySQL, and
-  PostgreSQL in Snowflake native, Snowflake managed Iceberg v3, and PostgreSQL
-  targets where supported, through Singer and supported FullSync/PartialSync routes
-- Version changed non-key decimal columns and retain their historical values.
-  Leave historical rows NULL in the new column until replicated again. Reject
-  automatic key-column and PartialSync range-column type changes before altering
-  the target
+- Preserve declared `DECIMAL` and `NUMERIC` precision and scale from
+  MariaDB, MySQL, and PostgreSQL in Snowflake native, Snowflake managed Iceberg
+  v3, and PostgreSQL targets where supported
+- Create new Snowflake decimal columns as fixed-point numbers where supported.
+  Keep existing legacy `FLOAT` decimal columns, including keys that now map to
+  text, by default. Set `force_precision_columns: true` on a supported tap to
+  retain the old non-key column and add its precision-preserving replacement.
+  Keep legacy floating-point decimal keys unchanged even with the option enabled.
+  Continue versioning other changed non-key decimal declarations, and reject
+  PartialSync range column versioning before altering the target
 - Keep columns and rows flowing when decimal declarations exceed target limits.
   Use compatible numeric declarations or double precision with warnings; clamp
   finite floating-point overflow. Store PostgreSQL numeric primary keys in Snowflake
@@ -22,12 +25,16 @@
   of stopping the transformation process
 - Retry PostgreSQL logical replication without wal2json numeric string output
   when the plugin rejects that option, independent of server message language
+- Replicate MariaDB/MySQL `SET`, `TINYBLOB`, `BLOB`, `MEDIUMBLOB`, `LONGBLOB`,
+  and `YEAR` columns through Singer and FastSync. Snowflake stores sets as text,
+  blobs as binary, and years as `NUMBER(38,0)`
 
 Run `import_config` before resuming replication after upgrading to refresh the
 generated tap settings and decimal schemas. No backfill or resync is required
-for column versioning. FullSync retains its table-replacement behavior and removes
-historical column versions. Existing PostgreSQL numeric primary keys on Snowflake
-need FullSync when changing to the new text type. See the
+for non-key column versioning. FullSync retains its table-replacement behavior
+and removes historical column versions. Existing PostgreSQL numeric primary keys
+on Snowflake remain floating-point by default and need FullSync only when changing
+to the new text type. See the
 [decimal mapping rules](docs/user_guide/schema_changes.rst).
 
 0.93.1 (2026-10-06)

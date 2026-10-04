@@ -91,6 +91,9 @@ def validate_config(config):
 
     errors.extend(managed_iceberg.validate_table_format_config(config))
 
+    if not isinstance(config.get('force_precision_columns', False), bool):
+        errors.append('force_precision_columns must be true or false')
+
     return errors
 
 
@@ -394,13 +397,22 @@ class DbSync:
             }
         return self._decimal_fields
 
+    def decimal_load_type(self, name, schema):
+        """Use the live FLOAT type when default migration retains a legacy decimal column."""
+        retained = getattr(self, '_retained_decimal_types', {})
+        return retained.get(name.upper()) or column_type(
+            schema,
+            is_key=name in self.stream_schema_message['key_properties'],
+            source=self.decimal_source(),
+        )
+
     def check_decimal_nan(self, record):
         """Keep ordinary NaN rows while refusing null primary-key identities."""
         keys = self.stream_schema_message['key_properties']
         for name, schema in self.decimal_fields().items():
             if record.get(name) != 'NaN':
                 continue
-            if not column_type(schema, is_key=name in keys, source=self.decimal_source()).startswith('NUMERIC'):
+            if not self.decimal_load_type(name, schema).startswith('NUMERIC'):
                 continue
             if name in keys:
                 raise ValueError(
@@ -491,10 +503,8 @@ class DbSync:
                 "name": safe_column_name(name),
                 "json_element_name": json_element_name(name),
                 "trans": column_trans(schema),
-                **({'decimal_type': column_type(
-                    schema, is_key=name in self.stream_schema_message['key_properties'],
-                    source=self.decimal_source(),
-                ), 'decimal_key': name in self.stream_schema_message['key_properties']}
+                **({'decimal_type': self.decimal_load_type(name, schema),
+                    'decimal_key': name in self.stream_schema_message['key_properties']}
                    if is_decimal_schema(schema) else {}),
             }
             for (name, schema) in self.flatten_schema.items()
@@ -852,7 +862,11 @@ class DbSync:
             iceberg_version,
             key_properties=stream_schema_message['key_properties'],
             source=self.decimal_source(),
+            force_precision_columns=self.connection_config.get(
+                'force_precision_columns', False
+            ),
         )
+        self._retained_decimal_types = dict(plan.retained_decimal_types)
 
         for column in plan.additions:
             self.add_column(column, stream, is_iceberg_table)

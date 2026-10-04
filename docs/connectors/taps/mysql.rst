@@ -129,6 +129,13 @@ Configuration
 Common tap settings are documented in :ref:`yaml_configuration`. Generate the
 full template with ``pipelinewise init``.
 
+Snowflake native and managed Iceberg v3 targets store ``SET`` values as
+``VARCHAR(134217728)``, the ``TINYBLOB``/``BLOB``/``MEDIUMBLOB``/``LONGBLOB``
+family as binary, and ``YEAR`` as ``NUMBER(38,0)``. Singer and FastSync use the
+same mappings. Binary values travel as hexadecimal text and are restored to
+binary by the target. Snowflake's 64 MiB binary value limit still applies, so a
+larger ``LONGBLOB`` value cannot be represented in one target cell.
+
 
 Operational notes
 -----------------
@@ -183,8 +190,11 @@ Operational notes
   per-row delete images. FullSync that table to capture the resulting contents
   before resuming Singer.
 - The connector interprets ``TINYINT(1)`` as Boolean; other display widths are
-  integers. ``DECIMAL(p,s)`` retains supported dimensions in Snowflake and PostgreSQL;
-  see :ref:`exact_decimal_mapping` for numeric fallback and column versioning.
+  integers. ``DECIMAL(p,s)`` and its ``NUMERIC(p,s)`` alias retain supported
+  dimensions in Snowflake and PostgreSQL. New Snowflake columns use the precise
+  mapping; legacy floating-point target columns remain unchanged unless
+  ``force_precision_columns`` is enabled on the tap. See
+  :ref:`exact_decimal_mapping` for numeric fallback and column versioning.
   Snowflake bulk mappings use Boolean ``BIT`` values and do not preserve
   multi-bit bitsets. MySQL ``TIME`` values outside a 24-hour clock cannot be
   represented by Snowflake ``TIME``.

@@ -562,6 +562,7 @@ class PartialSyncTestCase(TestCase):
                     ' WHERE "FOO_COLUMN" >= \'1\'',
                     boundary_column='foo_column',
                     decimal_columns=(),
+                    force_precision_columns=False,
                 )
                 mocked_fastsync_sf.return_value.s3.delete_object.assert_called_once_with(
                     Bucket=args.target['s3_bucket'], Key='FOO_S3_KEYS'

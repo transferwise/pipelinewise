@@ -38,3 +38,20 @@ def is_numeric_version_change(actual_type, expected_type):
         and (actual_type.startswith(numeric) or actual_type in ('FLOAT', 'DOUBLE'))
         and actual_type != expected_type
     )
+
+
+def is_retained_legacy_decimal_float(actual_type, expected_type):
+    """Keep a legacy decimal FLOAT when the new mapping would change its type."""
+    return (
+        actual_type in ('FLOAT', 'DOUBLE', 'DOUBLE PRECISION', 'REAL')
+        and expected_type != actual_type
+        and expected_type.startswith(('NUMBER(', 'NUMERIC(', 'DECIMAL(', 'VARCHAR(', 'TEXT(', 'STRING('))
+    )
+
+
+def is_decimal_version_change(actual_type, expected_type):
+    """Return whether a marked decimal can move to its precision-preserving type."""
+    return is_numeric_version_change(actual_type, expected_type) or (
+        actual_type in ('FLOAT', 'DOUBLE', 'DOUBLE PRECISION', 'REAL')
+        and expected_type.startswith(('VARCHAR(', 'TEXT(', 'STRING('))
+    )

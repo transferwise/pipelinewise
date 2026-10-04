@@ -234,6 +234,29 @@ def test_table_errors_are_redacted_and_do_not_hide_remaining_tables():
     assert 'secret' not in json.dumps(result)
 
 
+def test_build_report_reads_precision_opt_in_from_target_config():
+    @contextmanager
+    def source(*_):
+        yield mock.Mock()
+
+    with mock.patch.object(report, 'source_connection', side_effect=source), \
+            mock.patch.object(report, '_table_report', return_value={
+                'source_table': 'source.orders',
+                'status': 'compatible',
+                'columns': [{'column': 'AMOUNT', 'status': 'would_version'}],
+            }) as table_report:
+        result = report.build_report(
+            'tap-postgres',
+            {},
+            {'force_precision_columns': True},
+            catalog('orders'),
+            selection('orders'),
+        )
+
+    assert result[0]['columns'][0]['status'] == 'would_version'
+    assert table_report.call_args.kwargs['force_precision_columns'] is True
+
+
 def test_source_connection_failure_is_redacted():
     with mock.patch.object(report, 'source_connection', side_effect=RuntimeError('secret password')):
         result = report.build_report('tap-mysql', {}, {}, catalog('orders'), selection('orders'))
@@ -365,7 +388,11 @@ def test_cli_skips_unsupported_routes_before_validating_relational_catalog(
 def test_cli_consumes_generated_selection_wrapper_and_target_overrides(tmp_path, capsys):
     files = {'config': {'host': 'host'}, 'target': {'dbname': 'DB', 'default_target_schema': 'default'},
              'properties': catalog('orders'), 'selection': {'selection': selection('orders')},
-             'inheritable_config': {'default_target_schema': 'mapped', 'target_table_format': 'iceberg'}}
+             'inheritable_config': {
+                 'default_target_schema': 'mapped',
+                 'target_table_format': 'iceberg',
+                 'force_precision_columns': True,
+             }}
     for name, contents in files.items():
         (tmp_path / f'{name}.json').write_text(json.dumps(contents))
     with mock.patch.object(report, 'build_report', return_value=[{'status': 'skipped'}]) as build:
@@ -374,21 +401,40 @@ def test_cli_consumes_generated_selection_wrapper_and_target_overrides(tmp_path,
         ]) == 0
     assert build.call_args.kwargs['target'] == {
         'dbname': 'DB', 'default_target_schema': 'mapped', 'target_table_format': 'iceberg',
+        'force_precision_columns': True,
     }
     assert build.call_args.kwargs['selection'] == selection('orders')
     assert json.loads(capsys.readouterr().out) == [{'status': 'skipped'}]
 
 
-@pytest.mark.parametrize('guard', [{'primary_keys': ['AMOUNT']}, {'boundary_column': 'amount'}])
-def test_report_marks_protected_decimal_columns_incompatible(guard):
+def test_report_marks_protected_decimal_boundary_incompatible():
     result = utils.report_source_target_columns(
         {'schema': 'TARGET', 'table': 'ORDERS'}, ['"AMOUNT" NUMERIC(38,18)'],
-        [column('AMOUNT', type='REAL')], decimal_columns=('AMOUNT',), **guard,
+        [column('AMOUNT', type='REAL')], decimal_columns=('AMOUNT',),
+        force_precision_columns=True, boundary_column='amount',
     )
     assert result[0]['status'] == 'incompatible'
 
 
-def test_report_versions_only_columns_with_source_decimal_provenance():
+def test_report_keeps_legacy_decimal_float_key_compatible_with_opt_in():
+    result = utils.report_source_target_columns(
+        {'schema': 'TARGET', 'table': 'ORDERS'}, ['"AMOUNT" NUMERIC(38,18)'],
+        [column('AMOUNT', type='REAL')], decimal_columns=('AMOUNT',),
+        force_precision_columns=True, primary_keys=['AMOUNT'],
+    )
+    assert result[0]['status'] == 'compatible'
+
+
+@pytest.mark.parametrize('guard', [{'primary_keys': ['AMOUNT']}, {'boundary_column': 'amount'}])
+def test_report_keeps_protected_legacy_decimal_float_compatible_by_default(guard):
+    result = utils.report_source_target_columns(
+        {'schema': 'TARGET', 'table': 'ORDERS'}, ['"AMOUNT" NUMERIC(38,18)'],
+        [column('AMOUNT', type='REAL')], decimal_columns=('AMOUNT',), **guard,
+    )
+    assert result[0]['status'] == 'compatible'
+
+
+def test_report_opt_in_versions_only_columns_with_source_decimal_provenance():
     target = report.MetadataSnowflakeClient({'dbname': 'db', 'default_target_schema': 'mapped'})
     source_columns = report.MappedSourceColumns(
         ['"AMOUNT" NUMERIC(18,2)', '"SCORE" FLOAT'], ('AMOUNT',),
@@ -401,7 +447,10 @@ def test_report_versions_only_columns_with_source_decimal_provenance():
             mock.patch.object(report, 'mapped_source_columns', return_value=source_columns), \
             mock.patch.object(target, 'query', return_value=target_columns):
         inspector.return_value.discover_table_format.return_value = 'native'
-        result = report._table_report(mock.Mock(), mock.Mock(), target, 'source.orders')
+        result = report._table_report(
+            mock.Mock(), mock.Mock(), target, 'source.orders',
+            force_precision_columns=True,
+        )
     assert result['status'] == 'incompatible'
     assert [row['status'] for row in result['columns']] == ['would_version', 'incompatible']
 

@@ -13,6 +13,7 @@ from pipelinewise.fastsync.commons.partial_sync_boundary import (
     PartialSyncBoundary,
     PartialSyncBoundaryError,
 )
+from pipelinewise.fastsync.commons.snowflake_decimal_evolution import with_retained_decimal_types
 from pipelinewise.fastsync.partialsync import utils
 
 
@@ -246,6 +247,19 @@ def _prepare_iceberg_partial_export(run: _PartialSyncRun) -> bool:
         run.source_columns,
         run.primary_keys,
     )
+    if (
+        run.decimal_columns
+        and not run.args.drop_target_table
+    ):
+        current_spec = with_retained_decimal_types(
+            current_spec,
+            run.publisher.inspect_table(current_spec.name).spec,
+            decimal_columns=run.decimal_columns,
+            force_precision_columns=run.args.target.get(
+                'force_precision_columns', False
+            ),
+        )
+        run.source_columns = [column.definition for column in current_spec.columns]
     if run.attempt is not None:
         run.spec = run.attempt.table_spec
         iceberg_routes.validate_recovery_source_spec(run.spec, current_spec)
@@ -289,6 +303,9 @@ def _prepare_iceberg_partial_export(run: _PartialSyncRun) -> bool:
         staging_config=run.staging_config,
         resolved_source_engine=resolved_engine,
         decimal_columns=run.decimal_columns,
+        force_precision_columns=run.args.target.get(
+            'force_precision_columns', False
+        ),
     )
     run.publisher.plan_partial_sync(run.attempt, run.spec)
     return True
@@ -313,13 +330,17 @@ def _prepare_native_partial_export(run: _PartialSyncRun) -> bool:
         _require_native_partial_target(run)
 
     if run.native_target_exists and not run.args.drop_target_table:
-        utils.diff_source_target_columns(
+        columns_diff = utils.diff_source_target_columns(
             {'sf_object': run.snowflake, 'schema': run.target_schema, 'table': run.target_table},
             run.source_columns,
             primary_keys=run.primary_keys,
             boundary_column=run.column_name,
             decimal_columns=run.decimal_columns,
+            force_precision_columns=run.args.target.get(
+                'force_precision_columns', False
+            ),
         )
+        run.source_columns = columns_diff['staging_columns']
 
     run.bookmark = common_utils.get_bookmark_for_table(
         run.table_name,
@@ -469,6 +490,9 @@ def _publish_partial_native(run: _PartialSyncRun) -> bool:
         run.where_clause_sql,
         boundary_column=run.column_name,
         decimal_columns=run.decimal_columns,
+        force_precision_columns=run.args.target.get(
+            'force_precision_columns', False
+        ),
     )
     run.publication_status['attempted'] = True
     run.temp_created = False

@@ -8,7 +8,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from pipelinewise.fastsync.commons.snowflake_decimal_evolution import (
-    partial_compatibility, partial_preparation, plan_column_versions,
+    partial_compatibility, partial_preparation, plan_column_versions, with_retained_decimal_types,
 )
 from pipelinewise.fastsync.commons.snowflake_iceberg_model import IcebergColumn, IcebergTableSpec
 from pipelinewise.fastsync.commons.snowflake_iceberg_recovery import RecoveryManifestError, TableCompatibilityError
@@ -30,11 +30,49 @@ def _spec(amount_type):
 @pytest.mark.parametrize('old_type', ('FLOAT', 'NUMERIC(18,2)', 'NUMERIC(38,12)'))
 def test_iceberg_decimal_change_plans_rename_and_new_empty_column(old_type):
     expected, actual = _spec('NUMERIC(38,18)'), _spec(old_type)
-    versions = plan_column_versions(expected, actual, decimal_columns=('AMOUNT',))
-    statements = partial_preparation(expected, actual, versions)
+    versions = plan_column_versions(
+        expected, actual, decimal_columns=('AMOUNT',), force_precision_columns=True,
+    )
+    statements = partial_preparation(
+        expected, actual, versions, decimal_columns=('AMOUNT',), force_precision_columns=True,
+    )
     assert len(statements) == 2
     assert 'RENAME COLUMN "AMOUNT" TO "AMOUNT_' in statements[0]
     assert statements[1].endswith('ADD COLUMN "AMOUNT" NUMBER(38,18)')
+
+
+def test_iceberg_legacy_decimal_float_stays_in_place_without_opt_in():
+    expected, actual = _spec('NUMERIC(38,18)'), _spec('FLOAT')
+
+    assert partial_compatibility(
+        expected, actual, decimal_columns=('AMOUNT',),
+    ) == ('exact', ())
+    assert plan_column_versions(expected, actual, decimal_columns=('AMOUNT',)) == {}
+
+
+@pytest.mark.parametrize('force_precision_columns', [False, True])
+def test_iceberg_postgres_decimal_key_always_retains_float_staging_type(force_precision_columns):
+    expected = replace(_spec('VARCHAR(134217728)'), primary_key=('AMOUNT',))
+    actual = replace(_spec('DOUBLE'), primary_key=('AMOUNT',))
+
+    retained = with_retained_decimal_types(
+        expected,
+        actual,
+        decimal_columns=('AMOUNT',),
+        force_precision_columns=force_precision_columns,
+    )
+
+    assert next(column for column in retained.columns if column.name == 'AMOUNT').data_type == 'DOUBLE'
+    assert partial_compatibility(retained, actual, decimal_columns=('AMOUNT',))[0] == 'exact'
+    assert plan_column_versions(
+        expected,
+        actual,
+        decimal_columns=('AMOUNT',),
+        force_precision_columns=force_precision_columns,
+    ) == {}
+    assert partial_preparation(
+        expected, actual, {}, decimal_columns=('AMOUNT',),
+    ) == ()
 
 
 @pytest.mark.parametrize(('current', 'mapped'), (
@@ -67,25 +105,35 @@ def test_iceberg_recovery_rejects_numeric_drift_absent_from_persisted_plan(tmp_p
 
 def test_partial_ddl_retry_reuses_archive_and_does_not_rename_again():
     expected, actual = _spec('NUMERIC(38,18)'), _spec('FLOAT')
-    versions = plan_column_versions(expected, actual, decimal_columns=('AMOUNT',))
+    versions = plan_column_versions(
+        expected, actual, decimal_columns=('AMOUNT',), force_precision_columns=True,
+    )
     archive = IcebergColumn(versions['AMOUNT']['archived_name'], 'FLOAT')
     after_rename = replace(actual, columns=tuple(
         archive if column.name == 'AMOUNT' else column for column in actual.columns
     ))
-    statements = partial_preparation(expected, after_rename, versions)
+    statements = partial_preparation(
+        expected, after_rename, versions, decimal_columns=('AMOUNT',), force_precision_columns=True,
+    )
     assert len(statements) == 1 and 'ADD COLUMN "AMOUNT" NUMBER(38,18)' in statements[0]
     after_add = replace(expected, columns=expected.columns + (archive,))
-    assert partial_preparation(expected, after_add, versions) == ()
+    assert partial_preparation(
+        expected, after_add, versions, decimal_columns=('AMOUNT',), force_precision_columns=True,
+    ) == ()
     assert partial_compatibility(expected, after_add) == ('exact', ())
 
 
 def test_partial_recovery_rejects_changed_archive():
     expected, actual = _spec('NUMERIC(38,18)'), _spec('FLOAT')
-    versions = plan_column_versions(expected, actual, decimal_columns=('AMOUNT',))
+    versions = plan_column_versions(
+        expected, actual, decimal_columns=('AMOUNT',), force_precision_columns=True,
+    )
     changed_archive = IcebergColumn(versions['AMOUNT']['archived_name'], 'NUMBER(18,2)')
     changed = replace(expected, columns=expected.columns + (changed_archive,))
     with pytest.raises(RecoveryManifestError, match='Historical decimal column changed'):
-        partial_preparation(expected, changed, versions)
+        partial_preparation(
+            expected, changed, versions, decimal_columns=('AMOUNT',), force_precision_columns=True,
+        )
 
 
 @pytest.mark.parametrize('extra_name', ('UNEXPECTED', 'OTHER_20260929_123456_123456'))
@@ -96,11 +144,13 @@ def test_partial_does_not_accept_unrelated_extra_columns(extra_name):
 
 
 def test_numeric_key_type_change_is_rejected_before_planning_mutations():
-    expected, actual = _spec('NUMERIC(38,18)'), _spec('FLOAT')
+    expected, actual = _spec('NUMERIC(38,18)'), _spec('NUMERIC(18,2)')
     expected = replace(expected, primary_key=('AMOUNT',))
     actual = replace(actual, primary_key=('AMOUNT',))
     with pytest.raises(TableCompatibilityError, match='primary-key column AMOUNT'):
-        plan_column_versions(expected, actual, decimal_columns=('AMOUNT',))
+        plan_column_versions(
+            expected, actual, decimal_columns=('AMOUNT',), force_precision_columns=True,
+        )
 
 
 @pytest.mark.parametrize('current', (
@@ -112,13 +162,70 @@ def test_native_partial_versions_decimal_definition_changes(current):
     target = {'sf_object': client, 'schema': 'SCHEMA', 'table': 'TABLE'}
     changes = diff_source_target_columns(
         target, ['"AMOUNT" NUMERIC(38,18)'], primary_keys=['ID'], decimal_columns=('AMOUNT',),
+        force_precision_columns=True,
     )
     assert changes['column_versions'] == {'"AMOUNT"': 'NUMERIC(38,18)'}
+    assert all(call.args[0].startswith('SHOW COLUMNS') for call in client.query.call_args_list)
+
+
+def test_native_partial_rejects_non_float_decimal_key_change():
+    client = Mock()
+    client.query.return_value = [{
+        'column_name': 'AMOUNT',
+        'data_type': json.dumps({'type': 'FIXED', 'precision': 18, 'scale': 2}),
+    }]
+    target = {'sf_object': client, 'schema': 'SCHEMA', 'table': 'TABLE'}
     with pytest.raises(NativePartialSyncCompatibilityError, match='primary-key column'):
         diff_source_target_columns(
-            target, ['"AMOUNT" NUMERIC(38,18)'], primary_keys=['AMOUNT'], decimal_columns=('AMOUNT',),
+            target,
+            ['"AMOUNT" NUMERIC(38,18)'],
+            primary_keys=['AMOUNT'],
+            decimal_columns=('AMOUNT',),
+            force_precision_columns=True,
         )
-    assert all(call.args[0].startswith('SHOW COLUMNS') for call in client.query.call_args_list)
+
+
+def test_native_partial_keeps_legacy_decimal_float_without_opt_in():
+    client = Mock()
+    columns = [{'column_name': 'AMOUNT', 'data_type': json.dumps({'type': 'REAL'})}]
+    client.query.return_value = columns
+    target = {'sf_object': client, 'schema': 'SCHEMA', 'table': 'TABLE'}
+    source = ['"AMOUNT" NUMERIC(38,18)']
+
+    assert diff_source_target_columns(
+        target, source, primary_keys=['AMOUNT'], boundary_column='amount', decimal_columns=('AMOUNT',),
+    )['column_versions'] == {}
+    assert utils.report_source_target_columns(
+        target, source, columns, primary_keys=['AMOUNT'], boundary_column='amount', decimal_columns=('AMOUNT',),
+    )[0]['status'] == 'compatible'
+
+
+@pytest.mark.parametrize('force_precision_columns', [False, True])
+def test_native_partial_postgres_decimal_key_always_retains_float_staging_type(force_precision_columns):
+    client = Mock()
+    columns = [{'column_name': 'ID', 'data_type': json.dumps({'type': 'REAL'})}]
+    client.query.return_value = columns
+    target = {'sf_object': client, 'schema': 'SCHEMA', 'table': 'TABLE'}
+    source = ['"ID" VARCHAR(134217728)']
+
+    changes = diff_source_target_columns(
+        target,
+        source,
+        primary_keys=['ID'],
+        decimal_columns=('ID',),
+        force_precision_columns=force_precision_columns,
+    )
+
+    assert changes['column_versions'] == {}
+    assert changes['staging_columns'] == ['"ID" FLOAT']
+    assert utils.report_source_target_columns(
+        target,
+        source,
+        columns,
+        primary_keys=['ID'],
+        decimal_columns=('ID',),
+        force_precision_columns=force_precision_columns,
+    )[0]['status'] == 'compatible'
 
 
 @pytest.mark.parametrize(('source', 'current'), (
@@ -139,7 +246,10 @@ def test_native_unrelated_numeric_drift_never_versions_without_decimal_origin(so
 def test_iceberg_cannot_version_the_partial_range_column():
     expected, actual = _spec('NUMERIC(38,18)'), _spec('FLOAT')
     with pytest.raises(TableCompatibilityError, match='boundary column.*FullSync'):
-        plan_column_versions(expected, actual, boundary_column='amount', decimal_columns=('AMOUNT',))
+        plan_column_versions(
+            expected, actual, boundary_column='amount', decimal_columns=('AMOUNT',),
+            force_precision_columns=True,
+        )
 
 
 def test_iceberg_archive_cannot_take_a_new_source_column_name():
@@ -149,18 +259,25 @@ def test_iceberg_archive_cannot_take_a_new_source_column_name():
         'pipelinewise.fastsync.commons.snowflake_decimal_evolution.versioned_column_name', return_value='NEW',
     ):
         with pytest.raises(TableCompatibilityError, match='Historical column already exists: NEW'):
-            plan_column_versions(expected, actual, decimal_columns=('AMOUNT',))
+            plan_column_versions(
+                expected, actual, decimal_columns=('AMOUNT',), force_precision_columns=True,
+            )
 
 
 def test_iceberg_retry_rejects_a_persisted_boundary_column_rename():
     expected, actual = _spec('NUMERIC(38,18)'), _spec('FLOAT')
-    versions = plan_column_versions(expected, actual, decimal_columns=('AMOUNT',))
+    versions = plan_column_versions(
+        expected, actual, decimal_columns=('AMOUNT',), force_precision_columns=True,
+    )
     archive = IcebergColumn(versions['AMOUNT']['archived_name'], 'FLOAT')
     after_rename = replace(actual, columns=tuple(
         archive if column.name == 'AMOUNT' else column for column in actual.columns
     ))
     with pytest.raises(TableCompatibilityError, match='boundary column.*FullSync'):
-        partial_preparation(expected, after_rename, versions, boundary_column='amount')
+        partial_preparation(
+            expected, after_rename, versions, boundary_column='amount', decimal_columns=('AMOUNT',),
+            force_precision_columns=True,
+        )
 
 
 def test_native_boundary_type_change_is_rejected_before_mutation():
@@ -170,7 +287,7 @@ def test_native_boundary_type_change_is_rejected_before_mutation():
         diff_source_target_columns(
             {'sf_object': client, 'schema': 'SCHEMA', 'table': 'TABLE'},
             ['"AMOUNT" NUMERIC(38,18)'], primary_keys=['ID'], boundary_column='amount',
-            decimal_columns=('AMOUNT',),
+            decimal_columns=('AMOUNT',), force_precision_columns=True,
         )
     assert all(call.args[0].startswith('SHOW COLUMNS') for call in client.query.call_args_list)
 
@@ -256,7 +373,10 @@ def test_native_retry_after_rename_adds_replacement_without_archiving_twice():
     client.query.side_effect = query
     client.add_columns.side_effect = RuntimeError('interrupted after rename')
     target = {'sf_object': client, 'schema': 'SCHEMA', 'table': 'TABLE', 'temp': 'STAGE'}
-    args = Namespace(table='TABLE', drop_target_table=False)
+    args = Namespace(
+        table='TABLE', drop_target_table=False,
+        target={'force_precision_columns': True},
+    )
     source = ['"ID" NUMBER(38,0)', '"AMOUNT" NUMERIC(38,18)']
     with patch.object(utils.iceberg_routes, 'require_native_target_format'), \
             patch.object(utils, 'versioned_column_name', return_value=archive):
@@ -296,29 +416,44 @@ def test_published_partial_schema_verifies_persisted_history(change):
     elif change == 'not_nullable':
         actual = replace(actual, columns=expected.columns + (replace(old_archive, nullable=False), new_archive))
     attempt = Namespace(method=PUBLICATION_PARTIAL_MERGE,
-                        manifest_payload=Namespace(historical_columns=history, column_versions=versions))
+                        manifest_payload=Namespace(
+                            historical_columns=history, column_versions=versions,
+                            decimal_columns=['AMOUNT'], force_precision_columns=True,
+                        ))
     service = SnowflakeIcebergPublicationService(Mock())
     assert service._published_compatibility(attempt, expected, actual)[0] == (
         'exact' if change == 'none' else 'incompatible'
     )
     if change == 'none':
-        assert partial_preparation(expected, actual, versions, historical_columns=history) == ()
+        assert partial_preparation(
+            expected, actual, versions, historical_columns=history, decimal_columns=('AMOUNT',),
+            force_precision_columns=True,
+        ) == ()
     else:
         with pytest.raises(RecoveryManifestError):
-            partial_preparation(expected, actual, versions, historical_columns=history)
+            partial_preparation(
+                expected, actual, versions, historical_columns=history, decimal_columns=('AMOUNT',),
+                force_precision_columns=True,
+            )
 
 
 def test_decimal_float_fallback_versions_once_and_can_return_to_numeric():
     numeric, floating = _spec('NUMERIC(38,18)'), _spec('FLOAT')
     for expected, actual in ((floating, numeric), (numeric, floating)):
-        versions = plan_column_versions(expected, actual, decimal_columns=('AMOUNT',))
-        statements = partial_preparation(expected, actual, versions)
+        versions = plan_column_versions(
+            expected, actual, decimal_columns=('AMOUNT',), force_precision_columns=True,
+        )
+        statements = partial_preparation(
+            expected, actual, versions, decimal_columns=('AMOUNT',), force_precision_columns=True,
+        )
         assert len(statements) == 2
         archive = IcebergColumn(versions['AMOUNT']['archived_name'], next(
             column.data_type for column in actual.columns if column.name == 'AMOUNT'
         ))
         evolved = replace(expected, columns=expected.columns + (archive,))
-        assert partial_preparation(expected, evolved, versions) == ()
+        assert partial_preparation(
+            expected, evolved, versions, decimal_columns=('AMOUNT',), force_precision_columns=True,
+        ) == ()
     client = Mock()
     client.query.return_value = [{'column_name': 'AMOUNT', 'data_type': json.dumps({
         'type': 'FIXED', 'precision': 38, 'scale': 18,
@@ -342,11 +477,13 @@ def test_partial_preparation_persists_existing_archives_before_ddl(tmp_path):
     publisher.inspect_table = Mock(return_value=v3_snapshot(actual))
     attempt = publisher.prepare_partial_sync(
         expected, {}, PartialSyncBoundary('ID', 1, 10), recovery_identity=RECOVERY_IDENTITY,
-        decimal_columns=('AMOUNT',),
+        decimal_columns=('AMOUNT',), force_precision_columns=True,
     )
     recovered = publisher.load_attempt(expected, expected_kind='partial', recovery_identity=RECOVERY_IDENTITY)
     assert recovered.manifest_payload.historical_columns == {archive.name: archive.data_type}
     assert recovered.manifest_payload.column_versions == attempt.manifest_payload.column_versions
+    assert recovered.manifest_payload.decimal_columns == ['AMOUNT']
+    assert recovered.manifest_payload.force_precision_columns is True
     assert client.queries == []
     assert len(publisher.plan_partial_sync(recovered, expected).preparation_statements) == 2
 
@@ -354,6 +491,9 @@ def test_partial_preparation_persists_existing_archives_before_ddl(tmp_path):
 def test_partial_manifests_without_archive_evidence_keep_exact_schema_compatibility():
     expected = _spec('NUMERIC(38,18)')
     attempt = Namespace(method=PUBLICATION_PARTIAL_MERGE,
-                        manifest_payload=Namespace(historical_columns=None, column_versions=None))
+                        manifest_payload=Namespace(
+                            historical_columns=None, column_versions=None, decimal_columns=None,
+                            force_precision_columns=None,
+                        ))
     service = SnowflakeIcebergPublicationService(Mock())
     assert service._published_compatibility(attempt, expected, expected) == ('exact', ())

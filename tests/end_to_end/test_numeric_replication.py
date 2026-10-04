@@ -183,6 +183,73 @@ def test_decimal_fastsync_snowflake(source_export, tmp_path):
             _remove_s3_prefix(target, config['s3_key_prefix'])
 
 
+def test_legacy_decimal_float_migration_requires_opt_in(source_export, tmp_path):
+    """Keep legacy decimal FLOAT columns until the tap explicitly versions them."""
+    source = source_export
+    namespace = f'ppw_decimal_migration_{uuid4().hex[:12]}'
+    schema = namespace.upper()
+    config = {**_target_config(schema, namespace), 'archive_load_files': False}
+    if source.iceberg:
+        config.update(target_table_format='iceberg', iceberg_version=3)
+    target = FastSyncTargetSnowflake(config)
+    source.create(
+        [('id', 'INTEGER PRIMARY KEY'), ('amount', 'DECIMAL(65,30)'), ('position', 'INTEGER')],
+        [(1, '12.34', 1), (2, '56.78', 2)],
+    )
+    args = _args(source, config, tmp_path, namespace, replication_key='position')
+    full = postgres_to_snowflake if source.engine == 'postgres' else mysql_to_snowflake
+    partial = partial_postgres if source.engine == 'postgres' else partial_mysql
+    table = f'"{schema}"."{source.table_name.upper()}"'
+    request = (source.table, {
+        'column': 'position', 'start_value': '<S>1', 'end_value': '<S>2', 'drop_target_table': False,
+    })
+
+    def amount_columns():
+        return [
+            column for column in _fallback_columns(target, schema, source.table_name)
+            if column['COLUMN_NAME'] == 'AMOUNT' or column['COLUMN_NAME'].startswith('AMOUNT_')
+        ]
+
+    try:
+        result = full.sync_table(source.table, args)
+        assert result is True, result
+        columns = amount_columns()
+        assert len(columns) == 1
+        assert columns[0]['COLUMN_NAME'] == 'AMOUNT'
+        assert columns[0]['DATA_TYPE'] == 'FLOAT'
+
+        alter = 'ALTER COLUMN amount TYPE' if source.engine == 'postgres' else 'MODIFY COLUMN amount'
+        source.execute(f'ALTER TABLE {source.quoted_table} {alter} DECIMAL(18,2)')
+        result = partial.partial_sync_table(request, args)
+        assert result is True, result
+        columns = amount_columns()
+        assert len(columns) == 1
+        assert columns[0]['COLUMN_NAME'] == 'AMOUNT'
+        assert columns[0]['DATA_TYPE'] == 'FLOAT'
+
+        config['force_precision_columns'] = True
+        result = partial.partial_sync_table(request, args)
+        assert result is True, result
+        columns = amount_columns()
+        current = next(column for column in columns if column['COLUMN_NAME'] == 'AMOUNT')
+        assert current == {
+            'COLUMN_NAME': 'AMOUNT', 'DATA_TYPE': 'NUMBER',
+            'NUMERIC_PRECISION': 18, 'NUMERIC_SCALE': 2,
+        }
+        archives = [column for column in columns if column['COLUMN_NAME'].startswith('AMOUNT_')]
+        assert len(archives) == 1
+        assert archives[0]['DATA_TYPE'] == 'FLOAT'
+        rows = target.query(f'SELECT "ID", TO_VARCHAR("AMOUNT") AS AMOUNT FROM {table} ORDER BY "ID"')
+        assert [(row['ID'], Decimal(row['AMOUNT'])) for row in rows] == [
+            (1, Decimal('12.34')), (2, Decimal('56.78')),
+        ]
+    finally:
+        try:
+            target.query(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
+        finally:
+            _remove_s3_prefix(target, config['s3_key_prefix'])
+
+
 @pytest.mark.parametrize('source_export', [('postgres', False), ('postgres', True)], indirect=True)
 def test_postgres_bounded_numeric_key_snowflake(source_export, tmp_path):
     """Keep finite and NaN PostgreSQL keys stable through native/v3 bulk and Singer loads."""
@@ -279,6 +346,95 @@ def test_mysql_bounded_decimal_key_snowflake(source_export, tmp_path):
         assert {record['id'] for record in records} == {'1.00', '2.50'}
         _load_singer(config, 'snowflake', messages)
         assert_rows({Decimal('1.00'): (101, 3), Decimal('2.50'): (202, 4)})
+    finally:
+        try:
+            target.query(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
+        finally:
+            _remove_s3_prefix(target, config['s3_key_prefix'])
+
+
+@pytest.mark.parametrize('source_export', [
+    ('mysql', False), ('mysql', True), ('mariadb', False), ('mariadb', True),
+], indirect=True)
+def test_mysql_extended_types_snowflake(source_export, tmp_path):
+    """Preserve SET, BLOB-family and YEAR values through bulk and Singer loads."""
+    source = source_export
+    namespace = f'ppw_mysql_types_{uuid4().hex[:12]}'
+    schema = namespace.upper()
+    config = {**_target_config(schema, namespace), 'archive_load_files': False}
+    if source.iceberg:
+        config.update(target_table_format='iceberg', iceberg_version=3)
+    target = FastSyncTargetSnowflake(config)
+    binary_columns = ('tiny_payload', 'payload', 'medium_payload', 'long_payload')
+    source.create(
+        [
+            ('id', 'INTEGER PRIMARY KEY'), ('position', 'INTEGER'),
+            ('labels', "SET('first','second')"),
+            ('tiny_payload', 'TINYBLOB'), ('payload', 'BLOB'),
+            ('medium_payload', 'MEDIUMBLOB'), ('long_payload', 'LONGBLOB'),
+            ('calendar_year', 'YEAR'),
+        ],
+        [
+            (1, 1, 'second,first', b'\x00\xff', b'blob', b'\x00medium', b'long\xff', 2024),
+            (2, 2, '', b'', b'', b'', b'', 0),
+            (3, 3, None, None, None, None, None, None),
+        ],
+    )
+    args = _args(source, config, tmp_path, namespace, replication_key='position')
+    table = f'"{schema}"."{source.table_name.upper()}"'
+
+    def rows():
+        projections = ', '.join(f'HEX_ENCODE("{name.upper()}") AS "{name.upper()}"' for name in binary_columns)
+        return target.query(
+            f'SELECT "ID", "LABELS", {projections}, "CALENDAR_YEAR" FROM {table} ORDER BY "ID"',
+        )
+
+    try:
+        result = mysql_to_snowflake.sync_table(source.table, args)
+        assert result is True, result
+        columns = _fallback_columns(target, schema, source.table_name)
+        column_types = {column['COLUMN_NAME']: column for column in columns}
+        assert column_types['LABELS']['DATA_TYPE'] == 'TEXT'
+        assert all(column_types[name.upper()]['DATA_TYPE'] == 'BINARY' for name in binary_columns)
+        assert column_types['CALENDAR_YEAR'] == {
+            'COLUMN_NAME': 'CALENDAR_YEAR', 'DATA_TYPE': 'NUMBER',
+            'NUMERIC_PRECISION': 38, 'NUMERIC_SCALE': 0,
+        }
+        assert rows() == [
+            {
+                'ID': 1, 'LABELS': 'first,second', 'TINY_PAYLOAD': '00FF', 'PAYLOAD': '626C6F62',
+                'MEDIUM_PAYLOAD': '006D656469756D', 'LONG_PAYLOAD': '6C6F6E67FF', 'CALENDAR_YEAR': 2024,
+            },
+            {
+                'ID': 2, 'LABELS': '', 'TINY_PAYLOAD': '', 'PAYLOAD': '',
+                'MEDIUM_PAYLOAD': '', 'LONG_PAYLOAD': '', 'CALENDAR_YEAR': 0,
+            },
+            {
+                'ID': 3, 'LABELS': None, 'TINY_PAYLOAD': None, 'PAYLOAD': None,
+                'MEDIUM_PAYLOAD': None, 'LONG_PAYLOAD': None, 'CALENDAR_YEAR': None,
+            },
+        ]
+
+        source.execute(
+            f'UPDATE {source.quoted_table} SET position=%s, labels=%s, tiny_payload=%s, payload=%s, '
+            'medium_payload=%s, long_payload=%s, calendar_year=%s WHERE id=%s',
+            (4, '', b'', b'', b'', b'', 0, 1),
+        )
+        source.execute(
+            f'INSERT INTO {source.quoted_table} VALUES (%s,%s,%s,%s,%s,%s,%s,%s)',
+            (4, 5, None, None, None, None, None, None),
+        )
+        messages = _tap_extract(source, 'snowflake', args, dimensions=None, start=3, end=5)
+        assert {message['record']['id'] for message in messages if message['type'] == 'RECORD'} == {1, 4}
+        _load_singer(config, 'snowflake', messages)
+        assert rows()[0] == {
+            'ID': 1, 'LABELS': '', 'TINY_PAYLOAD': '', 'PAYLOAD': '',
+            'MEDIUM_PAYLOAD': '', 'LONG_PAYLOAD': '', 'CALENDAR_YEAR': 0,
+        }
+        assert rows()[-1] == {
+            'ID': 4, 'LABELS': None, 'TINY_PAYLOAD': None, 'PAYLOAD': None,
+            'MEDIUM_PAYLOAD': None, 'LONG_PAYLOAD': None, 'CALENDAR_YEAR': None,
+        }
     finally:
         try:
             target.query(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')

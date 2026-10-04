@@ -116,6 +116,7 @@ Set the desired format in any tap whose Singer output is compatible with
    target: "snowflake"
    target_table_format: iceberg
    iceberg_version: 3
+   force_precision_columns: false
 
 These tap-level settings are the only valid Iceberg selection. Omitting
 ``target_table_format`` or selecting ``native`` creates native tables. Target
@@ -141,7 +142,9 @@ numeric fields to Iceberg ``DOUBLE``. The latter preserves 64-bit floating-point
 range instead of narrowing to Iceberg ``FLOAT``. Native and fixed-point
 ``NUMBER(precision, scale)`` columns preserve supported MariaDB/MySQL and PostgreSQL
 decimal dimensions. PostgreSQL numeric primary keys use canonical text to retain
-``NaN`` identities. See :ref:`exact_decimal_mapping` for fallback and versioning. PostgreSQL
+``NaN`` identities. Existing legacy floating-point decimal columns remain
+unchanged unless ``force_precision_columns`` is enabled on the
+tap. See :ref:`exact_decimal_mapping` for fallback and versioning. PostgreSQL
 ``hstore`` maps to ``VARIANT`` on this route. For MariaDB sources, a
 ``LONGTEXT`` column with MariaDB's exact generated ``JSON_VALID`` constraint is
 treated as the ``JSON`` alias and maps to ``VARIANT``; ordinary ``LONGTEXT`` and

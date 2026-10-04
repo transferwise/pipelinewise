@@ -687,6 +687,12 @@ class PartialSyncUtilsTestCase(TestCase):
                 '"FOO_COLUMN_3"': 'VARCHAR',
                 '"FOO_COLUMN_5"': 'VARCHAR'
             },
+            'staging_columns': [
+                '"FOO_COLUMN_0" NUMBER',
+                '"FOO_COLUMN_1" NUMBER',
+                '"FOO_COLUMN_3" VARCHAR',
+                '"FOO_COLUMN_5" VARCHAR',
+            ],
             'target_columns': ['FOO_COLUMN_1', 'FOO_COLUMN_2',
                                'FOO_COLUMN_3', 'FOO_COLUMN_4',
                                '_SDC_EXTRACTED_AT', '_SDC_BATCHED_AT', '_SDC_DELETED_AT', '_SDC_FOO_BAR'],

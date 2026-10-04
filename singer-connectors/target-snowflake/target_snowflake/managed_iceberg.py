@@ -251,6 +251,7 @@ class ColumnChangePlan:
 
     additions: Tuple[str, ...]
     replacements: Tuple[Tuple[str, str], ...]
+    retained_decimal_types: Tuple[Tuple[str, str], ...] = ()
 
 
 def _quote_identifier(identifier):
@@ -820,6 +821,9 @@ def column_type(schema_property, is_iceberg_table=False, iceberg_version=None, i
     if iceberg_version is not None and not is_iceberg_table:
         raise ValueError('An Iceberg version cannot be used for a native table')
 
+    if schema_property.get('format') == 'singer.year':
+        return 'NUMERIC(38,0)'
+
     if is_decimal_schema(schema_property):
         mapped_type = decimal_sql_type(schema_property, 'snowflake', is_key=is_key, source=source)
         return 'DOUBLE' if is_iceberg_table and mapped_type == 'FLOAT' else mapped_type
@@ -873,6 +877,7 @@ def _replacement_for_existing_column(
     contract,
     is_key=False,
     source=None,
+    force_precision_columns=False,
 ):
     definition = column_clause(
         name,
@@ -891,6 +896,11 @@ def _replacement_for_existing_column(
     ).upper()
     base_new_type = _base_snowflake_type(new_type)
     if is_decimal_schema(properties_schema):
+        if (
+            (not force_precision_columns or is_key)
+            and _base_snowflake_type(current_type) in ('FLOAT', 'DOUBLE', 'DOUBLE PRECISION', 'REAL')
+        ):
+            return None
         if _base_snowflake_type(current_type) in ('NUMBER', 'NUMERIC', 'DECIMAL', 'FIXED'):
             if not re.fullmatch(r'(?:NUMBER|NUMERIC|DECIMAL|FIXED)\(\d+,\d+\)', current_type):
                 raise TableFormatDiscoveryException(
@@ -932,6 +942,7 @@ def plan_column_changes(
     iceberg_version=None,
     key_properties=(),
     source=None,
+    force_precision_columns=False,
 ):
     """Return additions and replacements without executing Snowflake DDL."""
     contract = None
@@ -949,6 +960,7 @@ def plan_column_changes(
     primary_keys = {name.upper() for name in key_properties}
     additions = []
     replacements = []
+    retained_decimal_types = []
     for name, properties_schema in flatten_schema.items():
         name_upper = name.upper()
         if name_upper not in normalized_existing_types:
@@ -963,6 +975,12 @@ def plan_column_changes(
             continue
 
         current_type = normalized_existing_types[name_upper]
+        if (
+            is_decimal_schema(properties_schema)
+            and (not force_precision_columns or name_upper in primary_keys)
+            and _base_snowflake_type(current_type) in ('FLOAT', 'DOUBLE', 'DOUBLE PRECISION', 'REAL')
+        ):
+            retained_decimal_types.append((name_upper, 'FLOAT'))
         replacement = _replacement_for_existing_column(
             name,
             properties_schema,
@@ -972,6 +990,7 @@ def plan_column_changes(
             contract=contract,
             is_key=name_upper in primary_keys,
             source=source,
+            force_precision_columns=force_precision_columns,
         )
         if replacement:
             if name_upper in primary_keys and is_decimal_schema(properties_schema):
@@ -980,4 +999,8 @@ def plan_column_changes(
                 )
             replacements.append(replacement)
 
-    return ColumnChangePlan(tuple(additions), tuple(replacements))
+    return ColumnChangePlan(
+        tuple(additions),
+        tuple(replacements),
+        tuple(retained_decimal_types),
+    )
