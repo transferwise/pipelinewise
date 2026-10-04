@@ -528,6 +528,11 @@
   },
   "type": "object",
   "properties": {
+    "previous_tap_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Previous PostgreSQL tap ID whose wal2json slot and state this tap retains."
+    },
     "id": {
       "type": "string"
     },

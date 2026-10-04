@@ -3,7 +3,8 @@
 # ------------------------------------------------------------------------------
 # General Properties
 # ------------------------------------------------------------------------------
-id: "postgres_sample"                  # Unique identifier of the tap
+id: "postgres_sample"                  # LOG_BASED: lowercase a-z, 0-9, underscores; max 54 characters
+#previous_tap_id: "Old-Postgres-ID"     # Optional: preserve a historical ID during wal2json migration
 name: "Sample Postgres Database"       # Name of the tap
 type: "tap-postgres"                   # !! THIS SHOULD NOT CHANGE !!
 owner: "somebody@foo.com"              # Data owner to contact
@@ -28,8 +29,8 @@ db_conn:
   #logical_poll_total_seconds:         # Optional: Stop running the tap when no data
                                        #           received from wal after certain number of seconds
                                        #           Default: 10800
-  #break_at_end_lsn:                   # Optional: Stop running the tap if the newly received lsn
-                                       #           is after the max lsn that was detected when the tap started
+  #break_at_end_lsn: true              # Stop at a decoded commit crossing the startup LSN boundary.
+                                       # Quiet sources may wait for the idle timeout.
                                        #           Default: true
   #ssl: "true"                         # Optional: Using SSL via postgres sslmode 'require' option.
                                        #           If the server does not accept SSL connections or the client

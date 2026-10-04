@@ -120,7 +120,7 @@ class TestIntegration(Base):
             }
         )
 
-        # Third message is a RECORD message with transformed values 
+        # Third message is a RECORD message with transformed values
         self.assertEqual(
             singer_output_messages[2],
             {
@@ -157,7 +157,7 @@ class TestIntegration(Base):
             }
         )
 
-        # Third message is a RECORD message with transformed values 
+        # Third message is a RECORD message with transformed values
         self.assertEqual(
             singer_output_messages[3],
             {

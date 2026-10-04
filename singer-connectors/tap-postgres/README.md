@@ -8,7 +8,7 @@
 
 This is a [PipelineWise](https://transferwise.github.io/pipelinewise) compatible tap connector.
 
-PostgreSQL 11.2 or later is required for every Singer replication method and for
+PostgreSQL 14 or later is required for every Singer replication method and for
 PipelineWise FullSync/PartialSync. This source minimum does not constrain
 PostgreSQL targets or the PipelineWise backend database.
 
@@ -122,14 +122,12 @@ to the tap for the next sync.
 
 * **A connection to the master instance**. Log-based replication will only work by connecting to the master instance.
 
-* **wal2json plugin**: To use Log Based for your PostgreSQL integration, you must install the wal2json plugin version >= 2.3.
-  The wal2json plugin outputs JSON objects for logical decoding, which the tap then uses to perform Log-based Replication.
-  Steps for installing the plugin vary depending on your operating system. Instructions for each operating system type
-  are in the wal2json’s GitHub repository:
-
-  * [Unix-based operating systems](https://github.com/eulerto/wal2json#unix-based-operating-systems)
-  * [Windows](https://github.com/eulerto/wal2json#windows)
-
+* **pgoutput plugin**: Built into PostgreSQL. PipelineWise creates and maintains
+  `ppw_slot_<tap_id>` as both the slot and publication name. The runtime needs
+  replication privileges, database CREATE, ownership of published tables, and
+  EXECUTE on the text overload of `pg_catalog.pg_logical_emit_message`.
+  Keep wal2json installed while existing slots migrate in release 0.94.0.
+  Release 0.95.0 will remove wal2json support and all related code and tests.
 
 * **postgres config file**: Locate the database configuration file (usually `postgresql.conf`) and define
   the parameters as follows:
@@ -146,19 +144,18 @@ to the tap for the next sync.
     This should be sufficient unless you have a large number of read replicas connected to the master instance.
 
 
-* **Existing replication slot**: Log based replication requires a dedicated logical replication slot.
-  In PostgreSQL, a logical replication slot represents a stream of database changes that can then be replayed to a
-  client in the order they were made on the original server. Each slot streams a sequence of changes from a single
-  database.
-
-  Login to the master instance as a superuser and using the `wal2json` plugin, create a logical replication slot:
-  ```
-    SELECT *
-    FROM pg_create_logical_replication_slot('pipelinewise_<database_name>', 'wal2json');
-  ```
-
-  **Note**: Replication slots are specific to a given database in a cluster. If you want to connect multiple
-  databases - whether in one integration or several - you’ll need to create a replication slot for each database.
+* **Migration and boundaries**: PipelineWise creates a fresh pgoutput slot,
+  bridges the old dedicated wal2json slot to a target-acknowledged commit, then
+  retires wal2json and replays the overlap from the original pgoutput position.
+  This release retains numeric LSN/commit boundaries without `messages=true`.
+  Quiet sources may wait for the idle timeout; overlap completion may need a
+  later published transaction. Do not manually advance a migrating slot.
+  Old keepalives could advance wal2json beyond saved bookmarks; this requires
+  an explicit whole-tap resync. A configured snapshot secondary must be a
+  physical standby in recovery. Incomplete conditional PATCH transformations
+  stop before emitting raw values or acknowledging the update.
+  See the [PostgreSQL source guide](../../docs/connectors/taps/postgres.rst) for
+  prerequisites, publication reconciliation, supported tables and rename recovery.
 
 ### To run tests:
 

@@ -48,6 +48,14 @@ jobs:
         continue-on-error: true
         run: ./scripts/ci_check_no_file_changes.sh python config e2e
 
+      - name: Prepare the pre-migration master tap
+        if: steps.check.outcome == 'failure'
+        run: |
+          git fetch --no-tags --depth=1 origin 6d7a02b5e6965eb03937f6de1946c207d1be2c1c
+          mkdir -p dev-project/.upgrade-baseline/tap_postgres
+          git archive 6d7a02b5e6965eb03937f6de1946c207d1be2c1c:singer-connectors/tap-postgres/tap_postgres |
+            tar -x -C dev-project/.upgrade-baseline/tap_postgres
+
       - name: Setup test containers
         if: steps.check.outcome == 'failure'
         run: |
@@ -83,11 +91,73 @@ jobs:
           -e TAP_S3_CSV_BUCKET=$TAP_S3_CSV_BUCKET \
           -e PIPELINEWISE_E2E_NAMESPACE=$PIPELINEWISE_E2E_NAMESPACE \
           pipelinewise pytest \
+          tests/end_to_end/test_postgres_master_upgrade.py \
           tests/end_to_end/test_target_postgres.py \
+          tests/end_to_end/test_postgres_pgoutput_slots.py \
           tests/end_to_end/test_postgres_stream_buffer_recovery.py \
           tests/end_to_end/data_diff/test_postgres_to_postgres.py \
           tests/end_to_end/data_diff/test_mysql_to_postgres.py \
           -vx --timer-top-n 10
+
+  postgres_migration_smoke:
+    name: pg_migration_smoke_${{ matrix.postgres_major }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres_major: [15, 18]
+    env:
+      POSTGRES_MAJOR: ${{ matrix.postgres_major }}
+
+    steps:
+      - name: Checking out repo
+        uses: actions/checkout@v7
+
+      - name: Check if migration inputs changed
+        id: check
+        env:
+          GITHUB_REPO: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        continue-on-error: true
+        run: ./scripts/ci_check_no_file_changes.sh python config e2e
+
+      - name: Setup PostgreSQL migration smoke containers
+        if: steps.check.outcome == 'failure'
+        run: |
+          cp dev-project/.env.template dev-project/.env
+          docker compose \
+            -f dev-project/docker-compose.yml \
+            -f dev-project/docker-compose.pg-version-smoke.yml \
+            up -d
+
+      - name: Wait for test containers to be ready
+        if: steps.check.outcome == 'failure'
+        timeout-minutes: 10
+        run: |
+          readiness_started_at=$(date +%s)
+          until docker logs --tail 50 pipelinewise 2>&1 | grep -Fq "PipelineWise Dev environment is ready"
+          do
+            container_status=$(docker inspect --format '{{.State.Status}}' pipelinewise)
+            if [ "$container_status" != "running" ]; then
+              echo "PipelineWise container stopped with status ${container_status}"
+              docker logs pipelinewise
+              exit 1
+            fi
+            elapsed_seconds=$(($(date +%s) - readiness_started_at))
+            echo "Waiting for PipelineWise dev environment (${elapsed_seconds}s elapsed)"
+            sleep 5
+          done
+          elapsed_seconds=$(($(date +%s) - readiness_started_at))
+          echo "PipelineWise dev environment became ready after ${elapsed_seconds}s"
+
+      - name: Run PostgreSQL migration smoke test
+        if: steps.check.outcome == 'failure'
+        run: |
+          docker exec -t pipelinewise pytest \
+            tests/end_to_end/test_postgres_pgoutput_slots.py::test_idle_migration_promotes_then_waits_for_published_commit \
+            -vx --timer-top-n 10
 
   e2e_tests_snowflake:
     name: ${{ matrix.check_name }}
@@ -101,18 +171,19 @@ jobs:
             check_name: e2e_tests_02
             test_paths: >-
               tests/end_to_end/target_snowflake/test_native_to_iceberg_converter.py
+              tests/end_to_end/target_snowflake/tap_postgres/test_pgoutput_migration_to_sf.py
               tests/end_to_end/data_diff/test_mysql_to_snowflake.py
           - shard: publication
             check_name: e2e_tests_03
             test_paths: >-
               tests/end_to_end/target_snowflake/tap_postgres/test_snowflake_iceberg_publisher.py
               tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_replica_to_sf.py
+              tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_with_custom_buffer_size.py
           - shard: pg-partial
             check_name: e2e_tests_04
             test_paths: >-
               tests/end_to_end/target_snowflake/tap_postgres/test_partial_sync_pg_to_sf.py
               tests/end_to_end/target_snowflake/tap_postgres/test_multiline_native_pg_to_sf.py
-              tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_with_custom_buffer_size.py
               tests/end_to_end/data_diff/test_postgres_to_snowflake.py
           - shard: mariadb-partial
             check_name: e2e_tests_05

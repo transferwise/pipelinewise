@@ -2,7 +2,7 @@ version: "3"
 
 services:
   db:
-    image: postgres:12-alpine
+    image: postgres:14-bookworm
     environment:
       POSTGRES_DB: "target_db"
       POSTGRES_USER: "my_user"

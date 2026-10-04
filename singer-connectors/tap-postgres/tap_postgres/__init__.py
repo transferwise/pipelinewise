@@ -1,6 +1,7 @@
 import argparse
 import itertools
 import copy
+import math
 import psycopg2
 import psycopg2.extras
 import psycopg2.extensions
@@ -18,7 +19,7 @@ from tap_postgres.sync_strategies import incremental
 from tap_postgres.discovery_utils import discover_db
 from tap_postgres.stream_utils import (
     dump_catalog, clear_state_on_replication_change,
-    is_selected_via_metadata, refresh_streams_schema, any_logical_streams)
+    is_selected_via_metadata, refresh_streams_schema)
 
 LOGGER = singer.get_logger('tap_postgres')
 
@@ -29,6 +30,17 @@ REQUIRED_CONFIG_KEYS = [
     'user',
     'password'
 ]
+
+
+def _positive_finite_number(config, key, default):
+    """Return a positive finite numeric setting or fail before connecting."""
+    try:
+        value = float(config.get(key, default))
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f'{key} must be a positive finite number') from exc
+    if not math.isfinite(value) or value <= 0:
+        raise ValueError(f'{key} must be a positive finite number')
+    return value
 
 
 def do_discovery(conn_config):
@@ -164,7 +176,9 @@ def sync_traditional_stream(conn_config, stream, state, sync_method, end_lsn):
         LOGGER.warning('There are no columns selected for stream %s, skipping it', stream['tap_stream_id'])
         return state
 
-    register_type_adapters(conn_config)
+    register_type_adapters(
+        {**conn_config, 'use_secondary': False}
+        if sync_method in {'logical_initial', 'logical_initial_interrupted'} else conn_config)
 
     if sync_method == 'full':
         state = singer.set_currently_syncing(state, stream['tap_stream_id'])
@@ -175,16 +189,17 @@ def sync_traditional_stream(conn_config, stream, state, sync_method, end_lsn):
     elif sync_method == 'logical_initial':
         state = singer.set_currently_syncing(state, stream['tap_stream_id'])
         LOGGER.info("Performing initial full table sync")
-        state = singer.write_bookmark(state, stream['tap_stream_id'], 'lsn', end_lsn)
-
         sync_common.send_schema_message(stream, [])
-        state = full_table.sync_table(conn_config, stream, state, desired_columns, md_map)
+        state = full_table.sync_table(
+            conn_config, stream, state, desired_columns, md_map, snapshot_lsn=end_lsn)
         state = singer.write_bookmark(state, stream['tap_stream_id'], 'xmin', None)
     elif sync_method == 'logical_initial_interrupted':
         state = singer.set_currently_syncing(state, stream['tap_stream_id'])
         LOGGER.info("Initial stage of full table sync was interrupted. resuming...")
         sync_common.send_schema_message(stream, [])
-        state = full_table.sync_table(conn_config, stream, state, desired_columns, md_map)
+        state = full_table.sync_table(
+            conn_config, stream, state, desired_columns, md_map,
+            snapshot_lsn=get_bookmark(state, stream['tap_stream_id'], 'lsn'))
     else:
         raise Exception(f"unknown sync method {sync_method} for stream {stream['tap_stream_id']}")
 
@@ -210,7 +225,8 @@ def sync_logical_streams(conn_config, logical_streams, state, end_lsn, state_fil
         for stream in logical_streams:
             selected_streams.add(stream['tap_stream_id'])
 
-        new_state = dict(currently_syncing=state['currently_syncing'], bookmarks={})
+        new_state = copy.deepcopy(state)
+        new_state['bookmarks'] = {}
 
         for stream, bookmark in state['bookmarks'].items():
             if bookmark == {} or bookmark['last_replication_method'] != 'LOG_BASED' or stream in selected_streams:
@@ -277,22 +293,40 @@ def register_type_adapters(conn_config):
                         (enum_oid,), f'ENUM_{enum_oid}[]', psycopg2.STRING))
 
 
+def _refresh_sync_schemas(conn_config, streams, logical_streams):
+    """Read CDC schemas from primary while honoring secondary selection for snapshots."""
+    if conn_config.get('use_secondary') and logical_streams:
+        logical_ids = {stream['tap_stream_id'] for stream in logical_streams}
+        traditional_streams = [stream for stream in streams if stream['tap_stream_id'] not in logical_ids]
+        if traditional_streams:
+            refresh_streams_schema(conn_config, traditional_streams)
+        refresh_streams_schema({**conn_config, 'use_secondary': False}, logical_streams)
+    else:
+        refresh_streams_schema(conn_config, streams)
+
+
 def do_sync(conn_config, catalog, default_replication_method, state, state_file=None):
     """
     Orchestrates sync of all streams
     """
+    if '_pipelinewise_pgoutput_fresh_start' in state:
+        raise logical_replication.ReplicationSlotMigrationError(
+            'A whole-tap PostgreSQL resync is incomplete; finish an unfiltered FastSync '
+            'before starting Singer replication')
     currently_syncing = singer.get_currently_syncing(state)
     streams = list(filter(is_selected_via_metadata, catalog['streams']))
     streams.sort(key=lambda s: s['tap_stream_id'])
     LOGGER.info("Selected streams: %s ", [s['tap_stream_id'] for s in streams])
-    if any_logical_streams(streams, default_replication_method):
+    logical_catalog_streams = prepare_logical_replication(
+        conn_config, streams, default_replication_method, state=state)
+    if logical_catalog_streams:
         # Use of logical replication requires fetching an lsn
         end_lsn = logical_replication.fetch_current_lsn(conn_config)
         LOGGER.debug("end_lsn = %s ", end_lsn)
     else:
         end_lsn = None
 
-    refresh_streams_schema(conn_config, streams)
+    _refresh_sync_schemas(conn_config, streams, logical_catalog_streams)
 
     sync_method_lookup, traditional_streams, logical_streams = \
         sync_method_for_streams(streams, state, default_replication_method)
@@ -319,6 +353,9 @@ def do_sync(conn_config, catalog, default_replication_method, state, state_file=
                                         state,
                                         sync_method_lookup[stream['tap_stream_id']],
                                         end_lsn)
+        if sync_method_lookup[stream['tap_stream_id']] in {'logical_initial', 'logical_initial_interrupted'}:
+            if not get_bookmark(state, stream['tap_stream_id'], 'xmin'):
+                logical_streams.append(stream)
 
     logical_streams.sort(key=lambda s: metadata.to_map(s['metadata']).get(()).get('database-name'))
     for dbname, streams in itertools.groupby(
@@ -332,6 +369,62 @@ def do_sync(conn_config, catalog, default_replication_method, state, state_file=
             state_file,
         )
     return state
+
+
+def prepare_logical_replication(
+        conn_config, streams, default_replication_method, state=None,
+        fresh_start=False, reconcile=False, final_log_deselection=False):
+    """Prepare the publication before capturing a snapshot or slot boundary."""
+    logical_streams = []
+    for stream in streams:
+        stream_metadata = metadata.to_map(stream['metadata'])
+        replication_method = stream_metadata.get((), {}).get(
+            'replication-method', default_replication_method)
+        if replication_method != 'LOG_BASED':
+            continue
+        if stream_metadata.get((), {}).get('is-view'):
+            raise ValueError(
+                f'Logical Replication is NOT supported for views: {stream["tap_stream_id"]}'
+            )
+        if any(
+                sync_common.should_sync_column(stream_metadata, column)
+                for column in stream['schema']['properties']):
+            logical_streams.append(stream)
+
+    if not logical_streams and not reconcile:
+        return []
+    if final_log_deselection and (logical_streams or not reconcile):
+        raise ValueError('Final LOG deselection requires an empty LOG_BASED selection and publication reconciliation')
+    if not conn_config.get('tap_id'):
+        raise ValueError('tap_id is required for LOG_BASED replication')
+    logical_replication.validate_tap_id(conn_config['tap_id'])
+
+    original_dbname = conn_config['dbname']
+    has_logical_history = (
+        any(get_bookmark(state or {}, stream['tap_stream_id'], 'lsn') is not None for stream in logical_streams)
+        or logical_replication.PGOUTPUT_MIGRATION_STATE_KEY in (state or {})
+    )
+    try:
+        if not logical_streams:
+            logical_replication.prepare_publication(
+                conn_config, [], state=state, fresh_start=fresh_start, reconcile=True,
+                final_log_deselection=final_log_deselection)
+            return []
+        logical_streams.sort(
+            key=lambda stream: metadata.to_map(stream['metadata']).get(()).get(
+                'database-name', original_dbname))
+        for dbname, grouped_streams in itertools.groupby(
+                logical_streams,
+                lambda stream: metadata.to_map(stream['metadata']).get(()).get(
+                    'database-name', original_dbname)):
+            conn_config['dbname'] = dbname
+            logical_replication.prepare_publication(
+                conn_config, list(grouped_streams), state=state,
+                fresh_start=fresh_start or not has_logical_history,
+                reconcile=reconcile)
+    finally:
+        conn_config['dbname'] = original_dbname
+    return logical_streams
 
 
 def parse_args(required_config_keys):
@@ -374,7 +467,30 @@ def parse_args(required_config_keys):
         action='store_true',
         help='Do schema discovery')
 
+    parser.add_argument(
+        '--prepare-publication',
+        action='store_true',
+        help='Prepare the LOG_BASED publication, then exit')
+
+    parser.add_argument(
+        '--fresh-start', action='store_true',
+        help='Prepare for an explicit whole-tap snapshot that replaces all logical history')
+
+    parser.add_argument(
+        '--reconcile-publication', action='store_true',
+        help='Remove stale PipelineWise-managed publication members during import')
+
+    parser.add_argument(
+        '--final-log-deselection', action='store_true',
+        help='Remove all managed members after PipelineWise invalidates LOG_BASED state')
+
     args = parser.parse_args()
+    if args.fresh_start and not args.prepare_publication:
+        parser.error('--fresh-start requires --prepare-publication')
+    if args.reconcile_publication and not args.prepare_publication:
+        parser.error('--reconcile-publication requires --prepare-publication')
+    if args.final_log_deselection and not args.reconcile_publication:
+        parser.error('--final-log-deselection requires --reconcile-publication')
     if args.config:
         setattr(args, 'config_path', args.config)
         args.config = utils.load_json(args.config)
@@ -414,11 +530,14 @@ def main_impl():
 
         # Optional config keys
         'tap_id': args.config.get('tap_id'),
+        'previous_tap_id': args.config.get('previous_tap_id'),
         'filter_schemas': args.config.get('filter_schemas'),
         'debug_lsn': args.config.get('debug_lsn') == 'true',
         'max_run_seconds': args.config.get('max_run_seconds', 43200),
         'break_at_end_lsn': args.config.get('break_at_end_lsn', True),
         'logical_poll_total_seconds': float(args.config.get('logical_poll_total_seconds', 0)),
+        'publication_fence_timeout_seconds': _positive_finite_number(
+            args.config, 'publication_fence_timeout_seconds', 300),
         'use_secondary': args.config.get('use_secondary', False),
         'limit': int(limit) if limit else None
     }
@@ -442,6 +561,20 @@ def main_impl():
 
     if args.discover:
         do_discovery(conn_config)
+    elif args.prepare_publication:
+        catalog = args.catalog.to_dict() if args.catalog else args.properties
+        if catalog is None:
+            raise ValueError('--prepare-publication requires --catalog or --properties')
+        streams = list(filter(is_selected_via_metadata, catalog['streams']))
+        prepare_logical_replication(
+            conn_config,
+            streams,
+            args.config.get('default_replication_method'),
+            state=args.state,
+            fresh_start=args.fresh_start,
+            reconcile=args.reconcile_publication,
+            final_log_deselection=args.final_log_deselection,
+        )
     elif args.properties or args.catalog:
         state = args.state
         state_file = args.state_file

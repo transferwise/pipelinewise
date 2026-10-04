@@ -48,7 +48,6 @@ class TestUnit(unittest.TestCase):
         }
         self.assertEqual(len(validator(config_with_schema_mapping)), 0)
 
-
     def test_column_type_mapping(self):
         """Test JSON type to Postgres column type mappings"""
         mapper = target_postgres.db_sync.column_type
@@ -65,13 +64,17 @@ class TestUnit(unittest.TestCase):
         json_num =          {"type": ["number"]             }
         json_smallint =     {"type": ["integer"]            , "maximum": 32767, "minimum": -32768}
         json_int =          {"type": ["integer"]            , "maximum": 2147483647, "minimum": -2147483648}
-        json_bigint =       {"type": ["integer"]            , "maximum": 9223372036854775807, "minimum": -9223372036854775808}
+        json_bigint = {
+            "type": ["integer"],
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+        }
         json_nobound_int =  {"type": ["integer"]            }
         json_int_or_str =   {"type": ["integer", "string"]  }
         json_bool =         {"type": ["boolean"]            }
         json_obj =          {"type": ["object"]             }
         json_arr =          {"type": ["array"]              }
-        
+
         # Mapping from JSON schema types to Postgres column types
         self.assertEqual(mapper(json_str)          , 'character varying')
         self.assertEqual(mapper(json_str_or_null)  , 'character varying')
@@ -122,7 +125,6 @@ class TestUnit(unittest.TestCase):
         assert \
             target_postgres.db_sync.stream_name_to_dict('my_catalog.my_schema.my_table', separator='.') == \
             {"catalog_name": "my_catalog", "schema_name": "my_schema", "table_name": "my_table"}
-
 
     def test_flatten_schema(self):
         """Test flattening of SCHEMA messages"""
@@ -181,7 +183,7 @@ class TestUnit(unittest.TestCase):
         #   max_level: 0 : No flattening (default)
         assert flatten_schema(nested_schema_with_properties, max_level=0) == nested_schema_with_properties['properties']
 
-        # FLATTENNING - Schema with object type property but without further properties should be a dict with flattened properties
+        # Flatten object properties through the requested level.
         assert \
             flatten_schema(nested_schema_with_properties, max_level=1) == \
             {
@@ -199,7 +201,7 @@ class TestUnit(unittest.TestCase):
                 }
         }
 
-        # FLATTENNING - Schema with object type property but without further properties should be a dict with flattened properties
+        # A high limit flattens every nested object property.
         assert \
             flatten_schema(nested_schema_with_properties, max_level=10) == \
             {
@@ -243,7 +245,11 @@ class TestUnit(unittest.TestCase):
                 "c_pk": 1,
                 "c_varchar": "1",
                 "c_int": 1,
-                "c_obj": '{"nested_prop1": "value_1", "nested_prop2": "value_2", "nested_prop3": {"multi_nested_prop1": "multi_value_1", "multi_nested_prop2": "multi_value_2"}}'
+                "c_obj": (
+                    '{"nested_prop1": "value_1", "nested_prop2": "value_2", '
+                    '"nested_prop3": {"multi_nested_prop1": "multi_value_1", '
+                    '"multi_nested_prop2": "multi_value_2"}}'
+                )
             }
 
         # NO FLATTENNING
@@ -254,7 +260,11 @@ class TestUnit(unittest.TestCase):
                 "c_pk": 1,
                 "c_varchar": "1",
                 "c_int": 1,
-                "c_obj": '{"nested_prop1": "value_1", "nested_prop2": "value_2", "nested_prop3": {"multi_nested_prop1": "multi_value_1", "multi_nested_prop2": "multi_value_2"}}'
+                "c_obj": (
+                    '{"nested_prop1": "value_1", "nested_prop2": "value_2", '
+                    '"nested_prop3": {"multi_nested_prop1": "multi_value_1", '
+                    '"multi_nested_prop2": "multi_value_2"}}'
+                )
             }
 
         # SEMI FLATTENNING
@@ -324,3 +334,37 @@ class TestUnit(unittest.TestCase):
         for idx, (should_use_flatten_schema, record, expected_output) in enumerate(test_cases):
             output = flatten_record(record, flatten_schema if should_use_flatten_schema else None)
             assert output == expected_output
+
+    def test_patch_update_only_assigns_columns_present_in_record(self):
+        config = {
+            'host': 'dummy-value',
+            'port': 5432,
+            'user': 'dummy-value',
+            'password': 'dummy-value',
+            'dbname': 'dummy-value',
+            'default_target_schema': 'public',
+        }
+        stream_schema_message = {
+            'type': 'SCHEMA',
+            'stream': 'public-patch_rows',
+            'key_properties': ['id'],
+            'schema': {
+                'type': 'object',
+                'x-pipelinewise-record-update-mode': 'PATCH',
+                'properties': {
+                    'id': {'type': ['integer']},
+                    'large_payload': {'type': ['null', 'string']},
+                    'status': {'type': ['null', 'string']},
+                },
+            },
+        }
+        db_sync = target_postgres.db_sync.DbSync(config, stream_schema_message)
+
+        update_column_names = db_sync.present_column_names({'id': 1, 'status': 'updated'})
+        update_query = db_sync.update_from_temp_table('tmp_patch', update_column_names)
+
+        self.assertEqual(db_sync.record_update_mode, target_postgres.db_sync.RECORD_UPDATE_MODE_PATCH)
+        self.assertEqual(update_column_names, ('id', 'status'))
+        self.assertNotIn('"id"=s."id"', update_query)
+        self.assertIn('"status"=s."status"', update_query)
+        self.assertNotIn('"large_payload"=s."large_payload"', update_query)

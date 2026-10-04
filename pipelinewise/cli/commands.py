@@ -8,7 +8,8 @@ import json
 import time
 
 from dataclasses import dataclass
-from subprocess import PIPE, STDOUT, Popen
+from concurrent.futures import ThreadPoolExecutor
+from subprocess import PIPE, STDOUT, Popen, TimeoutExpired
 
 from . import utils
 from .errors import StreamBufferTooLargeException
@@ -353,6 +354,29 @@ def build_singer_command(
     return command
 
 
+def build_postgres_publication_preflight_command(
+    tap_bin: str,
+    tap_config: str,
+    tap_catalog: str,
+    tap_state: str | None = None,
+    *,
+    fresh_start: bool = False,
+    reconcile: bool = False,
+    final_log_deselection: bool = False,
+) -> list[str]:
+    """Build the connector preflight that prepares pgoutput relations."""
+    command = [tap_bin, '--config', tap_config, '--catalog', tap_catalog, '--prepare-publication']
+    if tap_state and os.path.exists(tap_state):
+        command.extend(['--state', tap_state])
+    if fresh_start:
+        command.append('--fresh-start')
+    if reconcile:
+        command.append('--reconcile-publication')
+    if final_log_deselection:
+        command.append('--final-log-deselection')
+    return command
+
+
 def build_partialsync_command(
         tap: TapParams,
         target: TargetParams,
@@ -546,3 +570,30 @@ def run_command(command: str, log_file: str = None, line_callback: callable = No
             LOGGER.error(stderr)
 
     return [proc_rc, stdout, stderr]
+
+
+def run_command_argv(command: list[str], timeout: float = 360):
+    """Run one bounded command with live diagnostics and literal argument boundaries."""
+    LOGGER.debug('Running command argv %s', command)
+
+    def read_diagnostics(pipe):
+        chunks = []
+        for line in iter(pipe.readline, b''):
+            chunks.append(line)
+            LOGGER.info('%s', line.decode('utf-8', errors='replace').rstrip())
+        return b''.join(chunks)
+
+    with Popen(command, stdout=PIPE, stderr=PIPE) as proc, ThreadPoolExecutor(max_workers=2) as readers:
+        output = readers.submit(proc.stdout.read)
+        diagnostics = readers.submit(read_diagnostics, proc.stderr)
+        try:
+            proc.wait(timeout=timeout)
+        except TimeoutExpired as exc:
+            proc.kill()
+            proc.wait()
+            stderr = diagnostics.result().decode('utf-8', errors='replace')
+            raise RunCommandException(
+                f'PostgreSQL publication preflight timed out after {timeout}s. '
+                f'Retry after resolving source locks or long transactions. {stderr}'
+            ) from exc
+        return [proc.returncode, output.result().decode('utf-8'), diagnostics.result().decode('utf-8')]

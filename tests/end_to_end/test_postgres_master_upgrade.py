@@ -1,0 +1,179 @@
+"""Upgrade real wal2json state from the pinned pre-migration master tap."""
+
+import json
+import os
+import subprocess
+import threading
+from pathlib import Path
+
+import psycopg2
+
+from .test_postgres_pgoutput_slots import (
+    MIGRATION_STATE_KEY, SOURCE_SCHEMA, STREAM_ID, TABLE_NAME, TAP_ID, TARGET_ID,
+    _assert_promoted_overlap, _finish_overlap, _read_state, _read_state_lsn,
+    _run, _run_success, _simple_migration_case, _slot_status, _source_target_rows,
+)
+
+
+def _persist_target_acknowledgements(output, state_path):
+    """Expose only target-emitted state to the old tap's feedback reader."""
+    for line in output:
+        state = json.loads(line)
+        pending = state_path.with_suffix('.master-ack.tmp')
+        with pending.open('w', encoding='utf-8') as state_file:
+            json.dump(state, state_file)
+            state_file.flush()
+            os.fsync(state_file.fileno())
+        pending.replace(state_path)
+
+
+def _emit_other_database_wal(case):
+    """Move cluster WAL without creating another message in this tap's database."""
+    config = _read_state(case.state_path.parent / 'config.json')
+    connection_config = {key: config[key] for key in ('host', 'port', 'user', 'password', 'dbname')}
+    connection_config['dbname'] = 'template1' if config['dbname'] == 'postgres' else 'postgres'
+    connection = psycopg2.connect(**connection_config)
+    try:
+        with connection, connection.cursor() as cursor:
+            cursor.execute("SELECT pg_logical_emit_message(false, 'master_upgrade_background_wal', '')")
+    finally:
+        connection.close()
+
+
+def _load_master_checkpoints(output, command, case, target_log, errors, background_wal):
+    """Commit each old checkpoint through the real target before acknowledging it."""
+    schemas = {}
+    pending = []
+
+    def load():
+        result = subprocess.run(command, input='\n'.join(pending) + '\n', text=True,
+                                stdout=subprocess.PIPE, stderr=target_log, env=case.command_env, timeout=30)
+        assert result.returncode == 0, 'The target failed while applying a master checkpoint'
+        _persist_target_acknowledgements(result.stdout.splitlines(), case.state_path)
+        if background_wal:
+            _emit_other_database_wal(case)
+
+    try:
+        for line in output:
+            message = json.loads(line)
+            pending.append(line.rstrip('\n'))
+            if message['type'] == 'SCHEMA':
+                schemas[message['stream']] = line.rstrip('\n')
+            if message['type'] == 'STATE':
+                load()
+                pending = list(schemas.values())
+        if any(json.loads(line)['type'] == 'RECORD' for line in pending):
+            load()
+    except Exception as error:
+        errors.append(error)
+    finally:
+        output.close()
+
+
+def _run_master_tap(case, *, idle_feedback=False):
+    """Run the complete old package with a real target and live state persistence."""
+    home = Path(os.environ['PIPELINEWISE_HOME'])
+    baseline = home / '.upgrade-baseline'
+    assert (baseline / 'tap_postgres' / '__init__.py').is_file(), (
+        'Prepare the pinned master archive as documented in tests/end_to_end/AGENTS.md'
+    )
+    tap_dir = case.state_path.parent
+    old_config = _read_state(tap_dir / 'config.json')
+    old_config.update(
+        break_at_end_lsn=not idle_feedback,
+        max_run_seconds=35 if idle_feedback else 20,
+        logical_poll_total_seconds=40 if idle_feedback else 10,
+    )
+    old_config_path = tap_dir / 'master-config.json'
+    old_config_path.write_text(json.dumps(old_config), encoding='utf-8')
+    target_config = _read_state(case.config_dir / TARGET_ID / 'config.json')
+    target_config.update(_read_state(tap_dir / 'inheritable_config.json'))
+    target_config['batch_size_rows'] = 1
+    target_config_path = tap_dir / 'master-target-config.json'
+    target_config_path.write_text(json.dumps(target_config), encoding='utf-8')
+    if not case.state_path.exists():
+        case.state_path.write_text('{}', encoding='utf-8')
+    tap_command = [
+        str(home / '.virtualenvs/tap-postgres/bin/python'), '-c',
+        'import pathlib, sys, tap_postgres; '
+        'assert pathlib.Path(tap_postgres.__file__).is_relative_to(pathlib.Path(sys.argv.pop(1))); '
+        'tap_postgres.main()',
+        str(baseline), '--config', str(old_config_path), '--catalog', str(tap_dir / 'properties.json'),
+        '--state', str(case.state_path),
+    ]
+    target_command = [str(home / '.virtualenvs/target-postgres/bin/target-postgres'),
+                      '--config', str(target_config_path)]
+    errors = []
+    with (tap_dir / 'master-tap.log').open('w+') as tap_log, \
+            (tap_dir / 'master-target.log').open('w+') as target_log:
+        tap = subprocess.Popen(tap_command, stdout=subprocess.PIPE, stderr=tap_log, text=True,
+                               env={**case.command_env, 'PYTHONPATH': str(baseline)})
+        # EOF makes target-postgres acknowledge quiet checkpoints. Every batch still
+        # goes through its real loader; no bookmark or replication feedback is fabricated.
+        reader = threading.Thread(
+            target=_load_master_checkpoints,
+            args=(tap.stdout, target_command, case, target_log, errors, idle_feedback), daemon=True,
+        )
+        reader.start()
+        try:
+            tap.wait(timeout=65)
+        finally:
+            if tap.poll() is None:
+                tap.kill()
+                tap.wait(timeout=10)
+            reader.join(timeout=35)
+        tap_log.seek(0)
+        target_log.seek(0)
+        assert not errors, f'{errors}\n{target_log.read()}'
+        assert tap.returncode == 0, tap_log.read()
+        assert not reader.is_alive()
+    assert MIGRATION_STATE_KEY not in _read_state(case.state_path)
+    assert _slot_status(case.e2e, case.pgoutput_slot) is None
+    assert _source_target_rows(case.e2e)[0] == _source_target_rows(case.e2e)[1]
+
+
+def test_master_snapshot_and_cdc_upgrade_to_pgoutput(tmp_path):
+    with _simple_migration_case(tmp_path, bootstrap_fastsync=False) as case:
+        _run_master_tap(case)
+        case.e2e.run_query_tap_postgres(
+            f"UPDATE {SOURCE_SCHEMA}.{TABLE_NAME} SET status = 'old tap CDC' WHERE id = 1; "
+            f"INSERT INTO {SOURCE_SCHEMA}.{TABLE_NAME} VALUES (2, 'old tap insert', 'payload-2')"
+        )
+        _run_master_tap(case)
+        bookmark = _read_state_lsn(case.state_path)
+        assert _slot_status(case.e2e, case.wal2json_slot)['confirmed_flush_lsn'] <= bookmark
+        case.e2e.run_query_tap_postgres(
+            f"UPDATE {SOURCE_SCHEMA}.{TABLE_NAME} SET status = 'bridge update' WHERE id = 1; "
+            f'DELETE FROM {SOURCE_SCHEMA}.{TABLE_NAME} WHERE id = 2; '
+            f"INSERT INTO {SOURCE_SCHEMA}.{TABLE_NAME} VALUES (3, 'bridge insert', 'payload-3')"
+        )
+        _run_success(case.run_command, case.command_env)
+        _assert_promoted_overlap(case)
+        _finish_overlap(case)
+        assert _read_state_lsn(case.state_path) >= bookmark
+        assert _source_target_rows(case.e2e)[0] == _source_target_rows(case.e2e)[1]
+
+
+def test_master_idle_keepalive_state_is_rejected_then_whole_tap_resync_recovers(tmp_path):
+    with _simple_migration_case(tmp_path, bootstrap_fastsync=False) as case:
+        _run_master_tap(case)
+        _run_master_tap(case, idle_feedback=True)
+        before = _read_state(case.state_path)
+        slot = _slot_status(case.e2e, case.wal2json_slot)
+        assert slot['confirmed_flush_lsn'] > before['bookmarks'][STREAM_ID]['lsn']
+
+        result = _run(case.run_command, case.command_env)
+        assert result.returncode != 0
+        assert 'predates legacy slot' in result.stdout + result.stderr
+        assert _read_state(case.state_path) == before
+        assert _slot_status(case.e2e, case.wal2json_slot) == slot
+
+        _run_success(['pipelinewise', 'fast_sync', '--tap', TAP_ID, '--target', TARGET_ID], case.command_env)
+        assert _slot_status(case.e2e, case.wal2json_slot) is None
+        assert _slot_status(case.e2e, case.pgoutput_slot)['plugin'] == 'pgoutput'
+        assert MIGRATION_STATE_KEY not in _read_state(case.state_path)
+        case.e2e.run_query_tap_postgres(
+            f"INSERT INTO {SOURCE_SCHEMA}.{TABLE_NAME} VALUES (2, 'after recovery', 'payload-2')"
+        )
+        _run_success(case.run_command, case.command_env)
+        assert _source_target_rows(case.e2e)[0] == _source_target_rows(case.e2e)[1]

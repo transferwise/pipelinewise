@@ -324,7 +324,7 @@ class TestTransform(unittest.TestCase):
         )
 
     def test_transform_multiple_conditions_one_fails(self):
-        """Test conditional transformation, one of the conditions will not be met and transformation should not happen"""
+        """Do not transform when one of the required conditions is not met."""
 
         record = {
             "col_1": "random value",
@@ -352,4 +352,3 @@ class TestTransform(unittest.TestCase):
                 ]
             )
         )
-
