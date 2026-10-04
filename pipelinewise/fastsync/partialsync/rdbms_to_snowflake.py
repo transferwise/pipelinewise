@@ -395,6 +395,15 @@ def _validate_partial_export(run: _PartialSyncRun) -> None:
         exported_types.get('columns', []),
         exported_types.get('primary_key'),
     )
+    if run.decimal_columns:
+        exported_spec = with_retained_decimal_types(
+            exported_spec,
+            run.spec,
+            decimal_columns=run.decimal_columns,
+            force_precision_columns=run.args.target.get(
+                'force_precision_columns', False
+            ),
+        )
     iceberg_routes.validate_recovery_source_spec(run.spec, exported_spec)
 
 

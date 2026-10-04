@@ -89,6 +89,41 @@ def test_retained_iceberg_staging_definitions_exclude_pipelinewise_metadata():
     ]
 
 
+def test_partial_export_validation_reapplies_retained_decimal_types():
+    mapped = _spec('NUMERIC(38,18)')
+    retained = with_retained_decimal_types(
+        mapped,
+        _spec('FLOAT'),
+        decimal_columns=('AMOUNT',),
+    )
+    source_types = {
+        'columns': ['"ID" NUMBER', '"AMOUNT" NUMERIC(38,18)'],
+        'primary_key': ['"ID"'],
+        'source_column_names': ['ID', 'AMOUNT'],
+    }
+    run = Namespace(
+        source=Mock(map_column_types_to_target=Mock(return_value=source_types)),
+        boundary=Mock(),
+        args=Namespace(target={}),
+        target_schema='SCHEMA',
+        table_name='TABLE',
+        spec=retained,
+        decimal_columns=('AMOUNT',),
+    )
+
+    with patch.object(
+        rdbms_to_snowflake.iceberg_routes,
+        'create_spec',
+        return_value=mapped,
+    ), patch.object(
+        rdbms_to_snowflake.iceberg_routes,
+        'validate_recovery_source_spec',
+    ) as validate:
+        rdbms_to_snowflake._validate_partial_export(run)
+
+    validate.assert_called_once_with(retained, retained)
+
+
 @pytest.mark.parametrize(('current', 'mapped'), (
     ('NUMERIC(18,2)', 'FLOAT'),
     ('NUMERIC(18,2)', 'DOUBLE'),
