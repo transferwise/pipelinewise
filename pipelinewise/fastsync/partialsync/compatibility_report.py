@@ -155,7 +155,7 @@ def mapped_source_columns(connection, source, table, primary_keys=()):
 
 def _table_report(
     connection, source, target, table, primary_keys=(), boundary_column=None,
-    force_precision_columns=False,
+    version_legacy_float_columns=False,
 ):
     result = {'source_table': table}
     operation = 'target_format'
@@ -180,7 +180,7 @@ def _table_report(
             {'schema': schema, 'table': table_name}, mapped, columns,
             primary_keys=primary_keys, boundary_column=boundary_column,
             decimal_columns=getattr(mapped, 'decimal_columns', ()),
-            force_precision_columns=force_precision_columns,
+            version_legacy_float_columns=version_legacy_float_columns,
         )
         status = 'incompatible' if any(row['status'] == 'incompatible' for row in column_report) else 'compatible'
         return {**result, 'status': status, 'columns': column_report}
@@ -236,8 +236,8 @@ def build_report(tap_type, tap, target, properties, selection, tables=None, targ
                 try:
                     results.append(_table_report(
                         connection, source, snowflake, table,
-                        force_precision_columns=target.get(
-                            'force_precision_columns', False
+                        version_legacy_float_columns=target.get(
+                            'version_legacy_float_columns', False
                         ),
                         **_column_guards(properties, selection, catalog[table]),
                     ))

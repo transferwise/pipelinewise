@@ -586,7 +586,7 @@
       "type": "integer",
       "enum": [3]
     },
-    "force_precision_columns": {
+    "version_legacy_float_columns": {
       "type": "boolean",
       "default": false
     },

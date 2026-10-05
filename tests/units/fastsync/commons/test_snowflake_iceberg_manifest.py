@@ -44,7 +44,7 @@ def test_current_manifest_round_trips_typed_payload(spec):
             'drop_target': False,
             'delete_mode': 'hard',
             'decimal_columns': ['AMOUNT'],
-            'force_precision_columns': False,
+            'version_legacy_float_columns': False,
             'extension': 'preserved',
         },
     )
@@ -60,7 +60,7 @@ def test_current_manifest_round_trips_typed_payload(spec):
     assert isinstance(recovered.manifest_payload, PartialSyncManifestPayload)
     assert recovered.manifest_payload.column_name == 'ID'
     assert recovered.manifest_payload.decimal_columns == ['AMOUNT']
-    assert recovered.manifest_payload.force_precision_columns is False
+    assert recovered.manifest_payload.version_legacy_float_columns is False
     assert recovered.manifest_payload.extensions == {'extension': 'preserved'}
 
 
@@ -321,7 +321,7 @@ def test_partial_manifest_with_only_legacy_raw_sql_fails_closed(spec):
         ('partial', 'historical_columns', {'OLD': None}),
         ('partial', 'decimal_columns', 'AMOUNT'),
         ('partial', 'decimal_columns', ['AMOUNT', 'AMOUNT']),
-        ('partial', 'force_precision_columns', 1),
+        ('partial', 'version_legacy_float_columns', 1),
         ('manual_conversion', 'eventual', 'unknown'),
         ('manual_conversion', 'backup_table', ''),
         ('manual_conversion', 'source_schema_fingerprint', 'short'),

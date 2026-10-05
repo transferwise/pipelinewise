@@ -59,6 +59,9 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
     replication_key_sql_datatype = md_map.get(('properties', replication_key)).get('sql-datatype')
     key_schema = stream.get('schema', {}).get('properties', {}).get(replication_key, {})
     if replication_key_value is not None and is_decimal_schema(key_schema):
+        # A stored exact bookmark can remain outside a later, narrower typmod.
+        # PostgreSQL can still compare the current column with an unbounded numeric boundary.
+        replication_key_sql_datatype = 'numeric'
         legacy_float = isinstance(replication_key_value, float)
         try:
             replication_key_value = decimal_bookmark(replication_key_value, key_schema)

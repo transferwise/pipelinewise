@@ -13,7 +13,7 @@ from joblib import Parallel, delayed, parallel_backend
 from jsonschema import Draft7Validator, FormatChecker
 from singer import get_logger
 from singer.decimal_support import (
-    decimal_sort_key, decimal_sql_type, is_decimal_schema, schema_has_decimals, validate_decimal_record,
+    decimal_sort_key, is_decimal_schema, schema_has_decimals, validate_decimal_record,
 )
 from datetime import datetime, timedelta
 
@@ -504,13 +504,13 @@ def flush_record_group(stream, records, db_sync, update_column_names, temp_dir, 
                        archive_load_files):
     """Write and load records sharing one PATCH update-column signature."""
     text_decimal_keys = [
-        name for name in db_sync.stream_schema_message.get('key_properties', [])
+        name for name in db_sync.effective_key_properties()
         if is_decimal_schema(db_sync.flatten_schema.get(name))
-        and decimal_sql_type(
-            db_sync.flatten_schema[name], 'snowflake', is_key=True, source=db_sync.decimal_source(),
-        ).startswith('VARCHAR')
+        and db_sync.decimal_load_type(name, db_sync.flatten_schema[name]).startswith(('VARCHAR', 'TEXT'))
     ]
     format_options = {'key_properties': text_decimal_keys} if text_decimal_keys else {}
+    if getattr(db_sync, '_retained_decimal_types', {}) or getattr(db_sync, '_retained_column_types', {}):
+        format_options['value_transformer'] = db_sync.load_column_value
     filepath = db_sync.file_format.formatter.records_to_file(records,
                                                              db_sync.flatten_schema,
                                                              compression=not no_compression,

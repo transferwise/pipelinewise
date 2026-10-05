@@ -6,6 +6,8 @@ from singer import Catalog, RecordMessage, Schema, Transformer, format_message, 
 from singer.decimal_support import (
     decimal_bookmark,
     decimal_canonical_string,
+    decimal_float_key,
+    decimal_float_value,
     decimal_key,
     decimal_schema,
     decimal_sort_key,
@@ -148,12 +150,69 @@ def test_decimal_keys_preserve_distinct_low_digits():
         decimal_key('12345678901234567890.123456789012345679')
 
 
+@pytest.mark.parametrize(('sql_type', 'values'), [
+    ('double precision', ['9007199254740992', '9007199254740993']),
+    ('real', ['16777216', '16777217']),
+    ('FLOAT', ['1e999', '2e999']),
+    ('real', ['-1e999', '-2e999']),
+    ('double precision', ['0', '-0.0', '1e-999', '-1e-999']),
+    ('real', ['0', '-0.0', '1e-999', '-1e-999']),
+    ('FLOAT', ['Infinity', '+Infinity']),
+])
+def test_retained_float_keys_follow_target_rounding(sql_type, values):
+    with localcontext() as context:
+        context.prec = 2
+        assert len({decimal_float_key(value, sql_type) for value in values}) == 1
+        assert len({decimal_float_value(value, sql_type) for value in values}) == 1
+
+
+@pytest.mark.parametrize(('value', 'expected'), [
+    ('1.000000059604644775390624999999999999', '1.0'),
+    ('1.000000059604644775390625', '1.0'),
+    ('1.000000059604644775390625000000000001', '1.0000001192092896'),
+    ('1.000000178813934326171875', '1.000000238418579'),
+])
+def test_real_rounding_uses_original_decimal_at_binary64_midpoints(value, expected):
+    assert decimal_float_value(value, 'real') == expected
+
+
+def test_double_rounding_preserves_adjacent_values_and_follows_nearest_even():
+    midpoint = '1.00000000000000011102230246251565404236316680908203125'
+    assert decimal_float_value(midpoint) == '1.0'
+    assert decimal_float_value(midpoint + '0001') == '1.0000000000000002'
+    assert decimal_float_key('9007199254740992') != decimal_float_key('9007199254740994')
+
+
+@pytest.mark.parametrize('sql_type', ['real', 'double precision'])
+def test_retained_float_values_preserve_null_and_nonfinite_values(sql_type):
+    assert decimal_float_value(None, sql_type) is None
+    assert decimal_float_key(None, sql_type) is None
+    for value in ('NaN', 'Infinity', '-Infinity'):
+        assert decimal_float_value(value, sql_type) == value
+        assert decimal_float_key(value, sql_type) == value
+
+
+@pytest.mark.parametrize(('sql_type', 'exponent'), [('real', 150), ('double precision', 1075)])
+def test_retained_float_underflow_rounds_exact_halfway_to_zero(sql_type, exponent):
+    with localcontext() as context:
+        context.prec = 1100
+        halfway = Decimal(2) ** -exponent
+        above = halfway + Decimal(10) ** -(exponent + 1)
+        assert decimal_float_value(str(halfway), sql_type) == '0'
+        assert decimal_float_value(str(-halfway), sql_type) == '0'
+        assert float(decimal_float_value(str(above), sql_type)) > 0
+
+
 @pytest.mark.parametrize('source', ['9999999999999999.99', '-9999999999999999.99', '0.1', '-0.1'])
 def test_legacy_float_bookmark_replays_the_rounded_source_boundary(source):
     schema = decimal_schema(38, 18)
     boundary = decimal_bookmark(float(source), schema)
     assert Decimal(boundary) < Decimal(source)
     assert decimal_bookmark(source, schema) == source
+
+
+def test_exact_bookmark_remains_valid_after_source_declaration_narrows():
+    assert decimal_bookmark('1000.00', decimal_schema(2, 0)) == '1000.00'
 
 
 @pytest.mark.parametrize('value', [

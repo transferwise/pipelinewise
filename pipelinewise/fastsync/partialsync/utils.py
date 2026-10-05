@@ -85,7 +85,7 @@ def delete_s3_objects(
 
 def diff_source_target_columns(
     target_sf: dict, source_columns: list, primary_keys=(), boundary_column=None, decimal_columns=(),
-    force_precision_columns=False,
+    version_legacy_float_columns=False,
 ) -> dict:
     """Finding the diff between source and target columns"""
     target_column = target_sf['sf_object'].query(
@@ -105,14 +105,14 @@ def diff_source_target_columns(
     )
     versions = _validate_existing_column_types(
         target_sf, source_columns_dict, target_columns_info, primary_keys, boundary_column, decimal_columns,
-        force_precision_columns,
+        version_legacy_float_columns,
     )
     staging_columns = _staging_source_columns(
         source_columns_dict,
         target_columns_info,
         primary_keys,
         decimal_columns,
-        force_precision_columns,
+        version_legacy_float_columns,
     )
 
     return {
@@ -128,7 +128,7 @@ def diff_source_target_columns(
 
 def report_source_target_columns(
     target_sf: dict, source_columns: list, target_columns: list, primary_keys=(), boundary_column=None,
-    decimal_columns=(), force_precision_columns=False,
+    decimal_columns=(), version_legacy_float_columns=False,
 ) -> list:
     """Report every mapped column using the same checks as native PartialSync."""
     rows_by_name = {}
@@ -161,7 +161,7 @@ def report_source_target_columns(
                 )
                 versions = _validate_existing_column_types(
                     target_sf, {name: source_type}, metadata, primary_keys, boundary_column, decimal_columns,
-                    force_precision_columns,
+                    version_legacy_float_columns,
                 )
                 result['status'] = 'would_version' if versions else 'would_widen' if widening else 'compatible'
             except (NativePartialSyncCompatibilityError, ValueError, TypeError, KeyError) as exc:
@@ -183,12 +183,12 @@ def _reject_historical_boundary(boundary_column, source_columns, target_columns)
 
 def load_into_snowflake(target, args, source_columns, primary_keys, s3_key_pattern, size_bytes,
                         where_clause_sql, boundary_column=None, decimal_columns=(),
-                        force_precision_columns=None):
+                        version_legacy_float_columns=None):
     """Load staging data before creating or modifying the live target table."""
 
-    if force_precision_columns is None:
-        force_precision_columns = args.target.get(
-            'force_precision_columns', False
+    if version_legacy_float_columns is None:
+        version_legacy_float_columns = args.target.get(
+            'version_legacy_float_columns', False
         )
 
     snowflake = target['sf_object']
@@ -233,7 +233,7 @@ def load_into_snowflake(target, args, source_columns, primary_keys, s3_key_patte
         columns_diff = diff_source_target_columns(
             target, source_columns=source_columns, primary_keys=primary_keys, boundary_column=boundary_column,
             decimal_columns=decimal_columns,
-            force_precision_columns=force_precision_columns,
+            version_legacy_float_columns=version_legacy_float_columns,
         )
         for name, data_type, archive in _plan_native_column_versions(columns_diff):
             snowflake.query(
@@ -497,7 +497,7 @@ def _native_target_name(target_sf):
 
 def _validate_existing_column_types(
     target_sf, source_columns_dict, target_columns_info, primary_keys=(), boundary_column=None, decimal_columns=(),
-    force_precision_columns=False,
+    version_legacy_float_columns=False,
 ):
     versions = {}
     primary_keys = {str(key).strip('"').upper() for key in primary_keys or ()}
@@ -516,7 +516,7 @@ def _validate_existing_column_types(
         column_name = name[1:-1].replace('""', '"').upper()
         if column_name in decimal_columns and actual != expected:
             if (
-                (not force_precision_columns or column_name in primary_keys)
+                (not version_legacy_float_columns or column_name in primary_keys)
                 and is_retained_legacy_decimal_float(actual, expected)
             ):
                 continue
@@ -539,7 +539,7 @@ def _validate_existing_column_types(
 
 
 def _staging_source_columns(
-    source_columns_dict, target_columns_info, primary_keys=(), decimal_columns=(), force_precision_columns=False,
+    source_columns_dict, target_columns_info, primary_keys=(), decimal_columns=(), version_legacy_float_columns=False,
 ):
     """Match retained legacy decimal FLOAT columns in the PartialSync staging table."""
     primary_keys = {str(key).strip('"').upper() for key in primary_keys or ()}
@@ -553,7 +553,7 @@ def _staging_source_columns(
             actual = canonical_native_metadata_type(metadata)
             column_name = name[1:-1].replace('""', '"').upper()
             if (
-                (not force_precision_columns or column_name in primary_keys)
+                (not version_legacy_float_columns or column_name in primary_keys)
                 and is_retained_legacy_decimal_float(actual, expected)
             ):
                 data_type = actual

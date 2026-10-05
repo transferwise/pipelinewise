@@ -6,6 +6,10 @@ import re
 
 
 _DECIMAL_TEXT = re.compile(r'^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?$')
+_DECIMAL_FLOAT_FORMATS = {
+    'real': (24, -149, Decimal('3.4028234663852886e38')),
+    'double precision': (53, -1074, Decimal('1.7976931348623157e308')),
+}
 
 
 def _schema_dict(schema):
@@ -102,9 +106,10 @@ def decimal_bookmark(value, schema=None):
         if not math.isfinite(value) or not math.isfinite(previous):
             return None
         return str(Decimal.from_float(previous))
-    if value is not None and not Decimal(decimal_to_string(value, decimal_schema(None, None))).is_finite():
+    text = decimal_to_string(value, decimal_schema(None, None))
+    if value is not None and not Decimal(text).is_finite():
         return None
-    return decimal_to_string(value, schema)
+    return text
 
 
 def decimal_sort_key(value):
@@ -122,6 +127,53 @@ def decimal_canonical_string(value):
         return '0'
     text = format(number, 'f')
     return text.rstrip('0').rstrip('.') if '.' in text else text
+
+
+def _round_binary_decimal(number, precision, minimum_exponent):
+    """Round an exact decimal ratio to the target's binary significand and exponent."""
+    numerator, denominator = number.copy_abs().as_integer_ratio()
+    exponent = numerator.bit_length() - denominator.bit_length()
+    if exponent >= 0:
+        exponent -= numerator < denominator << exponent
+    else:
+        exponent -= numerator << -exponent < denominator
+    quantum = max(exponent - precision + 1, minimum_exponent)
+    if quantum < 0:
+        numerator <<= -quantum
+    else:
+        denominator <<= quantum
+    significand, remainder = divmod(numerator, denominator)
+    doubled_remainder = remainder * 2
+    if doubled_remainder > denominator or (doubled_remainder == denominator and significand % 2):
+        significand += 1
+    return math.copysign(math.ldexp(significand, quantum), -1 if number.is_signed() else 1)
+
+
+def decimal_float_value(value, sql_type='double precision'):
+    """Serialize the retained float value after saturation and nearest-even rounding."""
+    if value is None:
+        return None
+    float_type = sql_type.strip().lower()
+    if float_type in ('float', 'float8', 'double', 'double precision', 'float64'):
+        float_type = 'double precision'
+    elif float_type in ('float4', 'float32'):
+        float_type = 'real'
+    precision, minimum_exponent, limit = _DECIMAL_FLOAT_FORMATS[float_type]
+    number = Decimal(decimal_to_string(value, decimal_schema(None, None)))
+    if not number.is_finite():
+        return str(number)
+    if number.is_zero():
+        return '0'
+    if number.copy_abs() > limit:
+        number = limit.copy_sign(number)
+    # Round the original decimal directly: REAL must not pass through a binary64 midpoint.
+    rounded = _round_binary_decimal(number, precision, minimum_exponent)
+    return '0' if rounded == 0 else repr(rounded)
+
+
+def decimal_float_key(value, sql_type='double precision'):
+    """Coalesce keys that the retained floating column stores as the same value."""
+    return decimal_key(decimal_float_value(value, sql_type))
 
 
 def snowflake_float_expression(expression):

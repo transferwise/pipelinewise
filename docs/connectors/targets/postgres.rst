@@ -9,6 +9,23 @@ target schema changes.
 MariaDB/MySQL and PostgreSQL source decimals use ``NUMERIC(p,s)`` with their
 supported dimensions. Unconstrained PostgreSQL ``NUMERIC`` remains unconstrained.
 Older targets use unconstrained ``NUMERIC`` for unsupported scale declarations.
+Existing ``REAL`` or ``DOUBLE PRECISION`` columns created by the legacy decimal
+mapping remain in place, including primary keys. Singer stages those values with
+the existing target type. Finite values above ``1.7976931348623157e308`` for
+``DOUBLE PRECISION`` or ``3.4028234663852886e38`` for ``REAL`` clamp to that
+limit with the same sign. Magnitudes at or below ``2^-1075`` for
+``DOUBLE PRECISION`` or ``2^-150`` for ``REAL`` become zero. Finite values round
+to the nearest representable value, with exact ties rounded to even. ``NaN`` and
+infinities remain unchanged. New decimal columns use the exact numeric mapping. Singer
+groups retained floating-point decimal keys by their loaded target value.
+Colliding changes follow source event order within each batch. Distinct source
+keys that round or clamp to that value cannot remain distinct; FullSync the
+table to use the exact numeric key mapping.
+For MariaDB/MySQL tables, Singer keeps a nonempty legacy primary-key subset
+until FullSync adopts the complete source key. Singer also keeps an existing
+``YEAR`` key on its legacy text type. Retained text BLOB keys use uppercase
+hexadecimal to match historical FastSync rows. Use FullSync to change these
+legacy key mappings. Other exact numeric key type changes still require FullSync.
 See :ref:`exact_decimal_mapping` for column versioning and key restrictions.
 
 .. list-table:: Support

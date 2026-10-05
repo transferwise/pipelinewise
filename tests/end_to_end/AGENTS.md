@@ -117,14 +117,16 @@ run_e2e \
 run_sf_decimal \
   tests/integration/test_decimals.py::test_opt_in_exact_decimal_load_versions_history_and_retries_without_reversion \
   tests/integration/test_decimals.py::test_decimal_precision_reversal_in_one_process_refreshes_startup_cache \
-  tests/integration/test_decimals.py::test_decimal_archive_bounds_preserve_exact_text_and_ignore_nulls
+  tests/integration/test_decimals.py::test_decimal_archive_bounds_preserve_exact_text_and_ignore_nulls \
+  tests/integration/test_decimals.py::test_mysql_extended_composite_key_upgrade_preserves_historical_updates_and_deletes
 
 run_sf_decimal \
-  tests/integration/test_decimals.py::test_decimal_key_change_fails_before_adding_other_columns \
+  tests/integration/test_decimals.py::test_decimal_key_change_retains_existing_type_and_adds_other_columns \
   tests/integration/test_decimals.py::test_decimal_primary_keys_coalesce_equal_numeric_values \
   tests/integration/test_decimals.py::test_postgres_bounded_numeric_key_keeps_nan_and_canonical_identity \
   tests/integration/test_decimals.py::test_float_fallback_keys_preserve_distinct_rows_across_batches \
-  tests/integration/test_decimals.py::test_bounded_nan_retains_rows_in_copy_and_merge
+  tests/integration/test_decimals.py::test_bounded_nan_retains_rows_in_copy_and_merge \
+  tests/integration/test_decimals.py::test_legacy_text_binary_key_matches_uppercase_fastsync_hex
 
 run_e2e \
   tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_table_size_check.py \
@@ -143,7 +145,8 @@ run_e2e \
   'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[mariadb-v3]'
 
 run_sf_decimal \
-  tests/integration/test_decimals.py::test_float_fallback_retains_overflow_rows_nulls_and_stable_column
+  tests/integration/test_decimals.py::test_float_fallback_retains_overflow_rows_nulls_and_stable_column \
+  tests/integration/test_decimals.py::test_legacy_float_decimal_keys_coalesce_collisions_and_keep_last_patch_and_delete
 ```
 
 Run all twenty only for a full suite; otherwise run every affected group. MariaDB,

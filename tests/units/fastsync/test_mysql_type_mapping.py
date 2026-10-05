@@ -9,10 +9,10 @@ from pipelinewise.fastsync.commons.snowflake_iceberg_model import IcebergTableSp
 @pytest.mark.parametrize(
     ('source_type', 'column_type', 'native_type', 'iceberg_type'),
     [
-        ('tinyblob', 'tinyblob', 'BINARY', 'BINARY(67108864)'),
-        ('blob', 'blob', 'BINARY', 'BINARY(67108864)'),
-        ('mediumblob', 'mediumblob', 'BINARY', 'BINARY(67108864)'),
-        ('longblob', 'longblob', 'BINARY', 'BINARY(67108864)'),
+        ('tinyblob', 'tinyblob', 'BINARY(67108864)', 'BINARY(67108864)'),
+        ('blob', 'blob', 'BINARY(67108864)', 'BINARY(67108864)'),
+        ('mediumblob', 'mediumblob', 'BINARY(67108864)', 'BINARY(67108864)'),
+        ('longblob', 'longblob', 'BINARY(67108864)', 'BINARY(67108864)'),
         ('set', "set('first','second')", 'VARCHAR(134217728)', 'VARCHAR(134217728)'),
         ('year', 'year(4)', 'NUMERIC(38,0)', 'NUMBER(38,0)'),
     ],

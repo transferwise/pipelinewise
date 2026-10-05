@@ -97,6 +97,18 @@ def test_incremental_checkpoint_preserves_digits_and_resume_parameter():
     assert query.call_args.args[-1] == {'replication_key_value': EXACT}
 
 
+def test_incremental_checkpoint_outside_narrowed_declaration_remains_a_boundary():
+    catalog = entry(precision=2, scale=0)
+    state = {'bookmarks': {'source-events': {
+        'replication_key': 'amount', 'replication_key_value': '1000.00',
+    }}}
+    connection = MagicMock()
+    with patch('tap_mysql.sync_strategies.incremental.connect_with_backoff', return_value=connection), \
+            patch.object(common, 'sync_query') as query, patch('singer.write_message'):
+        incremental.sync_table(MagicMock(), catalog, state, ['amount'])
+    assert query.call_args.args[-1] == {'replication_key_value': '1000.00'}
+
+
 @pytest.mark.parametrize('value', ['9999999999999999.99', '-9999999999999999.99', '0.01'])
 def test_legacy_decimal_checkpoint_replays_before_rounded_boundary(value):
     state = {'bookmarks': {'source-events': {'replication_key': 'amount', 'replication_key_value': float(value)}}}

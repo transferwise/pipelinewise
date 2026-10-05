@@ -12,7 +12,7 @@ from .snowflake_iceberg_recovery import RecoveryManifestError, TableCompatibilit
 
 def partial_compatibility(
     expected, actual, allow_versions=True, boundary_column=None, historical_columns=None, decimal_columns=(),
-    force_precision_columns=False,
+    version_legacy_float_columns=False,
 ):
     """Allow nullable historical columns while retaining source and key checks."""
     if actual is None or expected.primary_key != actual.primary_key:
@@ -38,7 +38,7 @@ def partial_compatibility(
         if (
             desired is not None
             and name in decimal_columns
-            and (not force_precision_columns or name in expected.primary_key)
+            and (not version_legacy_float_columns or name in expected.primary_key)
             and is_retained_legacy_decimal_float(column.data_type, desired.data_type)
         ):
             continue
@@ -60,12 +60,12 @@ def partial_compatibility(
 
 
 def plan_column_versions(
-    expected, actual, boundary_column=None, decimal_columns=(), force_precision_columns=False,
+    expected, actual, boundary_column=None, decimal_columns=(), version_legacy_float_columns=False,
 ):
     """Persist archive identities before any independently committed DDL."""
     compatibility, _ = partial_compatibility(
         expected, actual, boundary_column=boundary_column, decimal_columns=decimal_columns,
-        force_precision_columns=force_precision_columns,
+        version_legacy_float_columns=version_legacy_float_columns,
     )
     if compatibility == 'incompatible':
         raise TableCompatibilityError('Existing Iceberg table is incompatible with PartialSync')
@@ -78,7 +78,7 @@ def plan_column_versions(
             continue
         if (
             column.name in decimal_columns
-            and (not force_precision_columns or column.name in expected.primary_key)
+            and (not version_legacy_float_columns or column.name in expected.primary_key)
             and is_retained_legacy_decimal_float(column.data_type, desired.data_type)
         ):
             continue
@@ -91,7 +91,7 @@ def plan_column_versions(
 
 
 def with_retained_decimal_types(
-    expected, actual, decimal_columns=(), force_precision_columns=False,
+    expected, actual, decimal_columns=(), version_legacy_float_columns=False,
 ):
     """Use existing FLOAT staging types for retained legacy decimal columns."""
     if actual is None:
@@ -103,7 +103,7 @@ def with_retained_decimal_types(
         if (
             column.name in decimal_columns
             and column.name in actual_columns
-            and (not force_precision_columns or column.name in expected.primary_key)
+            and (not version_legacy_float_columns or column.name in expected.primary_key)
             and is_retained_legacy_decimal_float(
                 actual_columns[column.name].data_type,
                 column.data_type,
@@ -117,7 +117,7 @@ def with_retained_decimal_types(
 
 def partial_preparation(
     expected, actual, versions, boundary_column=None, historical_columns=None,
-    decimal_columns=(), force_precision_columns=False,
+    decimal_columns=(), version_legacy_float_columns=False,
 ):
     """Resume before or after each rename/add without repeating a rename."""
     columns = {column.name: column for column in actual.columns}
@@ -136,7 +136,7 @@ def partial_preparation(
         expected, evolved, allow_versions=False, boundary_column=boundary_column,
         historical_columns=retained_column_types(historical_columns, versions),
         decimal_columns=decimal_columns,
-        force_precision_columns=force_precision_columns,
+        version_legacy_float_columns=version_legacy_float_columns,
     )
     if compatibility == 'incompatible':
         raise RecoveryManifestError('Iceberg target changed outside the planned decimal evolution')

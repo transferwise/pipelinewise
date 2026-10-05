@@ -44,9 +44,14 @@ def test_generic_api_number_and_legacy_decimal_string_are_unchanged():
     assert column_type({'type': ['string'], 'format': 'singer.decimal'}) == 'character varying'
 
 
+def test_mysql_year_uses_the_same_smallint_type_as_fastsync():
+    assert column_type({
+        'type': ['null', 'integer'], 'format': 'singer.year', 'minimum': 0, 'maximum': 2155,
+    }) == 'smallint'
+
+
 @pytest.mark.parametrize(('data_type', 'precision', 'scale'), [
-    ('double precision', 53, None), ('numeric', 29, 8), ('numeric', 28, 9),
-    ('numeric', 30, 9), ('numeric', None, None),
+    ('numeric', 29, 8), ('numeric', 28, 9), ('numeric', 30, 9), ('numeric', None, None),
 ])
 def test_changed_decimal_type_or_dimensions_versions_once(data_type, precision, scale):
     sync = make_sync({'amount': decimal_schema()}, [{
@@ -80,15 +85,52 @@ def test_matching_decimal_metadata_keeps_column(precision, scale):
     sync.query.assert_not_called()
 
 
-def test_decimal_key_change_refused_before_other_additions():
-    sync = make_sync({'new_column': {'type': ['string']}, 'id': decimal_schema()}, [
-        {'column_name': 'id', 'data_type': 'double precision'},
+@pytest.mark.parametrize('legacy_type', ['double precision', 'real'])
+def test_legacy_floating_decimal_column_is_retained_for_target_and_staging(legacy_type):
+    sync = make_sync({'amount': decimal_schema()}, [
+        {'column_name': 'amount', 'data_type': legacy_type},
     ])
 
-    with pytest.raises(ValueError, match='primary-key'):
-        sync.update_columns()
+    sync.update_columns()
 
     sync.query.assert_not_called()
+    assert sync.retained_column_types == {'amount': legacy_type}
+    assert f'"amount" {legacy_type}' in sync.create_table_query(is_temporary=True)
+    assert '"amount" NUMERIC(29,9)' in sync.create_table_query()
+
+
+@pytest.mark.parametrize(('legacy_type', 'limit'), [
+    ('double precision', '1.7976931348623157e+308'),
+    ('real', '3.4028234663852886e+38'),
+])
+def test_retained_floating_decimal_saturates_overflow_without_changing_exact_columns(legacy_type, limit):
+    sync = make_sync({'amount': decimal_schema(None, None)}, [
+        {'column_name': 'amount', 'data_type': legacy_type},
+    ])
+    sync.update_columns()
+
+    assert sync.record_to_csv_line({'amount': '1e999'}) == f'"{limit}"'
+    assert sync.record_to_csv_line({'amount': '-1e999'}) == f'"-{limit}"'
+    assert sync.record_to_csv_line({'amount': '1e-999'}) == '"0"'
+    assert sync.record_to_csv_line({'amount': '-1e-999'}) == '"0"'
+    for value in ('1.25', 'NaN', 'Infinity', '-Infinity'):
+        assert sync.record_to_csv_line({'amount': value}) == f'"{value}"'
+    assert sync.record_to_csv_line({'amount': '+Infinity'}) == '"Infinity"'
+
+    exact = make_sync({'amount': decimal_schema(None, None)}, [])
+    assert exact.record_to_csv_line({'amount': '1e999'}) == '"1e999"'
+
+
+@pytest.mark.parametrize('legacy_type', ['double precision', 'real'])
+def test_legacy_floating_decimal_key_does_not_block_other_additions(legacy_type):
+    sync = make_sync({'new_column': {'type': ['string']}, 'id': decimal_schema()}, [
+        {'column_name': 'id', 'data_type': legacy_type},
+    ])
+
+    sync.update_columns()
+
+    sync.query.assert_called_once_with('ALTER TABLE public."items" ADD COLUMN "new_column" character varying')
+    assert f'"id" {legacy_type}' in sync.create_table_query(is_temporary=True)
 
 
 def test_unmarked_key_evolution_keeps_legacy_behavior():
@@ -124,6 +166,88 @@ def test_decimal_key_identity_is_exact_and_independent_of_text_scale():
     assert sync.record_primary_key_string({'id': '1.0'}) == sync.record_primary_key_string({'id': '1.00'})
     assert sync.record_primary_key_string({'id': '9007199254740992.00'}) != (
         sync.record_primary_key_string({'id': '9007199254740992.01'})
+    )
+
+
+@pytest.mark.parametrize(('legacy_type', 'first', 'second', 'different'), [
+    ('double precision', '9007199254740992', '9007199254740993', '9007199254740994'),
+    ('real', '16777216', '16777217', '16777218'),
+    ('double precision', '1e999', '2e999', '-1e999'),
+    ('real', '0', '-1e-999', '1'),
+])
+def test_retained_decimal_key_identity_matches_the_stored_float(legacy_type, first, second, different):
+    sync = make_sync({'id': decimal_schema(None, None), 'tenant': {'type': ['integer']}}, [
+        {'column_name': 'id', 'data_type': legacy_type},
+        {'column_name': 'tenant', 'data_type': 'integer'},
+    ], keys=('tenant', 'id'))
+    sync.update_columns()
+    assert sync.record_primary_key_string({'tenant': 1, 'id': first}) == (
+        sync.record_primary_key_string({'tenant': 1, 'id': second})
+    )
+    assert sync.record_primary_key_string({'tenant': 1, 'id': first}) != (
+        sync.record_primary_key_string({'tenant': 1, 'id': different})
+    )
+    assert sync.record_primary_key_string({'tenant': 1, 'id': first}) != (
+        sync.record_primary_key_string({'tenant': 2, 'id': second})
+    )
+    assert sync._retained_decimal_value('id', first) == sync._retained_decimal_value('id', second)
+
+
+def test_mysql_existing_key_membership_is_retained_across_schema_restarts():
+    sync = make_sync({
+        'id': {'type': ['integer']},
+        'year': {'type': ['integer'], 'format': 'singer.year', 'maximum': 2155},
+    }, [{'column_name': 'id', 'data_type': 'numeric'}], keys=('id', 'year'))
+    sync.connection_config = {'source_tap_type': 'tap-mysql'}
+    sync.query.return_value = [{'column_name': 'id'}]
+
+    sync.update_columns()
+
+    assert sync.primary_key_properties() == ['id']
+    assert sync.record_primary_key_string({'id': 1, 'year': 2026}) == '1'
+    assert sync.primary_key_condition('t') == 's."id" = t."id"'
+    assert sync.primary_key_null_condition('t') == 't."id" is null'
+    assert 'PRIMARY KEY ("id")' in sync.create_table_query(is_temporary=True)
+
+    sync.get_table_columns.return_value.append({'column_name': 'year', 'data_type': 'smallint'})
+    sync.effective_key_properties = ['id', 'year']
+    sync.update_columns()
+    assert sync.primary_key_properties() == ['id']
+
+
+def test_mysql_binary_key_identity_and_csv_use_fastsync_hex_casing():
+    sync = make_sync({'id': {'type': ['string'], 'format': 'binary'}}, [
+        {'column_name': 'id', 'data_type': 'character varying'},
+    ])
+    sync.connection_config = {'source_tap_type': 'tap-mysql'}
+    sync.query.return_value = [{'column_name': 'id'}]
+    sync.update_columns()
+
+    assert sync.record_primary_key_string({'id': '00ff'}) == '00FF'
+    assert sync.record_to_csv_line({'id': '00ff'}) == '"00FF"'
+
+
+def test_mysql_legacy_varchar_year_key_keeps_live_type_in_staging():
+    sync = make_sync({'year': {'type': ['integer'], 'format': 'singer.year', 'maximum': 2155}}, [
+        {'column_name': 'year', 'data_type': 'character varying'},
+    ], keys=('year',))
+    sync.connection_config = {'source_tap_type': 'tap-mysql'}
+    sync.query.return_value = [{'column_name': 'year'}]
+    sync.update_columns()
+
+    assert sync.query.call_count == 1
+    assert sync.retained_column_types == {'year': 'character varying'}
+    assert '"year" character varying' in sync.create_table_query(is_temporary=True)
+    assert '"year" smallint' in sync.create_table_query()
+    assert sync.record_primary_key_string({'year': 2026}) == '2026'
+    assert sync.record_to_csv_line({'year': 2026}) == '2026'
+
+
+def test_composite_key_boundaries_do_not_collide_when_set_values_contain_commas():
+    sync = make_sync({'first': {'type': ['string']}, 'second': {'type': ['string']}}, [],
+                     keys=('first', 'second'))
+    assert sync.record_primary_key_string({'first': 'a,b', 'second': 'c'}) != (
+        sync.record_primary_key_string({'first': 'a', 'second': 'b,c'})
     )
 
 

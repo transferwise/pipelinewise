@@ -290,19 +290,19 @@ class SnowflakeIcebergPublicationService:
         drop_target = bool(attempt.manifest_payload.drop_target)
         planned_versions = attempt.manifest_payload.column_versions or {}
         decimal_columns = attempt.manifest_payload.decimal_columns or tuple(planned_versions)
-        force_precision_columns = bool(
-            attempt.manifest_payload.force_precision_columns
+        version_legacy_float_columns = bool(
+            attempt.manifest_payload.version_legacy_float_columns
         )
         if snapshot.fingerprint == attempt.pre_publication_target_fingerprint:
             method, additions = self._partial_method(
                 spec, snapshot, drop_target, iceberg_version, decimal_columns=decimal_columns,
-                force_precision_columns=force_precision_columns,
+                version_legacy_float_columns=version_legacy_float_columns,
             )
         elif attempt.method == PUBLICATION_PARTIAL_MERGE:
             compatibility, additions = partial_compatibility(
                 spec, snapshot.spec, boundary_column=attempt.manifest_payload.column_name,
                 decimal_columns=decimal_columns,
-                force_precision_columns=force_precision_columns,
+                version_legacy_float_columns=version_legacy_float_columns,
             )
             if (
                 snapshot.table_format != expected_table_format
@@ -334,7 +334,7 @@ class SnowflakeIcebergPublicationService:
                 boundary_column=attempt.manifest_payload.column_name,
                 historical_columns=attempt.manifest_payload.historical_columns,
                 decimal_columns=decimal_columns,
-                force_precision_columns=force_precision_columns,
+                version_legacy_float_columns=version_legacy_float_columns,
             )
         if method == PUBLICATION_PARTIAL_BOOTSTRAP_CTAS:
             publication = (
@@ -363,7 +363,7 @@ class SnowflakeIcebergPublicationService:
 
     def _partial_method(
         self, spec, snapshot, drop_target, iceberg_version, decimal_columns=(),
-        force_precision_columns=False,
+        version_legacy_float_columns=False,
     ):
         if snapshot.table_format == TABLE_FORMAT_MISSING:
             return PUBLICATION_PARTIAL_BOOTSTRAP_CTAS, ()
@@ -373,7 +373,7 @@ class SnowflakeIcebergPublicationService:
             return PUBLICATION_PARTIAL_REPLACEMENT_CTAS, ()
         compatibility, additions = partial_compatibility(
             spec, snapshot.spec, decimal_columns=decimal_columns,
-            force_precision_columns=force_precision_columns,
+            version_legacy_float_columns=version_legacy_float_columns,
         )
         if compatibility == 'incompatible':
             raise TableCompatibilityError(
@@ -841,8 +841,8 @@ class SnowflakeIcebergPublicationService:
                     attempt.manifest_payload.decimal_columns
                     or tuple(attempt.manifest_payload.column_versions or {})
                 ),
-                force_precision_columns=bool(
-                    attempt.manifest_payload.force_precision_columns
+                version_legacy_float_columns=bool(
+                    attempt.manifest_payload.version_legacy_float_columns
                 ),
             )
         return self._compatibility(spec, actual)

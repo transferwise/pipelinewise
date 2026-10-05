@@ -33,9 +33,12 @@ def _source(target='snowflake', primary_keys=('"ID"',), precision=10, scale=2):
     return source
 
 
-def _copy_sql(source, boundary=None):
+def _copy_sql(source, boundary=None, decimal_float_columns=()):
     with patch('pipelinewise.fastsync.commons.tap_postgres.split_gzip.open', return_value=io.BytesIO()):
-        source.copy_table('public.items', 'unused.csv', boundary=boundary)
+        source.copy_table(
+            'public.items', 'unused.csv', boundary=boundary,
+            decimal_float_columns=decimal_float_columns,
+        )
     return source.curr.copy_expert.call_args.args[0]
 
 
@@ -95,3 +98,23 @@ def test_nan_normalization_occurs_after_conditional_transformations():
     sql = _copy_sql(source)
     assert 'COPY (SELECT "id", NULLIF("Mixed"' in sql
     assert 'CASE WHEN ("id" = 1) THEN 0 ELSE "Mixed" END AS "Mixed"' in sql
+
+
+def test_set_null_decimal_stays_numeric_before_nan_normalization():
+    source = _source()
+    source.source_transformations = {'transformations': [{
+        'tap_stream_name': 'public-items', 'field_id': 'Mixed', 'type': 'SET-NULL',
+    }]}
+    sql = _copy_sql(source)
+    assert 'CAST(NULL AS numeric) AS "Mixed"' in sql
+    assert 'NULLIF("Mixed", \'NaN\'::numeric)' in sql
+
+
+def test_retained_decimal_float_preserves_nan_and_uses_float_transformation_type():
+    source = _source()
+    source.source_transformations = {'transformations': [{
+        'tap_stream_name': 'public-items', 'field_id': 'Mixed', 'type': 'SET-NULL',
+    }]}
+    sql = _copy_sql(source, decimal_float_columns={'Mixed'})
+    assert 'CAST(NULL AS double precision) AS "Mixed"' in sql
+    assert 'NULLIF' not in sql

@@ -227,6 +227,15 @@ def test_set_null_can_cover_non_string_types():
     assert 'SELECT NULL AS "secret"' in sql
 
 
+@pytest.mark.parametrize(('target_type', 'expected'), [
+    ('NUMBER(18,2)', 'CAST(NULL AS numeric)'),
+    ('FLOAT', 'CAST(NULL AS double precision)'),
+])
+def test_postgres_set_null_preserves_numeric_expression_type(target_type, expected):
+    sql = compile_rules([rule('SET-NULL')], [column(data_type='numeric', target_type=target_type)])
+    assert expected in sql
+
+
 @pytest.mark.parametrize('dialect', ['postgres', 'mysql', 'mariadb'])
 def test_integer_regex_matches_snowflake_decimal_text_conversion(dialect):
     cols = [

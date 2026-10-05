@@ -227,7 +227,7 @@ def test_legacy_decimal_float_migration_requires_opt_in(source_export, tmp_path)
         assert columns[0]['COLUMN_NAME'] == 'AMOUNT'
         assert columns[0]['DATA_TYPE'] == 'FLOAT'
 
-        config['force_precision_columns'] = True
+        config['version_legacy_float_columns'] = True
         result = partial.partial_sync_table(request, args)
         assert result is True, result
         columns = amount_columns()

@@ -112,7 +112,7 @@ Tap configuration
      password: "{{ env_var['POSTGRES_PASSWORD'] }}"
      dbname: "orders"
    target: "snowflake"
-   force_precision_columns: false
+   version_legacy_float_columns: false
    batch_size_rows: 20000
    stream_buffer_size: 0
    schemas:
@@ -230,7 +230,7 @@ Tap configuration
      - Managed-Iceberg version discriminator. Its only supported value is integer
        ``3``; it is required with ``target_table_format: iceberg`` and invalid
        otherwise.
-   * - ``force_precision_columns``
+   * - ``version_legacy_float_columns``
      - ``false``
      - For MariaDB/MySQL or PostgreSQL taps writing to Snowflake, set ``true``
        to retain an eligible non-key legacy floating-point decimal column under a

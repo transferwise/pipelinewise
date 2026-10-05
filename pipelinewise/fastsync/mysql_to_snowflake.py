@@ -11,7 +11,7 @@ from ..logger import Logger
 from .commons import utils
 from .commons import rdbms_to_snowflake
 from .commons import snowflake_iceberg_routes as iceberg_routes
-from .commons.snowflake_types import SNOWFLAKE_MAX_VARCHAR
+from .commons.snowflake_types import SNOWFLAKE_MAX_BINARY, SNOWFLAKE_MAX_VARCHAR
 from .commons.source_numeric import mysql_decimal_type
 from .commons.rdbms_source import RdbmsSnowflakeSource
 from .commons.tap_mysql import FastSyncTapMySql
@@ -56,12 +56,12 @@ def tap_type_to_target_type(mysql_type, mysql_column_type, *, is_key=False):
     return {
         'char': SNOWFLAKE_MAX_VARCHAR,
         'varchar': SNOWFLAKE_MAX_VARCHAR,
-        'binary': 'BINARY',
-        'varbinary': 'BINARY',
-        'blob': 'BINARY',
-        'tinyblob': 'BINARY',
-        'mediumblob': 'BINARY',
-        'longblob': 'BINARY',
+        'binary': SNOWFLAKE_MAX_BINARY,
+        'varbinary': SNOWFLAKE_MAX_BINARY,
+        'blob': SNOWFLAKE_MAX_BINARY,
+        'tinyblob': SNOWFLAKE_MAX_BINARY,
+        'mediumblob': SNOWFLAKE_MAX_BINARY,
+        'longblob': SNOWFLAKE_MAX_BINARY,
         'geometry': 'VARIANT',
         'point': 'VARIANT',
         'linestring': 'VARIANT',

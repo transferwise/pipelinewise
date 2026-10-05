@@ -74,6 +74,21 @@ def _source_column_definitions(spec):
     ]
 
 
+def _decimal_float_columns(source_columns, decimal_columns):
+    """Return decimal columns whose effective PartialSync staging type is floating point."""
+    decimal_columns = {str(name).strip('"').upper() for name in decimal_columns or ()}
+    result = set()
+    for definition in source_columns or ():
+        match = utils.SOURCE_COLUMN_DEFINITION.fullmatch(definition)
+        if match is None:
+            continue
+        name = match.group('name').strip('"').replace('""', '"')
+        data_type = match.group('data_type').strip().upper().removesuffix(' NOT NULL').rstrip().split('(', 1)[0]
+        if name.upper() in decimal_columns and data_type in {'FLOAT', 'DOUBLE', 'DOUBLE PRECISION', 'REAL'}:
+            result.add(name)
+    return result
+
+
 def partial_sync_table(
     table: tuple,
     args,
@@ -234,10 +249,14 @@ def _export_partial_source(run: _PartialSyncRun) -> bool:
         if not ready:
             return False
 
+        export_options = {'boundary': run.boundary}
+        decimal_float_columns = _decimal_float_columns(run.source_columns, run.decimal_columns)
+        if decimal_float_columns:
+            export_options['decimal_float_columns'] = decimal_float_columns
         run.file_parts = run.source.export_source_table_data(
             run.args,
             run.args.target.get('tap_id'),
-            boundary=run.boundary,
+            **export_options,
         )
         if run.iceberg_requested:
             _validate_partial_export(run)
@@ -269,8 +288,8 @@ def _prepare_iceberg_partial_export(run: _PartialSyncRun) -> bool:
             current_spec,
             run.publisher.inspect_table(current_spec.name).spec,
             decimal_columns=run.decimal_columns,
-            force_precision_columns=run.args.target.get(
-                'force_precision_columns', False
+            version_legacy_float_columns=run.args.target.get(
+                'version_legacy_float_columns', False
             ),
         )
         run.source_columns = _source_column_definitions(current_spec)
@@ -317,8 +336,8 @@ def _prepare_iceberg_partial_export(run: _PartialSyncRun) -> bool:
         staging_config=run.staging_config,
         resolved_source_engine=resolved_engine,
         decimal_columns=run.decimal_columns,
-        force_precision_columns=run.args.target.get(
-            'force_precision_columns', False
+        version_legacy_float_columns=run.args.target.get(
+            'version_legacy_float_columns', False
         ),
     )
     run.publisher.plan_partial_sync(run.attempt, run.spec)
@@ -350,8 +369,8 @@ def _prepare_native_partial_export(run: _PartialSyncRun) -> bool:
             primary_keys=run.primary_keys,
             boundary_column=run.column_name,
             decimal_columns=run.decimal_columns,
-            force_precision_columns=run.args.target.get(
-                'force_precision_columns', False
+            version_legacy_float_columns=run.args.target.get(
+                'version_legacy_float_columns', False
             ),
         )
         run.source_columns = columns_diff['staging_columns']
@@ -400,8 +419,8 @@ def _validate_partial_export(run: _PartialSyncRun) -> None:
             exported_spec,
             run.spec,
             decimal_columns=run.decimal_columns,
-            force_precision_columns=run.args.target.get(
-                'force_precision_columns', False
+            version_legacy_float_columns=run.args.target.get(
+                'version_legacy_float_columns', False
             ),
         )
     iceberg_routes.validate_recovery_source_spec(run.spec, exported_spec)
@@ -513,8 +532,8 @@ def _publish_partial_native(run: _PartialSyncRun) -> bool:
         run.where_clause_sql,
         boundary_column=run.column_name,
         decimal_columns=run.decimal_columns,
-        force_precision_columns=run.args.target.get(
-            'force_precision_columns', False
+        version_legacy_float_columns=run.args.target.get(
+            'version_legacy_float_columns', False
         ),
     )
     run.publication_status['attempted'] = True

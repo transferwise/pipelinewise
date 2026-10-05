@@ -294,6 +294,22 @@ def test_incremental_checkpoint_and_resume_query_keep_exact_digits():
     assert f"'{EXACT}'::numeric" in cursor.execute.call_args.args[0]
 
 
+def test_incremental_checkpoint_outside_narrowed_declaration_uses_unbounded_numeric():
+    source = stream(precision=2, scale=0)
+    state = {'bookmarks': {'public-events': {'replication_key_value': '1000.00'}}}
+    cursor = MagicMock()
+    connection = MagicMock()
+    connection.__enter__.return_value.cursor.return_value.__enter__.return_value = cursor
+    with patch.object(db, 'open_connection', return_value=connection), \
+            patch.object(db, 'hstore_available', return_value=False), patch('singer.write_message'):
+        incremental.sync_table(
+            {'limit': None}, source, state, ['amount'], metadata.to_map(source['metadata']),
+        )
+    query = cursor.execute.call_args.args[0]
+    assert "'1000.00'::numeric" in query
+    assert 'numeric(2,0)' not in query
+
+
 @pytest.mark.parametrize('value', ['9999999999999999.99', '-9999999999999999.99', '0.01'])
 def test_legacy_float_bookmark_replays_before_rounded_boundary_and_writes_exact_state(value):
     source = stream(precision=18, scale=2)

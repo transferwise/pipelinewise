@@ -8,7 +8,7 @@ from typing import List, Dict, Union, Tuple, Set
 from cryptography.hazmat.primitives import serialization
 
 from singer import get_logger
-from singer.decimal_support import decimal_key, is_decimal_schema
+from singer.decimal_support import decimal_float_value, decimal_key, is_decimal_schema
 from target_snowflake import flattening
 from target_snowflake import managed_iceberg
 from target_snowflake import stream_utils
@@ -91,16 +91,23 @@ def validate_config(config):
 
     errors.extend(managed_iceberg.validate_table_format_config(config))
 
-    if not isinstance(config.get('force_precision_columns', False), bool):
-        errors.append('force_precision_columns must be true or false')
+    if not isinstance(config.get('version_legacy_float_columns', False), bool):
+        errors.append('version_legacy_float_columns must be true or false')
 
     return errors
 
 
-def column_trans(schema_property):
+def column_trans(schema_property, retained_type=None):
     """Generate SQL transformed columns syntax"""
     property_type = schema_property['type']
     col_trans = ''
+    retained_base_type = re.sub(r'\(.*\)', '', retained_type or '').strip().upper()
+    if retained_base_type in managed_iceberg.SNOWFLAKE_STRING_TYPES:
+        return col_trans
+    if retained_base_type in ('VARIANT', 'OBJECT', 'ARRAY'):
+        return 'parse_json'
+    if retained_base_type in ('BINARY', 'VARBINARY'):
+        return 'to_binary'
     if 'object' in property_type or 'array' in property_type:
         col_trans = 'parse_json'
     elif schema_property.get('format') == 'binary':
@@ -363,7 +370,7 @@ class DbSync:
 
     def record_primary_key_string(self, record):
         """Generate a unique PK string in the record"""
-        keys = self.stream_schema_message['key_properties']
+        keys = self.effective_key_properties()
         if not keys and not self.decimal_fields():
             return None
         flatten = flattening.flatten_record(record, self.flatten_schema, max_level=self.data_flattening_max_level)
@@ -372,14 +379,14 @@ class DbSync:
             return None
 
         key_props = []
-        for key_prop in self.stream_schema_message['key_properties']:
+        for key_prop in keys:
             if key_prop not in flatten or flatten[key_prop] is None:
                 raise PrimaryKeyNotFoundException(
                     f"Primary key '{key_prop}' does not exist in record or is null. "
                     f"Available fields: {list(flatten.keys())}"
                 )
 
-            key_value = flatten[key_prop]
+            key_value = self.load_column_value(key_prop, flatten[key_prop])
             key_props.append(
                 decimal_key(key_value)
                 if is_decimal_schema(self.flatten_schema.get(key_prop))
@@ -388,6 +395,38 @@ class DbSync:
 
         # Delimiters may occur inside key values; encode component boundaries unambiguously.
         return json.dumps(key_props, ensure_ascii=False, separators=(',', ':'))
+
+    def effective_key_properties(self):
+        """Use the established target identity until FullSync replaces the table."""
+        return getattr(self, '_effective_key_properties', self.stream_schema_message['key_properties'])
+
+    def _retain_existing_primary_keys(self):
+        """Avoid widening legacy MySQL keys over unpopulated historical columns."""
+        self.__dict__.pop('_effective_key_properties', None)
+        keys = self.stream_schema_message['key_properties']
+        if self.connection_config.get('source_tap_type') != 'tap-mysql' or len(keys) < 2:
+            return
+        current_keys = {name.upper() for name in self._get_current_pks()}
+        if current_keys and current_keys < {name.upper() for name in keys}:
+            self._effective_key_properties = [name for name in keys if name.upper() in current_keys]
+            self.logger.warning(
+                'Keeping existing primary key columns %s for stream %s; FullSync adopts the complete source key',
+                ', '.join(self._effective_key_properties), self.stream_schema_message['stream'],
+            )
+
+    def load_column_value(self, name, value):
+        """Keep staged key values and buffered identities on the same live type."""
+        schema = self.flatten_schema.get(name, {})
+        if is_decimal_schema(schema):
+            data_type = self.decimal_load_type(name, schema)
+            base_type = re.sub(r'\(.*\)', '', data_type).strip().upper()
+            if base_type in ('FLOAT', 'DOUBLE', 'DOUBLE PRECISION', 'REAL'):
+                return decimal_float_value(value, 'double precision')
+        retained_type = getattr(self, '_retained_column_types', {}).get(name.upper(), '')
+        retained_base = re.sub(r'\(.*\)', '', retained_type).strip().upper()
+        if schema.get('format') == 'binary' and retained_base in managed_iceberg.SNOWFLAKE_STRING_TYPES:
+            return value.upper() if value is not None else None
+        return value
 
     def decimal_fields(self):
         """Cache marked fields once for this immutable stream schema."""
@@ -399,20 +438,26 @@ class DbSync:
 
     def decimal_load_type(self, name, schema):
         """Use the live FLOAT type when default migration retains a legacy decimal column."""
+        retained_columns = getattr(self, '_retained_column_types', {})
+        if name.upper() in retained_columns:
+            return retained_columns[name.upper()]
         retained = getattr(self, '_retained_decimal_types', {})
         return retained.get(name.upper()) or column_type(
             schema,
-            is_key=name in self.stream_schema_message['key_properties'],
+            is_key=name in self.effective_key_properties(),
             source=self.decimal_source(),
         )
 
     def check_decimal_nan(self, record):
         """Keep ordinary NaN rows while refusing null primary-key identities."""
-        keys = self.stream_schema_message['key_properties']
+        keys = self.effective_key_properties()
         for name, schema in self.decimal_fields().items():
             if record.get(name) != 'NaN':
                 continue
-            if not self.decimal_load_type(name, schema).startswith('NUMERIC'):
+            decimal_type = self.decimal_load_type(name, schema)
+            if re.sub(r'\(.*\)', '', decimal_type).strip().upper() not in (
+                'NUMBER', 'NUMERIC', 'DECIMAL', 'FIXED',
+            ):
                 continue
             if name in keys:
                 raise ValueError(
@@ -498,23 +543,29 @@ class DbSync:
         self.logger.info("Loading %d rows into '%s'", count, self.table_name(stream, False))
 
         # Get list if columns with types
-        columns_with_trans = [
-            {
-                "name": safe_column_name(name),
-                "json_element_name": json_element_name(name),
-                "trans": column_trans(schema),
-                **({'decimal_type': self.decimal_load_type(name, schema),
-                    'decimal_key': name in self.stream_schema_message['key_properties']}
-                   if is_decimal_schema(schema) else {}),
+        columns_with_trans = []
+        retained_columns = getattr(self, '_retained_column_types', {})
+        for name, schema in self.flatten_schema.items():
+            retained_type = retained_columns.get(name.upper())
+            column = {
+                'name': safe_column_name(name),
+                'json_element_name': json_element_name(name),
+                'trans': column_trans(schema, retained_type),
             }
-            for (name, schema) in self.flatten_schema.items()
-        ]
+            if is_decimal_schema(schema):
+                column.update(
+                    decimal_type=self.decimal_load_type(name, schema),
+                    decimal_key=name in self.effective_key_properties(),
+                )
+            elif retained_type:
+                column['retained_type'] = retained_type
+            columns_with_trans.append(column)
 
         inserts = 0
         updates = 0
 
         # Insert or Update with MERGE command if primary key defined
-        if len(self.stream_schema_message['key_properties']) > 0:
+        if self.effective_key_properties():
             try:
                 inserts, updates = self._load_file_merge(
                     s3_key=s3_key,
@@ -603,8 +654,7 @@ class DbSync:
 
     def primary_key_merge_condition(self):
         """Generate SQL join condition on primary keys for merge SQL statements"""
-        stream_schema_message = self.stream_schema_message
-        names = primary_column_names(stream_schema_message)
+        names = [safe_column_name(name) for name in self.effective_key_properties()]
         return ' AND '.join([f's.{c} = t.{c}' for c in names])
 
     def column_names(self):
@@ -797,9 +847,10 @@ class DbSync:
                              WHEN 'FIXED' THEN 'NUMBER'
                              WHEN 'REAL'  THEN 'FLOAT'
                              ELSE PARSE_JSON("data_type"):type::varchar
-                           END data_type
+                          END data_type
                           ,PARSE_JSON("data_type"):precision::integer AS numeric_precision
                           ,PARSE_JSON("data_type"):scale::integer AS numeric_scale
+                          ,PARSE_JSON("data_type"):length::integer AS type_length
                       FROM TABLE(RESULT_SCAN(%(LAST_QID)s))
                 """
 
@@ -862,11 +913,12 @@ class DbSync:
             iceberg_version,
             key_properties=stream_schema_message['key_properties'],
             source=self.decimal_source(),
-            force_precision_columns=self.connection_config.get(
-                'force_precision_columns', False
+            version_legacy_float_columns=self.connection_config.get(
+                'version_legacy_float_columns', False
             ),
         )
         self._retained_decimal_types = dict(plan.retained_decimal_types)
+        self._retained_column_types = dict(plan.retained_column_types)
 
         for column in plan.additions:
             self.add_column(column, stream, is_iceberg_table)
@@ -897,6 +949,15 @@ class DbSync:
         scale = column.get('NUMERIC_SCALE')
         if data_type in ('NUMBER', 'NUMERIC', 'DECIMAL', 'FIXED') and precision is not None and scale is not None:
             return f'NUMBER({precision},{scale})'
+        type_length = column.get('TYPE_LENGTH')
+        if (
+            type_length is not None
+            and (
+                data_type in managed_iceberg.SNOWFLAKE_STRING_TYPES
+                or data_type in ('BINARY', 'VARBINARY')
+            )
+        ):
+            return f'{data_type}({type_length})'
         return data_type
 
     def version_column(self, column_name, stream, is_iceberg_table=False, existing_names=()):
@@ -942,6 +1003,7 @@ class DbSync:
 
     def sync_table(self):
         """Creates or alters the target table according to the schema"""
+        self.__dict__.pop('_effective_key_properties', None)
         for name, schema in self.flatten_schema.items():
             if is_decimal_schema(schema):
                 precision, scale = schema['decimal']['precision'], schema['decimal']['scale']
@@ -998,6 +1060,7 @@ class DbSync:
             self.logger.info('Table %s exists', table_name_with_schema)
             is_iceberg_table = physical_format in ICEBERG_TABLE_FORMATS
             iceberg_version = requested.iceberg_version
+            self._retain_existing_primary_keys()
             self.update_columns(is_iceberg_table, iceberg_version)
 
         if not is_iceberg_table:
@@ -1031,7 +1094,7 @@ class DbSync:
         table_name = self.table_name(self.stream_schema_message['stream'], False)
         self.logger.info('Refreshing Table %s PK', table_name)
         current_pks = self._get_current_pks()
-        new_pks = set(pk.upper() for pk in self.stream_schema_message.get('key_properties', []))
+        new_pks = set(pk.upper() for pk in self.effective_key_properties())
 
         queries = []
 

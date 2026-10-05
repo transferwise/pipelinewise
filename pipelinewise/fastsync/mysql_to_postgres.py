@@ -67,6 +67,7 @@ def tap_type_to_target_type(mysql_type, mysql_column_type, *, is_key=False, post
         'timestamp': 'TIMESTAMP WITHOUT TIME ZONE',
         'time': 'TIME WITHOUT TIME ZONE',
         'json': 'JSONB',
+        'year': 'SMALLINT NULL',
     }.get(
         mysql_type,
         'CHARACTER VARYING',

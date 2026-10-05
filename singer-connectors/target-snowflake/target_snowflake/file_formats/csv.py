@@ -61,6 +61,8 @@ def _stage_column_expression(column, position):
         if column['decimal_type'].startswith('NUMERIC') and not column.get('decimal_key'):
             expression = f"NULLIF({expression}, 'NaN')"
         return f"CAST({expression} AS {column['decimal_type']})"
+    if column.get('retained_type'):
+        return f"CAST({expression} AS {column['retained_type']})"
     return expression
 
 
@@ -100,7 +102,8 @@ def create_merge_sql(table_name: str,
 def record_to_csv_line(record: dict,
                        schema: dict,
                        data_flattening_max_level: int = 0,
-                       key_properties=()) -> str:
+                       key_properties=(),
+                       value_transformer=None) -> str:
     """
     Transforms a record message to a CSV line
 
@@ -116,6 +119,8 @@ def record_to_csv_line(record: dict,
     values = []
     for column in schema:
         value = flatten_record.get(column)
+        if value_transformer is not None:
+            value = value_transformer(column, value)
         if column in key_properties:
             value = decimal_canonical_string(value)
         if value is None:
@@ -134,7 +139,8 @@ def write_records_to_file(outfile,
                           schema: Dict,
                           record_to_csv_line_transformer: Callable,
                           data_flattening_max_level: int = 0,
-                          key_properties=()) -> None:
+                          key_properties=(),
+                          value_transformer=None) -> None:
     """
     Writes a record message to a given file
 
@@ -150,6 +156,8 @@ def write_records_to_file(outfile,
     """
     for record in records.values():
         options = {'key_properties': key_properties} if key_properties else {}
+        if value_transformer is not None:
+            options['value_transformer'] = value_transformer
         csv_line = record_to_csv_line_transformer(record, schema, data_flattening_max_level, **options)
         outfile.write(bytes(csv_line + '\n', 'UTF-8'))
 
@@ -161,7 +169,8 @@ def records_to_file(records: Dict,
                     compression: bool = False,
                     dest_dir: str = None,
                     data_flattening_max_level: int = 0,
-                    key_properties=()):
+                    key_properties=(),
+                    value_transformer=None):
     """
     Transforms a list of dictionaries with records messages to a CSV file
 
@@ -193,11 +202,13 @@ def records_to_file(records: Dict,
             with gzip.GzipFile(filename=filename, mode='wb',fileobj=outfile) as gzipfile:
                 write_records_to_file(
                     gzipfile, records, schema, record_to_csv_line, data_flattening_max_level, key_properties,
+                    value_transformer,
                 )
     else:
         with open(filedesc, 'wb') as outfile:
             write_records_to_file(
                 outfile, records, schema, record_to_csv_line, data_flattening_max_level, key_properties,
+                value_transformer,
             )
 
     return filename

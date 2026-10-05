@@ -252,6 +252,7 @@ class ColumnChangePlan:
     additions: Tuple[str, ...]
     replacements: Tuple[Tuple[str, str], ...]
     retained_decimal_types: Tuple[Tuple[str, str], ...] = ()
+    retained_column_types: Tuple[Tuple[str, str], ...] = ()
 
 
 def _quote_identifier(identifier):
@@ -272,7 +273,10 @@ def sql_string_literal(value):
 
 
 def _base_snowflake_type(value):
-    return re.sub(r'\(.*\)', '', value).strip()
+    base_type = re.sub(r'\(.*\)', '', value).strip()
+    if base_type in ('NUMBER', 'NUMERIC', 'DECIMAL', 'FIXED'):
+        return 'NUMBER'
+    return base_type
 
 
 _MISSING = object()
@@ -833,6 +837,8 @@ def column_type(schema_property, is_iceberg_table=False, iceberg_version=None, i
         return _iceberg_column_type(native_type, iceberg_version)
     if native_type == 'text':
         return SNOWFLAKE_MAX_VARCHAR_TYPE
+    if native_type == 'binary':
+        return SNOWFLAKE_MAX_BINARY_TYPE
     return native_type
 
 
@@ -877,7 +883,7 @@ def _replacement_for_existing_column(
     contract,
     is_key=False,
     source=None,
-    force_precision_columns=False,
+    version_legacy_float_columns=False,
 ):
     definition = column_clause(
         name,
@@ -897,7 +903,7 @@ def _replacement_for_existing_column(
     base_new_type = _base_snowflake_type(new_type)
     if is_decimal_schema(properties_schema):
         if (
-            (not force_precision_columns or is_key)
+            (not version_legacy_float_columns or is_key)
             and _base_snowflake_type(current_type) in ('FLOAT', 'DOUBLE', 'DOUBLE PRECISION', 'REAL')
         ):
             return None
@@ -925,12 +931,13 @@ def _replacement_for_existing_column(
         return None
 
     compatibility = contract.type_compatibility if contract else None
-    if compatibility and (current_type, base_new_type) in compatibility.compatible_pairs:
+    base_current_type = _base_snowflake_type(current_type)
+    if compatibility and (base_current_type, base_new_type) in compatibility.compatible_pairs:
         return None
-    if compatibility and frozenset({current_type, base_new_type}) in compatibility.forbidden_pairs:
+    if compatibility and frozenset({base_current_type, base_new_type}) in compatibility.forbidden_pairs:
         raise TableFormatMismatchException(
             f'Iceberg column {name.upper()} is {current_type}, but '
-            f'{compatibility.mismatch_reason(current_type)}'
+            f'{compatibility.mismatch_reason(base_current_type)}'
         )
     return safe_column_name(name), definition
 
@@ -942,7 +949,7 @@ def plan_column_changes(
     iceberg_version=None,
     key_properties=(),
     source=None,
-    force_precision_columns=False,
+    version_legacy_float_columns=False,
 ):
     """Return additions and replacements without executing Snowflake DDL."""
     contract = None
@@ -961,6 +968,7 @@ def plan_column_changes(
     additions = []
     replacements = []
     retained_decimal_types = []
+    retained_column_types = []
     for name, properties_schema in flatten_schema.items():
         name_upper = name.upper()
         if name_upper not in normalized_existing_types:
@@ -977,30 +985,36 @@ def plan_column_changes(
         current_type = normalized_existing_types[name_upper]
         if (
             is_decimal_schema(properties_schema)
-            and (not force_precision_columns or name_upper in primary_keys)
+            and (not version_legacy_float_columns or name_upper in primary_keys)
             and _base_snowflake_type(current_type) in ('FLOAT', 'DOUBLE', 'DOUBLE PRECISION', 'REAL')
         ):
             retained_decimal_types.append((name_upper, 'FLOAT'))
-        replacement = _replacement_for_existing_column(
-            name,
-            properties_schema,
-            current_type,
-            is_iceberg_table=is_iceberg_table,
-            iceberg_version=iceberg_version,
-            contract=contract,
-            is_key=name_upper in primary_keys,
-            source=source,
-            force_precision_columns=force_precision_columns,
-        )
+        try:
+            replacement = _replacement_for_existing_column(
+                name,
+                properties_schema,
+                current_type,
+                is_iceberg_table=is_iceberg_table,
+                iceberg_version=iceberg_version,
+                contract=contract,
+                is_key=name_upper in primary_keys,
+                source=source,
+                version_legacy_float_columns=version_legacy_float_columns,
+            )
+        except (TableFormatDiscoveryException, TableFormatMismatchException):
+            if name_upper not in primary_keys:
+                raise
+            retained_column_types.append((name_upper, current_type))
+            continue
         if replacement:
-            if name_upper in primary_keys and is_decimal_schema(properties_schema):
-                raise TableFormatMismatchException(
-                    f'Cannot version primary-key column {name_upper}; recreate the table before changing its type'
-                )
+            if name_upper in primary_keys:
+                retained_column_types.append((name_upper, current_type))
+                continue
             replacements.append(replacement)
 
     return ColumnChangePlan(
         tuple(additions),
         tuple(replacements),
         tuple(retained_decimal_types),
+        tuple(retained_column_types),
     )

@@ -91,6 +91,8 @@ contains the original source precision and scale. Targets choose a compatible
 column type from those dimensions. Generic string and number schemas are unaffected.
 Quote precise decimal values in YAML transformation conditions so YAML does not
 parse them as floating-point numbers.
+``regex_match`` conditions on decimal fields are unsupported and rejected when
+the stream schema is validated.
 
 Snowflake uses the original declaration when precision is at most 38 and scale
 is between zero and the lesser of precision and 37. Otherwise, PipelineWise
@@ -106,7 +108,8 @@ special values on this fallback path.
 PostgreSQL also permits NaN in bounded numeric columns. PostgreSQL targets keep
 NaN. Snowflake fixed-point non-key columns represent ordinary NaN values as SQL
 ``NULL``, retaining the row and column. Singer logs a warning for each affected
-column; FastSync applies the conversion during export. PostgreSQL numeric
+column; FastSync applies the conversion during export. A retained legacy
+floating-point target column keeps ``NaN`` instead. PostgreSQL numeric
 primary keys use canonical text in both Snowflake table formats, regardless of
 their declared precision and scale. This preserves ``NaN`` and distinct finite
 keys without relying on floating-point identity. MariaDB/MySQL decimal keys
@@ -121,6 +124,13 @@ PostgreSQL retains supported declarations, including unconstrained ``NUMERIC``.
 Targets older than PostgreSQL 15 use unconstrained ``NUMERIC`` for negative scale
 or scale greater than precision. This preserves values without requiring syntax
 that the older server does not support.
+Existing PostgreSQL target ``REAL`` and ``DOUBLE PRECISION`` columns created by
+the legacy decimal mapping remain unchanged, including primary keys. Singer uses
+the same type in its staging table. Values outside PostgreSQL's accepted finite
+range clamp to the target type's finite limit. Magnitudes at or below half the
+smallest subnormal value become zero. ``NaN`` and infinities remain unchanged.
+New target columns use the current mapping. See :ref:`target-postgres` for the
+exact limits.
 
 The mapping is computed before loading from the source declaration and target
 capabilities. Source dimensions remain unchanged in the catalog even when the
@@ -146,7 +156,7 @@ legacy decimal mapping remain in place by default, so replication continues with
 its existing floating-point precision. This includes primary keys whose new
 precision-preserving mapping is text. Their load projection continues to use the
 existing floating-point type. Set
-``force_precision_columns: true`` at the MariaDB/MySQL or
+``version_legacy_float_columns: true`` at the MariaDB/MySQL or
 PostgreSQL tap root to archive each eligible non-key legacy column and add its
 precision-preserving replacement. This opt-in applies to native and managed Iceberg tables
 and to Singer and supported PartialSync routes. It does not affect new columns.
@@ -156,23 +166,48 @@ Run ``import_config`` after changing the setting. A retained Iceberg PartialSync
 attempt records the setting and its source-decimal columns in its internal
 recovery manifest so a retry cannot silently change the planned schema action.
 
-Other primary-key type changes are rejected before target schema changes.
-PartialSync also rejects versioning its range column, because empty
-values in the new column cannot identify historical rows in that range. Use
-FullSync to replace the table in either case. The range restriction also applies
-when Singer already versioned that column. A decimal range column that requires
+During Singer loads into Snowflake, any existing primary-key column whose live
+target type differs from the current mapping remains unchanged. Singer casts
+staged values to that live type so new changes continue to match historical rows.
+PostgreSQL also keeps a MariaDB/MySQL ``YEAR`` key on its legacy text type.
+Use FullSync to recreate these existing keys with the current mapping. Other
+PostgreSQL exact numeric key type changes still require FullSync.
+
+For MariaDB/MySQL tables on Snowflake or PostgreSQL, Singer also keeps an
+existing nonempty primary key when it is a subset of the refreshed source key.
+Updates and deletes continue matching historical rows when the upgrade adds
+previously unsupported ``YEAR``, ``SET``, or BLOB key columns. Newly added columns can remain
+``NULL`` on historical rows until those rows are replicated again. The target's
+primary-key metadata preserves this choice across restarts. New tables and
+FullSync use the complete source key. FullSync the table to adopt that key and
+preserve source rows that differ only in the newly supported key columns.
+Singer writes retained text BLOB keys as uppercase hexadecimal to match legacy
+FastSync rows.
+
+Singer groups retained floating-point decimal keys by the value loaded into
+the target, including rounding, overflow clamping, and underflow to zero.
+Changes that collapse onto one floating-point key follow source event order
+within a batch instead of failing on duplicate staged keys. They still cannot
+represent distinct source identities. FullSync the table to adopt the exact
+key mapping. New numeric and text keys keep their exact identities.
+
+PartialSync rejects incompatible primary-key changes and versioning its range
+column, because empty values in a new column cannot identify historical rows in
+that range. Use FullSync to replace the table in either case. The range
+restriction also applies when Singer already versioned that column. A decimal
+range column that requires
 FLOAT or text fallback also needs FullSync, because its target ordering cannot
 represent the source range exactly. Newly created PostgreSQL numeric primary
 keys on Snowflake, and other decimal primary keys that would require FLOAT,
 use canonical, lossless text instead, preserving distinct row identities.
-Changing an existing key's type still requires FullSync; leaving the option at
-its default does not require one.
 
 Legacy floating-point decimal bookmarks trigger a warning and conservative
 source-side replay from below the rounded boundary. Nonfinite boundaries request
-a full stream replay. Successful replication writes exact string bookmarks into
-the existing state field. No additional migration marker is stored. This avoids
-introducing skipped rows; it cannot restore data already missed by older runs.
+a full stream replay. An exact finite bookmark remains valid if a later source
+declaration narrows; PostgreSQL compares it as an unconstrained numeric boundary.
+Successful replication writes exact string bookmarks into the existing state
+field. No additional migration marker is stored. This avoids introducing skipped
+rows; it cannot restore data already missed by older runs.
 
 Iceberg PartialSync retains recognized historical column versions. FullSync
 keeps its existing full-table replacement behavior and recreates the current

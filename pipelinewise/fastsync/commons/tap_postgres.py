@@ -635,6 +635,7 @@ class FastSyncTapPostgres:
         split_file_max_chunks=20,
         compress=True,
         boundary=None,
+        decimal_float_columns=(),
     ):
         """
         Export data from table to a zipped csv
@@ -688,10 +689,21 @@ class FastSyncTapPostgres:
             where_clause = ''
 
         select_sql = f'SELECT {",".join(column_safe_sql_values)} FROM {schema_name}."{table_name}"{where_clause}'
-        transformed = self._compile_source_projection(source_table, table_columns, where_clause)
+        transformed = self._compile_source_projection(
+            source_table,
+            table_columns,
+            where_clause,
+            decimal_float_columns=decimal_float_columns,
+        )
         if transformed is not None:
             select_sql = f'SELECT _ppw_export.*, {",".join(metadata_columns)} FROM ({transformed}) AS _ppw_export'
-        select_sql = self._snowflake_numeric_export(source_table, table_columns, where_clause, select_sql)
+        select_sql = self._snowflake_numeric_export(
+            source_table,
+            table_columns,
+            where_clause,
+            select_sql,
+            decimal_float_columns=decimal_float_columns,
+        )
         sql = f"COPY ({select_sql}) TO STDOUT with CSV DELIMITER ','"
 
         LOGGER.info('Exporting data: %s', sql)
@@ -707,11 +719,15 @@ class FastSyncTapPostgres:
         with gzip_splitter as split_gzip_files:
             self.curr.copy_expert(sql, split_gzip_files, size=131072)
 
-    def _snowflake_numeric_export(self, table_name, columns, where_clause, select_sql):
+    def _snowflake_numeric_export(
+        self, table_name, columns, where_clause, select_sql, decimal_float_columns=(),
+    ):
         """Normalize ordinary NaN only after source transformations have evaluated."""
         if self.target_type != 'snowflake':
             return select_sql
+        decimal_float_columns = {str(name).upper() for name in decimal_float_columns}
         candidates = [column for column in columns if column.get('data_type') in ('numeric', 'decimal') and
+                      column['column_name'].upper() not in decimal_float_columns and
                       self._mapped_column_type(
                           column['data_type'], None, column.get('numeric_precision'), column.get('numeric_scale'),
                       ).startswith('NUMERIC(')]
@@ -769,18 +785,24 @@ class FastSyncTapPostgres:
             column_type = column_type[1 if character_maximum_length > 1 else 0]
         return column_type
 
-    def _compile_source_projection(self, table_name, table_columns, where_clause=''):
+    def _compile_source_projection(
+        self, table_name, table_columns, where_clause='', decimal_float_columns=(),
+    ):
         """Share projection validation between recovery preflight and export."""
         if self.source_transformations is None:
             return None
+        decimal_float_columns = {str(name).upper() for name in decimal_float_columns}
         table_columns, primary_keys = self._decimal_key_projection(table_name, table_columns)
         columns = []
         for column in table_columns:
-            target_type = self._mapped_column_type(
-                column['data_type'], column.get('character_maximum_length'),
-                column.get('numeric_precision'), column.get('numeric_scale'),
-                is_key=safe_column_name(column['column_name'], self.target_quote) in primary_keys,
-            )
+            if column['column_name'].upper() in decimal_float_columns:
+                target_type = 'FLOAT'
+            else:
+                target_type = self._mapped_column_type(
+                    column['data_type'], column.get('character_maximum_length'),
+                    column.get('numeric_precision'), column.get('numeric_scale'),
+                    is_key=safe_column_name(column['column_name'], self.target_quote) in primary_keys,
+                )
             columns.append(dict(column, target_type=target_type))
         table_reference = '.'.join(
             quote_source_identifier(part, 'postgres') for part in table_name.split('.')
@@ -797,18 +819,19 @@ class FastSyncTapPostgres:
 
     def export_source_table_data(
             self, args: Namespace, tap_id: str,
-            boundary: PartialSyncBoundary = None) -> list:
+            boundary: PartialSyncBoundary = None, decimal_float_columns=()) -> list:
         """Exporting data from the source table"""
         filename = utils.gen_export_filename(tap_id=tap_id, table=args.table, sync_type='partialsync')
         filepath = os.path.join(args.temp_dir, filename)
 
-        self.copy_table(
-            args.table,
-            filepath,
-            split_large_files=args.target.get('split_large_files'),
-            split_file_chunk_size_mb=args.target.get('split_file_chunk_size_mb'),
-            split_file_max_chunks=args.target.get('split_file_max_chunks'),
-            boundary=boundary
-        )
+        copy_options = {
+            'split_large_files': args.target.get('split_large_files'),
+            'split_file_chunk_size_mb': args.target.get('split_file_chunk_size_mb'),
+            'split_file_max_chunks': args.target.get('split_file_max_chunks'),
+            'boundary': boundary,
+        }
+        if decimal_float_columns:
+            copy_options['decimal_float_columns'] = decimal_float_columns
+        self.copy_table(args.table, filepath, **copy_options)
         file_parts = glob.glob(f'{filepath}*')
         return file_parts

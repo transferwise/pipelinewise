@@ -10,11 +10,17 @@ for selected database sources.
 MariaDB/MySQL and PostgreSQL source ``DECIMAL`` and ``NUMERIC`` columns retain
 supported precision and scale in new native and managed Iceberg columns.
 Existing legacy floating-point decimal columns remain unchanged unless
-``force_precision_columns`` is enabled on the tap. See
+``version_legacy_float_columns`` is enabled on the tap. See
 :ref:`exact_decimal_mapping` for compatible numeric declarations, FLOAT
 fallback, and column versioning.
 PostgreSQL numeric primary keys use canonical text so ``NaN`` remains a valid
 key in either table format.
+During Singer schema changes, an existing primary-key column keeps its live
+target type when the current mapping differs. Singer casts incoming key values
+to that type. Use FullSync to recreate the key with the current mapping.
+Singer also keeps a nonempty legacy MariaDB/MySQL primary-key subset and groups
+retained floating-point decimal keys by their loaded target value. See
+:ref:`exact_decimal_mapping` for the compatibility rules and their limits.
 
 Source-delete markers always physically remove rows before Singer state is
 acknowledged. Metadata columns are enabled automatically; see

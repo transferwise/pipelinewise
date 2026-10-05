@@ -387,17 +387,30 @@ class FastSyncTargetSnowflake(SnowflakeSqlClient):
             r'\s(?:FLOAT(?:4|8)?|DOUBLE(?:\s+PRECISION)?|REAL)(?:\s+NOT\s+NULL)?$',
             re.IGNORECASE,
         )
+        variant_type = re.compile(
+            r'\s(?:VARIANT|OBJECT|ARRAY)(?:\s+NOT\s+NULL)?$',
+            re.IGNORECASE,
+        )
+        binary_type = re.compile(
+            r'\s(?:BINARY|VARBINARY)(?:\(\d+\))?(?:\s+NOT\s+NULL)?$',
+            re.IGNORECASE,
+        )
         if columns and any(floating_type.search(column) for column in columns):
             source_columns = [
                 column for column in columns
                 if not column.startswith((utils.SDC_EXTRACTED_AT, utils.SDC_BATCHED_AT, utils.SDC_DELETED_AT))
             ]
             source_columns += ['TIMESTAMP_NTZ', 'TIMESTAMP_NTZ', 'VARCHAR']
-            expressions = [
-                snowflake_float_expression(f'${position}') if floating_type.search(column)
-                else f'${position}'
-                for position, column in enumerate(source_columns, start=1)
-            ]
+            expressions = []
+            for position, column in enumerate(source_columns, start=1):
+                expression = f'${position}'
+                if floating_type.search(column):
+                    expression = snowflake_float_expression(expression)
+                elif variant_type.search(column):
+                    expression = f'PARSE_JSON({expression})'
+                elif binary_type.search(column):
+                    expression = f"TO_BINARY({expression}, 'HEX')"
+                expressions.append(expression)
             source = f'(SELECT {", ".join(expressions)} FROM {source})'
         # Empty unquoted fields are the only SQL NULL representation. An empty
         # NULL_IF keeps literal source values such as ``\N`` intact.

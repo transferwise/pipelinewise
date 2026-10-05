@@ -37,7 +37,7 @@ _PARTIAL_FIELDS = _PUBLICATION_FIELDS | frozenset({
     'end_is_unbounded',
     'end_value',
     'start_value',
-    'force_precision_columns',
+    'version_legacy_float_columns',
 })
 _CONVERSION_FIELDS = frozenset({
     'backup_table',
@@ -142,8 +142,8 @@ def _validate_partial_fields(value: Dict[str, Any]) -> None:
         if name in value and not isinstance(value[name], bool):
             raise _invalid_payload()
     if (
-        'force_precision_columns' in value
-        and not isinstance(value['force_precision_columns'], bool)
+        'version_legacy_float_columns' in value
+        and not isinstance(value['version_legacy_float_columns'], bool)
     ):
         raise _invalid_payload()
     if 'delete_mode' in value and value['delete_mode'] != 'hard':
@@ -261,7 +261,7 @@ class PartialSyncManifestPayload(FullSyncManifestPayload):
     column_versions: Optional[Dict[str, Any]] = None
     decimal_columns: Optional[list[str]] = None
     historical_columns: Optional[Dict[str, str]] = None
-    force_precision_columns: Optional[bool] = None
+    version_legacy_float_columns: Optional[bool] = None
 
     @classmethod
     def from_context(cls, value: Dict[str, Any]) -> 'PartialSyncManifestPayload':
@@ -286,7 +286,7 @@ class PartialSyncManifestPayload(FullSyncManifestPayload):
             column_versions=_field(value, 'column_versions'),
             decimal_columns=_field(value, 'decimal_columns'),
             historical_columns=_field(value, 'historical_columns'),
-            force_precision_columns=_field(value, 'force_precision_columns'),
+            version_legacy_float_columns=_field(value, 'version_legacy_float_columns'),
         )
 
     def as_context(self) -> Dict[str, Any]:
@@ -310,7 +310,7 @@ class PartialSyncManifestPayload(FullSyncManifestPayload):
                 'column_versions': self.column_versions,
                 'decimal_columns': self.decimal_columns,
                 'historical_columns': self.historical_columns,
-                'force_precision_columns': self.force_precision_columns,
+                'version_legacy_float_columns': self.version_legacy_float_columns,
             },
             self.extensions,
         )

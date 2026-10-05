@@ -70,8 +70,8 @@ def query_history_poll_timeout_seconds(target_config):
 def validate_route_config(target_config):
     """Reject unsupported direct FastSync Iceberg configurations."""
     query_history_poll_timeout_seconds(target_config)
-    if not isinstance(target_config.get('force_precision_columns', False), bool):
-        raise ValueError('force_precision_columns must be true or false')
+    if not isinstance(target_config.get('version_legacy_float_columns', False), bool):
+        raise ValueError('version_legacy_float_columns must be true or false')
     if 'iceberg_create' in target_config:
         raise ValueError(
             'Snowflake FastSync no longer supports iceberg_create; configure '
@@ -225,8 +225,8 @@ def fastsync_recovery_identity(
         'target_table_format': target_config['target_table_format'],
         'iceberg_version': iceberg_version,
     }
-    if partial_boundary is not None and target_config.get('force_precision_columns', False):
-        target_identity['force_precision_columns'] = True
+    if partial_boundary is not None and target_config.get('version_legacy_float_columns', False):
+        target_identity['version_legacy_float_columns'] = True
 
     identity = {
         'source': source_identity,

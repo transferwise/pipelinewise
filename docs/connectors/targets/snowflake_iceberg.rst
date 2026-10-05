@@ -116,7 +116,7 @@ Set the desired format in any tap whose Singer output is compatible with
    target: "snowflake"
    target_table_format: iceberg
    iceberg_version: 3
-   force_precision_columns: false
+   version_legacy_float_columns: false
 
 These tap-level settings are the only valid Iceberg selection. Omitting
 ``target_table_format`` or selecting ``native`` creates native tables. Target
@@ -143,9 +143,14 @@ range instead of narrowing to Iceberg ``FLOAT``. Native and fixed-point
 ``NUMBER(precision, scale)`` columns preserve supported MariaDB/MySQL and PostgreSQL
 decimal dimensions. PostgreSQL numeric primary keys use canonical text to retain
 ``NaN`` identities. Existing legacy floating-point decimal columns remain
-unchanged unless ``force_precision_columns`` is enabled on the
-tap. See :ref:`exact_decimal_mapping` for fallback and versioning. PostgreSQL
-``hstore`` maps to ``VARIANT`` on this route. For MariaDB sources, a
+unchanged unless ``version_legacy_float_columns`` is enabled on the
+tap. During Singer schema changes, an existing primary-key column keeps its live
+target type when the current mapping differs. Use FullSync to recreate it with
+the current mapping. Singer also keeps a nonempty legacy MariaDB/MySQL
+primary-key subset and groups retained floating-point decimal keys by their
+loaded target value. See :ref:`exact_decimal_mapping` for fallback, versioning,
+and key compatibility. PostgreSQL ``hstore`` maps to ``VARIANT`` on this route. For
+MariaDB sources, a
 ``LONGTEXT`` column with MariaDB's exact generated ``JSON_VALID`` constraint is
 treated as the ``JSON`` alias and maps to ``VARIANT``; ordinary ``LONGTEXT`` and
 native routes remain strings. Object, array, string, number, Boolean, and null

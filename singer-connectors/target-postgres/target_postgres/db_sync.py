@@ -9,7 +9,14 @@ import itertools
 from datetime import datetime, timedelta, timezone
 from collections.abc import MutableMapping
 from singer import get_logger
-from singer.decimal_support import decimal_key, decimal_sql_type, is_decimal_schema, postgres_numeric_scale
+from singer.decimal_support import (
+    decimal_float_key,
+    decimal_float_value,
+    decimal_key,
+    decimal_sql_type,
+    is_decimal_schema,
+    postgres_numeric_scale,
+)
 
 
 def validate_config(config):
@@ -81,8 +88,11 @@ def safe_column_name(name):
     return '"{}"'.format(name).lower()
 
 
-def column_clause(name, schema_property, postgres_version=None):
-    return '{} {}'.format(safe_column_name(name), column_type(schema_property, postgres_version))
+def column_clause(name, schema_property, postgres_version=None, retained_type=None):
+    return '{} {}'.format(
+        safe_column_name(name),
+        retained_type or column_type(schema_property, postgres_version),
+    )
 
 
 def flatten_key(k, parent_key, sep):
@@ -286,6 +296,8 @@ class DbSync:
             self.data_flattening_max_level = self.connection_config.get('data_flattening_max_level', 0)
             self.flatten_schema = flatten_schema(stream_schema_message['schema'],
                                                  max_level=self.data_flattening_max_level)
+            self.retained_column_types = {}
+            self.effective_key_properties = list(stream_schema_message['key_properties'])
 
     def open_connection(self):
         conn_string = "host='{}' dbname='{}' user='{}' password='{}' port='{}'".format(
@@ -329,30 +341,58 @@ class DbSync:
         return f'{self.schema_name}."{pg_table_name.lower()}"'
 
     def record_primary_key_string(self, record):
-        if len(self.stream_schema_message['key_properties']) == 0:
+        key_properties = self.primary_key_properties()
+        if not key_properties:
             return None
         flatten = flatten_record(record, self.flatten_schema, max_level=self.data_flattening_max_level)
         try:
             key_props = [
-                decimal_key(flatten[p]) if is_decimal_schema(self.flatten_schema.get(p)) else str(flatten[p])
-                for p in self.stream_schema_message['key_properties']
+                self._record_key_value(p, flatten[p])
+                for p in key_properties
             ]
         except Exception as exc:
             self.logger.info("Cannot find %s primary key(s) in record: %s",
-                             self.stream_schema_message['key_properties'],
+                             key_properties,
                              flatten)
             raise exc
-        return ','.join(key_props)
+        return key_props[0] if len(key_props) == 1 else json.dumps(key_props, ensure_ascii=False)
+
+    def primary_key_properties(self):
+        return getattr(self, 'effective_key_properties', self.stream_schema_message['key_properties'])
+
+    def _record_key_value(self, name, value):
+        value = self._binary_key_value(name, value)
+        if not is_decimal_schema(self.flatten_schema.get(name)):
+            return str(value)
+        retained_type = getattr(self, 'retained_column_types', {}).get(name.lower())
+        if retained_type in ('real', 'double precision'):
+            return decimal_float_key(value, retained_type)
+        return decimal_key(value)
 
     def record_to_csv_line(self, record):
         flatten = flatten_record(record, self.flatten_schema, max_level=self.data_flattening_max_level)
         return ','.join(
             [
-                json.dumps(flatten[name], ensure_ascii=False)
+                json.dumps(self._retained_decimal_value(name, self._binary_key_value(name, flatten[name])),
+                           ensure_ascii=False)
                 if name in flatten and (flatten[name] == 0 or flatten[name]) else ''
                 for name in self.flatten_schema
             ]
         )
+
+    def _binary_key_value(self, name, value):
+        if (getattr(self, 'connection_config', {}).get('source_tap_type') == 'tap-mysql'
+                and name in self.primary_key_properties()
+                and self.flatten_schema.get(name, {}).get('format') == 'binary'
+                and isinstance(value, str)):
+            return value.upper()
+        return value
+
+    def _retained_decimal_value(self, name, value):
+        retained_type = getattr(self, 'retained_column_types', {}).get(name.lower())
+        if retained_type not in ('real', 'double precision'):
+            return value
+        return decimal_float_value(value, retained_type)
 
     def load_csv(self, file, count, size_bytes):
         stream_schema_message = self.stream_schema_message
@@ -374,7 +414,7 @@ class DbSync:
                 self.logger.debug(copy_sql)
                 with open(file, "rb") as f:
                     cur.copy_expert(copy_sql, f)
-                if len(self.stream_schema_message['key_properties']) > 0:
+                if self.primary_key_properties():
                     cur.execute(self.update_from_temp_table(temp_table))
                     updates = cur.rowcount
                 cur.execute(self.insert_from_temp_table(temp_table))
@@ -389,7 +429,7 @@ class DbSync:
         columns = self.column_names()
         table = self.table_name(stream_schema_message['stream'])
 
-        if len(stream_schema_message['key_properties']) == 0:
+        if not self.primary_key_properties():
             return """INSERT INTO {} ({})
                     (SELECT s.* FROM {} s)
                     """.format(table,
@@ -418,13 +458,11 @@ class DbSync:
                    self.primary_key_condition(table))
 
     def primary_key_condition(self, right_table):
-        stream_schema_message = self.stream_schema_message
-        names = primary_column_names(stream_schema_message)
+        names = [safe_column_name(name) for name in self.primary_key_properties()]
         return ' AND '.join(['s.{} = {}.{}'.format(c, right_table, c) for c in names])
 
     def primary_key_null_condition(self, right_table):
-        stream_schema_message = self.stream_schema_message
-        names = primary_column_names(stream_schema_message)
+        names = [safe_column_name(name) for name in self.primary_key_properties()]
         return ' AND '.join(['{}.{} is null'.format(right_table, c) for c in names])
 
     def column_names(self):
@@ -436,13 +474,14 @@ class DbSync:
             column_clause(
                 name,
                 schema,
-                self.decimal_postgres_version()
+                self.decimal_postgres_version(),
+                getattr(self, 'retained_column_types', {}).get(name.lower()) if is_temporary else None,
             )
             for (name, schema) in self.flatten_schema.items()
         ]
 
-        primary_key = ["PRIMARY KEY ({})".format(', '.join(primary_column_names(stream_schema_message)))] \
-            if len(stream_schema_message['key_properties']) > 0 else []
+        keys = [safe_column_name(name) for name in self.primary_key_properties()]
+        primary_key = ["PRIMARY KEY ({})".format(', '.join(keys))] if keys else []
 
         if not table_name:
             gen_table_name = self.table_name(stream_schema_message['stream'], is_temporary=is_temporary)
@@ -532,12 +571,51 @@ class DbSync:
       WHERE lower(table_name) = %s AND lower(table_schema) = %s""", (table_name.replace("\"", "").lower(),
                                                                      self.schema_name.lower()))
 
+    def _retain_existing_primary_key(self, table_name):
+        if getattr(self, 'connection_config', {}).get('source_tap_type') != 'tap-mysql':
+            return
+        rows = self.query('''SELECT keys.column_name
+            FROM information_schema.table_constraints AS constraints
+            JOIN information_schema.key_column_usage AS keys
+              ON keys.constraint_catalog = constraints.constraint_catalog
+             AND keys.constraint_schema = constraints.constraint_schema
+             AND keys.constraint_name = constraints.constraint_name
+             AND keys.table_schema = constraints.table_schema
+             AND keys.table_name = constraints.table_name
+            WHERE constraints.constraint_type = 'PRIMARY KEY'
+              AND constraints.table_schema = %s AND constraints.table_name = %s
+            ORDER BY keys.ordinal_position''', (self.schema_name, table_name.strip('"')))
+        stored_keys = {row['column_name'].lower() for row in rows}
+        incoming_keys = self.stream_schema_message['key_properties']
+        if stored_keys and stored_keys < {name.lower() for name in incoming_keys}:
+            # Legacy Singer excluded unsupported MySQL keys; NULL history cannot match the expanded key.
+            self.effective_key_properties = [name for name in incoming_keys if name.lower() in stored_keys]
+            self.logger.warning(
+                'Retaining existing primary key %s for %s; FullSync adopts the complete source key %s',
+                self.effective_key_properties, self.stream_schema_message['stream'], incoming_keys,
+            )
+
     def update_columns(self):
         stream_schema_message = self.stream_schema_message
         stream = stream_schema_message['stream']
         table_name = self.table_name(stream, without_schema=True)
         columns = self.get_table_columns(table_name)
+        self._retain_existing_primary_key(table_name)
         columns_dict = {column['column_name'].lower(): column for column in columns}
+        mysql_year_keys = {
+            name.lower() for name in self.primary_key_properties()
+            if getattr(self, 'connection_config', {}).get('source_tap_type') == 'tap-mysql'
+            and self.flatten_schema.get(name, {}).get('format') == 'singer.year'
+        }
+        self.retained_column_types = {
+            name.lower(): columns_dict[name.lower()]['data_type']
+            for name, properties_schema in self.flatten_schema.items()
+            if name.lower() in columns_dict
+            and (name.lower() in mysql_year_keys or (
+                is_decimal_schema(properties_schema)
+                and columns_dict[name.lower()]['data_type'].lower() in ('double precision', 'real')
+            ))
+        }
 
         columns_to_add = [
             column_clause(
@@ -557,6 +635,7 @@ class DbSync:
             ))
             for (name, properties_schema) in self.flatten_schema.items()
             if name.lower() in columns_dict and
+            name.lower() not in self.retained_column_types and
             not self._column_type_matches(
                 columns_dict[name.lower()], properties_schema, self.decimal_postgres_version(),
             )
@@ -597,6 +676,8 @@ class DbSync:
         """Compare decimal dimensions without changing unrelated legacy type rules."""
         expected = column_type(schema_property, postgres_version).lower()
         current = column['data_type'].lower()
+        if is_decimal_schema(schema_property) and current in ('double precision', 'real'):
+            return True
         if is_decimal_schema(schema_property) and current in ('numeric', 'decimal'):
             precision = column.get('numeric_precision')
             scale = postgres_numeric_scale(column.get('numeric_scale'))

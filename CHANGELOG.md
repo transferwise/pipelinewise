@@ -1,12 +1,14 @@
-0.94.0 (2026-10-04)
+0.94.0 (2026-10-05)
 -------------------
 
 - Preserve declared `DECIMAL` and `NUMERIC` precision and scale from
   MariaDB, MySQL, and PostgreSQL in Snowflake native, Snowflake managed Iceberg
-  v3, and PostgreSQL targets where supported
+  v3, and PostgreSQL targets where supported. Keep existing PostgreSQL `REAL`
+  and `DOUBLE PRECISION` decimal columns, including keys, on their live type.
+  Clamp retained floating-point overflow and underflow instead of failing a row
 - Create new Snowflake decimal columns as fixed-point numbers where supported.
   Keep existing legacy `FLOAT` decimal columns, including keys that now map to
-  text, by default. Set `force_precision_columns: true` on a supported tap to
+  text, by default. Set `version_legacy_float_columns: true` on a supported tap to
   retain the old non-key column and add its precision-preserving replacement.
   Keep legacy floating-point decimal keys unchanged even with the option enabled.
   Continue versioning other changed non-key decimal declarations, and reject
@@ -17,24 +19,33 @@
   as canonical text so bounded `NaN` keys remain loadable; keep other decimal keys
   as text only when their numeric mapping would lose identity
 - Replay conservatively from legacy floating-point decimal bookmarks, then save
-  exact bookmarks. Correct PostgreSQL negative-scale metadata and prevent repeated
-  column versioning. Keep other source/target combinations unchanged
+  exact bookmarks. Keep exact boundaries valid after a source declaration narrows.
+  Correct PostgreSQL negative-scale metadata and prevent repeated column versioning.
+  Keep other source/target combinations unchanged
 - Bundle PipelineWise Singer with the main codebase and install it through the
   existing Makefile and Docker workflows
-- Treat nonnumeric `equals` conditions on decimal fields as non-matches instead
-  of stopping the transformation process
+- Treat nonnumeric `equals` conditions on decimal fields as non-matches. Reject
+  decimal `regex_match` conditions before processing records
 - Retry PostgreSQL logical replication without wal2json numeric string output
   when the plugin rejects that option, independent of server message language
 - Replicate MariaDB/MySQL `SET`, `TINYBLOB`, `BLOB`, `MEDIUMBLOB`, `LONGBLOB`,
   and `YEAR` columns through Singer and FastSync. Snowflake stores sets as text,
-  blobs as binary, and years as `NUMBER(38,0)`
+  blobs as `BINARY(67108864)`, and years as `NUMBER(38,0)`. During Singer loads,
+  keep existing Snowflake primary-key columns on their live target type.
+  Keep legacy PostgreSQL text `YEAR` keys unchanged. Keep legacy key subsets on
+  Snowflake and PostgreSQL until FullSync adopts newly supported key columns.
+  Match retained text BLOB keys to historical FastSync rows
+- Group retained floating-point decimal keys by their loaded target value.
+  Apply colliding changes in source event order within each Singer batch instead
+  of failing or inserting duplicate staged keys
+- Run decimal connector integration tests in CI and balance E2E across twenty shards
 
 Run `import_config` before resuming replication after upgrading to refresh the
 generated tap settings and decimal schemas. No backfill or resync is required
 for non-key column versioning. FullSync retains its table-replacement behavior
 and removes historical column versions. Existing PostgreSQL numeric primary keys
-on Snowflake remain floating-point by default and need FullSync only when changing
-to the new text type. See the
+on Snowflake remain floating-point. Existing Snowflake primary-key columns need
+FullSync only when intentionally changing them to the current mapping. See the
 [decimal mapping rules](docs/user_guide/schema_changes.rst).
 
 0.93.1 (2026-10-06)

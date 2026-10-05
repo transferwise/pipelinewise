@@ -11,7 +11,7 @@ it does not constrain PostgreSQL targets or the PipelineWise backend database.
 ``NUMERIC(p,s)`` and its ``DECIMAL(p,s)`` alias retain supported precision and
 scale in Snowflake and PostgreSQL targets. New Snowflake columns use the precise
 mapping; legacy floating-point target columns remain unchanged unless
-``force_precision_columns`` is enabled on the tap. Snowflake
+``version_legacy_float_columns`` is enabled on the tap. Snowflake
 stores PostgreSQL numeric primary keys as canonical text to preserve ``NaN``
 identities. See :ref:`exact_decimal_mapping` for this key exception, numeric
 fallback, exact Singer transport, and column versioning.

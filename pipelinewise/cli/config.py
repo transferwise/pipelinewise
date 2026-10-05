@@ -25,7 +25,7 @@ class Config:
     TABLE_FORMAT_NATIVE = fastsync_capabilities.TABLE_FORMAT_NATIVE
     TABLE_FORMAT_ICEBERG = fastsync_capabilities.TABLE_FORMAT_ICEBERG
     ICEBERG_VERSION = 3
-    FORCE_PRECISION_COLUMNS_SETTING = 'force_precision_columns'
+    VERSION_LEGACY_FLOAT_COLUMNS_SETTING = 'version_legacy_float_columns'
     TARGET_FORMAT_KEYS = {
         'iceberg_create',
         'iceberg_version',
@@ -255,7 +255,7 @@ class Config:
                 for key in (
                     'target_table_format',
                     'iceberg_version',
-                    self.FORCE_PRECISION_COLUMNS_SETTING,
+                    self.VERSION_LEGACY_FLOAT_COLUMNS_SETTING,
                 ):
                     if key in tap:
                         tap_setting[key] = tap[key]
@@ -502,9 +502,12 @@ class Config:
             {
                 'temp_dir': self.get_temp_dir(),
                 'tap_id': tap.get('id'),
-                # The Snowflake target needs the source family to keep PostgreSQL NaN keys lossless.
+                # Targets need source identity for legacy MySQL keys and PostgreSQL NaN keys.
                 'source_tap_type': (
-                    'tap-postgres' if tap.get('type') == 'tap-postgres' and target_type == 'target-snowflake'
+                    tap.get('type') if (
+                        tap.get('type') == 'tap-mysql' and target_type in ('target-snowflake', 'target-postgres')
+                        or tap.get('type') == 'tap-postgres' and target_type == 'target-snowflake'
+                    )
                     else None
                 ),
                 'query_tag': json.dumps(
@@ -560,8 +563,8 @@ class Config:
                 ),
                 'target_table_format': tap.get('target_table_format'),
                 'iceberg_version': tap.get('iceberg_version'),
-                self.FORCE_PRECISION_COLUMNS_SETTING: (
-                    tap.get(self.FORCE_PRECISION_COLUMNS_SETTING, False)
+                self.VERSION_LEGACY_FLOAT_COLUMNS_SETTING: (
+                    tap.get(self.VERSION_LEGACY_FLOAT_COLUMNS_SETTING, False)
                     if target_type == 'target-snowflake'
                     and tap.get('type') in {'tap-mysql', 'tap-postgres'}
                     else None
@@ -577,20 +580,20 @@ class Config:
         if not isinstance(target, dict):
             return
         connection = target.get('db_conn')
-        if cls.FORCE_PRECISION_COLUMNS_SETTING in target or (
+        if cls.VERSION_LEGACY_FLOAT_COLUMNS_SETTING in target or (
             isinstance(connection, dict)
-            and cls.FORCE_PRECISION_COLUMNS_SETTING in connection
+            and cls.VERSION_LEGACY_FLOAT_COLUMNS_SETTING in connection
         ):
             raise InvalidConfigException(
                 f'Target "{target.get("id")}" cannot set '
-                f'{cls.FORCE_PRECISION_COLUMNS_SETTING}. Configure it on each '
+                f'{cls.VERSION_LEGACY_FLOAT_COLUMNS_SETTING}. Configure it on each '
                 'MariaDB, MySQL, or PostgreSQL tap that writes to Snowflake.'
             )
 
     @classmethod
     def validate_snowflake_decimal_versioning(cls, tap: Dict, target: Dict) -> None:
         """Limit the opt-in migration to supported SQL-to-Snowflake routes."""
-        setting = cls.FORCE_PRECISION_COLUMNS_SETTING
+        setting = cls.VERSION_LEGACY_FLOAT_COLUMNS_SETTING
         connection = tap.get('db_conn')
         if isinstance(connection, dict) and setting in connection:
             raise InvalidConfigException(

@@ -34,6 +34,24 @@ REQUIRED_CONFIG_KEYS = [
 ]
 
 
+def _field_schema(stream_schema, field_id):
+    if isinstance(stream_schema, Schema):
+        return stream_schema.properties[field_id].to_dict()
+    return stream_schema['properties'][field_id]
+
+
+def _validate_condition_types(stream_id, stream_schema, transformation):
+    for condition in transformation.when or []:
+        if 'regex_match' not in condition or condition.get('field_path'):
+            continue
+        condition_field = condition['column']
+        if is_decimal_schema(_field_schema(stream_schema, condition_field)):
+            raise InvalidTransformationException(
+                f'Cannot apply a `regex_match` condition to decimal field `{condition_field}` '
+                f'in stream `{stream_id}`'
+            )
+
+
 @unique
 class TransformationTypes(Enum):
     """
@@ -265,12 +283,11 @@ class TransformField:
             trans_type = transformation.type
             field_id = transformation.field_id
 
-            if isinstance(stream_schema, Schema):
-                field_schema = stream_schema.properties[field_id].to_dict()
-            else:
-                field_schema = stream_schema['properties'][field_id]
+            field_schema = _field_schema(stream_schema, field_id)
             field_type = field_schema.get('type')
             field_format = field_schema.get('format')
+
+            _validate_condition_types(stream_id, stream_schema, transformation)
 
             # If the value we want to transform is a field in a JSON property
             # then no need to enforce rules below for now

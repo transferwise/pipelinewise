@@ -248,13 +248,13 @@ def test_build_report_reads_precision_opt_in_from_target_config():
         result = report.build_report(
             'tap-postgres',
             {},
-            {'force_precision_columns': True},
+            {'version_legacy_float_columns': True},
             catalog('orders'),
             selection('orders'),
         )
 
     assert result[0]['columns'][0]['status'] == 'would_version'
-    assert table_report.call_args.kwargs['force_precision_columns'] is True
+    assert table_report.call_args.kwargs['version_legacy_float_columns'] is True
 
 
 def test_source_connection_failure_is_redacted():
@@ -391,7 +391,7 @@ def test_cli_consumes_generated_selection_wrapper_and_target_overrides(tmp_path,
              'inheritable_config': {
                  'default_target_schema': 'mapped',
                  'target_table_format': 'iceberg',
-                 'force_precision_columns': True,
+                 'version_legacy_float_columns': True,
              }}
     for name, contents in files.items():
         (tmp_path / f'{name}.json').write_text(json.dumps(contents))
@@ -401,7 +401,7 @@ def test_cli_consumes_generated_selection_wrapper_and_target_overrides(tmp_path,
         ]) == 0
     assert build.call_args.kwargs['target'] == {
         'dbname': 'DB', 'default_target_schema': 'mapped', 'target_table_format': 'iceberg',
-        'force_precision_columns': True,
+        'version_legacy_float_columns': True,
     }
     assert build.call_args.kwargs['selection'] == selection('orders')
     assert json.loads(capsys.readouterr().out) == [{'status': 'skipped'}]
@@ -411,7 +411,7 @@ def test_report_marks_protected_decimal_boundary_incompatible():
     result = utils.report_source_target_columns(
         {'schema': 'TARGET', 'table': 'ORDERS'}, ['"AMOUNT" NUMERIC(38,18)'],
         [column('AMOUNT', type='REAL')], decimal_columns=('AMOUNT',),
-        force_precision_columns=True, boundary_column='amount',
+        version_legacy_float_columns=True, boundary_column='amount',
     )
     assert result[0]['status'] == 'incompatible'
 
@@ -420,7 +420,7 @@ def test_report_keeps_legacy_decimal_float_key_compatible_with_opt_in():
     result = utils.report_source_target_columns(
         {'schema': 'TARGET', 'table': 'ORDERS'}, ['"AMOUNT" NUMERIC(38,18)'],
         [column('AMOUNT', type='REAL')], decimal_columns=('AMOUNT',),
-        force_precision_columns=True, primary_keys=['AMOUNT'],
+        version_legacy_float_columns=True, primary_keys=['AMOUNT'],
     )
     assert result[0]['status'] == 'compatible'
 
@@ -449,7 +449,7 @@ def test_report_opt_in_versions_only_columns_with_source_decimal_provenance():
         inspector.return_value.discover_table_format.return_value = 'native'
         result = report._table_report(
             mock.Mock(), mock.Mock(), target, 'source.orders',
-            force_precision_columns=True,
+            version_legacy_float_columns=True,
         )
     assert result['status'] == 'incompatible'
     assert [row['status'] for row in result['columns']] == ['would_version', 'incompatible']

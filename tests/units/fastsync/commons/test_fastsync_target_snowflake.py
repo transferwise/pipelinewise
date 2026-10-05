@@ -404,6 +404,26 @@ class TestFastSyncTargetSnowflake(TestCase):
         assert 'TRY_TO_DOUBLE($2)' in query
         assert "IFF(SUBSTR($2, 1, 1) = '-', -1.7976931348623157e308, 1.7976931348623157e308)" in query
 
+    def test_float_copy_projection_preserves_variant_and_binary_conversions(self):
+        """A float projection must keep the conversions direct COPY normally performs."""
+        columns = [
+            '"ID" NUMBER(38,0)',
+            '"AMOUNT" FLOAT',
+            '"PAYLOAD" VARIANT',
+            '"CONTENTS" BINARY(67108864)',
+            '_SDC_EXTRACTED_AT TIMESTAMP_NTZ',
+            '_SDC_BATCHED_AT TIMESTAMP_NTZ',
+            '_SDC_DELETED_AT VARCHAR',
+        ]
+
+        self.snowflake.copy_to_table('key', 'schema', 'items', 1, is_temporary=True, columns=columns)
+
+        query = self.snowflake.executed_queries[-1]
+        assert 'TRY_TO_DOUBLE($2)' in query
+        assert 'PARSE_JSON($3)' in query
+        assert "TO_BINARY($4, 'HEX')" in query
+        assert ", $5, $6, $7 FROM '@dummy_stage/key')" in query
+
     def test_numeric_copy_uses_existing_direct_stage_sql(self):
         """Supplying exact numeric columns does not change the established COPY form."""
         self.snowflake.copy_to_table('key', 'schema', 'items', 1, is_temporary=True)

@@ -295,6 +295,9 @@ def _transform(rule, column, dialect):
     expression = _identifier(column['column_name'], dialect)
     base = column['target_type'].split('(', 1)[0]
     if transform == 'SET-NULL':
+        if dialect == 'postgres' and base in {'NUMBER', 'FLOAT'}:
+            data_type = 'numeric' if base == 'NUMBER' else 'double precision'
+            return f'CAST(NULL AS {data_type})'
         return 'NULL'
     kind = _kind(column)
     if transform == 'MASK-NUMBER' and kind == 'number':

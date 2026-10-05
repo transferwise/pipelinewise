@@ -787,8 +787,9 @@ class FastSyncTapMySql:
 
     def export_source_table_data(
             self, args: Namespace, tap_id: str,
-            boundary: PartialSyncBoundary = None) -> list:
+            boundary: PartialSyncBoundary = None, decimal_float_columns=()) -> list:
         """Export source table data"""
+        del decimal_float_columns
         filename = utils.gen_export_filename(tap_id=tap_id, table=args.table, sync_type='partialsync')
         filepath = os.path.join(args.temp_dir, filename)
 

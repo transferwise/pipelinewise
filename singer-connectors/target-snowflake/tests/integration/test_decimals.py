@@ -11,7 +11,6 @@ import pytest
 import target_snowflake
 from singer.decimal_support import decimal_schema
 from target_snowflake.db_sync import DbSync
-from target_snowflake.exceptions import TableFormatMismatchException
 from target_snowflake.upload_clients.s3_upload_client import S3UploadClient
 from tests.integration import utils
 
@@ -47,12 +46,15 @@ def snowflake_decimal_target(request):
                     client.delete_objects(Bucket=config['s3_bucket'], Delete={'Objects': objects})
 
 
-def load(config, amount_schema, records=(), id_schema=None, extra_properties=None, key_properties=('id',)):
+def load(config, amount_schema, records=(), id_schema=None, extra_properties=None, key_properties=('id',),
+         record_update_mode=None):
     properties = {'id': id_schema or {'type': ['integer']}, 'amount': amount_schema, **(extra_properties or {})}
     messages = [{
         'type': 'SCHEMA', 'stream': 'public-items', 'key_properties': list(key_properties),
         'schema': {'type': 'object', 'properties': properties},
     }]
+    if record_update_mode:
+        messages[0]['schema']['x-pipelinewise-record-update-mode'] = record_update_mode
     messages.extend({'type': 'RECORD', 'stream': 'public-items', 'record': record} for record in records)
     cache, file_format = target_snowflake.get_snowflake_statics(config)
     target_snowflake.persist_lines(config, [json.dumps(message) for message in messages], cache, file_format)
@@ -60,7 +62,7 @@ def load(config, amount_schema, records=(), id_schema=None, extra_properties=Non
 
 def test_opt_in_exact_decimal_load_versions_history_and_retries_without_reversion(snowflake_decimal_target):
     config, database = snowflake_decimal_target
-    config['force_precision_columns'] = True
+    config['version_legacy_float_columns'] = True
     schema = config['default_target_schema']
     amount = '12345678901234567890.123456789'
     load(config, {'type': ['null', 'number']}, [{'id': 1, 'amount': 1.25}, {'id': 2, 'amount': 2.5}])
@@ -86,15 +88,19 @@ def test_opt_in_exact_decimal_load_versions_history_and_retries_without_reversio
     assert database.query(f'SELECT AMOUNT FROM "{schema}".ITEMS WHERE ID = 1')[0]['AMOUNT'] == Decimal(amount)
 
 
-def test_decimal_key_change_fails_before_adding_other_columns(snowflake_decimal_target):
+def test_decimal_key_change_retains_existing_type_and_adds_other_columns(snowflake_decimal_target):
     config, database = snowflake_decimal_target
     load(config, decimal_schema(29, 9), [{'id': 1, 'amount': '1.25'}])
     schema = config['default_target_schema']
-    before = database.get_table_columns([schema])
-    with pytest.raises(TableFormatMismatchException, match='primary-key'):
-        load(config, decimal_schema(29, 9), id_schema=decimal_schema(29, 9),
-             extra_properties={'added': {'type': ['string']}})
-    assert database.get_table_columns([schema]) == before
+    before = next(column for column in database.get_table_columns([schema]) if column['COLUMN_NAME'] == 'ID')
+    load(config, decimal_schema(29, 9), [{'id': '1.0', 'amount': '2.25', 'added': 'new'}],
+         id_schema=decimal_schema(29, 9), extra_properties={'added': {'type': ['string']}})
+    columns = database.get_table_columns([schema])
+    assert next(column for column in columns if column['COLUMN_NAME'] == 'ID') == before
+    assert any(column['COLUMN_NAME'] == 'ADDED' for column in columns)
+    assert database.query(f'SELECT ID, AMOUNT, ADDED FROM "{schema}".ITEMS') == [
+        {'ID': Decimal(1), 'AMOUNT': Decimal('2.25'), 'ADDED': 'new'},
+    ]
 
 
 def test_decimal_primary_keys_coalesce_equal_numeric_values(snowflake_decimal_target):
@@ -251,3 +257,133 @@ def test_bounded_nan_retains_rows_in_copy_and_merge(snowflake_decimal_target):
     ])
     rows = database.query(f'SELECT ID, AMOUNT FROM "{config["default_target_schema"]}".ITEMS ORDER BY ID')
     assert rows == [{'ID': 1, 'AMOUNT': Decimal('2.25')}, {'ID': 2, 'AMOUNT': None}, {'ID': 3, 'AMOUNT': None}]
+
+
+def current_primary_keys(config, database):
+    rows = database.query(f'SHOW PRIMARY KEYS IN TABLE "{config["default_target_schema"]}".ITEMS')
+    return {row['column_name'].upper() for row in rows}
+
+
+def drop_items(config, database):
+    table_kind = 'ICEBERG TABLE' if config['target_table_format'] == 'iceberg' else 'TABLE'
+    database.query(f'DROP {table_kind} "{config["default_target_schema"]}".ITEMS')
+
+
+def test_mysql_extended_composite_key_upgrade_preserves_historical_updates_and_deletes(snowflake_decimal_target):
+    config, database = snowflake_decimal_target
+    config['source_tap_type'] = 'tap-mysql'
+    amount_schema = decimal_schema(10, 2)
+    table = f'"{config["default_target_schema"]}".ITEMS'
+    load(config, amount_schema, [{'id': 1, 'amount': '1.00'}, {'id': 2, 'amount': '2.00'}])
+    properties = {
+        'calendar_year': {'type': ['null', 'integer'], 'format': 'singer.year'},
+        'tags': {'type': ['null', 'string']},
+        'payload': {'type': ['null', 'string'], 'format': 'binary'},
+    }
+    keys = ('id', *properties)
+    # Each load starts a target process, including the second schema after the columns already exist.
+    load(config, amount_schema, [{'id': 1, 'amount': '3.00', 'calendar_year': 2026,
+                                 'tags': 'a,b', 'payload': '00ff'}], extra_properties=properties,
+         key_properties=keys)
+    assert current_primary_keys(config, database) == {'ID'}
+    assert database.query(f'SELECT ID, AMOUNT, CALENDAR_YEAR, TAGS, HEX_ENCODE(PAYLOAD) AS PAYLOAD '
+                          f'FROM {table} ORDER BY ID') == [
+        {'ID': 1, 'AMOUNT': Decimal('3.00'), 'CALENDAR_YEAR': 2026, 'TAGS': 'a,b', 'PAYLOAD': '00FF'},
+        {'ID': 2, 'AMOUNT': Decimal('2.00'), 'CALENDAR_YEAR': None, 'TAGS': None, 'PAYLOAD': None},
+    ]
+    load(config, amount_schema, [
+        {'id': 1, 'amount': '4.00', 'calendar_year': 2025, 'tags': 'b', 'payload': 'abcd'},
+        {'id': 2, 'calendar_year': 2026, 'tags': 'a', 'payload': 'ff00',
+         '_sdc_deleted_at': '2026-10-05T00:00:00Z'},
+    ], extra_properties=properties, key_properties=keys)
+    assert database.query(f'SELECT ID, AMOUNT, CALENDAR_YEAR FROM {table}') == [
+        {'ID': 1, 'AMOUNT': Decimal('4.00'), 'CALENDAR_YEAR': 2025},
+    ]
+    assert current_primary_keys(config, database) == {'ID'}
+
+    drop_items(config, database)
+    load(config, amount_schema, [
+        {'id': 7, 'amount': '1.00', 'calendar_year': 2025, 'tags': 'a', 'payload': '00ff'},
+        {'id': 7, 'amount': '2.00', 'calendar_year': 2026, 'tags': 'a', 'payload': '00ff'},
+    ], extra_properties=properties, key_properties=keys)
+    assert current_primary_keys(config, database) == {name.upper() for name in keys}
+    assert database.query(f'SELECT ID, AMOUNT, CALENDAR_YEAR FROM {table} ORDER BY CALENDAR_YEAR') == [
+        {'ID': 7, 'AMOUNT': Decimal('1.00'), 'CALENDAR_YEAR': 2025},
+        {'ID': 7, 'AMOUNT': Decimal('2.00'), 'CALENDAR_YEAR': 2026},
+    ]
+
+
+def test_legacy_text_binary_key_matches_uppercase_fastsync_hex(snowflake_decimal_target):
+    config, database = snowflake_decimal_target
+    config['source_tap_type'] = 'tap-mysql'
+    amount_schema = decimal_schema(10, 2)
+    table = f'"{config["default_target_schema"]}".ITEMS'
+    load(config, amount_schema, [{'id': '00FFABCD', 'amount': '1.00'}, {'id': '11AABB', 'amount': '2.00'}],
+         id_schema={'type': ['string']})
+    binary_schema = {'type': ['string'], 'format': 'binary'}
+    load(config, amount_schema, [{'id': '00ffabcd', 'amount': '3.00'}], id_schema=binary_schema)
+    load(config, amount_schema, [{'id': '11aabb', '_sdc_deleted_at': '2026-10-05T00:00:00Z'}],
+         id_schema=binary_schema)
+    assert database.query(f'SELECT ID, AMOUNT FROM {table}') == [{'ID': '00FFABCD', 'AMOUNT': Decimal('3.00')}]
+    columns = database.get_table_columns([config['default_target_schema']])
+    assert next(column for column in columns if column['COLUMN_NAME'] == 'ID')['DATA_TYPE'] in ('TEXT', 'VARCHAR')
+
+    drop_items(config, database)
+    load(config, amount_schema, [{'id': '00ffabcd', 'amount': '4.00'}], id_schema=binary_schema)
+    assert database.query(f'SELECT HEX_ENCODE(ID) AS ID, AMOUNT FROM {table}') == [
+        {'ID': '00FFABCD', 'AMOUNT': Decimal('4.00')},
+    ]
+    columns = database.get_table_columns([config['default_target_schema']])
+    assert next(column for column in columns if column['COLUMN_NAME'] == 'ID')['DATA_TYPE'] == 'BINARY'
+
+
+def test_legacy_float_decimal_keys_coalesce_collisions_and_keep_last_patch_and_delete(snowflake_decimal_target):
+    config, database = snowflake_decimal_target
+    config['source_tap_type'] = 'tap-postgres'
+    amount_schema = decimal_schema(10, 2)
+    table = f'"{config["default_target_schema"]}".ITEMS'
+    properties = {'tenant': {'type': ['integer']}, 'description': {'type': ['null', 'string']}}
+    keys = ('id', 'tenant')
+    # Iceberg rejects FLOAT identifier fields; legacy tables can still use logical Singer keys.
+    legacy_keys = () if config['target_table_format'] == 'iceberg' else keys
+    config['primary_key_required'] = bool(legacy_keys)
+    load(config, amount_schema, [
+        {'id': 9007199254740992, 'tenant': 1, 'amount': '1.00', 'description': 'historical'},
+    ], id_schema={'type': ['number']}, extra_properties=properties, key_properties=legacy_keys)
+    config['primary_key_required'] = True
+    load(config, amount_schema, [
+        {'id': '9007199254740992', 'tenant': 1, 'amount': '2.00', 'description': 'kept by PATCH'},
+        {'id': '9007199254740993', 'tenant': 1, 'amount': '3.00'},
+        {'id': '9007199254740992', 'tenant': 2, 'amount': '4.00', 'description': 'other tenant'},
+    ], id_schema=decimal_schema(None, None), extra_properties=properties, key_properties=keys,
+         record_update_mode='PATCH')
+    assert database.query(f'SELECT ID, TENANT, AMOUNT, DESCRIPTION FROM {table} ORDER BY TENANT') == [
+        {'ID': float(9007199254740992), 'TENANT': 1, 'AMOUNT': Decimal('3.00'), 'DESCRIPTION': 'kept by PATCH'},
+        {'ID': float(9007199254740992), 'TENANT': 2, 'AMOUNT': Decimal('4.00'), 'DESCRIPTION': 'other tenant'},
+    ]
+    load(config, amount_schema, [
+        {'id': '9007199254740992', 'tenant': 1, 'amount': '5.00'},
+        {'id': '9007199254740993', 'tenant': 1, '_sdc_deleted_at': '2026-10-05T00:00:00Z'},
+    ], id_schema=decimal_schema(None, None), extra_properties=properties, key_properties=keys,
+         record_update_mode='PATCH')
+    assert database.query(f'SELECT TENANT, AMOUNT FROM {table}') == [{'TENANT': 2, 'AMOUNT': Decimal('4.00')}]
+
+    extremes = [
+        ('1e1000', '2e1000', float('1.7976931348623157e308')),
+        ('-1e1000', '-2e1000', -float('1.7976931348623157e308')),
+        ('1e-1000', '-1e-1000', 0.0),
+        ('-0', '0.000', 0.0),
+        ('NaN', 'NaN', float('nan')),
+    ]
+    records = [
+        {'id': key, 'tenant': index, 'amount': amount}
+        for index, (first, last, _expected) in enumerate(extremes, start=3)
+        for key, amount in ((first, '1.00'), (last, '2.00'))
+    ]
+    load(config, amount_schema, records, id_schema=decimal_schema(None, None), extra_properties=properties,
+         key_properties=keys)
+    rows = database.query(f'SELECT ID, TENANT, AMOUNT FROM {table} WHERE TENANT >= 3 ORDER BY TENANT')
+    assert len(rows) == len(extremes)
+    for row, (_first, _last, expected) in zip(rows, extremes):
+        assert math.isnan(row['ID']) if math.isnan(expected) else row['ID'] == expected
+        assert row['AMOUNT'] == Decimal('2.00')

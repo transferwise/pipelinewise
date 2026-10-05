@@ -74,9 +74,9 @@ def test_generic_zero_condition_retains_existing_behavior():
     assert not is_transform_required({'amount': 0}, [{'column': 'amount', 'equals': 0}])
 
 
-def test_decimal_wire_strings_do_not_enable_numeric_regex_matching(monkeypatch):
-    messages = _run(monkeypatch, ('other', 'SET-NULL'), '123.45', [{'column': 'amount', 'regex_match': '^123'}])
-    assert messages[1]['record']['other'] == 'private'
+def test_decimal_regex_condition_is_rejected(monkeypatch):
+    with pytest.raises(InvalidTransformationException, match='regex_match.*decimal field `amount`'):
+        _run(monkeypatch, ('other', 'SET-NULL'), '123.45', [{'column': 'amount', 'regex_match': '^123'}])
 
 
 @pytest.mark.parametrize('field_schema', [
