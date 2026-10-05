@@ -240,7 +240,7 @@ def test_snowflake_e2e_matrix_contract():
     assert job['name'] == '${{ matrix.check_name }}'
     assert strategy['fail-fast'] is False
     assert 'max-parallel' not in strategy
-    assert len(shards) == 16
+    assert len(shards) == 18
 
     expected_shards = {
         'conversion': (
@@ -310,10 +310,11 @@ def test_snowflake_e2e_matrix_contract():
                 'tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_with_split_large_files.py',
             ),
         ),
-        'decimal-fastsync': (
+        'decimal-fastsync-postgres': (
             'e2e_tests_10',
             (
-                'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake',
+                'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[postgres-native]',
+                'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[postgres-v3]',
             ),
         ),
         'decimal-migration': (
@@ -322,10 +323,11 @@ def test_snowflake_e2e_matrix_contract():
                 'tests/end_to_end/test_numeric_replication.py::test_legacy_decimal_float_migration_requires_opt_in',
             ),
         ),
-        'decimal-fallback': (
+        'decimal-fallback-postgres': (
             'e2e_tests_12',
             (
-                'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake',
+                'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[postgres-native]',
+                'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[postgres-v3]',
             ),
         ),
         'transformation-parity': (
@@ -362,6 +364,24 @@ def test_snowflake_e2e_matrix_contract():
             (
                 'tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_table_size_check.py',
                 'tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf.py',
+            ),
+        ),
+        'decimal-fastsync-mysql-family': (
+            'e2e_tests_18',
+            (
+                'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[mysql-native]',
+                'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[mysql-v3]',
+                'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[mariadb-native]',
+                'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[mariadb-v3]',
+            ),
+        ),
+        'decimal-fallback-mysql-family': (
+            'e2e_tests_19',
+            (
+                'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[mysql-native]',
+                'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[mysql-v3]',
+                'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[mariadb-native]',
+                'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[mariadb-v3]',
             ),
         ),
     }
@@ -418,17 +438,26 @@ def test_snowflake_e2e_matrix_contract():
         test_path, _, test_name = selector.partition('::')
         assert test_path in expected_paths, selector
         if test_name:
-            assert selector in tests_by_path[test_path], selector
-            selected_tests.append(selector)
+            base_selector = selector.partition('[')[0]
+            assert base_selector in tests_by_path[test_path], selector
+            selected_tests.append(base_selector)
         else:
             selected_tests.extend(tests_by_path[test_path])
 
-    assert len(selected_tests) == len(set(selected_tests))
     assert set(selected_tests) == expected_tests
+    split_test_counts = {
+        'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake': 6,
+        'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake': 6,
+    }
+    assert all(
+        selected_tests.count(test_id) == split_test_counts.get(test_id, 1)
+        for test_id in expected_tests
+    )
 
     commands = '\n'.join(step.get('run', '') for step in job['steps'])
     assert job['env']['E2E_TEST_PATHS'] == '${{ matrix.test_paths }}'
     assert 'pipelinewise pytest $E2E_TEST_PATHS' in commands
+    assert 'set -f' in commands
     assert '-e PIPELINEWISE_E2E_NAMESPACE=$PIPELINEWISE_E2E_NAMESPACE' in commands
     assert '${{ github.run_id }}' in job['env']['PIPELINEWISE_E2E_NAMESPACE']
     assert '${{ github.run_attempt }}' in job['env']['PIPELINEWISE_E2E_NAMESPACE']
@@ -539,7 +568,7 @@ def test_required_e2e_status_contract():
 
     assert len(configured_names) == len(set(configured_names))
     assert expected_statuses == {
-        f'e2e_tests_{shard_number:02d}' for shard_number in range(1, 18)
+        f'e2e_tests_{shard_number:02d}' for shard_number in range(1, 20)
     }
     assert required_statuses == expected_statuses
     assert not {

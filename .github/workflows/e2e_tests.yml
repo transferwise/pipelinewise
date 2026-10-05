@@ -153,18 +153,20 @@ jobs:
               tests/end_to_end/target_snowflake/tap_mariadb/test_multiline_native_mariadb_to_sf.py
               tests/end_to_end/target_snowflake/tap_mariadb/test_defined_partial_sync_mariadb_to_sf.py
               tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_with_split_large_files.py
-          - shard: decimal-fastsync
+          - shard: decimal-fastsync-postgres
             check_name: e2e_tests_10
             test_paths: >-
-              tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake
+              tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[postgres-native]
+              tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[postgres-v3]
           - shard: decimal-migration
             check_name: e2e_tests_11
             test_paths: >-
               tests/end_to_end/test_numeric_replication.py::test_legacy_decimal_float_migration_requires_opt_in
-          - shard: decimal-fallback
+          - shard: decimal-fallback-postgres
             check_name: e2e_tests_12
             test_paths: >-
-              tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake
+              tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[postgres-native]
+              tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[postgres-v3]
           - shard: transformation-parity
             check_name: e2e_tests_13
             test_paths: >-
@@ -202,6 +204,20 @@ jobs:
             test_paths: >-
               tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_table_size_check.py
               tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf.py
+          - shard: decimal-fastsync-mysql-family
+            check_name: e2e_tests_18
+            test_paths: >-
+              tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[mysql-native]
+              tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[mysql-v3]
+              tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[mariadb-native]
+              tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[mariadb-v3]
+          - shard: decimal-fallback-mysql-family
+            check_name: e2e_tests_19
+            test_paths: >-
+              tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[mysql-native]
+              tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[mysql-v3]
+              tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[mariadb-native]
+              tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[mariadb-v3]
     env:
       E2E_TEST_PATHS: ${{ matrix.test_paths }}
       PIPELINEWISE_E2E_NAMESPACE: >-
@@ -267,6 +283,7 @@ jobs:
       - name: Run Snowflake end-to-end shard
         if: steps.check.outcome == 'failure'
         run: |
+          set -f
           docker exec -t \
           -e TARGET_SNOWFLAKE_ACCOUNT=$TARGET_SNOWFLAKE_ACCOUNT \
           -e TARGET_SNOWFLAKE_AWS_ACCESS_KEY=$TARGET_SNOWFLAKE_AWS_ACCESS_KEY \
