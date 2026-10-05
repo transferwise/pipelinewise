@@ -58,8 +58,9 @@ def load(config, amount_schema, records=(), id_schema=None, extra_properties=Non
     target_snowflake.persist_lines(config, [json.dumps(message) for message in messages], cache, file_format)
 
 
-def test_exact_decimal_load_versions_history_and_retries_without_reversion(snowflake_decimal_target):
+def test_opt_in_exact_decimal_load_versions_history_and_retries_without_reversion(snowflake_decimal_target):
     config, database = snowflake_decimal_target
+    config['force_precision_columns'] = True
     schema = config['default_target_schema']
     amount = '12345678901234567890.123456789'
     load(config, {'type': ['null', 'number']}, [{'id': 1, 'amount': 1.25}, {'id': 2, 'amount': 2.5}])
