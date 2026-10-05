@@ -317,19 +317,19 @@ def test_snowflake_e2e_matrix_contract():
             (
                 'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake',
                 'tests/end_to_end/test_numeric_replication.py::test_legacy_decimal_float_migration_requires_opt_in',
-                'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake',
-                    'tests/end_to_end/test_numeric_replication.py::test_postgres_bounded_numeric_key_snowflake',
-                    'tests/end_to_end/test_numeric_replication.py::test_mysql_bounded_decimal_key_snowflake',
-                    'tests/end_to_end/test_numeric_replication.py::test_mysql_extended_types_snowflake',
-                    'tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_singer_and_fastsync_preserve_mapped_types_and_values',
+                'tests/end_to_end/test_numeric_replication.py::test_postgres_bounded_numeric_key_snowflake',
+                'tests/end_to_end/test_numeric_replication.py::test_mysql_bounded_decimal_key_snowflake',
+                'tests/end_to_end/test_numeric_replication.py::test_mysql_extended_types_snowflake',
+                'tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_singer_and_fastsync_preserve_mapped_types_and_values',
                 'tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_existing_singer_semantic_differences_remain_explicit',
                 'tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_ambiguous_regex_is_rejected_before_export',
                 'tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_bit_varying_conditions_match_snowflake',
             ),
         ),
-        'transformation-privacy': (
+        'decimal-fallback': (
             'e2e_tests_11',
             (
+                'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake',
                 'tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_transformations_are_private_through_publication',
                 'tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_table_size_check.py',
             ),
@@ -403,6 +403,13 @@ def test_snowflake_e2e_matrix_contract():
     assert '${{ github.run_id }}' in job['env']['PIPELINEWISE_E2E_NAMESPACE']
     assert '${{ github.run_attempt }}' in job['env']['PIPELINEWISE_E2E_NAMESPACE']
     assert '${{ matrix.shard }}' in job['env']['PIPELINEWISE_E2E_NAMESPACE']
+    connector_step = next(
+        step for step in job['steps']
+        if step['name'] == 'Run Snowflake decimal connector integrations'
+    )
+    assert connector_step['if'] == (
+        "steps.check.outcome == 'failure' && matrix.shard == 'decimal-fallback'"
+    )
 
     retired_jobs = {
         'e2e_tests_target_pg',
