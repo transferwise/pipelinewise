@@ -1,3 +1,4 @@
+import os
 from typing import Union
 
 import psycopg2
@@ -143,10 +144,11 @@ def sql_get_columns_snowflake(schemas: list) -> str:
     ORDER BY table_name"""
 
 
-def sql_show_columns_snowflake(schema: str) -> str:
+def sql_show_columns_snowflake(schema: str, database: str = None) -> str:
     """Read physical type lengths omitted by INFORMATION_SCHEMA.COLUMNS."""
-    identifier = schema.upper().replace('"', '""')
-    return f'SHOW COLUMNS IN SCHEMA "{identifier}"'
+    database = database if database is not None else os.environ['TARGET_SNOWFLAKE_DBNAME']
+    identifiers = [name.upper().replace('"', '""') for name in (database, schema)]
+    return 'SHOW COLUMNS IN SCHEMA ' + '.'.join(f'"{name}"' for name in identifiers)
 
 
 def sql_dynamic_row_count_mysql(schemas: list) -> str:

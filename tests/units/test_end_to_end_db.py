@@ -33,13 +33,25 @@ def test_max_width_sf_varchar_matches():
     )
 
 
-def test_sf_binary_metadata_uses_quoted_show_columns_schema():
-    assert db.sql_show_columns_snowflake('target_schema') == 'SHOW COLUMNS IN SCHEMA "TARGET_SCHEMA"'
-    assert db.sql_show_columns_snowflake('target"schema') == 'SHOW COLUMNS IN SCHEMA "TARGET""SCHEMA"'
+def test_sf_binary_metadata_uses_fully_qualified_quoted_database_and_schema():
+    assert db.sql_show_columns_snowflake('target_schema', 'target_db') == (
+        'SHOW COLUMNS IN SCHEMA "TARGET_DB"."TARGET_SCHEMA"'
+    )
+    assert db.sql_show_columns_snowflake('target"schema', 'target"db.with.dot') == (
+        'SHOW COLUMNS IN SCHEMA "TARGET""DB.WITH.DOT"."TARGET""SCHEMA"'
+    )
+
+
+def test_sf_binary_metadata_uses_configured_target_database(monkeypatch):
+    monkeypatch.setenv('TARGET_SNOWFLAKE_DBNAME', 'configured_target')
+    assert db.sql_show_columns_snowflake('target_schema') == (
+        'SHOW COLUMNS IN SCHEMA "CONFIGURED_TARGET"."TARGET_SCHEMA"'
+    )
 
 
 @pytest.mark.parametrize('source_type', ['binary', 'varbinary', 'blob', 'tinyblob', 'mediumblob', 'longblob'])
-def test_max_width_sf_binary_matches_show_columns_metadata(source_type):
+def test_max_width_sf_binary_matches_show_columns_metadata(source_type, monkeypatch):
+    monkeypatch.setenv('TARGET_SNOWFLAKE_DBNAME', 'target_db')
     queries = []
 
     def run_query_tap_mysql(_query):
@@ -54,7 +66,7 @@ def test_max_width_sf_binary_matches_show_columns_metadata(source_type):
     assertions.assert_all_columns_exist(
         run_query_tap_mysql, run_query_target_snowflake, mysql_to_snowflake.tap_type_to_target_type,
     )
-    assert queries[-1] == 'SHOW COLUMNS IN SCHEMA "PPW_E2E_TAP_MYSQL"'
+    assert queries[-1] == 'SHOW COLUMNS IN SCHEMA "TARGET_DB"."PPW_E2E_TAP_MYSQL"'
 
 
 @pytest.mark.parametrize('physical_type', [
@@ -62,7 +74,9 @@ def test_max_width_sf_binary_matches_show_columns_metadata(source_type):
     {'type': 'BINARY'},
     {'type': 'TEXT', 'length': 67108864},
 ])
-def test_sf_binary_column_assertion_requires_actual_maximum_width(physical_type):
+def test_sf_binary_column_assertion_requires_actual_maximum_width(physical_type, monkeypatch):
+    monkeypatch.setenv('TARGET_SNOWFLAKE_DBNAME', 'target_db')
+
     def run_query_tap_mysql(_query):
         return [('address', 'payload:blob:blob')]
 
