@@ -34,7 +34,7 @@ step ran and report pass/skip/fail counts.
 ## E2E matrix
 
 These groups mirror `.github/workflows/e2e_tests.yml` in required-check order
-`e2e_tests_01` through `e2e_tests_19`; update both together. CI runs eighteen
+`e2e_tests_01` through `e2e_tests_20`; update both together. CI runs nineteen
 Snowflake groups concurrently on isolated runners; local groups share/reset
 fixtures/config and must run serially:
 
@@ -93,13 +93,15 @@ run_e2e \
 
 run_e2e \
   'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[postgres-native]' \
-  'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[postgres-v3]'
+  'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[postgres-v3]' \
+  tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_transformations_are_private_through_publication
 
 run_e2e tests/end_to_end/test_numeric_replication.py::test_legacy_decimal_float_migration_requires_opt_in
 
 run_e2e \
   'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[postgres-native]' \
-  'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[postgres-v3]'
+  'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[postgres-v3]' \
+  tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_with_custom_buffer_size.py
 
 run_e2e \
   tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_singer_and_fastsync_preserve_mapped_types_and_values \
@@ -112,18 +114,15 @@ run_e2e \
   tests/end_to_end/test_numeric_replication.py::test_mysql_bounded_decimal_key_snowflake \
   tests/end_to_end/test_numeric_replication.py::test_mysql_extended_types_snowflake
 
-run_e2e tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_transformations_are_private_through_publication
 run_sf_decimal \
   tests/integration/test_decimals.py::test_opt_in_exact_decimal_load_versions_history_and_retries_without_reversion \
-  tests/integration/test_decimals.py::test_decimal_key_change_fails_before_adding_other_columns \
   tests/integration/test_decimals.py::test_decimal_precision_reversal_in_one_process_refreshes_startup_cache \
   tests/integration/test_decimals.py::test_decimal_archive_bounds_preserve_exact_text_and_ignore_nulls
 
-run_e2e tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_with_custom_buffer_size.py
 run_sf_decimal \
+  tests/integration/test_decimals.py::test_decimal_key_change_fails_before_adding_other_columns \
   tests/integration/test_decimals.py::test_decimal_primary_keys_coalesce_equal_numeric_values \
   tests/integration/test_decimals.py::test_postgres_bounded_numeric_key_keeps_nan_and_canonical_identity \
-  tests/integration/test_decimals.py::test_float_fallback_retains_overflow_rows_nulls_and_stable_column \
   tests/integration/test_decimals.py::test_float_fallback_keys_preserve_distinct_rows_across_batches \
   tests/integration/test_decimals.py::test_bounded_nan_retains_rows_in_copy_and_merge
 
@@ -142,9 +141,12 @@ run_e2e \
   'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[mysql-v3]' \
   'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[mariadb-native]' \
   'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[mariadb-v3]'
+
+run_sf_decimal \
+  tests/integration/test_decimals.py::test_float_fallback_retains_overflow_rows_nulls_and_stable_column
 ```
 
-Run all nineteen only for a full suite; otherwise run every affected group. MariaDB,
+Run all twenty only for a full suite; otherwise run every affected group. MariaDB,
 PostgreSQL, and genuine MySQL cover native and explicit v3.
 Do not infer one format from another. `SHOW PRIMARY KEYS` does not prove Iceberg
 identifier fields; compare raw-metadata `identifier-field-ids` with current

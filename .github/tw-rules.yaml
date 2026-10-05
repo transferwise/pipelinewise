@@ -62,6 +62,8 @@ actions:
             type: tests
           - name: e2e_tests_19
             type: tests
+          - name: e2e_tests_20
+            type: tests
 
   sync-codeowners:
     extraWriters:

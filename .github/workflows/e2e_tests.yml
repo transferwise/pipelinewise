@@ -158,6 +158,7 @@ jobs:
             test_paths: >-
               tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[postgres-native]
               tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[postgres-v3]
+              tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_transformations_are_private_through_publication
           - shard: decimal-migration
             check_name: e2e_tests_11
             test_paths: >-
@@ -167,6 +168,7 @@ jobs:
             test_paths: >-
               tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[postgres-native]
               tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[postgres-v3]
+              tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_with_custom_buffer_size.py
           - shard: transformation-parity
             check_name: e2e_tests_13
             test_paths: >-
@@ -182,21 +184,18 @@ jobs:
               tests/end_to_end/test_numeric_replication.py::test_mysql_extended_types_snowflake
           - shard: connector-evolution
             check_name: e2e_tests_15
-            test_paths: >-
-              tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_transformations_are_private_through_publication
+            test_paths: ''
             connector_test_paths: >-
               tests/integration/test_decimals.py::test_opt_in_exact_decimal_load_versions_history_and_retries_without_reversion
-              tests/integration/test_decimals.py::test_decimal_key_change_fails_before_adding_other_columns
               tests/integration/test_decimals.py::test_decimal_precision_reversal_in_one_process_refreshes_startup_cache
               tests/integration/test_decimals.py::test_decimal_archive_bounds_preserve_exact_text_and_ignore_nulls
-          - shard: connector-fallback
+          - shard: connector-keys
             check_name: e2e_tests_16
-            test_paths: >-
-              tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_with_custom_buffer_size.py
+            test_paths: ''
             connector_test_paths: >-
+              tests/integration/test_decimals.py::test_decimal_key_change_fails_before_adding_other_columns
               tests/integration/test_decimals.py::test_decimal_primary_keys_coalesce_equal_numeric_values
               tests/integration/test_decimals.py::test_postgres_bounded_numeric_key_keeps_nan_and_canonical_identity
-              tests/integration/test_decimals.py::test_float_fallback_retains_overflow_rows_nulls_and_stable_column
               tests/integration/test_decimals.py::test_float_fallback_keys_preserve_distinct_rows_across_batches
               tests/integration/test_decimals.py::test_bounded_nan_retains_rows_in_copy_and_merge
           - shard: postgres-maintenance
@@ -218,6 +217,11 @@ jobs:
               tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[mysql-v3]
               tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[mariadb-native]
               tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[mariadb-v3]
+          - shard: connector-overflow
+            check_name: e2e_tests_20
+            test_paths: ''
+            connector_test_paths: >-
+              tests/integration/test_decimals.py::test_float_fallback_retains_overflow_rows_nulls_and_stable_column
     env:
       E2E_TEST_PATHS: ${{ matrix.test_paths }}
       PIPELINEWISE_E2E_NAMESPACE: >-
@@ -281,7 +285,7 @@ jobs:
           echo "PipelineWise dev environment became ready after ${elapsed_seconds}s"
 
       - name: Run Snowflake end-to-end shard
-        if: steps.check.outcome == 'failure'
+        if: steps.check.outcome == 'failure' && matrix.test_paths != ''
         run: |
           set -f
           docker exec -t \

@@ -240,7 +240,7 @@ def test_snowflake_e2e_matrix_contract():
     assert job['name'] == '${{ matrix.check_name }}'
     assert strategy['fail-fast'] is False
     assert 'max-parallel' not in strategy
-    assert len(shards) == 18
+    assert len(shards) == 19
 
     expected_shards = {
         'conversion': (
@@ -315,6 +315,7 @@ def test_snowflake_e2e_matrix_contract():
             (
                 'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[postgres-native]',
                 'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[postgres-v3]',
+                'tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_transformations_are_private_through_publication',
             ),
         ),
         'decimal-migration': (
@@ -328,6 +329,7 @@ def test_snowflake_e2e_matrix_contract():
             (
                 'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[postgres-native]',
                 'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[postgres-v3]',
+                'tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_with_custom_buffer_size.py',
             ),
         ),
         'transformation-parity': (
@@ -349,15 +351,11 @@ def test_snowflake_e2e_matrix_contract():
         ),
         'connector-evolution': (
             'e2e_tests_15',
-            (
-                'tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_transformations_are_private_through_publication',
-            ),
+            (),
         ),
-        'connector-fallback': (
+        'connector-keys': (
             'e2e_tests_16',
-            (
-                'tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_with_custom_buffer_size.py',
-            ),
+            (),
         ),
         'postgres-maintenance': (
             'e2e_tests_17',
@@ -383,6 +381,10 @@ def test_snowflake_e2e_matrix_contract():
                 'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[mariadb-native]',
                 'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[mariadb-v3]',
             ),
+        ),
+        'connector-overflow': (
+            'e2e_tests_20',
+            (),
         ),
     }
     actual_shards = {
@@ -470,16 +472,18 @@ def test_snowflake_e2e_matrix_contract():
     assert connector_shards == {
         'connector-evolution': (
             'tests/integration/test_decimals.py::test_opt_in_exact_decimal_load_versions_history_and_retries_without_reversion',
-            'tests/integration/test_decimals.py::test_decimal_key_change_fails_before_adding_other_columns',
             'tests/integration/test_decimals.py::test_decimal_precision_reversal_in_one_process_refreshes_startup_cache',
             'tests/integration/test_decimals.py::test_decimal_archive_bounds_preserve_exact_text_and_ignore_nulls',
         ),
-        'connector-fallback': (
+        'connector-keys': (
+            'tests/integration/test_decimals.py::test_decimal_key_change_fails_before_adding_other_columns',
             'tests/integration/test_decimals.py::test_decimal_primary_keys_coalesce_equal_numeric_values',
             'tests/integration/test_decimals.py::test_postgres_bounded_numeric_key_keeps_nan_and_canonical_identity',
-            'tests/integration/test_decimals.py::test_float_fallback_retains_overflow_rows_nulls_and_stable_column',
             'tests/integration/test_decimals.py::test_float_fallback_keys_preserve_distinct_rows_across_batches',
             'tests/integration/test_decimals.py::test_bounded_nan_retains_rows_in_copy_and_merge',
+        ),
+        'connector-overflow': (
+            'tests/integration/test_decimals.py::test_float_fallback_retains_overflow_rows_nulls_and_stable_column',
         ),
     }
     connector_test_file = (
@@ -512,6 +516,13 @@ def test_snowflake_e2e_matrix_contract():
         "steps.check.outcome == 'failure' && matrix.connector_test_paths != ''"
     )
     assert '${{ matrix.connector_test_paths }}' in connector_step['run']
+    e2e_step = next(
+        step for step in job['steps']
+        if step['name'] == 'Run Snowflake end-to-end shard'
+    )
+    assert e2e_step['if'] == (
+        "steps.check.outcome == 'failure' && matrix.test_paths != ''"
+    )
 
     retired_jobs = {
         'e2e_tests_target_pg',
@@ -568,7 +579,7 @@ def test_required_e2e_status_contract():
 
     assert len(configured_names) == len(set(configured_names))
     assert expected_statuses == {
-        f'e2e_tests_{shard_number:02d}' for shard_number in range(1, 20)
+        f'e2e_tests_{shard_number:02d}' for shard_number in range(1, 21)
     }
     assert required_statuses == expected_statuses
     assert not {
