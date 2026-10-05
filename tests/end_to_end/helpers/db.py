@@ -143,6 +143,12 @@ def sql_get_columns_snowflake(schemas: list) -> str:
     ORDER BY table_name"""
 
 
+def sql_show_columns_snowflake(schema: str) -> str:
+    """Read physical type lengths omitted by INFORMATION_SCHEMA.COLUMNS."""
+    identifier = schema.upper().replace('"', '""')
+    return f'SHOW COLUMNS IN SCHEMA "{identifier}"'
+
+
 def sql_dynamic_row_count_mysql(schemas: list) -> str:
     """Generates ans SQL statement that counts the number of rows in
     every table in a specific schema(s) in a mysql database"""

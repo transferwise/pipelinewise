@@ -657,6 +657,7 @@ def _map_tap_to_target_functions(
         'run_query_target_snowflake': {
             'target_sql_get_cols_fn': db.sql_get_columns_snowflake,
             'target_sql_dynamic_row_count_fn': db.sql_dynamic_row_count_snowflake,
+            'target_sql_show_cols_fn': db.sql_show_columns_snowflake,
         },
     }
 
@@ -788,6 +789,10 @@ def assert_all_columns_exist(
         table[0].lower(): _cols_list_to_dict(table[1].lower().split(';'))
         for table in target_table_cols_raw
     }
+    if column_type_mapper_fn and 'target_sql_show_cols_fn' in funcs:
+        _add_binary_column_widths(
+            target_table_columns_map, target_schemas, target_query_runner_fn, funcs['target_sql_show_cols_fn'],
+        )
 
     for source_table_name, source_table_columns in source_table_columns_map.items():
 
@@ -827,15 +832,36 @@ def assert_all_columns_exist(
                 )
 
 
+def _add_binary_column_widths(table_columns, schemas, query_runner, show_columns_sql):
+    """SHOW COLUMNS exposes binary lengths that INFORMATION_SCHEMA leaves NULL."""
+    binary_columns = {
+        (table_name, name)
+        for table_name, columns in table_columns.items()
+        for name, column in columns.items()
+        if column['type'].lower() in ('binary', 'varbinary')
+    }
+    if not binary_columns:
+        return
+    for schema in schemas:
+        for row in _run_sql(query_runner, show_columns_sql(schema)):
+            table_name, _schema_name, name, raw_type = row[:4]
+            column_key = (table_name.lower(), name.lower())
+            if column_key not in binary_columns:
+                continue
+            column_type = json.loads(raw_type)
+            if column_type.get('type') == 'BINARY' and column_type.get('length') is not None:
+                table_columns[column_key[0]][column_key[1]]['type'] = f'binary({column_type["length"]})'
+
+
 def _column_comparison_types(source, target, column_type_mapper_fn):
-    """Compare declared decimal dimensions while preserving other type checks."""
+    """Compare declared fixed-point dimensions while preserving other type checks."""
     mapper_args = [source['type'], source['type_extra']]
     is_decimal = source['type'] in ('numeric', 'decimal')
     if is_decimal and 'numeric_precision' in source:
         mapper_args.extend((source['numeric_precision'], source['numeric_scale']))
     expected = column_type_mapper_fn(*mapper_args).replace(' NULL', '').lower()
     actual = target['type'].lower()
-    if is_decimal:
+    if is_decimal or re.fullmatch(r'(?:numeric|decimal|number)\(\d+,\d+\)', expected):
         expected = re.sub(r'^(decimal|number)\b', 'numeric', expected)
         if actual in ('numeric', 'decimal', 'number'):
             actual = 'numeric'

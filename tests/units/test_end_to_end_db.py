@@ -1,5 +1,7 @@
 """Non-credentialed tests for E2E database metadata helpers."""
 
+import json
+
 import pytest
 
 from pipelinewise.fastsync import mysql_to_postgres, mysql_to_snowflake, postgres_to_postgres, postgres_to_snowflake
@@ -29,6 +31,64 @@ def test_max_width_sf_varchar_matches():
         run_query_target_snowflake,
         mysql_to_snowflake.tap_type_to_target_type,
     )
+
+
+def test_sf_binary_metadata_uses_quoted_show_columns_schema():
+    assert db.sql_show_columns_snowflake('target_schema') == 'SHOW COLUMNS IN SCHEMA "TARGET_SCHEMA"'
+    assert db.sql_show_columns_snowflake('target"schema') == 'SHOW COLUMNS IN SCHEMA "TARGET""SCHEMA"'
+
+
+@pytest.mark.parametrize('source_type', ['binary', 'varbinary', 'blob', 'tinyblob', 'mediumblob', 'longblob'])
+def test_max_width_sf_binary_matches_show_columns_metadata(source_type):
+    queries = []
+
+    def run_query_tap_mysql(_query):
+        return [('address', f'payload:{source_type}:{source_type}(32)')]
+
+    def run_query_target_snowflake(query):
+        queries.append(query)
+        if query.startswith('SHOW COLUMNS'):
+            return [('ADDRESS', 'TARGET_SCHEMA', 'PAYLOAD', json.dumps({'type': 'BINARY', 'length': 67108864}))]
+        return [('ADDRESS', 'PAYLOAD:BINARY:::')]
+
+    assertions.assert_all_columns_exist(
+        run_query_tap_mysql, run_query_target_snowflake, mysql_to_snowflake.tap_type_to_target_type,
+    )
+    assert queries[-1] == 'SHOW COLUMNS IN SCHEMA "PPW_E2E_TAP_MYSQL"'
+
+
+@pytest.mark.parametrize('physical_type', [
+    {'type': 'BINARY', 'length': 8388608},
+    {'type': 'BINARY'},
+    {'type': 'TEXT', 'length': 67108864},
+])
+def test_sf_binary_column_assertion_requires_actual_maximum_width(physical_type):
+    def run_query_tap_mysql(_query):
+        return [('address', 'payload:blob:blob')]
+
+    def run_query_target_snowflake(query):
+        if query.startswith('SHOW COLUMNS'):
+            return [('ADDRESS', 'TARGET_SCHEMA', 'PAYLOAD', json.dumps(physical_type))]
+        return [('ADDRESS', 'PAYLOAD:BINARY:::')]
+
+    with pytest.raises(Exception, match=r'Expected: binary\(67108864\) Actual: binary'):
+        assertions.assert_all_columns_exist(
+            run_query_tap_mysql, run_query_target_snowflake, mysql_to_snowflake.tap_type_to_target_type,
+        )
+
+
+def test_column_existence_check_does_not_read_binary_width_without_mapper():
+    queries = []
+
+    def run_query_tap_mysql(_query):
+        return [('address', 'payload:blob:blob')]
+
+    def run_query_target_snowflake(query):
+        queries.append(query)
+        return [('ADDRESS', 'PAYLOAD:BINARY:::')]
+
+    assertions.assert_all_columns_exist(run_query_tap_mysql, run_query_target_snowflake)
+    assert len(queries) == 1
 
 
 def test_decimal_metadata_queries_keep_declared_dimensions():
@@ -66,6 +126,7 @@ def _assert_column_types(source_name, target_name, mapper, source_columns, targe
      'ID:NUMBER::38:0;VALUE:FLOAT:::'),
     ('mysql', 'snowflake', mysql_to_snowflake, "status:enum:enum('ready:yes','ready:no')",
      'STATUS:VARCHAR(134217728):::'),
+    ('mysql', 'snowflake', mysql_to_snowflake, 'calendar_year:year:year(4)', 'CALENDAR_YEAR:NUMBER::38:0'),
 ])
 def test_column_assertions_preserve_decimal_dimensions(
     source_name, target_name, mapper, source_columns, target_columns,
@@ -90,4 +151,17 @@ def test_mysql_decimal_column_assertion_rejects_wrong_scale():
     with pytest.raises(Exception, match=r'Expected: numeric\(10,0\) Actual: numeric\(10,2\)'):
         _assert_column_types(
             'mysql', 'postgres', mysql_to_postgres, 'amount:decimal:decimal(10,0)', 'amount:numeric::10:2',
+        )
+
+
+@pytest.mark.parametrize('target_columns', [
+    'CALENDAR_YEAR:NUMBER::37:0',
+    'CALENDAR_YEAR:NUMBER::38:1',
+    'CALENDAR_YEAR:NUMBER:::',
+    'CALENDAR_YEAR:FLOAT:::',
+])
+def test_mysql_year_column_assertion_requires_number_38_zero(target_columns):
+    with pytest.raises(Exception, match=r'Expected: numeric\(38,0\) Actual:'):
+        _assert_column_types(
+            'mysql', 'snowflake', mysql_to_snowflake, 'calendar_year:year:year(4)', target_columns,
         )
