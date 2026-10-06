@@ -484,6 +484,9 @@ and starts the Singer portion of the same <code class="docutils literal notransl
 or log-based tables. It does not wait for the next scheduled launch.</p>
 <p>If FullSync fails, Singer does not advance that table past an incomplete initial
 load. Restart the same command after correcting the failure.</p>
+<p>An explicit <code class="docutils literal notranslate"><span class="pre">fast_sync</span></code> without <code class="docutils literal notranslate"><span class="pre">--tables</span></code> skips configured entries that
+are missing or unselected in <code class="docutils literal notranslate"><span class="pre">properties.json</span></code>. See <a class="reference internal" href="../user_guide/resync.html#resync"><span class="std std-ref">Resync and repair</span></a> for command
+selection and PostgreSQL slot-reset behaviour.</p>
 </section>
 <section id="snowflake-iceberg-publication">
 <h2>Snowflake Iceberg publication<a class="headerlink" href="#snowflake-iceberg-publication" title="Link to this heading"></a></h2>

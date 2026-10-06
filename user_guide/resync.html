@@ -448,9 +448,13 @@ to Singer. <code class="docutils literal notranslate"><span class="pre">--replic
 <code class="docutils literal notranslate"><span class="pre">--force</span></code> overrides <code class="docutils literal notranslate"><span class="pre">allowed_resync_max_size</span></code> after the operator accepts the
 source and target impact. It does not override <code class="docutils literal notranslate"><span class="pre">sync_start_from</span></code> or change a
 configured PartialSync into a full-table reload.</p>
+<p>Without <code class="docutils literal notranslate"><span class="pre">--tables</span></code>, PipelineWise syncs only configured tables enabled in
+<code class="docutils literal notranslate"><span class="pre">properties.json</span></code>. It skips missing or unselected catalog entries and does
+nothing if no tables qualify. Explicit <code class="docutils literal notranslate"><span class="pre">--tables</span></code> requests retain existing
+catalog validation.</p>
 <section id="postgresql-source-slot-reset">
 <span id="resync-postgres-slot-reset"></span><h3>PostgreSQL source-slot reset<a class="headerlink" href="#postgresql-source-slot-reset" title="Link to this heading"></a></h3>
-<p>For a PostgreSQL tap containing LOG_BASED tables, this command drops and
+<p>For a PostgreSQL tap containing enabled LOG_BASED tables, this command drops and
 recreates the tap-specific source slot once before any worker starts:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pipelinewise<span class="w"> </span>fast_sync<span class="w"> </span>--tap<span class="w"> </span>&lt;tap_id&gt;<span class="w"> </span>--target<span class="w"> </span>&lt;target_id&gt;
 </pre></div>
@@ -458,7 +462,7 @@ recreates the tap-specific source slot once before any worker starts:</p>
 <p>Omit <code class="docutils literal notranslate"><span class="pre">--tables</span></code> and leave <code class="docutils literal notranslate"><span class="pre">--replication_method_only</span></code> at its <code class="docutils literal notranslate"><span class="pre">*</span></code> default
 so every selected table is rebuilt. The deprecated <code class="docutils literal notranslate"><span class="pre">sync_tables</span></code> alias has
 the same behaviour. <code class="docutils literal notranslate"><span class="pre">--force</span></code> is not required for the reset: it only bypasses
-the resync size limit. Taps without LOG_BASED tables do not reset a slot.</p>
+the resync size limit. Taps without enabled LOG_BASED tables do not reset a slot.</p>
 <table class="docutils align-default" id="id1">
 <caption><span class="caption-text">PostgreSQL slot behaviour during replication</span><a class="headerlink" href="#id1" title="Link to this table"></a></caption>
 <thead>
