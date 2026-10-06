@@ -1,3 +1,10 @@
+0.93.1 (2026-10-06)
+-------------------
+
+- Skip missing or unselected catalog entries during `fast_sync` without
+  `--tables`. Leave state and PostgreSQL slots unchanged when no tables qualify.
+  See the [resync guide](docs/user_guide/resync.rst).
+
 0.93.0 (2026-09-28)
 -------------------
 
