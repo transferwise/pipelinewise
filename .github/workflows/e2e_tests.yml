@@ -52,7 +52,8 @@ jobs:
         if: steps.check.outcome == 'failure'
         run: |
           cp dev-project/.env.template dev-project/.env
-          docker compose -f dev-project/docker-compose.yml up -d
+          docker compose -f dev-project/docker-compose.yml build --print | docker buildx bake --file - --allow network.host --load
+          docker compose -f dev-project/docker-compose.yml up -d --no-build
 
       - name: Wait for test containers to be ready
         timeout-minutes: 10
@@ -265,7 +266,8 @@ jobs:
           cp dev-project/.env.template dev-project/.env
           echo "$TARGET_SNOWFLAKE_PRIVATE_KEY" > dev-project/snowflake.pem
           chmod 600 dev-project/snowflake.pem
-          docker compose -f dev-project/docker-compose.yml up -d
+          docker compose -f dev-project/docker-compose.yml build --print | docker buildx bake --file - --allow network.host --load
+          docker compose -f dev-project/docker-compose.yml up -d --no-build
 
       - name: Wait for test containers to be ready
         if: steps.check.outcome == 'failure'
