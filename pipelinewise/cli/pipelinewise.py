@@ -1497,11 +1497,8 @@ class PipelineWise:
         ):
             return False
 
-        selection = utils.load_json(self.tap['files']['selection']) or {}
-        return any(
-            table.get('replication_method') == self.LOG_BASED
-            for table in selection.get('selection', [])
-        )
+        selected_tables = self._get_sync_tables_setting_from_selection_file(None, self.LOG_BASED)
+        return bool(selected_tables['full_sync'] or selected_tables['partial_sync'])
 
     def do_sync_tables(self, fastsync_stream_ids=None, reset_postgres_slot: bool = False):
         """
@@ -1514,6 +1511,8 @@ class PipelineWise:
 
         selected_tables = self._get_sync_tables_setting_from_selection_file(
             tables_to_sync, self.args.replication_method_only)
+        if not selected_tables['full_sync'] and not selected_tables['partial_sync']:
+            return
 
         if selected_tables['partial_sync']:
             self._check_target_table_format_supports_fastsync('partial_sync')
@@ -2712,16 +2711,23 @@ TAP RUN SUMMARY
         selection = selection.get('selection')
         all_tables = {'full_sync': [], 'partial_sync': {}}
         tables_list = tables.split(',') if tables else tables
+        if tables is None:
+            properties_path = self.tap['files']['properties']
+            properties = utils.load_json(properties_path)
+            self._validate_tap_catalog(properties, properties_path)
+            catalog_tables = fastsync_utils.get_tables_from_properties(properties)
         if selection:
             for table in selection:
                 table_name = self._get_fixed_name_of_table(table['tap_stream_id'])
+                if tables is None and table_name not in catalog_tables:
+                    continue
                 if tables_list is None or table_name in tables_list:
                     if replication_method in ['*', table.get('replication_method')]:
                         if table.get('sync_start_from'):
                             all_tables['partial_sync'][table_name] = table['sync_start_from']
                         else:
                             all_tables['full_sync'].append(table_name)
-            return all_tables
+        return all_tables
 
     def __check_if_table_is_selected(self, table_in_properties):
         table_metadata = table_in_properties.get('metadata', [])

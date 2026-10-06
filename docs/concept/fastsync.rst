@@ -90,6 +90,10 @@ or log-based tables. It does not wait for the next scheduled launch.
 If FullSync fails, Singer does not advance that table past an incomplete initial
 load. Restart the same command after correcting the failure.
 
+An explicit ``fast_sync`` without ``--tables`` skips configured entries that
+are missing or unselected in ``properties.json``. See :ref:`resync` for command
+selection and PostgreSQL slot-reset behaviour.
+
 
 Snowflake Iceberg publication
 -----------------------------
