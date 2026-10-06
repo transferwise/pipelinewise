@@ -39,6 +39,8 @@
   Apply colliding changes in source event order within each Singer batch instead
   of failing or inserting duplicate staged keys
 - Run decimal connector integration tests in CI and balance E2E across twenty shards
+- Allow host networking explicitly when building the PostgreSQL test image so
+  current Docker builders can start the E2E environment
 
 Run `import_config` before resuming replication after upgrading to refresh the
 generated tap settings and decimal schemas. No backfill or resync is required
