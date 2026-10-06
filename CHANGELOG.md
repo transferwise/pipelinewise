@@ -1,4 +1,4 @@
-0.94.0 (2026-10-05)
+0.94.0 (2026-10-06)
 -------------------
 
 - Preserve declared `DECIMAL` and `NUMERIC` precision and scale from
