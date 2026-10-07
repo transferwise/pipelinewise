@@ -411,9 +411,13 @@ def test_snowflake_e2e_matrix_contract():
             'tests/end_to_end/test_numeric_replication.py',
         }
     )
-    postgres_decimal_test = 'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_postgres'
+    postgres_decimal_tests = {
+        'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_postgres',
+        'tests/end_to_end/test_numeric_replication.py::test_postgres_decimal_float_underflow',
+    }
     postgres_commands = '\n'.join(step.get('run', '') for step in jobs['e2e_tests_01']['steps'])
-    assert postgres_decimal_test in postgres_commands
+    for selector in postgres_decimal_tests:
+        assert postgres_commands.count(selector) == 1
     expected_tests = set()
     tests_by_path = {}
     for test_path in expected_paths:
@@ -430,7 +434,7 @@ def test_snowflake_e2e_matrix_contract():
             for method in node.body
             if isinstance(method, (ast.FunctionDef, ast.AsyncFunctionDef)) and method.name.startswith('test_')
         )
-        test_ids.discard(postgres_decimal_test)
+        test_ids.difference_update(postgres_decimal_tests)
         assert test_ids, test_path
         tests_by_path[test_path] = test_ids
         expected_tests.update(test_ids)

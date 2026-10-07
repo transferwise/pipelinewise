@@ -311,8 +311,11 @@ class TransformField:
                         f' `{field_id}` in stream `{stream_id}`')
 
             elif trans_type == TransformationTypes.MASK_NUMBER.value:
-                if not is_decimal_schema(field_schema) and not (field_type is not None and (
-                        'number' in field_type or 'integer' in field_type) and not field_format):
+                if not is_decimal_schema(field_schema) and not (
+                    field_type is not None
+                    and ('number' in field_type or 'integer' in field_type)
+                    and (not field_format or ('integer' in field_type and field_format == 'singer.year'))
+                ):
                     raise InvalidTransformationException(
                         f'Cannot apply `{trans_type}` transformation type to a non-numeric field '
                         f'`{field_id}` in stream `{stream_id}`')

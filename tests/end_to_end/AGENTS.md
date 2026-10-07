@@ -45,6 +45,7 @@ run_sf_decimal() { docker exec -t pipelinewise bash scripts/test_decimal_connect
 run_e2e \
   tests/end_to_end/test_target_postgres.py \
   tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_postgres \
+  tests/end_to_end/test_numeric_replication.py::test_postgres_decimal_float_underflow \
   tests/end_to_end/test_postgres_stream_buffer_recovery.py \
   tests/end_to_end/data_diff/test_postgres_to_postgres.py \
   tests/end_to_end/data_diff/test_mysql_to_postgres.py

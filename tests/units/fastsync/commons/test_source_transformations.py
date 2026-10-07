@@ -1,5 +1,8 @@
 """Source SELECTs retain FastSync masking semantics before exporting rows."""
 
+from decimal import Decimal
+import re
+
 import pytest
 
 from pipelinewise.fastsync.commons.transform_utils import TransformationType
@@ -315,7 +318,13 @@ def test_postgres_numeric_float_conditions_saturate_before_casting():
     assert "::text IN ('NaN', 'Infinity', '-Infinity')" in sql
     assert '> 1.7976931348623157e308::numeric' in sql
     assert '< -1.7976931348623157e308::numeric' in sql
-    assert 'abs(("amount")) < 2.4703282292062328e-324::numeric' in sql
+    guard = re.search(r'abs\(\("amount"\)\) (<=?) ([^ ]+)::numeric THEN 0::double precision', sql)
+    assert guard is not None
+    assert guard.group(1) == '<='
+    midpoint = Decimal(guard.group(2))
+    assert midpoint.as_integer_ratio() == (1, 2 ** 1075)
+    assert Decimal('2.47032822920623275e-324') > midpoint
+    assert float('2.47032822920623275e-324') == float.fromhex('0x0.0000000000001p-1022')
 
 
 def test_unreferenced_postgres_numeric_float_column_keeps_raw_export():

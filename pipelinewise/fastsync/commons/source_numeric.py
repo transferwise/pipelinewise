@@ -8,6 +8,8 @@ from .partial_sync_boundary import PartialSyncBoundaryError
 
 
 LOGGER = logging.getLogger(__name__)
+# Binary64's exact zero-rounding midpoint is 2^-1075 = 5^1075 * 10^-1075.
+_FLOAT64_ZERO_MIDPOINT = f'{5 ** 1075}e-1075'
 
 
 def mysql_decimal_type(column_type, target, *, is_key=False, postgres_version=None):
@@ -62,6 +64,6 @@ def postgres_float_expression(expression):
         f"CASE WHEN {numeric}::text IN ('NaN', 'Infinity', '-Infinity') THEN {numeric}::double precision "
         f'WHEN {numeric} > {limit}::numeric THEN {limit}::double precision '
         f'WHEN {numeric} < -{limit}::numeric THEN -{limit}::double precision '
-        f'WHEN abs({numeric}) < 2.4703282292062328e-324::numeric THEN 0::double precision '
+        f'WHEN abs({numeric}) <= {_FLOAT64_ZERO_MIDPOINT}::numeric THEN 0::double precision '
         f'ELSE {numeric}::double precision END'
     )

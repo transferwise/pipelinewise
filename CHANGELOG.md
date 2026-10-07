@@ -1,11 +1,15 @@
-0.94.0 (2026-10-06)
+0.94.0 (2026-10-07)
 -------------------
+
+**Decimal precision**
 
 - Preserve declared `DECIMAL` and `NUMERIC` precision and scale from
   MariaDB, MySQL, and PostgreSQL in Snowflake native, Snowflake managed Iceberg
   v3, and PostgreSQL targets where supported. Keep existing PostgreSQL `REAL`
   and `DOUBLE PRECISION` decimal columns, including keys, on their live type.
   Clamp retained floating-point overflow and underflow instead of failing a row
+- Preserve representable tiny decimals when PostgreSQL FastSync casts to
+  floating point
 - Create new Snowflake decimal columns as fixed-point numbers where supported.
   Keep existing legacy `FLOAT` decimal columns, including keys that now map to
   text, by default. Set `version_legacy_float_columns: true` on a supported tap to
@@ -22,12 +26,16 @@
   exact bookmarks. Keep exact boundaries valid after a source declaration narrows.
   Correct PostgreSQL negative-scale metadata and prevent repeated column versioning.
   Keep other source/target combinations unchanged
-- Bundle PipelineWise Singer with the main codebase and install it through the
-  existing Makefile and Docker workflows
 - Treat nonnumeric `equals` conditions on decimal fields as non-matches. Reject
   decimal `regex_match` conditions before processing records
 - Retry PostgreSQL logical replication without wal2json numeric string output
   when the plugin rejects that option, independent of server message language
+- Group retained floating-point decimal keys by their loaded target value.
+  Apply colliding changes in source event order within each Singer batch instead
+  of failing or inserting duplicate staged keys
+
+**MariaDB and MySQL column types**
+
 - Replicate MariaDB/MySQL `SET`, `TINYBLOB`, `BLOB`, `MEDIUMBLOB`, `LONGBLOB`,
   and `YEAR` columns through Singer and FastSync. Snowflake stores sets as text,
   blobs as `BINARY(67108864)`, and years as `NUMBER(38,0)`. During Singer loads,
@@ -35,12 +43,17 @@
   Keep legacy PostgreSQL text `YEAR` keys unchanged. Keep legacy key subsets on
   Snowflake and PostgreSQL until FullSync adopts newly supported key columns.
   Match retained text BLOB keys to historical FastSync rows
-- Group retained floating-point decimal keys by their loaded target value.
-  Apply colliding changes in source event order within each Singer batch instead
-  of failing or inserting duplicate staged keys
+- Allow `MASK-NUMBER` transformations on `YEAR` columns in Singer
+
+**Packaging and CI**
+
+- Bundle PipelineWise Singer with the main codebase and install it through the
+  existing Makefile and Docker workflows
 - Run decimal connector integration tests in CI and balance E2E across twenty shards
 - Grant host networking explicitly when building test images in CI so current
   Docker builders can start the E2E environment
+
+**Upgrade**
 
 Run `import_config` before resuming replication after upgrading to refresh the
 generated tap settings and decimal schemas. No backfill or resync is required

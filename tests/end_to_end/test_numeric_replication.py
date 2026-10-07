@@ -4,7 +4,7 @@ import json
 import os
 import subprocess
 from argparse import Namespace
-from decimal import Decimal
+from decimal import Decimal, localcontext
 from pathlib import Path
 from uuid import uuid4
 
@@ -14,6 +14,7 @@ from pipelinewise.cli.config import Config
 from pipelinewise.fastsync import mysql_to_postgres, mysql_to_snowflake, postgres_to_postgres, postgres_to_snowflake
 from pipelinewise.fastsync.commons.target_postgres import FastSyncTargetPostgres
 from pipelinewise.fastsync.commons.target_snowflake import FastSyncTargetSnowflake
+from pipelinewise.fastsync.commons.source_numeric import postgres_float_expression
 from pipelinewise.fastsync.partialsync import mysql_to_snowflake as partial_mysql
 from pipelinewise.fastsync.partialsync import postgres_to_snowflake as partial_postgres
 from tests.end_to_end.target_snowflake.test_source_transformation_exports import source_export as source_export
@@ -24,6 +25,26 @@ from tests.end_to_end.target_snowflake.test_source_transformation_publication im
 
 EXACT = '12345678901234567890.123456789012345678'
 NEXT = '98765432109876543210.987654321098765432'
+
+
+@pytest.mark.parametrize('source_export', [('postgres', False)], indirect=True)
+def test_postgres_decimal_float_underflow(source_export):
+    """Round source-side casts correctly at the exact binary64 underflow midpoint."""
+    with localcontext() as context:
+        context.prec = 1100
+        midpoint = Decimal.from_float(float.fromhex('0x0.0000000000001p-1022')) / 2
+        epsilon = Decimal('1e-1100')
+        positive = [midpoint - epsilon, midpoint, midpoint + epsilon, Decimal('2.47032822920623275e-324')]
+    values = positive + [value.copy_negate() for value in positive] + [Decimal(0), None]
+    expression = postgres_float_expression('amount')
+
+    rows = source_export.source.query(
+        f'SELECT {expression} AS amount FROM unnest(%s::numeric[]) '
+        'WITH ORDINALITY AS inputs(amount, position) ORDER BY position',
+        params=(values,),
+    )
+
+    assert [row['amount'] for row in rows] == [float(value) if value is not None else None for value in values]
 
 
 def _args(source, config, tmp_path, namespace, replication_key='amount'):
