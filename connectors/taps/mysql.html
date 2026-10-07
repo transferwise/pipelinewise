@@ -247,6 +247,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#change-outcomes">Change outcomes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#column-versioning">Column versioning</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#operational-procedure">Operational procedure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#decimal-mapping">Decimal mapping</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/transformations.html">Load-time transformations</a><ul>
@@ -524,6 +525,19 @@ the other defaults.</p></td>
 </table>
 <p>Common tap settings are documented in <a class="reference internal" href="../../user_guide/yaml_config.html#yaml-configuration"><span class="std std-ref">YAML configuration</span></a>. Generate the
 full template with <code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">init</span></code>.</p>
+<p>Snowflake native and managed Iceberg v3 targets store <code class="docutils literal notranslate"><span class="pre">SET</span></code> values as
+<code class="docutils literal notranslate"><span class="pre">VARCHAR(134217728)</span></code>, the <code class="docutils literal notranslate"><span class="pre">TINYBLOB</span></code>/<code class="docutils literal notranslate"><span class="pre">BLOB</span></code>/<code class="docutils literal notranslate"><span class="pre">MEDIUMBLOB</span></code>/<code class="docutils literal notranslate"><span class="pre">LONGBLOB</span></code>
+family as binary, and <code class="docutils literal notranslate"><span class="pre">YEAR</span></code> as <code class="docutils literal notranslate"><span class="pre">NUMBER(38,0)</span></code>. Singer and FastSync use the
+same mappings. Binary values travel as hexadecimal text and are restored to
+binary by the target. Snowflake’s 64 MiB binary value limit still applies, so a
+larger <code class="docutils literal notranslate"><span class="pre">LONGBLOB</span></code> value cannot be represented in one target cell.
+PostgreSQL targets store <code class="docutils literal notranslate"><span class="pre">YEAR</span></code> as <code class="docutils literal notranslate"><span class="pre">SMALLINT</span></code> through both Singer and
+FullSync.
+Existing Snowflake and PostgreSQL tables keep a nonempty target primary key
+that is a subset of the refreshed source key during Singer replication. FullSync
+the table to adopt newly supported key columns. Retained text BLOB keys use uppercase
+hexadecimal to match historical FastSync rows. See <a class="reference internal" href="../../user_guide/schema_changes.html#exact-decimal-mapping"><span class="std std-ref">Decimal mapping</span></a>
+for key compatibility and resync rules.</p>
 </section>
 <section id="operational-notes">
 <h2>Operational notes<a class="headerlink" href="#operational-notes" title="Link to this heading"></a></h2>
@@ -578,8 +592,12 @@ restart; GTID and metadata connections keep their safe reconnect behavior.</p></
 per-row delete images. FullSync that table to capture the resulting contents
 before resuming Singer.</p></li>
 <li><p>The connector interprets <code class="docutils literal notranslate"><span class="pre">TINYINT(1)</span></code> as Boolean; other display widths are
-integers. Snowflake bulk mappings use floating-point <code class="docutils literal notranslate"><span class="pre">DECIMAL</span></code> and Boolean
-<code class="docutils literal notranslate"><span class="pre">BIT</span></code> values, so they do not preserve arbitrary decimal precision or
+integers. <code class="docutils literal notranslate"><span class="pre">DECIMAL(p,s)</span></code> and its <code class="docutils literal notranslate"><span class="pre">NUMERIC(p,s)</span></code> alias retain supported
+dimensions in Snowflake and PostgreSQL. New Snowflake columns use the precise
+mapping; legacy floating-point target columns remain unchanged unless
+<code class="docutils literal notranslate"><span class="pre">version_legacy_float_columns</span></code> is enabled on the tap. See
+<a class="reference internal" href="../../user_guide/schema_changes.html#exact-decimal-mapping"><span class="std std-ref">Decimal mapping</span></a> for numeric fallback and column versioning.
+Snowflake bulk mappings use Boolean <code class="docutils literal notranslate"><span class="pre">BIT</span></code> values and do not preserve
 multi-bit bitsets. MySQL <code class="docutils literal notranslate"><span class="pre">TIME</span></code> values outside a 24-hour clock cannot be
 represented by Snowflake <code class="docutils literal notranslate"><span class="pre">TIME</span></code>.</p></li>
 <li><p>The bundled decoder does not distinguish SQL <code class="docutils literal notranslate"><span class="pre">NULL</span></code> from JSON literal

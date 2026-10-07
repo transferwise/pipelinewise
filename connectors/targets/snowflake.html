@@ -247,6 +247,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#change-outcomes">Change outcomes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#column-versioning">Column versioning</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#operational-procedure">Operational procedure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#decimal-mapping">Decimal mapping</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/transformations.html">Load-time transformations</a><ul>
@@ -387,6 +388,20 @@
 <p><code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code> loads Singer records from compatible taps through staged
 CSV files into native or managed Iceberg v3 tables. It also supports FastSync
 for selected database sources.</p>
+<p>MariaDB/MySQL and PostgreSQL source <code class="docutils literal notranslate"><span class="pre">DECIMAL</span></code> and <code class="docutils literal notranslate"><span class="pre">NUMERIC</span></code> columns retain
+supported precision and scale in new native and managed Iceberg columns.
+Existing legacy floating-point decimal columns remain unchanged unless
+<code class="docutils literal notranslate"><span class="pre">version_legacy_float_columns</span></code> is enabled on the tap. See
+<a class="reference internal" href="../../user_guide/schema_changes.html#exact-decimal-mapping"><span class="std std-ref">Decimal mapping</span></a> for compatible numeric declarations, FLOAT
+fallback, and column versioning.
+PostgreSQL numeric primary keys use canonical text so <code class="docutils literal notranslate"><span class="pre">NaN</span></code> remains a valid
+key in either table format.
+During Singer schema changes, an existing primary-key column keeps its live
+target type when the current mapping differs. Singer casts incoming key values
+to that type. Use FullSync to recreate the key with the current mapping.
+Singer also keeps a nonempty legacy MariaDB/MySQL primary-key subset and groups
+retained floating-point decimal keys by their loaded target value. See
+<a class="reference internal" href="../../user_guide/schema_changes.html#exact-decimal-mapping"><span class="std std-ref">Decimal mapping</span></a> for the compatibility rules and their limits.</p>
 <p>Source-delete markers always physically remove rows before Singer state is
 acknowledged. Metadata columns are enabled automatically; see
 <a class="reference internal" href="../../user_guide/metadata_columns.html#metadata-columns"><span class="std std-ref">Metadata columns</span></a> for deletion processing.</p>

@@ -247,6 +247,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#change-outcomes">Change outcomes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#column-versioning">Column versioning</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#operational-procedure">Operational procedure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#decimal-mapping">Decimal mapping</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/transformations.html">Load-time transformations</a><ul>
@@ -388,6 +389,13 @@
 wal2json logical replication from PostgreSQL 11.2 or later. This source minimum
 applies to every Singer replication method and PipelineWise FullSync/PartialSync;
 it does not constrain PostgreSQL targets or the PipelineWise backend database.</p>
+<p><code class="docutils literal notranslate"><span class="pre">NUMERIC(p,s)</span></code> and its <code class="docutils literal notranslate"><span class="pre">DECIMAL(p,s)</span></code> alias retain supported precision and
+scale in Snowflake and PostgreSQL targets. New Snowflake columns use the precise
+mapping; legacy floating-point target columns remain unchanged unless
+<code class="docutils literal notranslate"><span class="pre">version_legacy_float_columns</span></code> is enabled on the tap. Snowflake
+stores PostgreSQL numeric primary keys as canonical text to preserve <code class="docutils literal notranslate"><span class="pre">NaN</span></code>
+identities. See <a class="reference internal" href="../../user_guide/schema_changes.html#exact-decimal-mapping"><span class="std std-ref">Decimal mapping</span></a> for this key exception, numeric
+fallback, exact Singer transport, and column versioning.</p>
 <table class="docutils align-default" id="id1" style="width: 100%">
 <caption><span class="caption-text">Support</span><a class="headerlink" href="#id1" title="Link to this table"></a></caption>
 <colgroup>
@@ -423,6 +431,9 @@ tables must be discovered automatically.</p>
 version 2 support; and</p></li>
 <li><p>permission to create and consume a logical replication slot.</p></li>
 </ul>
+<p>For LOG_BASED tables with numeric primary keys that can contain <code class="docutils literal notranslate"><span class="pre">NaN</span></code> or
+infinity, use wal2json 2.6 or later. Older versions convert these values to
+NULL before PipelineWise can preserve the key. See <a class="reference internal" href="../../user_guide/schema_changes.html#exact-decimal-mapping"><span class="std std-ref">Decimal mapping</span></a>.</p>
 <p>PipelineWise creates one tap-specific slot in the source database. PostgreSQL retains WAL needed
 by that slot, so monitor retained WAL and do not remove the slot while the tap is
 active.</p>

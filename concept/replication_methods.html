@@ -247,6 +247,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/schema_changes.html#change-outcomes">Change outcomes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/schema_changes.html#column-versioning">Column versioning</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/schema_changes.html#operational-procedure">Operational procedure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/schema_changes.html#decimal-mapping">Decimal mapping</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/transformations.html">Load-time transformations</a><ul>
@@ -385,6 +386,10 @@
 <span id="id1"></span><h1>Replication methods<a class="headerlink" href="#replication-methods" title="Link to this heading"></a></h1>
 <p>A table’s replication method controls how its tap finds records after the
 initial load. FastSync is a transfer optimisation, not a replication method.</p>
+<p>MariaDB/MySQL and PostgreSQL preserve supported decimal precision and scale when
+replicating to Snowflake native, managed Iceberg v3, or PostgreSQL. This applies
+to every replication method; see <a class="reference internal" href="../user_guide/schema_changes.html#exact-decimal-mapping"><span class="std std-ref">Decimal mapping</span></a> for numeric fallback
+and column versioning after an upgrade.</p>
 <section id="choose-a-method">
 <h2>Choose a method<a class="headerlink" href="#choose-a-method" title="Link to this heading"></a></h2>
 <table class="docutils align-default" style="width: 100%">

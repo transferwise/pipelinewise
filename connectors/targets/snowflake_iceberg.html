@@ -247,6 +247,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#change-outcomes">Change outcomes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#column-versioning">Column versioning</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#operational-procedure">Operational procedure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#decimal-mapping">Decimal mapping</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/transformations.html">Load-time transformations</a><ul>
@@ -491,6 +492,7 @@ operation that might replace a table.</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">"snowflake"</span>
 <span class="nt">target_table_format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">iceberg</span>
 <span class="nt">iceberg_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<span class="nt">version_legacy_float_columns</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
 </pre></div>
 </div>
 <p>These tap-level settings are the only valid Iceberg selection. Omitting
@@ -512,8 +514,17 @@ than converting it silently.</p>
 <p>Explicit v3 maps integer Singer fields to <code class="docutils literal notranslate"><span class="pre">NUMBER(38,0)</span></code> and approximate
 numeric fields to Iceberg <code class="docutils literal notranslate"><span class="pre">DOUBLE</span></code>. The latter preserves 64-bit floating-point
 range instead of narrowing to Iceberg <code class="docutils literal notranslate"><span class="pre">FLOAT</span></code>. Native and fixed-point
-<code class="docutils literal notranslate"><span class="pre">NUMBER(precision,</span> <span class="pre">scale)</span></code> mappings are unchanged. PostgreSQL
-<code class="docutils literal notranslate"><span class="pre">hstore</span></code> maps to <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> on this route. For MariaDB sources, a
+<code class="docutils literal notranslate"><span class="pre">NUMBER(precision,</span> <span class="pre">scale)</span></code> columns preserve supported MariaDB/MySQL and PostgreSQL
+decimal dimensions. PostgreSQL numeric primary keys use canonical text to retain
+<code class="docutils literal notranslate"><span class="pre">NaN</span></code> identities. Existing legacy floating-point decimal columns remain
+unchanged unless <code class="docutils literal notranslate"><span class="pre">version_legacy_float_columns</span></code> is enabled on the
+tap. During Singer schema changes, an existing primary-key column keeps its live
+target type when the current mapping differs. Use FullSync to recreate it with
+the current mapping. Singer also keeps a nonempty legacy MariaDB/MySQL
+primary-key subset and groups retained floating-point decimal keys by their
+loaded target value. See <a class="reference internal" href="../../user_guide/schema_changes.html#exact-decimal-mapping"><span class="std std-ref">Decimal mapping</span></a> for fallback, versioning,
+and key compatibility. PostgreSQL <code class="docutils literal notranslate"><span class="pre">hstore</span></code> maps to <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> on this route. For
+MariaDB sources, a
 <code class="docutils literal notranslate"><span class="pre">LONGTEXT</span></code> column with MariaDB’s exact generated <code class="docutils literal notranslate"><span class="pre">JSON_VALID</span></code> constraint is
 treated as the <code class="docutils literal notranslate"><span class="pre">JSON</span></code> alias and maps to <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code>; ordinary <code class="docutils literal notranslate"><span class="pre">LONGTEXT</span></code> and
 native routes remain strings. Object, array, string, number, Boolean, and null

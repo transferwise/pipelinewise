@@ -247,6 +247,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#change-outcomes">Change outcomes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#column-versioning">Column versioning</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#operational-procedure">Operational procedure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#decimal-mapping">Decimal mapping</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/transformations.html">Load-time transformations</a><ul>
@@ -386,6 +387,27 @@
 <span id="target-postgres"></span><h1>PostgreSQL target<a class="headerlink" href="#postgresql-target" title="Link to this heading"></a></h1>
 <p><code class="docutils literal notranslate"><span class="pre">target-postgres</span></code> loads Singer streams into PostgreSQL and manages compatible
 target schema changes.</p>
+<p>MariaDB/MySQL and PostgreSQL source decimals use <code class="docutils literal notranslate"><span class="pre">NUMERIC(p,s)</span></code> with their
+supported dimensions. Unconstrained PostgreSQL <code class="docutils literal notranslate"><span class="pre">NUMERIC</span></code> remains unconstrained.
+Older targets use unconstrained <code class="docutils literal notranslate"><span class="pre">NUMERIC</span></code> for unsupported scale declarations.
+Existing <code class="docutils literal notranslate"><span class="pre">REAL</span></code> or <code class="docutils literal notranslate"><span class="pre">DOUBLE</span> <span class="pre">PRECISION</span></code> columns created by the legacy decimal
+mapping remain in place, including primary keys. Singer stages those values with
+the existing target type. Finite values above <code class="docutils literal notranslate"><span class="pre">1.7976931348623157e308</span></code> for
+<code class="docutils literal notranslate"><span class="pre">DOUBLE</span> <span class="pre">PRECISION</span></code> or <code class="docutils literal notranslate"><span class="pre">3.4028234663852886e38</span></code> for <code class="docutils literal notranslate"><span class="pre">REAL</span></code> clamp to that
+limit with the same sign. Magnitudes at or below <code class="docutils literal notranslate"><span class="pre">2^-1075</span></code> for
+<code class="docutils literal notranslate"><span class="pre">DOUBLE</span> <span class="pre">PRECISION</span></code> or <code class="docutils literal notranslate"><span class="pre">2^-150</span></code> for <code class="docutils literal notranslate"><span class="pre">REAL</span></code> become zero. Finite values round
+to the nearest representable value, with exact ties rounded to even. <code class="docutils literal notranslate"><span class="pre">NaN</span></code> and
+infinities remain unchanged. New decimal columns use the exact numeric mapping. Singer
+groups retained floating-point decimal keys by their loaded target value.
+Colliding changes follow source event order within each batch. Distinct source
+keys that round or clamp to that value cannot remain distinct; FullSync the
+table to use the exact numeric key mapping.
+For MariaDB/MySQL tables, Singer keeps a nonempty legacy primary-key subset
+until FullSync adopts the complete source key. Singer also keeps an existing
+<code class="docutils literal notranslate"><span class="pre">YEAR</span></code> key on its legacy text type. Retained text BLOB keys use uppercase
+hexadecimal to match historical FastSync rows. Use FullSync to change these
+legacy key mappings. Other exact numeric key type changes still require FullSync.
+See <a class="reference internal" href="../../user_guide/schema_changes.html#exact-decimal-mapping"><span class="std std-ref">Decimal mapping</span></a> for column versioning and key restrictions.</p>
 <table class="docutils align-default" id="id1" style="width: 100%">
 <caption><span class="caption-text">Support</span><a class="headerlink" href="#id1" title="Link to this table"></a></caption>
 <colgroup>

@@ -247,6 +247,7 @@
 <li class="toctree-l2"><a class="reference internal" href="schema_changes.html#change-outcomes">Change outcomes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="schema_changes.html#column-versioning">Column versioning</a></li>
 <li class="toctree-l2"><a class="reference internal" href="schema_changes.html#operational-procedure">Operational procedure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="schema_changes.html#decimal-mapping">Decimal mapping</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="transformations.html">Load-time transformations</a><ul>
@@ -386,6 +387,9 @@
 <p>PartialSync exports a bounded source range, loads a temporary target table, and
 merges that range into the existing target. It is available from MariaDB/MySQL or
 PostgreSQL to Snowflake.</p>
+<p>Changed non-key decimal definitions use column versioning before the merge.
+Historical versions remain available, and untouched rows have NULL in the new
+column. Decimal primary-key changes and lossy decimal range mappings require FullSync. See <a class="reference internal" href="schema_changes.html#exact-decimal-mapping"><span class="std std-ref">Decimal mapping</span></a>.</p>
 <p>A table configured with <code class="docutils literal notranslate"><span class="pre">sync_start_from</span></code> also uses PartialSync during
 <code class="docutils literal notranslate"><span class="pre">fast_sync</span></code>, including <code class="docutils literal notranslate"><span class="pre">fast_sync</span> <span class="pre">--force</span></code>. The flag bypasses the FullSync
 size limit; it does not override the configured range or request a full-table
@@ -442,11 +446,15 @@ and can hand ongoing replication over from that position after the merge.</p>
 <td><p>PipelineWise widens the target column before applying the merge.</p></td>
 <td><p>Values are unchanged; the wider column definition applies to the table.</p></td>
 </tr>
-<tr class="row-even"><td><p>Existing column has an incompatible type, width, or precision</p></td>
+<tr class="row-even"><td><p>Non-key decimal changes type, precision, or scale; it is not the range column</p></td>
+<td><p>The old column is versioned; the new numeric column receives source values.</p></td>
+<td><p>Old values remain in the versioned column; the new column is <code class="docutils literal notranslate"><span class="pre">NULL</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Other incompatible type, width, or precision</p></td>
 <td><p>PartialSync fails before export; no merge or state advancement.</p></td>
 <td><p>Unchanged.</p></td>
 </tr>
-<tr class="row-odd"><td><p>Target row absent from the source range</p></td>
+<tr class="row-even"><td><p>Target row absent from the source range</p></td>
 <td><p>Deleted.</p></td>
 <td><p>Unchanged.</p></td>
 </tr>
@@ -461,8 +469,11 @@ columns before starting DML. It checks all overlapping column types before
 export and again before the merge, even when no transformations are configured.
 Numeric precision and scale, binary width, and temporal precision must hold the
 mapped values; timestamp timezone types must match. Missing catalog dimensions
-fail validation rather than being guessed. Only compatible text widening is
-automatic.</p>
+fail validation rather than being guessed. Compatible text widening and
+<a class="reference internal" href="schema_changes.html#exact-decimal-mapping"><span class="std std-ref">decimal column versioning</span></a> are automatic. Versioning
+is unavailable for primary keys or the PartialSync range column.
+Only source decimal columns qualify for numeric versioning; a mismatched
+floating-point or integer source column remains incompatible.</p>
 <p>This can reject previously tolerated numeric, binary, or temporal differences
 between Singer and FastSync. The existing text-type check also rejects native
 PostgreSQL <code class="docutils literal notranslate"><span class="pre">hstore</span></code> stored as Singer <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> where FastSync maps it to
@@ -492,12 +503,14 @@ normally configured for replacement.</p>
 run custom session SQL, alter columns, or change replication state/recovery.
 It uses FastSync’s native source configuration, metadata query, and type mapping.
 JSON output lists all incompatible columns, compatible columns, columns that
-would widen, and columns that would be added. Missing targets and unsupported
+would widen, decimal columns that would be versioned, and columns that would be
+added. Missing targets and unsupported
 routes or Iceberg tables are reported separately.</p>
 <p>Exit status is 1 for incompatibilities or report errors, 2 for invalid input,
 and 0 otherwise. Inspect skipped entries: exit 0 is not proof that every table
 was checked. This is a metadata snapshot, not a check of transformations,
-publication privileges, primary keys, or pending recovery. Resolve incompatible
+publication privileges, target primary-key constraints, or pending recovery.
+It uses imported source key metadata to reject decimal key changes. Resolve incompatible
 types before deployment; runtime validation remains enabled.</p>
 <p>Errors identify the failed operation and exception type, with database error
 codes and a Snowflake query ID when available. Unexpected code errors also
@@ -529,17 +542,20 @@ messages, credentials, or source values; use the codes or query ID to investigat
 <tr class="row-even"><td><p>New nullable source column</p></td>
 <td><p>Adds the column, then applies the range transaction.</p></td>
 </tr>
-<tr class="row-odd"><td><p>Other schema or primary-key mismatch</p></td>
+<tr class="row-odd"><td><p>Non-key decimal changes type, precision, or scale; it is not the range column</p></td>
+<td><p>Versions the old column and adds the numeric column before the range transaction.</p></td>
+</tr>
+<tr class="row-even"><td><p>Other schema or primary-key mismatch</p></td>
 <td><p>Fails before DML.</p></td>
 </tr>
-<tr class="row-even"><td><p>Existing string column is not <code class="docutils literal notranslate"><span class="pre">VARCHAR(134217728)</span></code></p></td>
+<tr class="row-odd"><td><p>Existing string column is not <code class="docutils literal notranslate"><span class="pre">VARCHAR(134217728)</span></code></p></td>
 <td><p>Fails before DML; PipelineWise does not widen existing Iceberg columns.</p></td>
 </tr>
-<tr class="row-odd"><td><p>NULL or duplicate transformed staging key</p></td>
+<tr class="row-even"><td><p>NULL or duplicate transformed staging key</p></td>
 <td><p>Fails before new publication DML; an already-submitted recovery remains
 ambiguous and preserves its evidence.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">drop_target_table:</span> <span class="pre">true</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">drop_target_table:</span> <span class="pre">true</span></code></p></td>
 <td><p>Replaces the table with only the selected range.</p></td>
 </tr>
 </tbody>
