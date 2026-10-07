@@ -121,7 +121,8 @@ run_sf_decimal \
   tests/integration/test_decimals.py::test_decimal_archive_bounds_preserve_exact_text_and_ignore_nulls \
   tests/integration/test_decimals.py::test_mysql_extended_composite_key_upgrade_preserves_historical_updates_and_deletes \
   tests/integration/test_runtime_contracts.py::test_cli_loads_utf8_and_acknowledges_committed_state \
-  tests/integration/test_runtime_contracts.py::test_cli_rejects_invalid_file_format_before_loading
+  tests/integration/test_runtime_contracts.py::test_cli_rejects_invalid_file_format_before_loading \
+  tests/integration/test_runtime_contracts.py::test_rejects_managed_text_variant_changes_without_versioning
 
 run_sf_decimal \
   tests/integration/test_decimals.py::test_decimal_key_change_retains_existing_type_and_adds_other_columns \
@@ -132,8 +133,7 @@ run_sf_decimal \
   tests/integration/test_decimals.py::test_legacy_text_binary_key_matches_uppercase_fastsync_hex \
   tests/integration/test_runtime_contracts.py::test_rejects_table_format_change_without_altering_rows \
   tests/integration/test_runtime_contracts.py::test_rejects_managed_v2_before_schema_changes \
-  tests/integration/test_runtime_contracts.py::test_rejects_managed_merge_on_read_before_schema_changes \
-  tests/integration/test_runtime_contracts.py::test_rejects_managed_text_variant_changes_without_versioning
+  tests/integration/test_runtime_contracts.py::test_rejects_managed_merge_on_read_before_schema_changes
 
 run_e2e \
   tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_table_size_check.py \

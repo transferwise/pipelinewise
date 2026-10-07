@@ -481,6 +481,7 @@ def test_snowflake_e2e_matrix_contract():
             'tests/integration/test_decimals.py::test_mysql_extended_composite_key_upgrade_preserves_historical_updates_and_deletes',
             'tests/integration/test_runtime_contracts.py::test_cli_loads_utf8_and_acknowledges_committed_state',
             'tests/integration/test_runtime_contracts.py::test_cli_rejects_invalid_file_format_before_loading',
+            'tests/integration/test_runtime_contracts.py::test_rejects_managed_text_variant_changes_without_versioning',
         ),
         'connector-keys': (
             'tests/integration/test_decimals.py::test_decimal_key_change_retains_existing_type_and_adds_other_columns',
@@ -492,7 +493,6 @@ def test_snowflake_e2e_matrix_contract():
             'tests/integration/test_runtime_contracts.py::test_rejects_table_format_change_without_altering_rows',
             'tests/integration/test_runtime_contracts.py::test_rejects_managed_v2_before_schema_changes',
             'tests/integration/test_runtime_contracts.py::test_rejects_managed_merge_on_read_before_schema_changes',
-            'tests/integration/test_runtime_contracts.py::test_rejects_managed_text_variant_changes_without_versioning',
         ),
         'connector-overflow': (
             'tests/integration/test_decimals.py::test_float_fallback_retains_overflow_rows_nulls_and_stable_column',
