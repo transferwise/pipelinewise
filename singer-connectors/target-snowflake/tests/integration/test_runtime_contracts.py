@@ -88,18 +88,18 @@ def test_rejects_table_format_change_without_altering_rows(snowflake_decimal_tar
 
 
 @pytest.mark.parametrize('snowflake_decimal_target', ['iceberg'], indirect=True)
-def test_rejects_narrow_managed_varchar_before_schema_changes(snowflake_decimal_target):
+def test_rejects_managed_v2_before_schema_changes(snowflake_decimal_target):
     config, database = snowflake_decimal_target
     table = f'"{config["default_target_schema"]}".ITEMS'
     database.query(f'CREATE SCHEMA "{config["default_target_schema"]}"')
     database.query(
-        f'CREATE ICEBERG TABLE {table} (ID NUMBER(38,0), AMOUNT VARCHAR(20)) '
-        "CATALOG='SNOWFLAKE' ICEBERG_VERSION=3 ICEBERG_MERGE_ON_READ_BEHAVIOR='DISABLED'"
+        f'CREATE ICEBERG TABLE {table} (ID NUMBER(19,0), AMOUNT NUMBER(10,2)) '
+        "CATALOG='SNOWFLAKE' ICEBERG_VERSION=2"
     )
-    database.query(f"INSERT INTO {table} VALUES (1, 'original')")
-    with pytest.raises(TableFormatMismatchException, match='CHARACTER_MAXIMUM_LENGTH'):
+    database.query(f'INSERT INTO {table} VALUES (1, 1.25)')
+    with pytest.raises(TableFormatDiscoveryException, match='unsupported ICEBERG_VERSION 2'):
         load(config, decimal_schema(10, 2), extra_properties={'added': {'type': ['string']}})
-    assert database.query(f'SELECT * FROM {table}') == [{'ID': 1, 'AMOUNT': 'original'}]
+    assert database.query(f'SELECT * FROM {table}') == [{'ID': 1, 'AMOUNT': Decimal('1.25')}]
 
 
 @pytest.mark.parametrize('snowflake_decimal_target', ['iceberg'], indirect=True)
@@ -170,7 +170,7 @@ def test_sparse_patch_batches_preserve_omitted_values_and_apply_null(snowflake_d
 
 def test_polymorphic_and_untyped_source_fields_load_after_flattening(snowflake_decimal_target):
     config, database = snowflake_decimal_target
-    config.update(data_flattening_max_level=1, validate_records=False)
+    config['data_flattening_max_level'] = 1
     long_name = 'long_source_column_' * 12
     extra = {
         'nested': {'anyOf': [{'type': 'integer'}, {'type': 'object', 'properties': {'label': {'type': 'string'}}}]},

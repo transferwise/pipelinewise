@@ -205,7 +205,7 @@ jobs:
               tests/integration/test_decimals.py::test_bounded_nan_retains_rows_in_copy_and_merge
               tests/integration/test_decimals.py::test_legacy_text_binary_key_matches_uppercase_fastsync_hex
               tests/integration/test_runtime_contracts.py::test_rejects_table_format_change_without_altering_rows
-              tests/integration/test_runtime_contracts.py::test_rejects_narrow_managed_varchar_before_schema_changes
+              tests/integration/test_runtime_contracts.py::test_rejects_managed_v2_before_schema_changes
               tests/integration/test_runtime_contracts.py::test_rejects_managed_merge_on_read_before_schema_changes
               tests/integration/test_runtime_contracts.py::test_rejects_managed_text_variant_changes_without_versioning
           - shard: postgres-maintenance
