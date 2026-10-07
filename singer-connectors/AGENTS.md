@@ -13,9 +13,10 @@ host fallbacks.
 
 Connector CI installs all connectors and runs Python 3.12 units for tap-mysql
 (`make unit_test_cov`, 47%), tap-postgres (`make unit_test_cov`, 58%),
-target-postgres (`make unit_test`, 44%), and target-snowflake (`make unit_test`, 67%).
-E2E job 01 runs SQL-source and PostgreSQL-target decimal integrations; job 10
-runs Snowflake decimal integrations through `scripts/test_decimal_connectors.sh`.
+target-postgres (`make unit_test`, 44%), and target-snowflake (`make unit_test`, 90%).
+E2E job 01 runs SQL-source and PostgreSQL-target decimal integrations; jobs 15,
+16, and 20 run Snowflake decimal and runtime integrations through
+`scripts/test_decimal_connectors.sh`.
 Other connector integration suites still require local validation.
 
 Root `make connectors -e pw_connector=<name>` creates runtime
@@ -69,21 +70,26 @@ CSV suite needs standard Snowflake/S3 variables,
 `TARGET_SNOWFLAKE_SCHEMA`, and `TARGET_SNOWFLAKE_FILE_FORMAT_CSV` (which may
 reuse `TARGET_SNOWFLAKE_FILE_FORMAT`); ensure the private key is readable.
 
-Run the supported 69-test suite with plaintext upload explicitly selected:
+Run the integration suite with plaintext upload explicitly selected and a
+separate coverage file:
 
 ```bash
-docker exec -t -e CLIENT_SIDE_ENCRYPTION_MASTER_KEY= pipelinewise bash -c '
+docker exec -t -e CLIENT_SIDE_ENCRYPTION_MASTER_KEY= \
+  -e COVERAGE_FILE=/tmp/target-snowflake-integration.coverage pipelinewise bash -c '
   cd /opt/pipelinewise/singer-connectors/target-snowflake
   . ./venv/bin/activate
   pytest tests/integration -vvx \
-    -k "not test_loading_tables_with_client_side_encryption or wrong_master_key"
+    -k "not test_loading_tables_with_client_side_encryption or wrong_master_key" \
+    --cov=target_snowflake --cov-report=term-missing
 '
 ```
 
-This excludes successful client-side encryption while retaining CSV external
-and table-stage loads plus wrong-key rejection. Expect 69 passes, zero skips;
-anything else is non-green. Full `make integration_test` separately requires a
-real client-side encryption master key and expects 70 passes.
+This excludes one successful client-side encryption test while retaining CSV
+external and table-stage loads plus wrong-key rejection. Expect 113 passes,
+one deselection, and zero skips. Full `make integration_test` separately requires
+a real client-side encryption master key and expects 114 passes. Report unit,
+integration, and combined coverage separately; combining them does not satisfy
+either individual gate.
 
 ## Versioning and upstream
 

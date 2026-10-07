@@ -119,7 +119,12 @@ run_sf_decimal \
   tests/integration/test_decimals.py::test_opt_in_exact_decimal_load_versions_history_and_retries_without_reversion \
   tests/integration/test_decimals.py::test_decimal_precision_reversal_in_one_process_refreshes_startup_cache \
   tests/integration/test_decimals.py::test_decimal_archive_bounds_preserve_exact_text_and_ignore_nulls \
-  tests/integration/test_decimals.py::test_mysql_extended_composite_key_upgrade_preserves_historical_updates_and_deletes
+  tests/integration/test_decimals.py::test_mysql_extended_composite_key_upgrade_preserves_historical_updates_and_deletes \
+  tests/integration/test_runtime_contracts.py::test_cli_loads_utf8_and_acknowledges_committed_state \
+  tests/integration/test_runtime_contracts.py::test_cli_rejects_malformed_messages_without_acknowledging \
+  tests/integration/test_runtime_contracts.py::test_cli_rejects_invalid_settings_before_schema_creation \
+  tests/integration/test_runtime_contracts.py::test_cli_ignores_activation_and_acknowledges_state_without_records \
+  tests/integration/test_runtime_contracts.py::test_cli_rejects_invalid_file_format_before_loading
 
 run_sf_decimal \
   tests/integration/test_decimals.py::test_decimal_key_change_retains_existing_type_and_adds_other_columns \
@@ -127,7 +132,11 @@ run_sf_decimal \
   tests/integration/test_decimals.py::test_postgres_bounded_numeric_key_keeps_nan_and_canonical_identity \
   tests/integration/test_decimals.py::test_float_fallback_keys_preserve_distinct_rows_across_batches \
   tests/integration/test_decimals.py::test_bounded_nan_retains_rows_in_copy_and_merge \
-  tests/integration/test_decimals.py::test_legacy_text_binary_key_matches_uppercase_fastsync_hex
+  tests/integration/test_decimals.py::test_legacy_text_binary_key_matches_uppercase_fastsync_hex \
+  tests/integration/test_runtime_contracts.py::test_rejects_table_format_change_without_altering_rows \
+  tests/integration/test_runtime_contracts.py::test_rejects_narrow_managed_varchar_before_schema_changes \
+  tests/integration/test_runtime_contracts.py::test_rejects_managed_merge_on_read_before_schema_changes \
+  tests/integration/test_runtime_contracts.py::test_rejects_managed_text_variant_changes_without_versioning
 
 run_e2e \
   tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_table_size_check.py \
@@ -147,7 +156,10 @@ run_e2e \
 
 run_sf_decimal \
   tests/integration/test_decimals.py::test_float_fallback_retains_overflow_rows_nulls_and_stable_column \
-  tests/integration/test_decimals.py::test_legacy_float_decimal_keys_coalesce_collisions_and_keep_last_patch_and_delete
+  tests/integration/test_decimals.py::test_legacy_float_decimal_keys_coalesce_collisions_and_keep_last_patch_and_delete \
+  tests/integration/test_runtime_contracts.py::test_failed_copy_or_merge_does_not_acknowledge_state \
+  tests/integration/test_runtime_contracts.py::test_sparse_patch_batches_preserve_omitted_values_and_apply_null \
+  tests/integration/test_runtime_contracts.py::test_polymorphic_and_untyped_source_fields_load_after_flattening
 ```
 
 Run all twenty only for a full suite; otherwise run every affected group. MariaDB,

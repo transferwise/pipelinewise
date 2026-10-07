@@ -49,7 +49,8 @@
 
 - Bundle PipelineWise Singer with the main codebase and install it through the
   existing Makefile and Docker workflows
-- Run decimal connector integration tests in CI and balance E2E across twenty shards
+- Run decimal and Snowflake runtime integration tests in CI across twenty E2E
+  shards. Cover failed loads, schema safeguards, and state acknowledgements
 - Grant host networking explicitly when building test images in CI so current
   Docker builders can start the E2E environment
 

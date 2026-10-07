@@ -479,6 +479,11 @@ def test_snowflake_e2e_matrix_contract():
             'tests/integration/test_decimals.py::test_decimal_precision_reversal_in_one_process_refreshes_startup_cache',
             'tests/integration/test_decimals.py::test_decimal_archive_bounds_preserve_exact_text_and_ignore_nulls',
             'tests/integration/test_decimals.py::test_mysql_extended_composite_key_upgrade_preserves_historical_updates_and_deletes',
+            'tests/integration/test_runtime_contracts.py::test_cli_loads_utf8_and_acknowledges_committed_state',
+            'tests/integration/test_runtime_contracts.py::test_cli_rejects_malformed_messages_without_acknowledging',
+            'tests/integration/test_runtime_contracts.py::test_cli_rejects_invalid_settings_before_schema_creation',
+            'tests/integration/test_runtime_contracts.py::test_cli_ignores_activation_and_acknowledges_state_without_records',
+            'tests/integration/test_runtime_contracts.py::test_cli_rejects_invalid_file_format_before_loading',
         ),
         'connector-keys': (
             'tests/integration/test_decimals.py::test_decimal_key_change_retains_existing_type_and_adds_other_columns',
@@ -487,24 +492,30 @@ def test_snowflake_e2e_matrix_contract():
             'tests/integration/test_decimals.py::test_float_fallback_keys_preserve_distinct_rows_across_batches',
             'tests/integration/test_decimals.py::test_bounded_nan_retains_rows_in_copy_and_merge',
             'tests/integration/test_decimals.py::test_legacy_text_binary_key_matches_uppercase_fastsync_hex',
+            'tests/integration/test_runtime_contracts.py::test_rejects_table_format_change_without_altering_rows',
+            'tests/integration/test_runtime_contracts.py::test_rejects_narrow_managed_varchar_before_schema_changes',
+            'tests/integration/test_runtime_contracts.py::test_rejects_managed_merge_on_read_before_schema_changes',
+            'tests/integration/test_runtime_contracts.py::test_rejects_managed_text_variant_changes_without_versioning',
         ),
         'connector-overflow': (
             'tests/integration/test_decimals.py::test_float_fallback_retains_overflow_rows_nulls_and_stable_column',
             'tests/integration/test_decimals.py::test_legacy_float_decimal_keys_coalesce_collisions_and_keep_last_patch_and_delete',
+            'tests/integration/test_runtime_contracts.py::test_failed_copy_or_merge_does_not_acknowledge_state',
+            'tests/integration/test_runtime_contracts.py::test_sparse_patch_batches_preserve_omitted_values_and_apply_null',
+            'tests/integration/test_runtime_contracts.py::test_polymorphic_and_untyped_source_fields_load_after_flattening',
         ),
     }
-    connector_test_file = (
+    connector_test_directory = (
         REPOSITORY_ROOT
         / 'singer-connectors'
         / 'target-snowflake'
         / 'tests'
         / 'integration'
-        / 'test_decimals.py'
     )
-    connector_module = ast.parse(connector_test_file.read_text(encoding='utf-8'))
     expected_connector_tests = {
-        f'tests/integration/test_decimals.py::{node.name}'
-        for node in connector_module.body
+        f'tests/integration/{filename}::{node.name}'
+        for filename in ('test_decimals.py', 'test_runtime_contracts.py')
+        for node in ast.parse((connector_test_directory / filename).read_text(encoding='utf-8')).body
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
         and node.name.startswith('test_')
     }
