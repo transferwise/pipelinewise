@@ -32,9 +32,13 @@ def test_postgres_decimal_float_underflow(source_export):
     """Round source-side casts correctly at the exact binary64 underflow midpoint."""
     with localcontext() as context:
         context.prec = 1100
-        midpoint = Decimal.from_float(float.fromhex('0x0.0000000000001p-1022')) / 2
+        minimum = Decimal.from_float(float.fromhex('0x0.0000000000001p-1022'))
+        midpoint = minimum / 2
         epsilon = Decimal('1e-1100')
-        positive = [midpoint - epsilon, midpoint, midpoint + epsilon, Decimal('2.47032822920623275e-324')]
+        positive = [
+            midpoint - epsilon, midpoint, midpoint + epsilon, Decimal('2.47032822920623275e-324'),
+            minimum, Decimal('5e-324'), Decimal('1e-323'),
+        ]
     values = positive + [value.copy_negate() for value in positive] + [Decimal(0), None]
     expression = postgres_float_expression('amount')
 

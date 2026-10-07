@@ -325,6 +325,8 @@ def test_postgres_numeric_float_conditions_saturate_before_casting():
     assert midpoint.as_integer_ratio() == (1, 2 ** 1075)
     assert Decimal('2.47032822920623275e-324') > midpoint
     assert float('2.47032822920623275e-324') == float.fromhex('0x0.0000000000001p-1022')
+    assert 'abs(("amount")) < 5e-324::numeric' in sql
+    assert "sign((\"amount\"))::double precision * '5e-324'::double precision" in sql
 
 
 def test_unreferenced_postgres_numeric_float_column_keeps_raw_export():

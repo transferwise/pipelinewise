@@ -65,5 +65,8 @@ def postgres_float_expression(expression):
         f'WHEN {numeric} > {limit}::numeric THEN {limit}::double precision '
         f'WHEN {numeric} < -{limit}::numeric THEN -{limit}::double precision '
         f'WHEN abs({numeric}) <= {_FLOAT64_ZERO_MIDPOINT}::numeric THEN 0::double precision '
+        # Avoid cast underflow for decimals that round to the smallest subnormal.
+        f'WHEN abs({numeric}) < 5e-324::numeric '
+        f"THEN sign({numeric})::double precision * '5e-324'::double precision "
         f'ELSE {numeric}::double precision END'
     )
