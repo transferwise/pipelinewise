@@ -2,3 +2,9 @@
 include pipelinewise/cli/schemas/*.json
 include pipelinewise/cli/samples/README.md
 include pipelinewise/cli/samples/*.yml.sample
+include singer-connectors/singer-python/setup.py
+include singer-connectors/singer-python/README.md
+include singer-connectors/singer-python/LICENSE
+include singer-connectors/singer-python/Makefile
+recursive-include singer-connectors/singer-python/singer *.py *.conf
+recursive-include singer-connectors/singer-python/tests *.py

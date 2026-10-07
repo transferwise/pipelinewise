@@ -67,9 +67,13 @@ def refresh_streams_schema(conn_config: Dict, streams: List[Dict]):
 
     # Run discovery to get the streams most up to date json schemas
     with open_connection(conn_config) as conn:
+        discovery_options = (
+            {'decimal_target': conn_config['decimal_target']} if conn_config.get('decimal_target') else {}
+        )
         new_discovery = {
             stream['tap_stream_id']: stream
-            for stream in discover_db(conn, conn_config.get('filter_schemas'), [st['table_name'] for st in streams])
+            for stream in discover_db(
+                conn, conn_config.get('filter_schemas'), [st['table_name'] for st in streams], **discovery_options)
         }
 
         LOGGER.debug('New discovery schemas %s', new_discovery)
@@ -85,11 +89,17 @@ def refresh_streams_schema(conn_config: Dict, streams: List[Dict]):
             # so let's copy those from the original stream object
             md_map = metadata.to_map(stream['metadata'])
             meta = md_map.get(())
+            if not conn_config.get('decimal_target'):
+                meta.pop('decimal-target', None)
 
             for idx_met, metadatum in enumerate(new_discovery[stream['tap_stream_id']]['metadata']):
                 if not metadatum['breadcrumb']:
                     meta.update(new_discovery[stream['tap_stream_id']]['metadata'][idx_met]['metadata'])
                     new_discovery[stream['tap_stream_id']]['metadata'][idx_met]['metadata'] = meta
+                elif conn_config.get('decimal_target'):
+                    previous = md_map.get(tuple(metadatum['breadcrumb']), {})
+                    if 'selected' in previous:
+                        metadatum['metadata']['selected'] = previous['selected']
 
             # 2nd step: now copy all the metadata from the updated new discovery to the original stream
             streams[idx]['metadata'] = copy.deepcopy(new_discovery[stream['tap_stream_id']]['metadata'])

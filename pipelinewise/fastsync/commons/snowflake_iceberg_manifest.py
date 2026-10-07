@@ -28,12 +28,16 @@ _PUBLICATION_FIELDS = frozenset({
     'staging_config',
 })
 _PARTIAL_FIELDS = _PUBLICATION_FIELDS | frozenset({
+    'column_versions',
+    'decimal_columns',
+    'historical_columns',
     'column_name',
     'delete_mode',
     'drop_target',
     'end_is_unbounded',
     'end_value',
     'start_value',
+    'version_legacy_float_columns',
 })
 _CONVERSION_FIELDS = frozenset({
     'backup_table',
@@ -96,6 +100,29 @@ def _valid_boundary(value: Any) -> bool:
 
 def _validate_partial_fields(value: Dict[str, Any]) -> None:
     _validate_publication_fields(value)
+    historical = value.get('historical_columns', {})
+    if not isinstance(historical, dict) or any(
+        not isinstance(name, str) or not name or not isinstance(data_type, str) or not data_type
+        for name, data_type in historical.items()
+    ):
+        raise _invalid_payload()
+    versions = value.get('column_versions', {})
+    if not isinstance(versions, dict):
+        raise _invalid_payload()
+    for name, version in versions.items():
+        if (
+            not isinstance(name, str) or not name or not isinstance(version, dict)
+            or set(version) != {'archived_name', 'data_type'}
+            or any(not isinstance(item, str) or not item for item in version.values())
+        ):
+            raise _invalid_payload()
+    decimal_columns = value.get('decimal_columns', [])
+    if (
+        not isinstance(decimal_columns, list)
+        or any(not isinstance(name, str) or not name for name in decimal_columns)
+        or len(decimal_columns) != len(set(decimal_columns))
+    ):
+        raise _invalid_payload()
     required_fields = {
         'column_name',
         'delete_mode',
@@ -114,6 +141,11 @@ def _validate_partial_fields(value: Dict[str, Any]) -> None:
     for name in ('end_is_unbounded', 'drop_target'):
         if name in value and not isinstance(value[name], bool):
             raise _invalid_payload()
+    if (
+        'version_legacy_float_columns' in value
+        and not isinstance(value['version_legacy_float_columns'], bool)
+    ):
+        raise _invalid_payload()
     if 'delete_mode' in value and value['delete_mode'] != 'hard':
         raise _invalid_payload()
     if any(
@@ -226,6 +258,10 @@ class PartialSyncManifestPayload(FullSyncManifestPayload):
     end_is_unbounded: Optional[bool] = None
     drop_target: Optional[bool] = None
     delete_mode: Optional[str] = None
+    column_versions: Optional[Dict[str, Any]] = None
+    decimal_columns: Optional[list[str]] = None
+    historical_columns: Optional[Dict[str, str]] = None
+    version_legacy_float_columns: Optional[bool] = None
 
     @classmethod
     def from_context(cls, value: Dict[str, Any]) -> 'PartialSyncManifestPayload':
@@ -247,6 +283,10 @@ class PartialSyncManifestPayload(FullSyncManifestPayload):
             end_is_unbounded=_field(value, 'end_is_unbounded'),
             drop_target=_field(value, 'drop_target'),
             delete_mode=_field(value, 'delete_mode'),
+            column_versions=_field(value, 'column_versions'),
+            decimal_columns=_field(value, 'decimal_columns'),
+            historical_columns=_field(value, 'historical_columns'),
+            version_legacy_float_columns=_field(value, 'version_legacy_float_columns'),
         )
 
     def as_context(self) -> Dict[str, Any]:
@@ -267,6 +307,10 @@ class PartialSyncManifestPayload(FullSyncManifestPayload):
                 'end_is_unbounded': self.end_is_unbounded,
                 'drop_target': self.drop_target,
                 'delete_mode': self.delete_mode,
+                'column_versions': self.column_versions,
+                'decimal_columns': self.decimal_columns,
+                'historical_columns': self.historical_columns,
+                'version_legacy_float_columns': self.version_legacy_float_columns,
             },
             self.extensions,
         )

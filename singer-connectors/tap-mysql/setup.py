@@ -19,7 +19,7 @@ setup(name='pipelinewise-tap-mysql',
       py_modules=['tap_mysql'],
       install_requires=[
           'pendulum==3.2.0',
-          'pipelinewise-singer-python==3.0.2',
+          'pipelinewise-singer-python==3.0.2+pipelinewise.0.94.0',
           # Newer decoders need optional FULL binlog metadata for correct types.
           'mysql-replication==0.46',
           'PyMySQL==1.1.3',

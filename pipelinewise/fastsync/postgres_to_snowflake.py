@@ -12,6 +12,7 @@ from .commons import utils
 from .commons import rdbms_to_snowflake
 from .commons import snowflake_iceberg_routes as iceberg_routes
 from .commons.snowflake_types import SNOWFLAKE_MAX_VARCHAR
+from .commons.source_numeric import postgres_decimal_type
 from .commons.rdbms_source import RdbmsSnowflakeSource
 from .commons.tap_postgres import FastSyncTapPostgres
 from .commons.target_snowflake import FastSyncTargetSnowflake
@@ -44,8 +45,12 @@ REQUIRED_CONFIG_KEYS = {
 }
 
 
-def tap_type_to_target_type(pg_type, *_):
+def tap_type_to_target_type(
+    pg_type, _character_length=None, numeric_precision=None, numeric_scale=None, *, is_key=False,
+):
     """Data type mapping from Postgres to Snowflake"""
+    if pg_type in ('numeric', 'decimal'):
+        return postgres_decimal_type(numeric_precision, numeric_scale, 'snowflake', is_key=is_key)
     return {
         'char': SNOWFLAKE_MAX_VARCHAR,
         'character': SNOWFLAKE_MAX_VARCHAR,
@@ -62,7 +67,6 @@ def tap_type_to_target_type(pg_type, *_):
         'smallserial': 'NUMBER',
         'serial': 'NUMBER',
         'bigserial': 'NUMBER',
-        'numeric': 'FLOAT',
         'double precision': 'FLOAT',
         'real': 'FLOAT',
         'bool': 'BOOLEAN',

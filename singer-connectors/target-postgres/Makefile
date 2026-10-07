@@ -2,10 +2,11 @@ venv:
 	python3 -m venv venv ;\
 	. ./venv/bin/activate ;\
 	pip install --upgrade pip setuptools wheel ;\
-	pip install -e .[test]
+	pip install -e ../singer-python -e .[test]
 
 lint:
-	cd ../.. && singer-connectors/target-postgres/venv/bin/ruff check singer-connectors/target-postgres/target_postgres/
+	cd ../.. && singer-connectors/target-postgres/venv/bin/ruff check singer-connectors/target-postgres/target_postgres/ \
+		singer-connectors/target-postgres/tests/unit/
 
 unit_test:
 	. ./venv/bin/activate ;\

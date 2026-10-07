@@ -21,6 +21,11 @@ from pipelinewise.fastsync.commons.snowflake_types import (
     canonical_native_type,
 )
 from pipelinewise.fastsync.commons.target_snowflake import FastSyncTargetSnowflake
+from pipelinewise.fastsync.commons.snowflake_column_versioning import (
+    has_column_versions,
+    is_retained_legacy_decimal_float,
+    versioned_column_name,
+)
 
 
 # A dynamic boundary query with no usable scalar is a successful no-op.
@@ -78,7 +83,10 @@ def delete_s3_objects(
     )
 
 
-def diff_source_target_columns(target_sf: dict, source_columns: list) -> dict:
+def diff_source_target_columns(
+    target_sf: dict, source_columns: list, primary_keys=(), boundary_column=None, decimal_columns=(),
+    version_legacy_float_columns=False,
+) -> dict:
     """Finding the diff between source and target columns"""
     target_column = target_sf['sf_object'].query(
         f'SHOW COLUMNS IN TABLE {target_sf["schema"]}."{target_sf["table"].upper()}"'
@@ -86,54 +94,106 @@ def diff_source_target_columns(target_sf: dict, source_columns: list) -> dict:
 
     source_columns_dict = _get_source_columns_dict(source_columns)
     target_columns_info = _get_target_columns_info(target_column)
+    _reject_historical_boundary(boundary_column, source_columns_dict, target_columns_info['column_names'])
     added_columns = _get_added_columns(source_columns_dict, target_columns_info['columns_dict'])
     removed_columns = _get_removed_columns(source_columns_dict, target_columns_info['columns_dict'])
     varchar_columns_to_widen = _get_varchar_columns_to_widen(
         target_sf,
         source_columns_dict,
         target_columns_info,
+        decimal_columns,
     )
-    _validate_existing_column_types(target_sf, source_columns_dict, target_columns_info)
+    versions = _validate_existing_column_types(
+        target_sf, source_columns_dict, target_columns_info, primary_keys, boundary_column, decimal_columns,
+        version_legacy_float_columns,
+    )
+    staging_columns = _staging_source_columns(
+        source_columns_dict,
+        target_columns_info,
+        primary_keys,
+        decimal_columns,
+        version_legacy_float_columns,
+    )
 
     return {
         'added_columns': added_columns,
         'removed_columns': removed_columns,
         'target_columns': target_columns_info['column_names'],
         'source_columns': source_columns_dict,
+        'staging_columns': staging_columns,
         'varchar_columns_to_widen': varchar_columns_to_widen,
+        'column_versions': versions,
     }
 
 
-def report_source_target_columns(target_sf: dict, source_columns: list, target_columns: list) -> list:
+def report_source_target_columns(
+    target_sf: dict, source_columns: list, target_columns: list, primary_keys=(), boundary_column=None,
+    decimal_columns=(), version_legacy_float_columns=False,
+) -> list:
     """Report every mapped column using the same checks as native PartialSync."""
     rows_by_name = {}
     for row in target_columns:
         normalized = {key.lower(): value for key, value in row.items()}
         rows_by_name[_quote_identifier(normalized['column_name'])] = normalized
     results = []
-    for name, source_type in _get_source_columns_dict(source_columns).items():
+    source_columns_dict = _get_source_columns_dict(source_columns)
+    for name, source_type in source_columns_dict.items():
         row = rows_by_name.get(name)
         result = {'column': name, 'mapped_type': source_type, 'status': 'would_add', 'target_type': None}
+        if boundary_column and name[1:-1].replace('""', '"').upper() == boundary_column.upper():
+            try:
+                _reject_historical_boundary(
+                    boundary_column, source_columns_dict, [row['column_name'] for row in rows_by_name.values()],
+                )
+            except NativePartialSyncCompatibilityError as exc:
+                result.update(status='incompatible', reason=str(exc))
+                results.append(result)
+                continue
         if row is not None:
             try:
                 metadata = _get_target_columns_info([row])
                 result['target_type'] = canonical_native_metadata_type(metadata['type_metadata'][name])
-                widening = _get_varchar_columns_to_widen(target_sf, {name: source_type}, metadata)
-                _validate_existing_column_types(target_sf, {name: source_type}, metadata)
-                result['status'] = 'would_widen' if widening else 'compatible'
+                widening = _get_varchar_columns_to_widen(
+                    target_sf,
+                    {name: source_type},
+                    metadata,
+                    decimal_columns,
+                )
+                versions = _validate_existing_column_types(
+                    target_sf, {name: source_type}, metadata, primary_keys, boundary_column, decimal_columns,
+                    version_legacy_float_columns,
+                )
+                result['status'] = 'would_version' if versions else 'would_widen' if widening else 'compatible'
             except (NativePartialSyncCompatibilityError, ValueError, TypeError, KeyError) as exc:
                 result.update(status='incompatible', reason=str(exc))
         results.append(result)
     return results
 
 
+def _reject_historical_boundary(boundary_column, source_columns, target_columns):
+    if not boundary_column:
+        return
+    source_names = {name[1:-1].replace('""', '"') for name in source_columns}
+    if has_column_versions(boundary_column.upper(), source_names, target_columns):
+        raise NativePartialSyncCompatibilityError(
+            f'PartialSync boundary column {boundary_column} has historical versions; '
+            'run FullSync to recreate the target'
+        )
+
+
 def load_into_snowflake(target, args, source_columns, primary_keys, s3_key_pattern, size_bytes,
-                        where_clause_sql):
+                        where_clause_sql, boundary_column=None, decimal_columns=(),
+                        version_legacy_float_columns=None):
     """Load staging data before creating or modifying the live target table."""
+
+    if version_legacy_float_columns is None:
+        version_legacy_float_columns = args.target.get(
+            'version_legacy_float_columns', False
+        )
 
     snowflake = target['sf_object']
     snowflake.copy_to_table(
-        s3_key_pattern, target['schema'], args.table, size_bytes, is_temporary=True
+        s3_key_pattern, target['schema'], args.table, size_bytes, is_temporary=True, columns=source_columns,
     )
 
     if args.drop_target_table:
@@ -170,7 +230,16 @@ def load_into_snowflake(target, args, source_columns, primary_keys, s3_key_patte
             publication_status['attempted'] = True
         snowflake.swap_tables(target['schema'], target['table'])
     else:
-        columns_diff = diff_source_target_columns(target, source_columns=source_columns)
+        columns_diff = diff_source_target_columns(
+            target, source_columns=source_columns, primary_keys=primary_keys, boundary_column=boundary_column,
+            decimal_columns=decimal_columns,
+            version_legacy_float_columns=version_legacy_float_columns,
+        )
+        for name, data_type, archive in _plan_native_column_versions(columns_diff):
+            snowflake.query(
+                f'ALTER TABLE {_native_target_name(target)} RENAME COLUMN {name} TO {_quote_identifier(archive)}'
+            )
+            snowflake.add_columns(target['schema'], target['table'], {name: data_type})
         # Snowflake DDL commits independently. Finish safe, monotonic schema changes before the atomic MERGE.
         if columns_diff['varchar_columns_to_widen']:
             try:
@@ -212,6 +281,20 @@ def load_into_snowflake(target, args, source_columns, primary_keys, s3_key_patte
             is_temporary=True,
             max_attempts=3,
         )
+
+
+def _plan_native_column_versions(columns_diff):
+    names = set(columns_diff['target_columns']) | {
+        name[1:-1].replace('""', '"') for name in columns_diff['source_columns']
+    }
+    versions = []
+    for name, data_type in columns_diff['column_versions'].items():
+        archive = versioned_column_name(name[1:-1].replace('""', '"'))
+        if archive in names:
+            raise NativePartialSyncCompatibilityError(f'Historical column already exists: {archive}')
+        names.add(archive)
+        versions.append((name, data_type, archive))
+    return versions
 
 
 def update_state_file(
@@ -412,7 +495,13 @@ def _native_target_name(target_sf):
     return f'{target_sf["schema"]}."{target_sf["table"].upper()}"'
 
 
-def _validate_existing_column_types(target_sf, source_columns_dict, target_columns_info):
+def _validate_existing_column_types(
+    target_sf, source_columns_dict, target_columns_info, primary_keys=(), boundary_column=None, decimal_columns=(),
+    version_legacy_float_columns=False,
+):
+    versions = {}
+    primary_keys = {str(key).strip('"').upper() for key in primary_keys or ()}
+    decimal_columns = {str(name).strip('"').upper() for name in decimal_columns or ()}
     for name, source_type in source_columns_dict.items():
         metadata = target_columns_info['type_metadata'].get(name)
         if metadata is None:
@@ -424,12 +513,52 @@ def _validate_existing_column_types(target_sf, source_columns_dict, target_colum
             raise NativePartialSyncCompatibilityError(
                 f'Native PartialSync cannot verify the type of {_native_target_name(target_sf)}.{name}: {exc}'
             ) from exc
+        column_name = name[1:-1].replace('""', '"').upper()
+        if column_name in decimal_columns and actual != expected:
+            if (
+                (not version_legacy_float_columns or column_name in primary_keys)
+                and is_retained_legacy_decimal_float(actual, expected)
+            ):
+                continue
+            if column_name in primary_keys:
+                raise NativePartialSyncCompatibilityError(f'Cannot version primary-key column {name}')
+            if boundary_column and name[1:-1].replace('""', '"').upper() == boundary_column.upper():
+                raise NativePartialSyncCompatibilityError(
+                    f'Cannot version PartialSync boundary column {name}; run FullSync to recreate the target'
+                )
+            if actual.startswith('NUMBER(') or actual == 'FLOAT':
+                versions[name] = source_type
+                continue
         if not _native_type_accepts(actual, expected):
             raise NativePartialSyncCompatibilityError(
                 f'Native PartialSync cannot safely publish {name} as {expected}: '
                 f'existing target {_native_target_name(target_sf)} has type {actual}. '
                 'Run a FullSync to recreate the target with the mapped column types, then retry PartialSync.'
             )
+    return versions
+
+
+def _staging_source_columns(
+    source_columns_dict, target_columns_info, primary_keys=(), decimal_columns=(), version_legacy_float_columns=False,
+):
+    """Match retained legacy decimal FLOAT columns in the PartialSync staging table."""
+    primary_keys = {str(key).strip('"').upper() for key in primary_keys or ()}
+    decimal_columns = {str(name).strip('"').upper() for name in decimal_columns or ()}
+    staging_columns = []
+    for name, source_type in source_columns_dict.items():
+        data_type = source_type
+        metadata = target_columns_info['type_metadata'].get(name)
+        if metadata is not None and name[1:-1].replace('""', '"').upper() in decimal_columns:
+            expected = canonical_native_type(source_type)
+            actual = canonical_native_metadata_type(metadata)
+            column_name = name[1:-1].replace('""', '"').upper()
+            if (
+                (not version_legacy_float_columns or column_name in primary_keys)
+                and is_retained_legacy_decimal_float(actual, expected)
+            ):
+                data_type = actual
+        staging_columns.append(f'{name} {data_type}')
+    return staging_columns
 
 
 def _native_type_accepts(actual, expected):
@@ -453,8 +582,10 @@ def _get_varchar_columns_to_widen(
     target_sf,
     source_columns_dict,
     target_columns_info,
+    decimal_columns=(),
 ):
     columns_to_widen = []
+    decimal_columns = {str(name).strip('"').upper() for name in decimal_columns or ()}
     normalized_max_varchar = _normalized_data_type(SNOWFLAKE_MAX_VARCHAR)
     for source_column, source_type in source_columns_dict.items():
         if _normalized_data_type(source_type) != normalized_max_varchar:
@@ -463,6 +594,16 @@ def _get_varchar_columns_to_widen(
         if target_type is None:
             continue
         if target_type.upper() not in SNOWFLAKE_TEXT_TYPES:
+            metadata = target_columns_info['type_metadata'].get(source_column)
+            if (
+                metadata is not None
+                and source_column[1:-1].replace('""', '"').upper() in decimal_columns
+                and is_retained_legacy_decimal_float(
+                    canonical_native_metadata_type(metadata),
+                    canonical_native_type(source_type),
+                )
+            ):
+                continue
             raise NativePartialSyncCompatibilityError(
                 f'Native PartialSync cannot safely publish {source_column} as '
                 f'{SNOWFLAKE_MAX_VARCHAR}: existing target '

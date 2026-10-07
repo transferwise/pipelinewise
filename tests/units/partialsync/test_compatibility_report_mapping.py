@@ -89,7 +89,7 @@ def test_report_and_runtime_share_native_configuration_query_and_mapping(tap_typ
     else:
         assert source.source_engine == runtime.source_engine
         assert source.uses_mariadb_json_aliases is runtime.uses_mariadb_json_aliases is False
-        assert actual == ['"JSON" VARIANT', '"JSON_ALIAS" VARCHAR(134217728)', '"BINARY" BINARY',
+        assert actual == ['"JSON" VARIANT', '"JSON_ALIAS" VARCHAR(134217728)', '"BINARY" BINARY(67108864)',
                           '"BOOLEAN" BOOLEAN', '"NUMBER" NUMBER']
         assert 'information_schema.check_constraints' not in runtime_sql
         connection.cursor.assert_called_once_with(pymysql.cursors.DictCursor)

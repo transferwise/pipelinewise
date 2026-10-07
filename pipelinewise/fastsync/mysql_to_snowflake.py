@@ -11,7 +11,8 @@ from ..logger import Logger
 from .commons import utils
 from .commons import rdbms_to_snowflake
 from .commons import snowflake_iceberg_routes as iceberg_routes
-from .commons.snowflake_types import SNOWFLAKE_MAX_VARCHAR
+from .commons.snowflake_types import SNOWFLAKE_MAX_BINARY, SNOWFLAKE_MAX_VARCHAR
+from .commons.source_numeric import mysql_decimal_type
 from .commons.rdbms_source import RdbmsSnowflakeSource
 from .commons.tap_mysql import FastSyncTapMySql
 from .commons.target_snowflake import FastSyncTargetSnowflake
@@ -48,17 +49,19 @@ def _is_boolean_tinyint(mysql_column_type):
     )
 
 
-def tap_type_to_target_type(mysql_type, mysql_column_type):
+def tap_type_to_target_type(mysql_type, mysql_column_type, *, is_key=False):
     """Data type mapping from MySQL to Snowflake"""
+    if mysql_type in ('decimal', 'numeric'):
+        return mysql_decimal_type(mysql_column_type, 'snowflake', is_key=is_key)
     return {
         'char': SNOWFLAKE_MAX_VARCHAR,
         'varchar': SNOWFLAKE_MAX_VARCHAR,
-        'binary': 'BINARY',
-        'varbinary': 'BINARY',
-        'blob': SNOWFLAKE_MAX_VARCHAR,
-        'tinyblob': SNOWFLAKE_MAX_VARCHAR,
-        'mediumblob': SNOWFLAKE_MAX_VARCHAR,
-        'longblob': SNOWFLAKE_MAX_VARCHAR,
+        'binary': SNOWFLAKE_MAX_BINARY,
+        'varbinary': SNOWFLAKE_MAX_BINARY,
+        'blob': SNOWFLAKE_MAX_BINARY,
+        'tinyblob': SNOWFLAKE_MAX_BINARY,
+        'mediumblob': SNOWFLAKE_MAX_BINARY,
+        'longblob': SNOWFLAKE_MAX_BINARY,
         'geometry': 'VARIANT',
         'point': 'VARIANT',
         'linestring': 'VARIANT',
@@ -73,13 +76,13 @@ def tap_type_to_target_type(mysql_type, mysql_column_type):
         'mediumtext': SNOWFLAKE_MAX_VARCHAR,
         'longtext': SNOWFLAKE_MAX_VARCHAR,
         'enum': SNOWFLAKE_MAX_VARCHAR,
+        'set': SNOWFLAKE_MAX_VARCHAR,
         'int': 'NUMBER',
         'tinyint': 'BOOLEAN' if _is_boolean_tinyint(mysql_column_type) else 'NUMBER',
         'smallint': 'NUMBER',
         'mediumint': 'NUMBER',
         'bigint': 'NUMBER',
         'bit': 'BOOLEAN',
-        'decimal': 'FLOAT',
         'double': 'FLOAT',
         'float': 'FLOAT',
         'bool': 'BOOLEAN',
@@ -88,6 +91,7 @@ def tap_type_to_target_type(mysql_type, mysql_column_type):
         'datetime': 'TIMESTAMP_NTZ',
         'timestamp': 'TIMESTAMP_NTZ',
         'time': 'TIME',
+        'year': 'NUMERIC(38,0)',
         'json': 'VARIANT',
     }.get(mysql_type, SNOWFLAKE_MAX_VARCHAR)
 

@@ -8,6 +8,7 @@ import pymysql
 from typing import Optional, Dict, Tuple, Set, List
 from singer import metadata, Schema, get_logger
 from singer.catalog import Catalog, CatalogEntry
+from singer.decimal_support import decimal_schema, decimal_sql_type, is_decimal_schema
 
 from tap_mysql.connection import connect_with_backoff, MySQLConnection
 from tap_mysql.sync_strategies import common
@@ -31,6 +32,7 @@ pymysql.converters.conversions[pendulum.DateTime] = pymysql.converters.escape_da
 STRING_TYPES = {
     'char',
     'enum',
+    'set',
     'tinytext',
     'longtext',
     'mediumtext',
@@ -56,6 +58,10 @@ DATETIME_TYPES = {'datetime', 'timestamp', 'time', 'date'}
 
 BINARY_TYPES = {'binary', 'varbinary'}
 
+BLOB_TYPES = {'tinyblob', 'blob', 'mediumblob', 'longblob'}
+
+YEAR_TYPES = {'year'}
+
 SPATIAL_TYPES = {'geometry', 'point', 'linestring',
                  'polygon', 'multipoint', 'multilinestring',
                  'multipolygon', 'geometrycollection', 'geomcollection'}
@@ -66,6 +72,8 @@ SUPPORTED_COLUMN_TYPES_AGGREGATED = \
         .union(FLOAT_TYPES) \
         .union(DATETIME_TYPES) \
         .union(BINARY_TYPES) \
+        .union(BLOB_TYPES) \
+        .union(YEAR_TYPES) \
         .union(SPATIAL_TYPES) \
         .union(BOOL_TYPES) \
         .union(JSON_TYPES) \
@@ -82,6 +90,25 @@ def is_supported_column_type(column_datatype: str) -> bool:
     Returns: True if column type is supported, False otherwise
     """
     return column_datatype in SUPPORTED_COLUMN_TYPES_AGGREGATED
+
+
+def integer_schema(column, inclusion):
+    """Build integer constraints, including MySQL's dedicated YEAR domain."""
+    result = Schema(type=['null', 'integer'], inclusion=inclusion)
+    data_type = column.data_type.lower()
+    if data_type in YEAR_TYPES:
+        result.format = 'singer.year'
+        result.minimum = 0
+        result.maximum = 2155
+        return result
+    bits = BYTES_FOR_INTEGER_TYPE[data_type] * 8
+    if 'unsigned' in column.column_type.lower():
+        result.minimum = 0
+        result.maximum = 2 ** bits - 1
+    else:
+        result.minimum = 0 - 2 ** (bits - 1)
+        result.maximum = 2 ** (bits - 1) - 1
+    return result
 
 
 def mariadb_json_aliases_enabled(config: Dict) -> bool:
@@ -136,7 +163,8 @@ def discover_catalog(
         mysql_conn: MySQLConnection,
         dbs: str = None,
         tables: Optional[str] = None,
-        detect_json_aliases: bool = False):
+        detect_json_aliases: bool = False,
+        decimal_target: Optional[str] = None):
     """Returns a Catalog describing the structure of the database."""
 
     if dbs:
@@ -226,7 +254,7 @@ def discover_catalog(
                 (table_schema, table_name) = k
 
                 schema = Schema(type='object',
-                                properties={c.column_name: schema_for_column(c) for c in cols})
+                                properties={c.column_name: schema_for_column(c, decimal_target) for c in cols})
                 mdata = create_column_metadata(cols)
                 md_map = metadata.to_map(mdata)
 
@@ -277,7 +305,7 @@ def discover_catalog(
     return Catalog(entries)
 
 
-def schema_for_column(column):
+def schema_for_column(column, decimal_target=None):
     """Returns the Schema object for the given Column."""
 
     data_type = column.data_type.lower()
@@ -293,15 +321,12 @@ def schema_for_column(column):
     if data_type in BOOL_TYPES or column_type.startswith('tinyint(1)'):
         result.type = ['null', 'boolean']
 
-    elif data_type in BYTES_FOR_INTEGER_TYPE:
-        result.type = ['null', 'integer']
-        bits = BYTES_FOR_INTEGER_TYPE[data_type] * 8
-        if 'unsigned' in column_type:
-            result.minimum = 0
-            result.maximum = 2 ** bits - 1
-        else:
-            result.minimum = 0 - 2 ** (bits - 1)
-            result.maximum = 2 ** (bits - 1) - 1
+    elif data_type in BYTES_FOR_INTEGER_TYPE or data_type in YEAR_TYPES:
+        result = integer_schema(column, inclusion)
+
+    elif data_type == 'decimal' and decimal_target:
+        result = Schema.from_dict(decimal_schema(column.numeric_precision, column.numeric_scale))
+        result.inclusion = inclusion
 
     elif data_type in FLOAT_TYPES:
         result.type = ['null', 'number']
@@ -328,7 +353,7 @@ def schema_for_column(column):
         else:
             result.format = 'date-time'
 
-    elif data_type in BINARY_TYPES:
+    elif data_type in BINARY_TYPES or data_type in BLOB_TYPES:
         result.type = ['null', 'string']
         result.format = 'binary'
 
@@ -365,7 +390,7 @@ def create_column_metadata(cols: List[Column]):
     return metadata.to_list(mdata)
 
 
-def resolve_catalog(discovered_catalog, streams_to_sync):
+def resolve_catalog(discovered_catalog, streams_to_sync, decimal_target=None):
     result = Catalog(streams=[])
 
     # Iterate over the streams in the input catalog and match each one up
@@ -387,6 +412,11 @@ def resolve_catalog(discovered_catalog, streams_to_sync):
 
         # These are the columns we need to select
         columns = desired_columns(selected, discovered_table.schema)
+        if decimal_target:
+            for column in columns:
+                column_schema = discovered_table.schema.properties[column].to_dict()
+                if is_decimal_schema(column_schema):
+                    decimal_sql_type(column_schema, decimal_target)
 
         result.streams.append(CatalogEntry(
             tap_stream_id=catalog_entry.tap_stream_id,

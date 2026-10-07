@@ -124,7 +124,7 @@ def test_root_ci_dependencies_and_policy_use_ruff():
 
     connector_workflow = (REPOSITORY_ROOT / '.github/workflows/connectors.yml').read_text()
     ci_tested_connectors = set(re.findall(r'^\s+- connector: ([\w-]+)$', connector_workflow, re.MULTILINE))
-    assert ci_tested_connectors == {'tap-mysql', 'tap-postgres', 'target-snowflake'}
+    assert ci_tested_connectors == {'tap-mysql', 'tap-postgres', 'target-snowflake', 'target-postgres'}
 
     connector_test_dirs = {
         str(path.relative_to(REPOSITORY_ROOT))
@@ -136,18 +136,33 @@ def test_root_ci_dependencies_and_policy_use_ruff():
     for test_dir in connector_test_dirs:
         is_excluded = any(fnmatch.fnmatchcase(test_dir, pattern) for pattern in exclusions)
         connector = Path(test_dir).parts[1]
-        if connector in ci_tested_connectors and test_dir.endswith('/tests'):
+        if connector == 'singer-python':
+            assert not is_excluded
+            assert 'make -C singer-connectors/singer-python venv lint unit_test' in connector_workflow
+        elif connector in ci_tested_connectors | {'transform-field'} and test_dir.endswith('/tests'):
             unit_dir = f'{test_dir}/unit'
             integration_dir = f'{test_dir}/integration'
             assert not any(fnmatch.fnmatchcase(unit_dir, pattern) for pattern in exclusions)
             if (REPOSITORY_ROOT / integration_dir).is_dir():
-                assert any(fnmatch.fnmatchcase(integration_dir, pattern) for pattern in exclusions)
+                assert any(
+                    fnmatch.fnmatchcase(integration_dir, pattern) or pattern.startswith(f'{integration_dir}/')
+                    for pattern in exclusions
+                )
         else:
             assert is_excluded
 
     for connector in ci_tested_connectors:
         makefile = (REPOSITORY_ROOT / f'singer-connectors/{connector}/Makefile').read_text()
         assert f'singer-connectors/{connector}/tests/unit/' in makefile
+
+    for connector, filename in (
+        ('tap-mysql', 'test_decimal_mapping.py'),
+        ('tap-postgres', 'test_decimal_mapping.py'),
+        ('target-postgres', 'test_decimals.py'),
+        ('target-snowflake', 'test_decimals.py'),
+    ):
+        decimal_test = f'singer-connectors/{connector}/tests/integration/{filename}'
+        assert not any(fnmatch.fnmatchcase(decimal_test, pattern) for pattern in exclusions)
 
     assert set(ruff_config['lint']['select']) == {'C90', 'E', 'F', 'PLE', 'Q002', 'W'}
     assert ruff_config['lint']['preview'] is True
@@ -170,6 +185,35 @@ def test_root_ci_dependencies_and_policy_use_ruff():
     connector_setups = sorted((REPOSITORY_ROOT / 'singer-connectors').glob('*/setup.py'))
     assert connector_setups
     assert all('ruff==0.16.1' in path.read_text() for path in connector_setups)
+
+
+def test_all_local_packages_pin_vendored_singer_version():
+    singer_setup = REPOSITORY_ROOT / 'singer-connectors/singer-python/setup.py'
+    singer_tree = ast.parse(singer_setup.read_text())
+    versions = [
+        keyword.value.value
+        for node in ast.walk(singer_tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == 'setup'
+        for keyword in node.keywords
+        if keyword.arg == 'version' and isinstance(keyword.value, ast.Constant)
+    ]
+    assert len(versions) == 1
+
+    expected_requirement = f'pipelinewise-singer-python=={versions[0]}'
+    consumer_setups = [REPOSITORY_ROOT / 'setup.py'] + [
+        path for path in sorted((REPOSITORY_ROOT / 'singer-connectors').glob('*/setup.py'))
+        if path != singer_setup
+    ]
+    missing_or_stale = [
+        str(path.relative_to(REPOSITORY_ROOT))
+        for path in consumer_setups
+        if expected_requirement not in {
+            node.value for node in ast.walk(ast.parse(path.read_text()))
+            if isinstance(node, ast.Constant) and isinstance(node.value, str)
+        }
+    ]
+
+    assert not missing_or_stale, f'Packages without {expected_requirement}: {missing_or_stale}'
 
 
 @pytest.mark.parametrize(

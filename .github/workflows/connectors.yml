@@ -52,6 +52,8 @@ jobs:
             test_target: unit_test_cov
           - connector: target-snowflake
             test_target: unit_test
+          - connector: target-postgres
+            test_target: unit_test
 
     steps:
       - name: Checking out repo
@@ -62,7 +64,9 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-          cache-dependency-path: singer-connectors/${{ matrix.connector }}/setup.py
+          cache-dependency-path: |
+            singer-connectors/${{ matrix.connector }}/setup.py
+            singer-connectors/singer-python/setup.py
 
       - name: Install connector test dependencies
         run: make venv
@@ -71,3 +75,31 @@ jobs:
       - name: Run connector unit tests
         run: make ${{ matrix.test_target }}
         working-directory: singer-connectors/${{ matrix.connector }}
+
+  test_shared_singer:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Test vendored Singer
+        run: make -C singer-connectors/singer-python venv lint unit_test
+      - name: Test transformations
+        run: make -C singer-connectors/transform-field venv lint unit_test integration_test
+
+  connector_tests:
+    name: connector_tests
+    if: ${{ always() }}
+    needs:
+      - test_connector_units
+      - test_shared_singer
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require connector test success
+        env:
+          CONNECTOR_UNITS_RESULT: ${{ needs.test_connector_units.result }}
+          SHARED_SINGER_RESULT: ${{ needs.test_shared_singer.result }}
+        run: |
+          test "$CONNECTOR_UNITS_RESULT" = success
+          test "$SHARED_SINGER_RESULT" = success

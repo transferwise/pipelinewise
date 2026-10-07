@@ -19,7 +19,7 @@ setup(name='pipelinewise-tap-salesforce',
       py_modules=['tap_salesforce'],
       install_requires=[
           'requests==2.33.1',
-          'pipelinewise-singer-python==3.0.2',
+          'pipelinewise-singer-python==3.0.2+pipelinewise.0.94.0',
           'xmltodict==0.11.0'
       ],
       extras_require={

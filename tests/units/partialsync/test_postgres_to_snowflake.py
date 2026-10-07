@@ -4,6 +4,7 @@ from tempfile import TemporaryDirectory
 from unittest import TestCase, mock
 
 from pipelinewise.fastsync.partialsync import postgres_to_snowflake
+from pipelinewise.fastsync.partialsync import rdbms_to_snowflake
 from pipelinewise.fastsync.commons.tap_postgres import FastSyncTapPostgres
 from pipelinewise.fastsync.commons.partial_sync_boundary import (
     PartialSyncBoundary,
@@ -203,7 +204,7 @@ class PartialSyncTestCase(TestCase):
                     self.assertEqual(snowflake.create_table.call_count, 1)
                 elif failure_method == 'publish_partial_sync':
                     snowflake.copy_to_table.assert_called_once_with(
-                        's3-pattern', 'foo_schema', 'foo', 4, is_temporary=True
+                        's3-pattern', 'foo_schema', 'foo', 4, is_temporary=True, columns=['"ID" NUMBER'],
                     )
                     snowflake.publish_partial_sync.assert_called_once()
                 expected_drop_call = mock.call(
@@ -259,7 +260,7 @@ class PartialSyncTestCase(TestCase):
 
         self.assertIs(result, True)
         snowflake.copy_to_table.assert_called_once_with(
-            'NO_FILES_TO_LOAD', 'foo_schema', 'foo', 0, is_temporary=True
+            'NO_FILES_TO_LOAD', 'foo_schema', 'foo', 0, is_temporary=True, columns=['"ID" NUMBER'],
         )
         snowflake.publish_partial_sync.assert_called_once()
         snowflake.s3.delete_object.assert_not_called()
@@ -399,6 +400,34 @@ class PartialSyncTestCase(TestCase):
         self.assertEqual(len(actual_file_parts), len(expected_file_parts))
         for file_part in expected_file_parts:
             self.assertIn(file_part, actual_file_parts)
+
+    def test_export_source_table_data_passes_effective_decimal_float_columns(self):
+        args = PartialSync2SFArgs(temp_test_dir='unused')
+        source = FastSyncTapPostgres({}, {})
+        with mock.patch.object(source, 'copy_table') as copy_table, \
+                mock.patch('pipelinewise.fastsync.commons.tap_postgres.glob.glob', return_value=[]):
+            source.export_source_table_data(
+                args, 'tap_id', decimal_float_columns={'amount'},
+            )
+        self.assertEqual({'amount'}, copy_table.call_args.kwargs['decimal_float_columns'])
+
+    def test_effective_decimal_float_columns_only_include_declared_decimals(self):
+        self.assertEqual(
+            {'amount', 'wide amount'},
+            rdbms_to_snowflake._decimal_float_columns(
+                ['"amount" FLOAT', '"wide amount" DOUBLE PRECISION', '"ratio" FLOAT', '"exact" NUMBER(18,2)'],
+                ['AMOUNT', 'WIDE AMOUNT', 'EXACT'],
+            ),
+        )
+
+    def test_effective_decimal_float_columns_parse_iceberg_not_null_definitions(self):
+        self.assertEqual(
+            {'AMOUNT', 'APPROXIMATE'},
+            rdbms_to_snowflake._decimal_float_columns(
+                ['"AMOUNT" DOUBLE NOT NULL', '"APPROXIMATE" FLOAT NOT NULL', '"EXACT" NUMBER(18,2) NOT NULL'],
+                ['AMOUNT', 'APPROXIMATE', 'EXACT'],
+            ),
+        )
 
     @mock.patch('pipelinewise.fastsync.partialsync.postgres_to_snowflake.multiprocessing.Pool')
     def test_running_partial_sync_postgres_to_snowflake(self, mocked_pool):
@@ -562,6 +591,9 @@ class PartialSyncTestCase(TestCase):
                     maped_column_types_to_target['primary_key'],
                     s3_key_pattern, file_size,
                     ' WHERE "FOO_COLUMN" >= \'1\'',
+                    boundary_column='foo_column',
+                    decimal_columns=(),
+                    version_legacy_float_columns=False,
                 )
                 mocked_fastsync_sf.return_value.s3.delete_object.assert_called_once_with(
                     Bucket=args.target['s3_bucket'], Key='FOO_S3_KEYS'

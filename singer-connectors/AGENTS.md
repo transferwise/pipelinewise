@@ -5,16 +5,19 @@ Read root `AGENTS.md` and relevant implementation, test, E2E, and docs guides.
 ## Environments and CI
 
 These are vendored sources, not submodules. The root Ruff gate checks connector
-source packages plus the tap-mysql, tap-postgres, and target-snowflake unit
+source packages plus the tap-mysql, tap-postgres, target-postgres, and target-snowflake unit
 suites run by connector CI. Connector tests outside GitHub connector CI,
 including integration suites, legacy tests, and spikes, remain excluded; root
 unit tests exclude connectors. Prefer the ready `pipelinewise` container; report
 host fallbacks.
 
 Connector CI installs all connectors and runs Python 3.12 units for tap-mysql
-(`make unit_test_cov`, 47%), tap-postgres (`make unit_test_cov`, 58%), and
-target-snowflake (`make unit_test`, 67%). It excludes integration; behavior
-changes need local connector tests and an available E2E route.
+(`make unit_test_cov`, 47%), tap-postgres (`make unit_test_cov`, 58%),
+target-postgres (`make unit_test`, 44%), and target-snowflake (`make unit_test`, 90%).
+E2E job 01 runs SQL-source and PostgreSQL-target decimal integrations; jobs 15,
+16, and 20 run Snowflake decimal and runtime integrations through
+`scripts/test_decimal_connectors.sh`.
+Other connector integration suites still require local validation.
 
 Root `make connectors -e pw_connector=<name>` creates runtime
 `.virtualenvs/<name>/`; connector Makefiles often test in `./venv/`. Never mix
@@ -25,7 +28,7 @@ PipelineWise, runtime-connector, connector-test, host, or container interpreters
 Ruff is the only supported connector linter. Where present, the owning
 Makefile's `lint` target runs the connector environment's Ruff binary from the
 repository root so the root `pyproject.toml` applies. The tap-mysql,
-tap-postgres, and target-snowflake targets lint source, their GitHub-tested unit
+tap-postgres, target-postgres, and target-snowflake targets lint source, their GitHub-tested unit
 suites, and shared unit helpers; other connector targets lint source only. Unit
 and integration targets remain the behavioral validation. Do not add
 connector-local lint configuration, another Python linter, or an automatic
@@ -67,21 +70,26 @@ CSV suite needs standard Snowflake/S3 variables,
 `TARGET_SNOWFLAKE_SCHEMA`, and `TARGET_SNOWFLAKE_FILE_FORMAT_CSV` (which may
 reuse `TARGET_SNOWFLAKE_FILE_FORMAT`); ensure the private key is readable.
 
-Run the supported 49-test suite with plaintext upload explicitly selected:
+Run the integration suite with plaintext upload explicitly selected and a
+separate coverage file:
 
 ```bash
-docker exec -t -e CLIENT_SIDE_ENCRYPTION_MASTER_KEY= pipelinewise bash -lc '
+docker exec -t -e CLIENT_SIDE_ENCRYPTION_MASTER_KEY= \
+  -e COVERAGE_FILE=/tmp/target-snowflake-integration.coverage pipelinewise bash -c '
   cd /opt/pipelinewise/singer-connectors/target-snowflake
   . ./venv/bin/activate
   pytest tests/integration -vvx \
-    -k "not test_loading_tables_with_client_side_encryption or wrong_master_key"
+    -k "not test_loading_tables_with_client_side_encryption or wrong_master_key" \
+    --cov=target_snowflake --cov-report=term-missing
 '
 ```
 
-This excludes successful client-side encryption while retaining CSV external
-and table-stage loads plus wrong-key rejection. Expect 49 passes, zero skips;
-anything else is non-green. Full `make integration_test` separately requires a
-real client-side encryption master key and expects 50 passes.
+This excludes one successful client-side encryption test while retaining CSV
+external and table-stage loads plus wrong-key rejection. Expect 95 passes,
+one deselection, and zero skips. Full `make integration_test` separately requires
+a real client-side encryption master key and expects 96 passes. Report unit,
+integration, and combined coverage separately; combining them does not satisfy
+either individual gate.
 
 ## Versioning and upstream
 

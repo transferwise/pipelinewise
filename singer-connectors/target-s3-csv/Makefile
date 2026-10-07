@@ -2,7 +2,7 @@ venv:
 	python3 -m venv venv ;\
 	. ./venv/bin/activate ;\
 	pip install --upgrade pip setuptools wheel ;\
-	pip install -e .[test]
+	pip install -e ../singer-python -e .[test]
 
 lint:
 	cd ../.. && singer-connectors/target-s3-csv/venv/bin/ruff check singer-connectors/target-s3-csv/target_s3_csv/

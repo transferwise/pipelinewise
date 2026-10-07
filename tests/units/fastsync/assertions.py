@@ -303,7 +303,7 @@ def assert_snowflake_sync_table_native_workflow(
     expected_target_calls = [
         call.create_schema('TARGET_SCHEMA'),
         call.create_table('TARGET_SCHEMA', table, columns, primary_key, is_temporary=True),
-        call.copy_to_table('loads/export.csv.gz', 'TARGET_SCHEMA', table, 30, is_temporary=True),
+        call.copy_to_table('loads/export.csv.gz', 'TARGET_SCHEMA', table, 30, is_temporary=True, columns=columns),
         call.create_table(
             'TARGET_SCHEMA',
             table,
@@ -716,6 +716,7 @@ def assert_snowflake_sync_table_iceberg_workflow(
             30,
             is_temporary=True,
             staging_table_name='PW_STAGE_123',
+            columns=columns,
         )
         target.obfuscate_columns.assert_not_called()
         publisher.record_uploaded.assert_called_once_with(attempt, s3_keys)

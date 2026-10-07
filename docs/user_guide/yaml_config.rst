@@ -112,6 +112,7 @@ Tap configuration
      password: "{{ env_var['POSTGRES_PASSWORD'] }}"
      dbname: "orders"
    target: "snowflake"
+   version_legacy_float_columns: false
    batch_size_rows: 20000
    stream_buffer_size: 0
    schemas:
@@ -229,6 +230,15 @@ Tap configuration
      - Managed-Iceberg version discriminator. Its only supported value is integer
        ``3``; it is required with ``target_table_format: iceberg`` and invalid
        otherwise.
+   * - ``version_legacy_float_columns``
+     - ``false``
+     - For MariaDB/MySQL or PostgreSQL taps writing to Snowflake, set ``true``
+       to retain an eligible non-key legacy floating-point decimal column under a
+       timestamped name and create its fixed-point replacement. New decimal
+       columns use the current precision-preserving mapping regardless of this
+       setting. Existing floating-point decimal keys remain unchanged even when
+       this option is enabled. Configure it at the tap root, not in ``db_conn``
+       or the shared target.
    * - ``validate_records``
      - ``false``
      - Validates Singer records against their emitted schema before loading.

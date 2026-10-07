@@ -1,7 +1,5 @@
 import unittest
 import os
-import gzip
-import tempfile
 
 from unittest.mock import patch
 

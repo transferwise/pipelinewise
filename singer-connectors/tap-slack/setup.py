@@ -18,7 +18,7 @@ setup(name='pipelinewise-tap-slack',
       ],
       py_modules=['tap_slack'],
       install_requires=[
-          'pipelinewise-singer-python==3.0.2',
+          'pipelinewise-singer-python==3.0.2+pipelinewise.0.94.0',
           'slack-sdk==3.20.0',
       ],
       extras_require={

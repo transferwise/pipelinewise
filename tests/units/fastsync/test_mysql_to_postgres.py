@@ -30,6 +30,7 @@ class S3CsvToPostgres(unittest.TestCase):
         self.assertEqual('JSONB', tap_type_to_target_type('multipolygon', None))
         self.assertEqual('JSONB', tap_type_to_target_type('geometrycollection', None))
         self.assertEqual('JSONB', tap_type_to_target_type('geomcollection', None))
+        self.assertEqual('SMALLINT NULL', tap_type_to_target_type('year', 'year(4)'))
 
     def test_tap_type_to_target_type_with_undefined_tap_type_returns_CHARACTER_VARYING(
         self,

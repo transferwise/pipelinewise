@@ -91,6 +91,8 @@ services:
       # The Dockerfile clones wal2json from GitHub, which fails behind some
       # corporate proxy/DNS setups on the default bridge network.
       network: host
+      entitlements:
+        - network.host
     container_name: pipelinewise-postgres-source
     volumes:
       - ./pg/pg_hba.conf:/var/lib/postgresql/pg_hba.conf

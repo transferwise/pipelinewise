@@ -6,6 +6,8 @@ import os
 from typing import Callable, Dict, Iterable, List, Optional
 from tempfile import mkstemp
 
+from singer.decimal_support import decimal_canonical_string, snowflake_float_expression
+
 from target_snowflake import flattening
 from target_snowflake.managed_iceberg import sql_string_literal
 
@@ -35,9 +37,33 @@ def create_copy_sql(table_name: str,
     """Generate a CSV compatible snowflake COPY INTO command"""
     p_columns = ', '.join([c['name'] for c in columns])
 
+    if any(column.get('decimal_type') for column in columns):
+        expressions = ', '.join(
+            _stage_column_expression(column, position) for position, column in enumerate(columns, start=1)
+        )
+        return (
+            f"COPY INTO {table_name} ({p_columns}) FROM (SELECT {expressions} "
+            f"FROM '@{stage_name}/{s3_key}') "
+            f"FILE_FORMAT = (format_name={sql_string_literal(file_format_name)})"
+        )
+
     return f"COPY INTO {table_name} ({p_columns}) " \
            f"FROM '@{stage_name}/{s3_key}' " \
            f"FILE_FORMAT = (format_name={sql_string_literal(file_format_name)})"
+
+
+def _stage_column_expression(column, position):
+    """Give decimal join keys their exact type before MERGE comparisons."""
+    expression = f"{column['trans']}(${position})"
+    if column.get('decimal_type') == 'FLOAT':
+        return snowflake_float_expression(expression)
+    if column.get('decimal_type'):
+        if column['decimal_type'].startswith('NUMERIC') and not column.get('decimal_key'):
+            expression = f"NULLIF({expression}, 'NaN')"
+        return f"CAST({expression} AS {column['decimal_type']})"
+    if column.get('retained_type'):
+        return f"CAST({expression} AS {column['retained_type']})"
+    return expression
 
 
 def create_merge_sql(table_name: str,
@@ -50,7 +76,10 @@ def create_merge_sql(table_name: str,
                      update_columns: Optional[Iterable[str]] = None) -> str:
     """Generate a CSV compatible snowflake MERGE INTO command"""
     update_column_names = None if update_columns is None else set(update_columns)
-    p_source_columns = ', '.join([f"{c['trans']}(${i + 1}) {c['name']}" for i, c in enumerate(columns)])
+    p_source_columns = ', '.join([
+        f"{_stage_column_expression(column, position)} {column['name']}"
+        for position, column in enumerate(columns, start=1)
+    ])
     p_update = ', '.join([
         f"{c['name']}=s.{c['name']}" for c in columns
         if update_column_names is None or c['name'] in update_column_names
@@ -72,7 +101,9 @@ def create_merge_sql(table_name: str,
 
 def record_to_csv_line(record: dict,
                        schema: dict,
-                       data_flattening_max_level: int = 0) -> str:
+                       data_flattening_max_level: int = 0,
+                       key_properties=(),
+                       value_transformer=None) -> str:
     """
     Transforms a record message to a CSV line
 
@@ -88,6 +119,10 @@ def record_to_csv_line(record: dict,
     values = []
     for column in schema:
         value = flatten_record.get(column)
+        if value_transformer is not None:
+            value = value_transformer(column, value)
+        if column in key_properties:
+            value = decimal_canonical_string(value)
         if value is None:
             values.append('')
         elif isinstance(value, str):
@@ -103,7 +138,9 @@ def write_records_to_file(outfile,
                           records: Dict,
                           schema: Dict,
                           record_to_csv_line_transformer: Callable,
-                          data_flattening_max_level: int = 0) -> None:
+                          data_flattening_max_level: int = 0,
+                          key_properties=(),
+                          value_transformer=None) -> None:
     """
     Writes a record message to a given file
 
@@ -118,7 +155,10 @@ def write_records_to_file(outfile,
         None
     """
     for record in records.values():
-        csv_line = record_to_csv_line_transformer(record, schema, data_flattening_max_level)
+        options = {'key_properties': key_properties} if key_properties else {}
+        if value_transformer is not None:
+            options['value_transformer'] = value_transformer
+        csv_line = record_to_csv_line_transformer(record, schema, data_flattening_max_level, **options)
         outfile.write(bytes(csv_line + '\n', 'UTF-8'))
 
 
@@ -128,7 +168,9 @@ def records_to_file(records: Dict,
                     prefix: str = 'batch_',
                     compression: bool = False,
                     dest_dir: str = None,
-                    data_flattening_max_level: int = 0):
+                    data_flattening_max_level: int = 0,
+                    key_properties=(),
+                    value_transformer=None):
     """
     Transforms a list of dictionaries with records messages to a CSV file
 
@@ -158,9 +200,15 @@ def records_to_file(records: Dict,
     if compression:
         with open(filedesc, 'wb') as outfile:
             with gzip.GzipFile(filename=filename, mode='wb',fileobj=outfile) as gzipfile:
-                write_records_to_file(gzipfile, records, schema, record_to_csv_line, data_flattening_max_level)
+                write_records_to_file(
+                    gzipfile, records, schema, record_to_csv_line, data_flattening_max_level, key_properties,
+                    value_transformer,
+                )
     else:
         with open(filedesc, 'wb') as outfile:
-            write_records_to_file(outfile, records, schema, record_to_csv_line, data_flattening_max_level)
+            write_records_to_file(
+                outfile, records, schema, record_to_csv_line, data_flattening_max_level, key_properties,
+                value_transformer,
+            )
 
     return filename

@@ -1,15 +1,17 @@
 import hashlib
 import re
+from decimal import Decimal, InvalidOperation
 
 from typing import Dict, Any, Optional, List
 from dpath.util import get as get_xpath, set as set_xpath
 from singer import get_logger
+from singer.decimal_support import decimal_to_string, is_decimal_schema
 from dateutil import parser
 
 LOGGER = get_logger('transform_field')
 
 
-def is_transform_required(record: Dict, when: Optional[List[Dict]]) -> bool:
+def is_transform_required(record: Dict, when: Optional[List[Dict]], schema: Optional[Dict] = None) -> bool:
     """
         Detects if the transformation is required or not based on
         the defined conditions and the actual values in a record.
@@ -48,11 +50,15 @@ def is_transform_required(record: Dict, when: Optional[List[Dict]]) -> bool:
 
         cond_equals = condition.get('equals')
         cond_pattern = condition.get('regex_match')
+        field_schema = (schema or {}).get('properties', {}).get(column_to_match, {})
+        decimal_condition = is_decimal_schema(field_schema) and not field_path_to_match
 
         # Exact condition
-        if cond_equals:
+        if cond_equals or (decimal_condition and 'equals' in condition):
             LOGGER.debug('Equals condition found, value is: %s', cond_equals)
-            if field_path_to_match:
+            if decimal_condition:
+                transform_required = _decimal_equals(column_value, cond_equals, field_schema)
+            elif field_path_to_match:
                 transform_required = __is_condition_met('equal', cond_equals, field_value)
             else:
                 transform_required = __is_condition_met('equal', cond_equals, column_value)
@@ -65,6 +71,11 @@ def is_transform_required(record: Dict, when: Optional[List[Dict]]) -> bool:
         # Regex based condition
         elif cond_pattern:
             LOGGER.debug('Regex condition found, pattern is: %s', cond_pattern)
+
+            # String transport must not enable regex matching for numeric fields.
+            if decimal_condition:
+                transform_required = False
+                break
 
             if field_path_to_match:
                 transform_required = __is_condition_met('regex', cond_pattern, field_value)
@@ -79,6 +90,17 @@ def is_transform_required(record: Dict, when: Optional[List[Dict]]) -> bool:
     LOGGER.debug('Transformation required? %s', transform_required)
 
     return transform_required
+
+
+def _decimal_equals(value, condition, schema):
+    if value is None or condition is None:
+        return value is None and condition is None
+    left = Decimal(decimal_to_string(value, schema))
+    try:
+        right = Decimal(str(condition))
+        return (left.is_nan() and right.is_nan()) or left == right
+    except InvalidOperation:
+        return False
 
 
 def __is_condition_met(condition_type: str, condition_value: Any, value: Any) -> bool:
@@ -107,7 +129,8 @@ def do_transform(record: Dict,
                  field: str,
                  trans_type: str,
                  when: Optional[List[Dict]] = None,
-                 field_paths: Optional[List[str]] = None
+                 field_paths: Optional[List[str]] = None,
+                 schema: Optional[Dict] = None,
                  ) -> Any:
     """Transform a value by a certain transformation type.
     Optionally can set conditional criteria based on other
@@ -117,7 +140,7 @@ def do_transform(record: Dict,
 
     try:
         # Do transformation only if required
-        if is_transform_required(record, when):
+        if is_transform_required(record, when, schema):
 
             # transforming fields nested in value dictionary
             if isinstance(value, dict) and field_paths:
