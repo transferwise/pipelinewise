@@ -480,9 +480,6 @@ def test_snowflake_e2e_matrix_contract():
             'tests/integration/test_decimals.py::test_decimal_archive_bounds_preserve_exact_text_and_ignore_nulls',
             'tests/integration/test_decimals.py::test_mysql_extended_composite_key_upgrade_preserves_historical_updates_and_deletes',
             'tests/integration/test_runtime_contracts.py::test_cli_loads_utf8_and_acknowledges_committed_state',
-            'tests/integration/test_runtime_contracts.py::test_cli_rejects_malformed_messages_without_acknowledging',
-            'tests/integration/test_runtime_contracts.py::test_cli_rejects_invalid_settings_before_schema_creation',
-            'tests/integration/test_runtime_contracts.py::test_cli_ignores_activation_and_acknowledges_state_without_records',
             'tests/integration/test_runtime_contracts.py::test_cli_rejects_invalid_file_format_before_loading',
         ),
         'connector-keys': (

@@ -40,69 +40,13 @@ def test_cli_loads_utf8_and_acknowledges_committed_state(snowflake_decimal_targe
     run_cli(config, [
         schema_message(decimal_schema(10, 2), extra_properties={'label': {'type': ['string']}}),
         {'type': 'RECORD', 'stream': 'public-items', 'record': {'id': 1, 'amount': '1.25', 'label': 'Καλημέρα 日本語'}},
+        {'type': 'ACTIVATE_VERSION'},
         {'type': 'STATE', 'value': state},
     ], tmp_path, monkeypatch)
     assert [json.loads(line) for line in capsys.readouterr().out.splitlines()] == [state]
     assert database.query(f'SELECT ID, AMOUNT, LABEL FROM "{config["default_target_schema"]}".ITEMS') == [
         {'ID': 1, 'AMOUNT': Decimal('1.25'), 'LABEL': 'Καλημέρα 日本語'},
     ]
-
-
-@pytest.mark.parametrize('snowflake_decimal_target', ['native'], indirect=True)
-@pytest.mark.parametrize(('message', 'error'), [
-    ({}, "missing required key 'type'"),
-    ({'type': 'RECORD', 'record': {}}, "missing required key 'stream'"),
-    ({'type': 'SCHEMA', 'schema': {}}, "missing required key 'stream'"),
-    ({'type': 'SCHEMA', 'stream': 'public-items', 'schema': {'type': 'object'}}, 'key_properties field is required'),
-    ({'type': 'SCHEMA', 'stream': 'public-items', 'schema': {'type': 'object'}, 'key_properties': []},
-     'key_properties field is required'),
-    ({'type': 'UNRECOGNIZED'}, 'Unknown message type'),
-])
-def test_cli_rejects_malformed_messages_without_acknowledging(
-    snowflake_decimal_target, message, error, tmp_path, monkeypatch, capsys,
-):
-    config, database = snowflake_decimal_target
-    with pytest.raises(Exception, match=error):
-        run_cli(config, [message, {'type': 'STATE', 'value': {'last_id': 1}}], tmp_path, monkeypatch)
-    assert not capsys.readouterr().out
-    assert database.get_table_columns([config['default_target_schema']]) == []
-
-
-@pytest.mark.parametrize('snowflake_decimal_target', ['native'], indirect=True)
-@pytest.mark.parametrize('invalid_settings', [
-    {'warehouse': None},
-    {'s3_bucket': None},
-    {'stage': None},
-    {'stage': 'unqualified_stage'},
-    {'default_target_schema': None},
-    {'s3_bucket': None, 'stage': None, 'archive_load_files': True},
-    {'version_legacy_float_columns': 'true'},
-    {'iceberg_create': True},
-    {'target_table_format': 'unsupported'},
-    {'target_table_format': 'iceberg', 'iceberg_version': 2},
-    {'iceberg_version': 3},
-])
-def test_cli_rejects_invalid_settings_before_schema_creation(
-    snowflake_decimal_target, invalid_settings, tmp_path, monkeypatch, capsys,
-):
-    config, database = snowflake_decimal_target
-    schema = config['default_target_schema']
-    with pytest.raises(SystemExit) as error:
-        run_cli({**config, **invalid_settings}, [schema_message(decimal_schema(10, 2))], tmp_path, monkeypatch)
-    assert error.value.code == 1
-    assert not capsys.readouterr().out
-    assert database.get_table_columns([schema]) == []
-
-
-@pytest.mark.parametrize('snowflake_decimal_target', ['native'], indirect=True)
-def test_cli_ignores_activation_and_acknowledges_state_without_records(
-    snowflake_decimal_target, tmp_path, monkeypatch, capsys,
-):
-    config, database = snowflake_decimal_target
-    state = {'bookmarks': {'public-items': {'last_id': 1}}}
-    run_cli(config, [{'type': 'ACTIVATE_VERSION'}, {'type': 'STATE', 'value': state}], tmp_path, monkeypatch)
-    assert [json.loads(line) for line in capsys.readouterr().out.splitlines()] == [state]
-    assert database.get_table_columns([config['default_target_schema']]) == []
 
 
 @pytest.mark.parametrize('snowflake_decimal_target', ['native'], indirect=True)

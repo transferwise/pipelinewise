@@ -146,3 +146,71 @@ def test_startup_preserves_unexpected_errors_without_consuming_records():
 
     persist.assert_not_called()
     assert input_bytes.tell() == 0
+
+
+@pytest.mark.parametrize(('message', 'error'), [
+    ({}, "missing required key 'type'"),
+    ({'type': 'RECORD', 'record': {}}, "missing required key 'stream'"),
+    ({'type': 'RECORD', 'stream': 'public-items', 'record': {}}, 'before a corresponding schema'),
+    ({'type': 'SCHEMA', 'schema': {}}, "missing required key 'stream'"),
+    ({'type': 'SCHEMA', 'stream': 'public-items', 'schema': {'type': 'object'}}, 'key_properties field is required'),
+    ({'type': 'SCHEMA', 'stream': 'public-items', 'schema': {'type': 'object'}, 'key_properties': []},
+     'key_properties field is required'),
+    ({'type': 'UNRECOGNIZED'}, 'Unknown message type'),
+    ('{broken-json', 'Expecting property name'),
+])
+def test_malformed_protocol_stops_before_database_sync_or_acknowledgement(message, error):
+    first_line = message if isinstance(message, str) else json.dumps(message)
+    with patch.object(target_snowflake, 'DbSync') as database, \
+            patch.object(target_snowflake, 'emit_state') as emit, \
+            pytest.raises(Exception, match=error):
+        target_snowflake.persist_lines({}, [first_line, json.dumps({'type': 'STATE', 'value': {'last_id': 1}})])
+    database.assert_not_called()
+    emit.assert_not_called()
+
+
+@pytest.mark.parametrize('invalid_settings', [
+    {'warehouse': None},
+    {'s3_bucket': None},
+    {'stage': None},
+    {'stage': 'unqualified_stage'},
+    {'default_target_schema': None},
+    {'s3_bucket': None, 'stage': None, 'archive_load_files': True},
+    {'version_legacy_float_columns': 'true'},
+    {'iceberg_create': True},
+    {'target_table_format': 'unsupported'},
+    {'target_table_format': 'iceberg', 'iceberg_version': 2},
+    {'iceberg_version': 3},
+])
+def test_invalid_cli_settings_do_not_query_snowflake_or_read_input(tmp_path, invalid_settings):
+    config = {
+        'account': 'test-account', 'dbname': 'TEST_DB', 'user': 'test-user', 'private_key': 'unused.pem',
+        'warehouse': 'TEST_WH', 'file_format': 'TEST_DB.TEST_SCHEMA.TEST_FORMAT',
+        'default_target_schema': 'TEST_SCHEMA', 's3_bucket': 'test-bucket', 'stage': 'TEST_SCHEMA.TEST_STAGE',
+        **invalid_settings,
+    }
+    config_path = tmp_path / 'config.json'
+    config_path.write_text(json.dumps(config), encoding='utf-8')
+    input_bytes = io.BytesIO(b'{"type":"STATE","value":{"last_id":1}}\n')
+    singer_input = io.TextIOWrapper(input_bytes, encoding='utf-8')
+    with patch('sys.argv', ['target-snowflake', '--config', str(config_path)]), \
+            patch('sys.stdin', singer_input), \
+            patch.object(target_snowflake.DbSync, 'open_connection') as connection, \
+            patch.object(target_snowflake, 'persist_lines') as persist, \
+            pytest.raises(SystemExit) as error:
+        target_snowflake.main()
+    assert error.value.code == 1
+    connection.assert_not_called()
+    persist.assert_not_called()
+    assert input_bytes.tell() == 0
+
+
+def test_activation_message_does_not_prevent_idle_state_acknowledgement():
+    state = {'bookmarks': {'public-items': {'last_id': 1}}}
+    with patch.object(target_snowflake, 'DbSync') as database, \
+            patch.object(target_snowflake, 'emit_state') as emit:
+        target_snowflake.persist_lines({}, [
+            json.dumps({'type': 'ACTIVATE_VERSION'}), json.dumps({'type': 'STATE', 'value': state}),
+        ])
+    database.assert_not_called()
+    emit.assert_called_once_with(state)

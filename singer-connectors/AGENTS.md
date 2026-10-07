@@ -85,9 +85,9 @@ docker exec -t -e CLIENT_SIDE_ENCRYPTION_MASTER_KEY= \
 ```
 
 This excludes one successful client-side encryption test while retaining CSV
-external and table-stage loads plus wrong-key rejection. Expect 113 passes,
+external and table-stage loads plus wrong-key rejection. Expect 95 passes,
 one deselection, and zero skips. Full `make integration_test` separately requires
-a real client-side encryption master key and expects 114 passes. Report unit,
+a real client-side encryption master key and expects 96 passes. Report unit,
 integration, and combined coverage separately; combining them does not satisfy
 either individual gate.
 
