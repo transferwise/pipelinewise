@@ -640,8 +640,8 @@ class DataDiffRepository:
                 INSERT INTO {SCHEMA}.dd_preflight_log(
                     preflight_id, check_id, status, checked_at,
                     query_fingerprint, index_metadata, findings, error,
-                    table_rows, row_limit, has_leading_index
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    has_leading_index
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     preflight_id, check_id, preflight["status"],
@@ -649,8 +649,6 @@ class DataDiffRepository:
                     psycopg2.extras.Json(preflight.get("index_metadata", [])),
                     psycopg2.extras.Json(preflight.get("findings", [])),
                     preflight.get("error"),
-                    preflight.get("table_rows"),
-                    preflight.get("row_limit"),
                     preflight.get("has_leading_index"),
                 ),
             )

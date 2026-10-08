@@ -364,31 +364,28 @@ Source safety
 Preflight
 '''''''''
 
-Before reading data, preflight returns ``BLOCKED`` when both conditions apply:
+Before each data check, the source table must have a usable index whose first
+column is ``timestamp_column``. This applies to every table size and to initial
+full scans. Without that index, preflight returns ``BLOCKED`` and the data
+comparison does not run. Schema-only checks do not require an index.
 
-- The source table has more than 100,000 estimated rows.
-- No accepted index starts with ``timestamp_column``.
+Checks that combine schema and data comparisons keep completed schema results.
+If preflight blocks the data comparison, the overall run is ``ERROR``. No data
+queries run, and verified coverage does not advance.
 
-Tables at or below that limit can run without the index. PipelineWise reports
-the missing index but does not create one.
-
-Accepted indexes must start with the timestamp column:
+Accepted indexes are:
 
 - PostgreSQL: a plain, valid, ready B-tree index. Partial, expression, hash,
   BRIN, and still-building indexes do not satisfy this preflight policy.
 - MySQL/MariaDB: a BTREE index with no prefix length on the timestamp column.
   ``INVISIBLE`` and ``IGNORED`` indexes do not satisfy the policy.
 
-Row counts come from catalog estimates, counting partitions once. PostgreSQL
-falls back to physical size when usable row estimates are missing. Refresh stale
-statistics with ``ANALYZE`` on PostgreSQL or ``ANALYZE TABLE`` on MySQL/MariaDB.
-These refresh estimates, not exact counts.
-
 .. note::
 
-   Preflight checks metadata, not the query plan. A wide window may still use a
-   full scan. Keep rolling windows narrow and set ``statement_timeout`` to limit
-   each query's duration.
+   Preflight checks index metadata. A query may still use a full table scan.
+   Keep rolling windows narrow and set ``statement_timeout`` to limit each
+   query's duration.
 
-For a blocked check, ask the DBA to add or enable an accepted index. Inspect
-``dd_preflight_log`` for the verdict, row estimate, limit, and index findings.
+For a blocked check, ask the DBA to add or enable an accepted index. PipelineWise
+does not create indexes. Inspect ``dd_preflight_log`` for the verdict and index
+findings.

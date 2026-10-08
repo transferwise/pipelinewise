@@ -1,7 +1,7 @@
 """Database adapters for data-diff checks.
 
 One adapter per database type, providing dialect-specific SQL generation, column
-and index metadata, table sizing, and checksum normalization. Checksum expressions
+and index metadata, and checksum normalization. Checksum expressions
 must agree numerically across every dialect, since a source and target are compared
 by their sums: see ``checksum_integer`` and ``normalize_checksum_value``.
 """
@@ -14,10 +14,6 @@ from time import perf_counter
 import psycopg2.extras
 
 
-MAX_SAFE_FULL_SCAN_ROWS = 100_000
-# Used only when a table has no planner statistics. Deliberately the densest
-# realistic packing, so an unanalyzed large table blocks rather than slips through.
-ROWS_PER_PAGE_ESTIMATE = 250
 # Distinguishes "probed, no visibility column" from "not probed yet"; None is a real
 # result here, so it cannot double as the sentinel.
 _UNPROBED = object()
@@ -186,10 +182,6 @@ class DatabaseAdapter:
         """Return ordered index-column metadata for the table."""
         raise NotImplementedError
 
-    def table_rows(self, schema: str, table: str) -> int:
-        """Return the approximate row count of a table from catalog statistics."""
-        raise NotImplementedError
-
     def minimum_timestamp(self, schema: str, table: str, column: dict, cutoff: datetime):
         """Read the earliest non-NULL timestamp before the settled cutoff in UTC."""
         timestamp = self.quote(column["name"])
@@ -292,56 +284,6 @@ class PostgresAdapter(DatabaseAdapter):
                 (schema, table),
             )
             return [dict(row) for row in cursor.fetchall()]
-
-    def table_rows(self, schema, table):
-        """Return the approximate row count of a table, including its partitions.
-
-        Only leaf relations contribute. A partitioned parent reports the same
-        reltuples as its partitions, so counting both double-counts every row.
-
-        ``reltuples <= 0`` means the planner has no usable estimate, not that the
-        table is empty: ANALYZE on an empty table records 0, and rows inserted
-        afterwards do not update it. Physical size is the honest signal in that
-        case, and a genuinely empty table occupies no pages so it still passes.
-        """
-        with self.connection.cursor() as cursor:
-            cursor.execute(
-                """
-                WITH RECURSIVE tree AS (
-                    SELECT table_class.oid, table_class.reltuples
-                      FROM pg_class table_class
-                      JOIN pg_namespace namespace
-                        ON namespace.oid = table_class.relnamespace
-                     WHERE namespace.nspname = %s AND table_class.relname = %s
-                    UNION ALL
-                    SELECT child.oid, child.reltuples
-                      FROM tree
-                      JOIN pg_inherits inherits ON inherits.inhparent = tree.oid
-                      JOIN pg_class child ON child.oid = inherits.inhrelid
-                )
-                SELECT COALESCE(SUM(
-                    CASE
-                        WHEN tree.reltuples > 0 THEN tree.reltuples
-                        -- No statistics at all: pg_stats is empty too, so the only
-                        -- honest input is physical size. Assume the densest
-                        -- plausible packing so the guard fails closed — a table
-                        -- large enough to matter is blocked rather than waved
-                        -- through. ROWS_PER_PAGE_ESTIMATE is that upper bound.
-                        ELSE (pg_relation_size(tree.oid) / 8192) * %s
-                    END
-                ), 0)::bigint AS rows
-                  FROM tree
-                 WHERE NOT EXISTS (
-                     SELECT 1 FROM pg_inherits parent_of
-                      WHERE parent_of.inhparent = tree.oid
-                 )
-                """,
-                (schema, table, ROWS_PER_PAGE_ESTIMATE),
-            )
-            row = cursor.fetchone()
-        if not row:
-            return 0
-        return int(row["rows"] if isinstance(row, dict) else row[0])
 
 
 class MySQLAdapter(DatabaseAdapter):
@@ -478,36 +420,6 @@ class MySQLAdapter(DatabaseAdapter):
             entry["columns"].append(row["column_name"])
         return list(grouped.values())
 
-    def table_rows(self, schema, table):
-        """Return the approximate row count of a table, including its partitions."""
-        with self.connection.cursor() as cursor:
-            cursor.execute(
-                """
-                SELECT COALESCE(SUM(TABLE_ROWS), 0) AS row_count
-                  FROM information_schema.PARTITIONS
-                 WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s
-                """,
-                (schema, table),
-            )
-            row = cursor.fetchone()
-        count = int((row["row_count"] if isinstance(row, dict) else row[0]) or 0)
-        if count:
-            return count
-        # PARTITIONS reports nothing for some engines, so fall back to TABLES.
-        with self.connection.cursor() as cursor:
-            cursor.execute(
-                """
-                SELECT COALESCE(TABLE_ROWS, 0) AS row_count
-                  FROM information_schema.TABLES
-                 WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s
-                """,
-                (schema, table),
-            )
-            row = cursor.fetchone()
-        if not row:
-            return 0
-        return int((row["row_count"] if isinstance(row, dict) else row[0]) or 0)
-
 
 class SnowflakeAdapter(DatabaseAdapter):
     """Snowflake metadata and aggregate operations."""
@@ -580,9 +492,6 @@ class SnowflakeAdapter(DatabaseAdapter):
 
     def indexes(self, schema, table):  # pragma: no cover - targets are not preflighted
         return []
-
-    def table_rows(self, schema, table):  # pragma: no cover - targets are not preflighted
-        return 0
 
 
 def _match_columns(schema, table, requested, available, *, allow_missing=False):

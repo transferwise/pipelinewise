@@ -60,6 +60,7 @@ def overlap_source(request):
     timestamp_type = 'TIMESTAMP(6)' if source_engine == 'postgres' else 'DATETIME(6)'
     query(f'CREATE TABLE {qualified_table} (id INTEGER PRIMARY KEY, updated_at {timestamp_type}, payload VARCHAR(30))')
     try:
+        query(f'CREATE INDEX {table}_updated_at_idx ON {qualified_table} (updated_at)')
         rows = [
             (row_id, datetime(2026, 1, day) if day else None, f'value-{row_id}')
             for row_id, day in ((1, 1), (2, 2), (3, 3), (4, 9), (5, 10), (6, None))

@@ -1431,7 +1431,8 @@ CREATE TABLE `weight_unit` (
   `original_date_created` varchar(50),
   `date_created` datetime DEFAULT CURRENT_TIMESTAMP,
   `date_updated` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`weight_unit_id`)
+  PRIMARY KEY (`weight_unit_id`),
+  KEY `weight_unit_date_updated_idx` (`date_updated`)
 ) ENGINE=MyISAM AUTO_INCREMENT=25 DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 

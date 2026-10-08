@@ -1,3 +1,16 @@
+0.95.0 (2026-10-08)
+-------------------
+
+- Require a usable source index starting with the timestamp column for every
+  data-diff data check, including initial historical scans and small tables.
+  Remove the row-count threshold. Add a qualifying index before running checks
+  on sources that previously relied on the small-table exemption. See
+  [data-diff preflight](docs/user_guide/data_diff.rst#preflight)
+- Stop collecting row estimates for new preflight records. Keep the old audit
+  columns and historical values for compatibility
+- Keep completed schema results when data-diff preflight blocks data queries.
+  Keep the run in ERROR so it does not advance verified coverage
+
 0.94.1 (2026-10-08)
 -------------------
 

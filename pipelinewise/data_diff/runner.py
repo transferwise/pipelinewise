@@ -186,7 +186,7 @@ def _execute_and_persist(
                 or f"Source preflight {preflight['status']}"
             )
             backend.finish_run(
-                run["run_id"], "ERROR", [], preflight_id=preflight_id, error=error
+                run["run_id"], "ERROR", results, preflight_id=preflight_id, error=error
             )
             status = "ERROR"
         else:
@@ -311,8 +311,6 @@ def _finish_failed_run(backend, check: dict, run: dict, preflight_id, error: str
                 "index_metadata": [],
                 "findings": [],
                 "error": error,
-                "table_rows": None,
-                "row_limit": None,
                 "has_leading_index": None,
             },
         )

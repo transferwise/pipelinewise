@@ -70,16 +70,16 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
   always delete marked rows, and enable target metadata.
 - Dev MySQL requires TLS (`ssl={'': True}`). PyMySQL interpolates bound SQL, so
   double literal tokens, e.g. `DATE_FORMAT(t, '%%Y')`.
-- PostgreSQL `reltuples == 0` after ANALYZE-then-load does not prove emptiness;
-  partitioned parents can duplicate child estimates. Sum leaf partitions.
 - SIGTERM normally does not raise `SystemExit`; durable handling needs an
   installed signal handler, and injected `SystemExit` is not proof.
 - Separate backend app roles receive schema/sequence access plus `SELECT`,
   `INSERT`, and `UPDATE`, but no `DELETE`/DDL. A shared app/DDL identity removes
   that separation intentionally.
-- Source preflight checks estimates and timestamp-index shape—not exact counts
-  or actual index use—and requires a statement timeout. Treat `min_key`/`max_key`
-  values in `dd_run_results` as sensitive; avoid casual logging.
+- Source preflight requires a usable index whose first column is the timestamp
+  column, including initial full scans. Schema-only checks are exempt. Inspect
+  index metadata without query plans or row estimates, and require a statement
+  timeout. Treat `min_key`/`max_key` values in `dd_run_results` as sensitive;
+  avoid casual logging.
 
 ## Snowflake and Iceberg contract
 

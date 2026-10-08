@@ -106,6 +106,9 @@ either individual gate.
   method and PipelineWise FullSync/PartialSync. Keep their version checks aligned;
   this source minimum does not constrain target-postgres or the PipelineWise
   backend database.
+- PostgreSQL discovery's `row-count` uses `reltuples`, which can be stale or zero
+  after ANALYZE-then-load. Zero does not prove emptiness. Sum leaf estimates for
+  partitioned totals without adding parent estimates.
 - PostgreSQL/Snowflake targets silently ignore retired deletion-mode options,
   enable metadata automatically, and physically process `_SDC_DELETED_AT` before
   acknowledging state. Keep this marker in Singer schemas and transport.
