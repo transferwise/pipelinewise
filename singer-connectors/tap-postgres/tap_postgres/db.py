@@ -7,6 +7,7 @@ import pytz
 import psycopg2
 import psycopg2.extras
 import singer
+from singer.logger import log_source_host
 
 from typing import List
 from dateutil.parser import parse
@@ -76,6 +77,7 @@ def open_connection(conn_config, logical_replication=False, prioritize_primary=F
     if logical_replication:
         cfg['connection_factory'] = psycopg2.extras.LogicalReplicationConnection
 
+    log_source_host(LOGGER, 'PostgreSQL', cfg['host'])
     conn = psycopg2.connect(**cfg)
     try:
         validate_server_version(conn)

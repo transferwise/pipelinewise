@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import logging
 import math
 import time
 from typing import Any, Dict, Optional, Tuple
@@ -70,6 +71,7 @@ from pipelinewise.fastsync.commons.snowflake_decimal_evolution import (
 )
 
 
+LOGGER = logging.getLogger(__name__)
 _PUBLICATION_SUBMITTED_AT = 'publication_submitted_at'
 _TERMINAL_HISTORY_STATUSES = frozenset({
     'success',
@@ -328,14 +330,17 @@ class SnowflakeIcebergPublicationService:
             f'ALTER ICEBERG TABLE {spec.name.quoted} ADD COLUMN {column.definition}'
             for column in additions
         )
+        column_renames = ()
         if method == PUBLICATION_PARTIAL_MERGE:
-            preparation = partial_preparation(
+            preparation_plan = partial_preparation(
                 spec, snapshot.spec, attempt.manifest_payload.column_versions or {},
                 boundary_column=attempt.manifest_payload.column_name,
                 historical_columns=attempt.manifest_payload.historical_columns,
                 decimal_columns=decimal_columns,
                 version_legacy_float_columns=version_legacy_float_columns,
             )
+            preparation = preparation_plan.statements
+            column_renames = preparation_plan.column_renames
         if method == PUBLICATION_PARTIAL_BOOTSTRAP_CTAS:
             publication = (
                 self._ctas_sql(
@@ -359,7 +364,9 @@ class SnowflakeIcebergPublicationService:
             )
         else:
             publication = self._partial_merge_sql(spec, attempt)
-        return PublicationPlan(method, preparation, publication, snapshot.fingerprint, attempt.query_tag)
+        return PublicationPlan(
+            method, preparation, publication, snapshot.fingerprint, attempt.query_tag, column_renames,
+        )
 
     def _partial_method(
         self, spec, snapshot, drop_target, iceberg_version, decimal_columns=(),
@@ -739,8 +746,13 @@ class SnowflakeIcebergPublicationService:
         if snapshot.fingerprint != plan.target_fingerprint:
             raise RecoveryManifestError('Iceberg target changed after publication planning')
 
-        for statement in plan.preparation_statements:
+        renames = {rename.statement_index: rename for rename in plan.column_renames}
+        for index, statement in enumerate(plan.preparation_statements):
             self.snowflake.query(statement, query_tag_props={**attempt.query_tag, 'phase': 'schema_evolution'})
+            rename = renames.get(index)
+            if rename is not None:
+                LOGGER.info('Column "%s" in table "%s" has been renamed to "%s"',
+                            rename.column_name, spec.name.quoted, rename.archived_name)
         if plan.preparation_statements:
             evolved = self.inspect_table(spec.name)
             compatibility, additions = self._published_compatibility(attempt, spec, evolved.spec)

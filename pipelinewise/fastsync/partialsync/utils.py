@@ -1,4 +1,5 @@
 import json
+import logging
 
 import argparse
 import os
@@ -28,6 +29,7 @@ from pipelinewise.fastsync.commons.snowflake_column_versioning import (
 )
 
 
+LOGGER = logging.getLogger(__name__)
 # A dynamic boundary query with no usable scalar is a successful no-op.
 DYNAMIC_BOUNDARY_NOT_READY = object()
 SNOWFLAKE_TEXT_TYPES = frozenset({
@@ -239,6 +241,8 @@ def load_into_snowflake(target, args, source_columns, primary_keys, s3_key_patte
             snowflake.query(
                 f'ALTER TABLE {_native_target_name(target)} RENAME COLUMN {name} TO {_quote_identifier(archive)}'
             )
+            LOGGER.info('Column "%s" in table "%s" has been renamed to "%s"', name[1:-1].replace('""', '"'),
+                        _native_target_name(target), archive)
             snowflake.add_columns(target['schema'], target['table'], {name: data_type})
         # Snowflake DDL commits independently. Finish safe, monotonic schema changes before the atomic MERGE.
         if columns_diff['varchar_columns_to_widen']:

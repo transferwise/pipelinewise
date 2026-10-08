@@ -14,6 +14,8 @@ host fallbacks.
 Connector CI installs all connectors and runs Python 3.12 units for tap-mysql
 (`make unit_test_cov`, 47%), tap-postgres (`make unit_test_cov`, 58%),
 target-postgres (`make unit_test`, 44%), and target-snowflake (`make unit_test`, 90%).
+The shared Singer job also runs tap-mongodb's source logging regression tests in
+a separate environment without a database. Other MongoDB units remain local.
 E2E job 01 runs SQL-source and PostgreSQL-target decimal integrations; jobs 15,
 16, and 20 run Snowflake decimal and runtime integrations through
 `scripts/test_decimal_connectors.sh`.

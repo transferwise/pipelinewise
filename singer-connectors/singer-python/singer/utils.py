@@ -11,6 +11,7 @@ import pytz
 import backoff as backoff_module
 
 from singer.catalog import Catalog
+from singer.logger import configure_log_redaction
 
 DATETIME_PARSE = '%Y-%m-%dT%H:%M:%SZ'
 DATETIME_FMT = '%04Y-%m-%dT%H:%M:%S.%fZ'
@@ -191,6 +192,7 @@ def parse_args(required_config_keys):
 
 
 def check_config(config, required_keys):
+    configure_log_redaction(config)
     missing_keys = [key for key in required_keys if key not in config]
     if missing_keys:
         raise RuntimeError(f'Config is missing required keys: {missing_keys}')

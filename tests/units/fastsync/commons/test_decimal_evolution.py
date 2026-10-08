@@ -3,6 +3,7 @@
 from dataclasses import replace
 from argparse import Namespace
 import json
+import logging
 from unittest.mock import Mock, patch
 
 import pytest
@@ -19,7 +20,9 @@ from pipelinewise.fastsync.commons.partial_sync_boundary import PartialSyncBound
 from pipelinewise.fastsync.partialsync.utils import diff_source_target_columns, NativePartialSyncCompatibilityError
 from pipelinewise.fastsync.partialsync import utils
 from pipelinewise.fastsync.partialsync import rdbms_to_snowflake
-from tests.units.fastsync.commons.snowflake_iceberg_test_helpers import FakeSnowflake, RECOVERY_IDENTITY, v3_snapshot
+from tests.units.fastsync.commons.snowflake_iceberg_test_helpers import (
+    FakeSnowflake, RECOVERY_IDENTITY, make_attempt, persist_attempt, v3_snapshot,
+)
 
 
 def _spec(amount_type):
@@ -34,12 +37,18 @@ def test_iceberg_decimal_change_plans_rename_and_new_empty_column(old_type):
     versions = plan_column_versions(
         expected, actual, decimal_columns=('AMOUNT',), version_legacy_float_columns=True,
     )
-    statements = partial_preparation(
+    preparation = partial_preparation(
         expected, actual, versions, decimal_columns=('AMOUNT',), version_legacy_float_columns=True,
     )
+    statements = preparation.statements
     assert len(statements) == 2
     assert 'RENAME COLUMN "AMOUNT" TO "AMOUNT_' in statements[0]
     assert statements[1].endswith('ADD COLUMN "AMOUNT" NUMBER(38,18)')
+    assert len(preparation.column_renames) == 1
+    rename = preparation.column_renames[0]
+    assert (rename.statement_index, rename.column_name, rename.archived_name) == (
+        0, 'AMOUNT', versions['AMOUNT']['archived_name'],
+    )
 
 
 def test_iceberg_legacy_decimal_float_stays_in_place_without_opt_in():
@@ -73,7 +82,7 @@ def test_iceberg_postgres_decimal_key_always_retains_float_staging_type(version_
     ) == {}
     assert partial_preparation(
         expected, actual, {}, decimal_columns=('AMOUNT',),
-    ) == ()
+    ).statements == ()
 
 
 def test_retained_iceberg_staging_definitions_exclude_pipelinewise_metadata():
@@ -161,14 +170,16 @@ def test_partial_ddl_retry_reuses_archive_and_does_not_rename_again():
     after_rename = replace(actual, columns=tuple(
         archive if column.name == 'AMOUNT' else column for column in actual.columns
     ))
-    statements = partial_preparation(
+    preparation = partial_preparation(
         expected, after_rename, versions, decimal_columns=('AMOUNT',), version_legacy_float_columns=True,
     )
+    statements = preparation.statements
     assert len(statements) == 1 and 'ADD COLUMN "AMOUNT" NUMBER(38,18)' in statements[0]
+    assert preparation.column_renames == ()
     after_add = replace(expected, columns=expected.columns + (archive,))
     assert partial_preparation(
         expected, after_add, versions, decimal_columns=('AMOUNT',), version_legacy_float_columns=True,
-    ) == ()
+    ).statements == ()
     assert partial_compatibility(expected, after_add) == ('exact', ())
 
 
@@ -403,7 +414,10 @@ def test_native_archive_collisions_fail_before_any_column_is_renamed(collision):
             utils._plan_native_column_versions(changes)
 
 
-def test_native_retry_after_rename_adds_replacement_without_archiving_twice():
+@pytest.mark.parametrize('failure_point', ['rename', 'add'])
+def test_native_retry_after_rename_adds_replacement_without_archiving_twice(failure_point, monkeypatch, caplog):
+    monkeypatch.setattr(logging.getLogger('pipelinewise'), 'propagate', True)
+    caplog.set_level(logging.INFO)
     client = Mock()
     archive = 'AMOUNT_20260930_120000_123456'
     target_columns = {'ID': {'type': 'FIXED', 'precision': 38, 'scale': 0}, 'AMOUNT': {'type': 'REAL'}}
@@ -413,6 +427,8 @@ def test_native_retry_after_rename_adds_replacement_without_archiving_twice():
             return [{'column_name': name, 'data_type': json.dumps(data_type)}
                     for name, data_type in target_columns.items()]
         assert f'RENAME COLUMN "AMOUNT" TO "{archive}"' in sql
+        if failure_point == 'rename' and archive not in target_columns:
+            raise RuntimeError('interrupted during rename')
         target_columns[archive] = target_columns.pop('AMOUNT')
 
     def add_columns(_schema, _table, columns):
@@ -433,7 +449,10 @@ def test_native_retry_after_rename_adds_replacement_without_archiving_twice():
             utils.load_into_snowflake(
                 target, args, source, ['ID'], 'prefix', 1, 'WHERE ID > 0', decimal_columns=('AMOUNT',),
             )
+        messages = [record.getMessage() for record in caplog.records if 'has been renamed to' in record.getMessage()]
+        assert len(messages) == (0 if failure_point == 'rename' else 1)
         client.publish_partial_sync.assert_not_called()
+        failure_point = None
         client.add_columns.side_effect = add_columns
         utils.load_into_snowflake(
             target, args, source, ['ID'], 'prefix', 1, 'WHERE ID > 0', decimal_columns=('AMOUNT',),
@@ -443,8 +462,64 @@ def test_native_retry_after_rename_adds_replacement_without_archiving_twice():
         )
     assert set(target_columns) == {'ID', 'AMOUNT', archive}
     assert target_columns[archive] == {'type': 'REAL'}
-    assert sum('RENAME COLUMN' in call.args[0] for call in client.query.call_args_list) == 1
+    assert sum('RENAME COLUMN' in call.args[0] for call in client.query.call_args_list) == (
+        2 if len(messages) == 0 else 1
+    )
     assert client.publish_partial_sync.call_count == 2
+    messages = [record.getMessage() for record in caplog.records if 'has been renamed to' in record.getMessage()]
+    assert messages == [f'Column "AMOUNT" in table "SCHEMA."TABLE"" has been renamed to "{archive}"']
+
+
+@pytest.mark.parametrize('failure_point', ['none', 'rename', 'add'])
+def test_iceberg_rename_logging_survives_sql_formatting_and_ddl_retries(tmp_path, monkeypatch, caplog, failure_point):
+    monkeypatch.setattr(logging.getLogger('pipelinewise'), 'propagate', True)
+    caplog.set_level(logging.INFO)
+    expected, actual = _spec('NUMERIC(38,18)'), _spec('FLOAT')
+    versions = plan_column_versions(
+        expected, actual, decimal_columns=('AMOUNT',), version_legacy_float_columns=True,
+    )
+    archive = IcebergColumn(versions['AMOUNT']['archived_name'], 'FLOAT')
+    evolved = replace(expected, columns=expected.columns + (archive,))
+    key_validation = [{'HAS_NULL_KEY': 0, 'HAS_DUPLICATE_KEY': 0}]
+    responses = [key_validation]
+    if failure_point == 'add':
+        responses.append([])
+    if failure_point != 'none':
+        responses.append(RuntimeError('interrupted DDL'))
+    client = FakeSnowflake(responses)
+    publisher = SnowflakeIcebergPublisher(client, str(tmp_path))
+    publisher.inspect_table = Mock(side_effect=[v3_snapshot(actual), v3_snapshot(actual), v3_snapshot(evolved)])
+    publisher._verify_published = Mock()
+    attempt = make_attempt(expected, kind='partial', method=PUBLICATION_PARTIAL_MERGE, snapshot=v3_snapshot(actual),
+                           context={'column_versions': versions, 'decimal_columns': ['AMOUNT'],
+                                    'version_legacy_float_columns': True})
+    persist_attempt(publisher, attempt)
+    original_plan = publisher.publication_service.plan_partial_sync
+
+    def reformatted_plan(*args):
+        plan = original_plan(*args)
+        return replace(plan, preparation_statements=tuple(
+            statement.replace(' RENAME COLUMN ', '\nRENAME COLUMN ') for statement in plan.preparation_statements
+        ))
+
+    publisher.publication_service.plan_partial_sync = reformatted_plan
+    if failure_point != 'none':
+        with pytest.raises(RuntimeError, match='interrupted DDL'):
+            publisher.publish_partial_sync(attempt, expected)
+        messages = [record.getMessage() for record in caplog.records if 'has been renamed to' in record.getMessage()]
+        assert len(messages) == (0 if failure_point == 'rename' else 1)
+        retry_schema = actual if failure_point == 'rename' else replace(
+            actual, columns=tuple(archive if column.name == 'AMOUNT' else column for column in actual.columns),
+        )
+        publisher.inspect_table = Mock(side_effect=[
+            v3_snapshot(retry_schema), v3_snapshot(retry_schema), v3_snapshot(evolved),
+        ])
+        client.responses = [key_validation]
+    publisher.publish_partial_sync(attempt, expected)
+    messages = [record.getMessage() for record in caplog.records if 'has been renamed to' in record.getMessage()]
+    assert messages == [
+        f'Column "AMOUNT" in table "{expected.name.quoted}" has been renamed to "{archive.name}"',
+    ]
 
 
 @pytest.mark.parametrize('change', ['none', 'unexpected', 'changed_type', 'missing', 'not_nullable'])
@@ -477,7 +552,7 @@ def test_published_partial_schema_verifies_persisted_history(change):
         assert partial_preparation(
             expected, actual, versions, historical_columns=history, decimal_columns=('AMOUNT',),
             version_legacy_float_columns=True,
-        ) == ()
+        ).statements == ()
     else:
         with pytest.raises(RecoveryManifestError):
             partial_preparation(
@@ -494,7 +569,7 @@ def test_decimal_float_fallback_versions_once_and_can_return_to_numeric():
         )
         statements = partial_preparation(
             expected, actual, versions, decimal_columns=('AMOUNT',), version_legacy_float_columns=True,
-        )
+        ).statements
         assert len(statements) == 2
         archive = IcebergColumn(versions['AMOUNT']['archived_name'], next(
             column.data_type for column in actual.columns if column.name == 'AMOUNT'
@@ -502,7 +577,7 @@ def test_decimal_float_fallback_versions_once_and_can_return_to_numeric():
         evolved = replace(expected, columns=expected.columns + (archive,))
         assert partial_preparation(
             expected, evolved, versions, decimal_columns=('AMOUNT',), version_legacy_float_columns=True,
-        ) == ()
+        ).statements == ()
     client = Mock()
     client.query.return_value = [{'column_name': 'AMOUNT', 'data_type': json.dumps({
         'type': 'FIXED', 'precision': 38, 'scale': 18,

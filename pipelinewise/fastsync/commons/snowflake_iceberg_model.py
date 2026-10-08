@@ -540,6 +540,15 @@ class SnowflakeTableMetadata:
 
 
 @dataclass(frozen=True)
+class ColumnVersionRename:
+    """Identify a column rename by its position in preparation statements."""
+
+    statement_index: int
+    column_name: str
+    archived_name: str
+
+
+@dataclass(frozen=True)
 class PublicationPlan:
     """Statements and guard evidence for one publication attempt."""
 
@@ -548,6 +557,7 @@ class PublicationPlan:
     publication_statements: Tuple[str, ...]
     target_fingerprint: str
     query_tag: Dict[str, str]
+    column_renames: Tuple[ColumnVersionRename, ...] = ()
 
     @property
     def statements(self) -> Tuple[str, ...]:

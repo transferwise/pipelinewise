@@ -11,6 +11,7 @@ import stat
 import tempfile
 
 from typing import Callable, Dict, List, Optional, Tuple
+from singer.logger import configure_log_redaction
 from pipelinewise.cli.utils import generate_random_string
 
 LOGGER = logging.getLogger(__name__)
@@ -453,6 +454,7 @@ def _state_file_lock(path):
 
 
 def check_config(config, required_keys):
+    configure_log_redaction(config)
     missing_keys = [key for key in required_keys if key not in config]
     if missing_keys:
         raise Exception('Config is missing required keys: {}'.format(missing_keys))

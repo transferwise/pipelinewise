@@ -1,3 +1,18 @@
+0.94.1 (2026-10-08)
+-------------------
+
+- Log the selected source hostname for MariaDB, MySQL, PostgreSQL, and MongoDB
+  once per process in FastSync and Singer
+- Redact credentials from connector logs and exception tracebacks. Preserve
+  database names and counts when they match a username or short password.
+  Include MySQL TLS private-key contents
+- Log Snowflake native and Iceberg PartialSync column versioning at INFO,
+  including the table, column, and archived column name. See
+  [logging diagnostics](docs/user_guide/troubleshooting.rst#logging-and-diagnostics)
+- Update the bundled Singer version and package pins so wheel installations
+  include the logging helpers
+- Run MongoDB source logging regression tests in connector CI
+
 0.94.0 (2026-10-07)
 -------------------
 

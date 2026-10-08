@@ -6,6 +6,7 @@ from typing import List, Dict, Optional
 from urllib import parse
 
 import singer
+from singer.logger import log_source_host
 from pymongo import MongoClient
 from singer import metadata, metrics, utils
 
@@ -303,10 +304,10 @@ def main_impl():
         config = args.config
 
     connection_string = get_connection_string(config)
+    log_source_host(LOGGER, 'MongoDB', config['host'])
     client = MongoClient(connection_string)
 
-    LOGGER.info('Connected to MongoDB host: %s, version: %s',
-                config['host'],
+    LOGGER.info('Connected to MongoDB, version: %s',
                 client.server_info().get('version', 'unknown'))
 
     common.INCLUDE_SCHEMAS_IN_DESTINATION_STREAM_NAME = \

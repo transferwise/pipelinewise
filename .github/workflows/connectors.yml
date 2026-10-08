@@ -87,6 +87,13 @@ jobs:
         run: make -C singer-connectors/singer-python venv lint unit_test
       - name: Test transformations
         run: make -C singer-connectors/transform-field venv lint unit_test integration_test
+      - name: Test MongoDB source logging
+        run: |
+          python -m venv singer-connectors/tap-mongodb/venv
+          singer-connectors/tap-mongodb/venv/bin/python -m pip install \
+            -e singer-connectors/singer-python -e 'singer-connectors/tap-mongodb[test]'
+          singer-connectors/tap-mongodb/venv/bin/python -m pytest -v \
+            singer-connectors/tap-mongodb/tests/test_logging.py
 
   connector_tests:
     name: connector_tests

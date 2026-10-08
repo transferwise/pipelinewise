@@ -5,6 +5,7 @@ import glob
 import logging
 import os
 import pymysql
+from singer.logger import log_source_host
 import pymysql.cursors
 
 from argparse import Namespace
@@ -206,6 +207,7 @@ class FastSyncTapMySql:
         # using the normal credentials to connect
 
         conn_params, is_replica = self.get_connection_parameters()
+        log_source_host(LOGGER, 'MySQL/MariaDB', conn_params['host'])
 
         self.is_replica = is_replica
 
