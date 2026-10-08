@@ -713,6 +713,9 @@ connection. MongoDB logs the configured seed hostname or host list.
 Configured passwords, tokens, passphrases, AWS secrets, and MySQL ``ssl_key``
 contents are redacted from connector logs and default exception tracebacks,
 including worker threads.
+Configured multiline secrets are also redacted when connector output arrives
+one line at a time. Short fragments are masked only in credential fields or as
+complete lines. Replication state and control messages retain their original contents.
 Usernames and short passwords are redacted in credential fields and connection
 URI userinfo. Short secrets are also redacted after ``Bearer`` and in recognised
 authentication error formats, such as ``authentication failed (<secret>)`` and

@@ -108,6 +108,49 @@ def test_short_authentication_secrets_are_redacted_without_changing_replication_
     assert logfile.with_suffix('.log.success').read_text(encoding='utf-8') == expected
 
 
+@pytest.mark.parametrize('newline', ['\n', '\r\n'])
+@pytest.mark.parametrize('failed', [False, True])
+def test_raw_multiline_stderr_is_redacted_before_callbacks_and_log_writes(tmp_path, newline, failed):
+    fragments = ['-----BEGIN PRIVATE KEY-----', 'SYNTHETIC_TEST_KEY_CONTENT', '1', '-----END PRIVATE KEY-----']
+    key = newline.join(fragments)
+    config = tmp_path / 'config.json'
+    config.write_text(json.dumps({'ssl_key': key}), encoding='utf-8')
+    state = json.dumps({'bookmarks': {'stream': {'value': key}}})
+    control = 'PIPELINEWISE_CONTROL:' + json.dumps({'event': key})
+    before = state + '\n' + control + '\n'
+    raw_key = 'ERROR ssl_key="' + key + '"'
+    script = tmp_path / 'tap.py'
+    script.write_text(
+        'import sys\n'
+        f'sys.stderr.write({before!r})\n'
+        'sys.stderr.write("rows=1 dbname=1\\n")\n'
+        f'sys.stderr.write({raw_key!r})\nsys.stderr.flush()\nraise SystemExit({int(failed)})\n', encoding='utf-8',
+    )
+    received = []
+    logfile = tmp_path / 'tap.log'
+
+    def capture(line):
+        received.append(line)
+        return line
+
+    command = f'{sys.executable} "{script}" --config "{config}"'
+    expected = (before + 'rows=1 dbname=1\n' + 'ERROR ssl_key="[REDACTED]' + newline
+                + '[REDACTED]' + newline + '[REDACTED]' + newline + '[REDACTED]"')
+    if failed:
+        with pytest.raises(commands.RunCommandException) as error:
+            commands.run_command(command, str(logfile), capture)
+        assert 'ERROR ssl_key="[REDACTED]' in str(error.value)
+        assert 'SYNTHETIC_TEST_KEY_CONTENT' not in str(error.value)
+    else:
+        status, stdout, stderr = commands.run_command(command, str(logfile), capture)
+        assert status == 0 and stderr is None
+        assert stdout == expected
+    assert ''.join(received) == expected
+    assert received[:2] == [state + '\n', control + '\n']
+    suffix = 'failed' if failed else 'success'
+    assert logfile.with_suffix('.log.' + suffix).read_bytes().decode('utf-8') == expected
+
+
 def test_plain_logs_are_not_parsed_as_state_messages():
     with patch.object(utils.json, 'loads') as loads:
         assert not utils.is_state_message('Connecting to PostgreSQL source host: source.example\n')

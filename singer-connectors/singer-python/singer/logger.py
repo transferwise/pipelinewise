@@ -30,11 +30,18 @@ _AUTHENTICATION_PREFIX = (
 _URI_USERINFO = re.compile(r'(?P<scheme>\b[a-z][a-z0-9+.-]*://)[^/\s?#@]+@', re.IGNORECASE)
 
 
-def _value_pattern(values, prefix):
+def _credential_variants(text):
+    return {
+        text, quote(text), quote(text, safe=''), quote_plus(text, safe=''),
+        repr(text)[1:-1], json.dumps(text)[1:-1],
+    }
+
+
+def _value_pattern(values, prefix, suffix=r'(?![\w-]|\.[\w-])'):
     if not values:
         return None
     alternatives = '|'.join(re.escape(value) for value in sorted(values, key=len, reverse=True))
-    return re.compile(prefix + '(?:' + alternatives + r')(?![\w-]|\.[\w-])')
+    return re.compile(prefix + '(?:' + alternatives + ')' + suffix)
 
 
 class CredentialRedactor:
@@ -44,9 +51,10 @@ class CredentialRedactor:
         self.context_values = set()
         self.secret_values = set()
         self.short_secret_values = set()
+        self.multiline_values = set()
         self.basic_auth_values = set()
         self.context_pattern = self.secret_pattern = self.basic_auth_pattern = None
-        self.authentication_pattern = None
+        self.authentication_pattern = self.multiline_pattern = None
         for config in configs:
             self.add_config(config)
 
@@ -60,15 +68,10 @@ class CredentialRedactor:
                 is_secret = field_name in _SECRET_FIELDS or field in _SECRET_FIELDS
                 if is_secret or field_name in _IDENTITY_FIELDS or field in _IDENTITY_FIELDS:
                     text = str(value)
-                    variants = {
-                        text, quote(text), quote(text, safe=''), quote_plus(text, safe=''),
-                        repr(text)[1:-1], json.dumps(text)[1:-1],
-                    }
+                    variants = _credential_variants(text)
                     self.context_values.update(variants)
-                    # Short secrets need credential context so counts and identifiers remain useful.
                     if is_secret:
-                        values = self.secret_values if len(text) >= 8 else self.short_secret_values
-                        values.update(variants)
+                        self._add_secret_values(text, variants)
         user = next((config[key] for key in ('user', 'username', 'email', 'account_sid')
                      if config.get(key) is not None), None)
         password = next((config[key] for key in ('password', 'api_token', 'auth_token')
@@ -81,13 +84,38 @@ class CredentialRedactor:
         self.secret_pattern = _value_pattern(self.secret_values, r'(?<![\w.-])')
         self.authentication_pattern = _value_pattern(self.short_secret_values, _AUTHENTICATION_PREFIX)
         self.basic_auth_pattern = _value_pattern(self.basic_auth_values, r'(?P<prefix>(?i:\bBasic\s+))')
+        self.multiline_pattern = _value_pattern(
+            self.multiline_values, r'''(?m)^(?P<prefix>[ \t]*["']?)''',
+            suffix=r'''(?P<suffix>["']?[ \t]*\r?$)''',
+        )
+
+    def _add_secret_values(self, text, variants):
+        values = self.secret_values if len(text) >= 8 else self.short_secret_values
+        values.update(variants)
+        if '\n' not in text and '\r' not in text:
+            return
+        # Connector pipes deliver physical lines, so whole-value matching cannot protect raw PEM output.
+        for line in text.splitlines():
+            fragment = line.strip(' \t\r')
+            if not fragment:
+                continue
+            variants = _credential_variants(fragment)
+            self.context_values.update(variants)
+            values = self.secret_values if len(fragment) >= 8 else self.multiline_values
+            values.update(variants)
 
     def __call__(self, text):
         text = _URI_USERINFO.sub(r'\g<scheme>[REDACTED]@', text)
         for pattern in (self.context_pattern, self.basic_auth_pattern, self.authentication_pattern):
             if pattern:
                 text = pattern.sub(lambda match: match.group('prefix') + '[REDACTED]', text)
-        return self.secret_pattern.sub('[REDACTED]', text) if self.secret_pattern else text
+        if self.secret_pattern:
+            text = self.secret_pattern.sub('[REDACTED]', text)
+        if self.multiline_pattern:
+            text = self.multiline_pattern.sub(
+                lambda match: match.group('prefix') + '[REDACTED]' + match.group('suffix'), text,
+            )
+        return text
 
 
 _LOG_REDACTOR = CredentialRedactor()

@@ -112,6 +112,29 @@ def test_mysql_private_key_content_is_redacted(render):
     assert redact('TLS configuration rejected ' + key) == 'TLS configuration rejected [REDACTED]'
 
 
+@pytest.mark.parametrize('newline', ['\n', '\r\n'])
+def test_multiline_secrets_are_redacted_when_split_into_physical_lines(newline):
+    fragments = [
+        '-----BEGIN PRIVATE KEY-----', 'SYNTHETIC_TEST_KEY_CONTENT', 'AQ==', '', '1', '-----END PRIVATE KEY-----',
+    ]
+    key = newline.join(fragments)
+    redact = CredentialRedactor([{'ssl_key': key}])
+    output = 'ssl_key="' + key + '"' + newline
+    expected = newline.join([
+        'ssl_key="[REDACTED]', '[REDACTED]', '[REDACTED]', '', '[REDACTED]', '[REDACTED]"', '',
+    ])
+    assert ''.join(redact(line) for line in output.splitlines(keepends=True)) == expected
+    assert redact('  "1"  ' + newline) == '  "[REDACTED]"  ' + newline
+    assert redact('1') == '[REDACTED]'
+    assert redact('password=1 rows=1') == 'password=[REDACTED] rows=1'
+    assert redact('dbname=1 rows=1 table="1"."orders"') == 'dbname=1 rows=1 table="1"."orders"'
+
+
+def test_multiline_identities_do_not_register_secret_fragments():
+    redact = CredentialRedactor([{'user': 'analytics\nreporting'}])
+    assert redact('analytics\nreporting\nrows=1') == 'analytics\nreporting\nrows=1'
+
+
 def test_key_paths_and_kms_identifiers_remain_available_for_diagnosis():
     redact = CredentialRedactor([{
         'private_key': '/keys/snowflake.pem', 'encryption_key': 'alias/stage-kms', 'replication_key': 'last_updated',

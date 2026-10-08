@@ -5,8 +5,8 @@
   once per process in FastSync and Singer
 - Redact credentials from connector logs and exception tracebacks. Preserve
   database names and counts when they match a username or short password.
-  Include MySQL TLS private-key contents and short secrets in Bearer headers
-  and recognised authentication errors
+  Include MySQL TLS private-key contents in streamed logs and short secrets
+  in Bearer headers and recognised authentication errors
 - Log Snowflake native and Iceberg PartialSync column versioning at INFO,
   including the table, column, and archived column name. See
   [logging diagnostics](docs/user_guide/troubleshooting.rst#logging-and-diagnostics)
