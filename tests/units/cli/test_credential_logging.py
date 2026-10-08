@@ -89,6 +89,25 @@ def test_fastsync_tap_and_target_configs_protect_logs(tmp_path):
     ]
 
 
+def test_short_authentication_secrets_are_redacted_without_changing_replication_state(tmp_path):
+    config = tmp_path / 'config.json'
+    config.write_text(json.dumps({'password': 1, 'access_token': 'abc'}), encoding='utf-8')
+    state = json.dumps({'bookmarks': {'stream': {'value': 'abc', 'position': 1}}})
+    script = tmp_path / 'tap.py'
+    script.write_text(
+        'print("Authorization: Bearer abc")\n'
+        'print("RuntimeError: authentication failed (1); dbname=abc rows=1")\n'
+        f'print({state!r})\n', encoding='utf-8',
+    )
+    logfile = tmp_path / 'tap.log'
+    status, stdout, stderr = commands.run_command(f'{sys.executable} "{script}" --config "{config}"', str(logfile))
+    expected = ('Authorization: Bearer [REDACTED]\n'
+                'RuntimeError: authentication failed ([REDACTED]); dbname=abc rows=1\n' + state + '\n')
+    assert status == 0 and stderr is None
+    assert stdout == expected
+    assert logfile.with_suffix('.log.success').read_text(encoding='utf-8') == expected
+
+
 def test_plain_logs_are_not_parsed_as_state_messages():
     with patch.object(utils.json, 'loads') as loads:
         assert not utils.is_state_message('Connecting to PostgreSQL source host: source.example\n')

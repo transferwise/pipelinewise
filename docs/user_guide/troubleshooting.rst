@@ -713,9 +713,11 @@ connection. MongoDB logs the configured seed hostname or host list.
 Configured passwords, tokens, passphrases, AWS secrets, and MySQL ``ssl_key``
 contents are redacted from connector logs and default exception tracebacks,
 including worker threads.
-Usernames and short passwords are redacted in credential fields, authentication
-messages, and connection URI userinfo. Database names and counts remain visible
-when they match those values.
+Usernames and short passwords are redacted in credential fields and connection
+URI userinfo. Short secrets are also redacted after ``Bearer`` and in recognised
+authentication error formats, such as ``authentication failed (<secret>)`` and
+``invalid credentials: <secret>``. Database names and counts remain visible when
+they match those values. Unlabelled short values in other text remain visible.
 
 Snowflake native and managed Iceberg PartialSync log column versioning at INFO
 after the rename succeeds. The message follows Singer's format:

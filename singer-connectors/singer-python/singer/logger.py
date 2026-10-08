@@ -20,6 +20,13 @@ _CREDENTIAL_PREFIX = (
     r'''(?P<prefix>(?i:(?<![\w.-])(?:[\w.-]*[_.-])?(?:''' + _CONTEXT_FIELDS
     + r''')(?:["']?\s*[:=]\s*|\s+)["']?))'''
 )
+_AUTHENTICATION_PREFIX = (
+    r'''(?P<prefix>(?i:(?<![\w.-])(?:Bearer[ \t]+|'''
+    r'''(?:(?:authentication|authorization|login)[ _-]*(?:failed|failure|error)'''
+    r'''|(?:invalid|incorrect|expired|rejected)[ \t]+(?:credentials?|password|token)'''
+    r'''|(?:credentials?|password|token)[ \t]+(?:invalid|incorrect|expired|rejected))'''
+    r'''\b[ \t]*[:=]?[ \t]*)(?:\([ \t]*)?["']?))'''
+)
 _URI_USERINFO = re.compile(r'(?P<scheme>\b[a-z][a-z0-9+.-]*://)[^/\s?#@]+@', re.IGNORECASE)
 
 
@@ -36,8 +43,10 @@ class CredentialRedactor:
     def __init__(self, configs=()):
         self.context_values = set()
         self.secret_values = set()
+        self.short_secret_values = set()
         self.basic_auth_values = set()
         self.context_pattern = self.secret_pattern = self.basic_auth_pattern = None
+        self.authentication_pattern = None
         for config in configs:
             self.add_config(config)
 
@@ -57,8 +66,9 @@ class CredentialRedactor:
                     }
                     self.context_values.update(variants)
                     # Short secrets need credential context so counts and identifiers remain useful.
-                    if is_secret and len(text) >= 8:
-                        self.secret_values.update(variants)
+                    if is_secret:
+                        values = self.secret_values if len(text) >= 8 else self.short_secret_values
+                        values.update(variants)
         user = next((config[key] for key in ('user', 'username', 'email', 'account_sid')
                      if config.get(key) is not None), None)
         password = next((config[key] for key in ('password', 'api_token', 'auth_token')
@@ -69,11 +79,12 @@ class CredentialRedactor:
                 self.basic_auth_values.add(base64.b64encode(f'{user}/token:{password}'.encode()).decode())
         self.context_pattern = _value_pattern(self.context_values, _CREDENTIAL_PREFIX)
         self.secret_pattern = _value_pattern(self.secret_values, r'(?<![\w.-])')
+        self.authentication_pattern = _value_pattern(self.short_secret_values, _AUTHENTICATION_PREFIX)
         self.basic_auth_pattern = _value_pattern(self.basic_auth_values, r'(?P<prefix>(?i:\bBasic\s+))')
 
     def __call__(self, text):
         text = _URI_USERINFO.sub(r'\g<scheme>[REDACTED]@', text)
-        for pattern in (self.context_pattern, self.basic_auth_pattern):
+        for pattern in (self.context_pattern, self.basic_auth_pattern, self.authentication_pattern):
             if pattern:
                 text = pattern.sub(lambda match: match.group('prefix') + '[REDACTED]', text)
         return self.secret_pattern.sub('[REDACTED]', text) if self.secret_pattern else text

@@ -45,6 +45,41 @@ def test_short_passwords_and_basic_auth_are_redacted():
     )
 
 
+@pytest.mark.parametrize('token', ['abc', 'p', 1, 0])
+@pytest.mark.parametrize('header', ['Authorization: Bearer {}', "{{'Authorization': 'bearer {}'}}"])
+def test_short_bearer_tokens_are_redacted_without_hiding_diagnostics(token, header):
+    redact = CredentialRedactor([{'access_token': token}])
+    diagnostics = f' dbname={token} rows=1 table="{token}"."orders"'
+    assert redact(header.format(token) + diagnostics) == header.format('[REDACTED]') + diagnostics
+    assert redact('Authorization: Bearer unknown-token') == 'Authorization: Bearer unknown-token'
+
+
+@pytest.mark.parametrize('message', [
+    'RuntimeError: authentication failed ({})',
+    'Authentication failed ("{}")',
+    'Authentication failure: {}',
+    'AuthorizationError: {}',
+    'Login failed: {}',
+    'Invalid credentials: {}',
+    'Password rejected: {}',
+    'Token expired: {}',
+])
+@pytest.mark.parametrize('password', ['abc', 1])
+def test_short_secrets_in_authentication_errors_preserve_database_names_and_counts(message, password):
+    redact = CredentialRedactor([{'password': password}])
+    diagnostics = f' dbname={password} rows=1 table="{password}"."orders"'
+    assert redact(message.format(password) + diagnostics) == message.format('[REDACTED]') + diagnostics
+
+
+def test_authentication_context_does_not_mask_unlabelled_values_or_cross_lines():
+    redact = CredentialRedactor([{'user': 'analytics', 'password': 1, 'access_token': 'abc'}])
+    diagnostics = 'Authentication failed for database abc; rows=1; table="abc"."orders"'
+    assert redact(diagnostics) == diagnostics
+    assert redact('Authentication failed:\nabc\nrows=1') == 'Authentication failed:\nabc\nrows=1'
+    assert redact('RuntimeError: abc; rows=1') == 'RuntimeError: abc; rows=1'
+    assert redact('Authorization: Bearer analytics') == 'Authorization: Bearer analytics'
+
+
 @pytest.mark.parametrize('password', ['1', 1, 0])
 def test_numeric_passwords_do_not_hide_counts_or_same_name_databases(password):
     redact = CredentialRedactor([{'user': 'analytics', 'password': password}])
@@ -165,13 +200,15 @@ def test_uncaught_thread_exception_is_redacted():
     code = (
         'import threading; from singer.logger import configure_log_redaction; '
         'configure_log_redaction({"user":"analytics", "password":1}); '
-        'thread = threading.Thread(target=lambda: exec("raise RuntimeError(\'user=analytics password=1 rows=1\')")); '
+        'thread = threading.Thread(target=lambda: exec('
+        '"raise RuntimeError(\'authentication failed (1); user=analytics password=1 rows=1\')")); '
         'thread.start(); thread.join()'
     )
     result = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True, check=False)
     assert result.returncode == 0
     assert 'Exception in thread' in result.stderr
-    assert 'RuntimeError: user=[REDACTED] password=[REDACTED] rows=1' in result.stderr
+    expected = 'RuntimeError: authentication failed ([REDACTED]); user=[REDACTED] password=[REDACTED] rows=1'
+    assert expected in result.stderr
 
 
 def test_source_host_is_reported_once_for_many_connections(monkeypatch):
