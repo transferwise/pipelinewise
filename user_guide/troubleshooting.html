@@ -949,6 +949,26 @@ connectivity to a source before running a full sync.</p>
 to <code class="docutils literal notranslate"><span class="pre">~/.pipelinewise</span></code>. Tap logs are stored under
 <code class="docutils literal notranslate"><span class="pre">&lt;target_id&gt;/&lt;tap_id&gt;/log/</span></code> and use <code class="docutils literal notranslate"><span class="pre">.running</span></code>, <code class="docutils literal notranslate"><span class="pre">.success</span></code>, or <code class="docutils literal notranslate"><span class="pre">.failed</span></code>
 suffixes. See <a class="reference internal" href="logging.html#logging"><span class="std std-ref">Logging</span></a> for details.</p>
+<p>MariaDB/MySQL, PostgreSQL, and MongoDB connections log their source hostname at
+INFO once per host per process in FastSync and Singer. Repeated connections to
+the same host use DEBUG. The hostname reflects the selected primary or replica
+connection. MongoDB logs the configured seed hostname or host list.</p>
+<p>Configured passwords, tokens, passphrases, AWS secrets, and MySQL <code class="docutils literal notranslate"><span class="pre">ssl_key</span></code>
+contents are redacted from connector logs and default exception tracebacks,
+including worker threads.
+Configured multiline secrets are also redacted when connector output arrives
+one line at a time. Short fragments are masked only in credential fields or as
+complete lines. Replication state and control messages retain their original contents.
+Usernames and short passwords are redacted in credential fields and connection
+URI userinfo. Short secrets are also redacted after <code class="docutils literal notranslate"><span class="pre">Bearer</span></code> and in recognised
+authentication error formats, such as <code class="docutils literal notranslate"><span class="pre">authentication</span> <span class="pre">failed</span> <span class="pre">(&lt;secret&gt;)</span></code> and
+<code class="docutils literal notranslate"><span class="pre">invalid</span> <span class="pre">credentials:</span> <span class="pre">&lt;secret&gt;</span></code>. Database names and counts remain visible when
+they match those values. Unlabelled short values in other text remain visible.</p>
+<p>Snowflake native and managed Iceberg PartialSync log column versioning at INFO
+after the rename succeeds. The message follows Singer’s format:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Column "AMOUNT" in table ""DATABASE"."SCHEMA"."TABLE"" has been renamed to "AMOUNT_20261007_120000_123456"
+</pre></div>
+</div>
 <p>To follow the progress of a running sync:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span><span class="nv">pipelinewise_config_dir</span><span class="o">=</span><span class="s2">"</span><span class="si">${</span><span class="nv">PIPELINEWISE_CONFIG_DIRECTORY</span><span class="k">:-</span><span class="nv">$HOME</span><span class="p">/.pipelinewise</span><span class="si">}</span><span class="s2">"</span>
 $<span class="w"> </span>tail<span class="w"> </span>-f<span class="w"> </span><span class="s2">"</span><span class="nv">$pipelinewise_config_dir</span><span class="s2">/&lt;target_id&gt;/&lt;tap_id&gt;/log/"</span>*running
