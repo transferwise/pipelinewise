@@ -26,7 +26,7 @@ setup(name='pipelinewise-tap-postgres',
       extras_require={
           "test": [
               'pytest==9.1.1',
-              'ruff==0.16.1',
+              'ruff==0.16.10',
               'pytest-cov==7.1.0'
           ]
       },
