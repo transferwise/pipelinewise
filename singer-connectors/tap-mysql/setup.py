@@ -22,7 +22,7 @@ setup(name='pipelinewise-tap-mysql',
           'pipelinewise-singer-python==3.0.2+pipelinewise.0.94.1',
           # Newer decoders need optional FULL binlog metadata for correct types.
           'mysql-replication==0.46',
-          'PyMySQL==1.1.3',
+          'PyMySQL==1.2.3',
           'plpygis==0.6.1',
           'tzlocal==5.4.4',
       ],
