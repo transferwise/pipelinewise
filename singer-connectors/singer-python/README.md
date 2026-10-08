@@ -22,7 +22,7 @@ python -m pip install -e singer-connectors/singer-python -e '.[test]'
 The root source distribution includes this library, so the corresponding
 non-editable command also works from an extracted source archive. Build and
 install both packages when producing wheels. The root pins the unique local
-version `3.0.2+pipelinewise.0.94.0`; installing it alone without the bundled
+version `3.0.2+pipelinewise.0.94.1`; installing it alone without the bundled
 package or its wheel fails dependency resolution instead of loading the
 published Singer implementation.
 

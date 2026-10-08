@@ -1,13 +1,21 @@
 """Plan resumable decimal column versioning for managed Iceberg PartialSync."""
 
-from dataclasses import replace
+from dataclasses import dataclass, replace
 
 from .snowflake_column_versioning import (
     has_column_versions, is_decimal_version_change, is_retained_legacy_decimal_float, is_versioned_column,
     versioned_column_name,
 )
-from .snowflake_iceberg_model import IcebergColumn, quote_identifier
+from .snowflake_iceberg_model import ColumnVersionRename, IcebergColumn, quote_identifier
 from .snowflake_iceberg_recovery import RecoveryManifestError, TableCompatibilityError
+
+
+@dataclass(frozen=True)
+class SchemaPreparationPlan:
+    """Keep executable statements and their column rename events together."""
+
+    statements: tuple[str, ...]
+    column_renames: tuple[ColumnVersionRename, ...]
 
 
 def partial_compatibility(
@@ -123,6 +131,7 @@ def partial_preparation(
     columns = {column.name: column for column in actual.columns}
     desired_columns = {column.name: column for column in expected.columns}
     statements = []
+    renames = []
     for name, version in versions.items():
         desired = desired_columns.get(name)
         if desired is None or name in expected.primary_key:
@@ -130,7 +139,7 @@ def partial_preparation(
         _reject_boundary_version(name, boundary_column)
         old = IcebergColumn(name, version['data_type'], True, desired.iceberg_version)
         archived = replace(old, name=version['archived_name'])
-        _resume_column_version(expected, columns, old, archived, desired, statements)
+        _resume_column_version(expected, columns, old, archived, desired, statements, renames)
     evolved = replace(actual, columns=tuple(columns.values()))
     compatibility, additions = partial_compatibility(
         expected, evolved, allow_versions=False, boundary_column=boundary_column,
@@ -144,7 +153,7 @@ def partial_preparation(
         f'ALTER ICEBERG TABLE {expected.name.quoted} ADD COLUMN {column.definition}'
         for column in additions
     )
-    return tuple(statements)
+    return SchemaPreparationPlan(tuple(statements), tuple(renames))
 
 
 def retained_column_types(historical_columns, versions):
@@ -165,12 +174,13 @@ def _reject_boundary_version(name, boundary_column):
         )
 
 
-def _resume_column_version(expected, columns, old, archived, desired, statements):
+def _resume_column_version(expected, columns, old, archived, desired, statements, renames):
     existing_archive = columns.get(archived.name)
     current = columns.get(old.name)
     if existing_archive is None:
         if current != old:
             raise RecoveryManifestError('Decimal column changed before its planned rename')
+        renames.append(ColumnVersionRename(len(statements), old.name, archived.name))
         statements.append(
             f'ALTER ICEBERG TABLE {expected.name.quoted} RENAME COLUMN '
             f'{quote_identifier(old.name)} TO {quote_identifier(archived.name)}'

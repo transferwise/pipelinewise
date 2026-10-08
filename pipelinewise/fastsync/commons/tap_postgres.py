@@ -6,6 +6,7 @@ import os
 import re
 import sys
 import psycopg2
+from singer.logger import log_source_host
 import psycopg2.extras
 
 from argparse import Namespace
@@ -240,7 +241,7 @@ class FastSyncTapPostgres:
         template = "host='{}' port='{}' user='{}' password='{}' dbname='{}'"
 
         if prioritize_primary:
-            LOGGER.info('Connecting to primary server')
+            log_source_host(LOGGER, 'PostgreSQL', connection_config['host'])
             conn_string = template.format(
                 connection_config['host'],
                 connection_config['port'],
@@ -249,7 +250,7 @@ class FastSyncTapPostgres:
                 connection_config['dbname'],
             )
         else:
-            LOGGER.info('Connecting to replica')
+            log_source_host(LOGGER, 'PostgreSQL', connection_config.get('replica_host', connection_config['host']))
             conn_string = template.format(
                 # Fastsync is using replica_{host|port|user|password} values from the config by default
                 # to avoid making heavy load on the primary source database when syncing large tables

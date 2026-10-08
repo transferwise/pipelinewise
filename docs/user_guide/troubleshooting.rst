@@ -705,6 +705,30 @@ to ``~/.pipelinewise``. Tap logs are stored under
 ``<target_id>/<tap_id>/log/`` and use ``.running``, ``.success``, or ``.failed``
 suffixes. See :ref:`logging` for details.
 
+MariaDB/MySQL, PostgreSQL, and MongoDB connections log their source hostname at
+INFO once per host per process in FastSync and Singer. Repeated connections to
+the same host use DEBUG. The hostname reflects the selected primary or replica
+connection. MongoDB logs the configured seed hostname or host list.
+
+Configured passwords, tokens, passphrases, AWS secrets, and MySQL ``ssl_key``
+contents are redacted from connector logs and default exception tracebacks,
+including worker threads.
+Configured multiline secrets are also redacted when connector output arrives
+one line at a time. Short fragments are masked only in credential fields or as
+complete lines. Replication state and control messages retain their original contents.
+Usernames and short passwords are redacted in credential fields and connection
+URI userinfo. Short secrets are also redacted after ``Bearer`` and in recognised
+authentication error formats, such as ``authentication failed (<secret>)`` and
+``invalid credentials: <secret>``. Database names and counts remain visible when
+they match those values. Unlabelled short values in other text remain visible.
+
+Snowflake native and managed Iceberg PartialSync log column versioning at INFO
+after the rename succeeds. The message follows Singer's format:
+
+.. code-block:: text
+
+    Column "AMOUNT" in table ""DATABASE"."SCHEMA"."TABLE"" has been renamed to "AMOUNT_20261007_120000_123456"
+
 To follow the progress of a running sync:
 
 .. code-block:: bash

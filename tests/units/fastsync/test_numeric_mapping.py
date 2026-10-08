@@ -53,7 +53,7 @@ def test_iceberg_decimal_fallback_uses_double_for_creation_and_column_evolution(
     assert expected.columns[0].data_type == 'DOUBLE'
     statements = partial_preparation(
         expected, actual, plan_column_versions(expected, actual, decimal_columns=('AMOUNT',)),
-    )
+    ).statements
     assert statements[-1].endswith('ADD COLUMN "AMOUNT" DOUBLE')
 
 

@@ -139,6 +139,11 @@ def test_root_ci_dependencies_and_policy_use_ruff():
         if connector == 'singer-python':
             assert not is_excluded
             assert 'make -C singer-connectors/singer-python venv lint unit_test' in connector_workflow
+        elif connector == 'tap-mongodb':
+            for path in (REPOSITORY_ROOT / test_dir).rglob('*.py'):
+                test_file = str(path.relative_to(REPOSITORY_ROOT))
+                file_is_excluded = any(fnmatch.fnmatchcase(test_file, pattern) for pattern in exclusions)
+                assert file_is_excluded == (path.name != 'test_logging.py')
         elif connector in ci_tested_connectors | {'transform-field'} and test_dir.endswith('/tests'):
             unit_dir = f'{test_dir}/unit'
             integration_dir = f'{test_dir}/integration'

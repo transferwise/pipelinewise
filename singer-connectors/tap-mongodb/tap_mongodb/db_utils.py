@@ -114,7 +114,7 @@ def get_roles(database: Database, db_user: str) -> List[Dict]:
 
     users = [u for u in user_info.get('users') if u.get('user') == db_user]
     if len(users) != 1:
-        LOGGER.warning('Could not find any users for %s', db_user)
+        LOGGER.warning('Could not find the configured database user')
         return []
 
     return get_roles_with_find_privs(database, users[0])

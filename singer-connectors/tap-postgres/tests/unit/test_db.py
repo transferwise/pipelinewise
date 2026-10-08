@@ -3,8 +3,10 @@ import unittest
 
 import datetime
 from unittest.mock import MagicMock, patch
+import singer.logger as singer_logger
 
 from tap_postgres import db
+from tap_postgres.sync_strategies import logical_replication as log_replication
 
 
 class TestDbFunctions(unittest.TestCase):
@@ -19,6 +21,34 @@ class TestDbFunctions(unittest.TestCase):
             'port': 5432,
             'use_secondary': False,
         }
+
+    @patch('tap_postgres.db.psycopg2.connect')
+    def test_logical_array_and_hstore_values_do_not_repeat_info_host_logs(self, connect):
+        connect.return_value.server_version = 150013
+        cursor = connect.return_value.__enter__.return_value.cursor.return_value.__enter__.return_value
+        cursor.fetchone.return_value = ([],)
+        with patch.object(singer_logger, '_REPORTED_SOURCE_HOSTS', set()), \
+                self.assertLogs(db.LOGGER, level='INFO') as logs:
+            for _ in range(100):
+                self.assertEqual([], log_replication.create_array_elem('{}', 'integer[]', self.conn_config))
+                self.assertEqual({}, log_replication.create_hstore_elem(self.conn_config, ''))
+        self.assertEqual(connect.call_count, 200)
+        self.assertEqual(logs.output, ['INFO:tap_postgres:Connecting to PostgreSQL source host: primary.example.com'])
+
+    @patch('tap_postgres.db.psycopg2.connect')
+    def test_host_logs_track_replica_and_logical_primary_connections(self, connect):
+        connect.return_value.server_version = 150013
+        config = {**self.conn_config, 'use_secondary': True, 'secondary_host': 'replica.example.com'}
+        with patch.object(singer_logger, '_REPORTED_SOURCE_HOSTS', set()), \
+                self.assertLogs(db.LOGGER, level='INFO') as logs:
+            db.open_connection(config)
+            self.assertEqual(connect.call_args.kwargs['host'], 'replica.example.com')
+            db.open_connection(config, logical_replication=True)
+            self.assertEqual(connect.call_args.kwargs['host'], 'primary.example.com')
+        self.assertEqual(logs.output, [
+            'INFO:tap_postgres:Connecting to PostgreSQL source host: replica.example.com',
+            'INFO:tap_postgres:Connecting to PostgreSQL source host: primary.example.com',
+        ])
 
     @patch('tap_postgres.db.psycopg2.connect')
     def test_open_connection_rejects_postgres_before_11_2(self, connect):

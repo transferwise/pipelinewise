@@ -1,6 +1,165 @@
 import logging
 import logging.config
+import base64
+import json
 import os
+import re
+import sys
+import threading
+import traceback
+from urllib.parse import quote, quote_plus
+
+
+_IDENTITY_FIELDS = frozenset({'user', 'username', 'email', 'account_sid'})
+_SECRET_FIELDS = frozenset({
+    'password', 'passwd', 'pwd', 'passphrase', 'secret', 'token', 'api_key', 'ssl_key',
+    'aws_secret_access_key', 'secret_access_key', 'client_side_encryption_master_key',
+})
+_CONTEXT_FIELDS = '|'.join(sorted(_IDENTITY_FIELDS | _SECRET_FIELDS | {'login'}, key=len, reverse=True))
+_CREDENTIAL_PREFIX = (
+    r'''(?P<prefix>(?i:(?<![\w.-])(?:[\w.-]*[_.-])?(?:''' + _CONTEXT_FIELDS
+    + r''')(?:["']?\s*[:=]\s*|\s+)["']?))'''
+)
+_AUTHENTICATION_PREFIX = (
+    r'''(?P<prefix>(?i:(?<![\w.-])(?:Bearer[ \t]+|'''
+    r'''(?:(?:authentication|authorization|login)[ _-]*(?:failed|failure|error)'''
+    r'''|(?:invalid|incorrect|expired|rejected)[ \t]+(?:credentials?|password|token)'''
+    r'''|(?:credentials?|password|token)[ \t]+(?:invalid|incorrect|expired|rejected))'''
+    r'''\b[ \t]*[:=]?[ \t]*)(?:\([ \t]*)?["']?))'''
+)
+_URI_USERINFO = re.compile(r'(?P<scheme>\b[a-z][a-z0-9+.-]*://)[^/\s?#@]+@', re.IGNORECASE)
+
+
+def _credential_variants(text):
+    return {
+        text, quote(text), quote(text, safe=''), quote_plus(text, safe=''),
+        repr(text)[1:-1], json.dumps(text)[1:-1],
+    }
+
+
+def _value_pattern(values, prefix, suffix=r'(?![\w-]|\.[\w-])'):
+    if not values:
+        return None
+    alternatives = '|'.join(re.escape(value) for value in sorted(values, key=len, reverse=True))
+    return re.compile(prefix + '(?:' + alternatives + ')' + suffix)
+
+
+class CredentialRedactor:
+    """Preserve diagnostic names while removing credentials from log text."""
+
+    def __init__(self, configs=()):
+        self.context_values = set()
+        self.secret_values = set()
+        self.short_secret_values = set()
+        self.multiline_values = set()
+        self.basic_auth_values = set()
+        self.context_pattern = self.secret_pattern = self.basic_auth_pattern = None
+        self.authentication_pattern = self.multiline_pattern = None
+        for config in configs:
+            self.add_config(config)
+
+    def add_config(self, config):
+        for key, value in config.items():
+            if isinstance(value, dict):
+                self.add_config(value)
+            elif isinstance(value, (str, int, float)) and str(value):
+                field_name = str(key).lower()
+                field = re.split(r'[_.-]', field_name)[-1]
+                is_secret = field_name in _SECRET_FIELDS or field in _SECRET_FIELDS
+                if is_secret or field_name in _IDENTITY_FIELDS or field in _IDENTITY_FIELDS:
+                    text = str(value)
+                    variants = _credential_variants(text)
+                    self.context_values.update(variants)
+                    if is_secret:
+                        self._add_secret_values(text, variants)
+        user = next((config[key] for key in ('user', 'username', 'email', 'account_sid')
+                     if config.get(key) is not None), None)
+        password = next((config[key] for key in ('password', 'api_token', 'auth_token')
+                         if config.get(key) is not None), None)
+        if user is not None and password is not None:
+            self.basic_auth_values.add(base64.b64encode(f'{user}:{password}'.encode()).decode())
+            if config.get('email') and config.get('api_token'):
+                self.basic_auth_values.add(base64.b64encode(f'{user}/token:{password}'.encode()).decode())
+        self.context_pattern = _value_pattern(self.context_values, _CREDENTIAL_PREFIX)
+        self.secret_pattern = _value_pattern(self.secret_values, r'(?<![\w.-])')
+        self.authentication_pattern = _value_pattern(self.short_secret_values, _AUTHENTICATION_PREFIX)
+        self.basic_auth_pattern = _value_pattern(self.basic_auth_values, r'(?P<prefix>(?i:\bBasic\s+))')
+        self.multiline_pattern = _value_pattern(
+            self.multiline_values, r'''(?m)^(?P<prefix>[ \t]*["']?)''',
+            suffix=r'''(?P<suffix>["']?[ \t]*\r?$)''',
+        )
+
+    def _add_secret_values(self, text, variants):
+        values = self.secret_values if len(text) >= 8 else self.short_secret_values
+        values.update(variants)
+        if '\n' not in text and '\r' not in text:
+            return
+        # Connector pipes deliver physical lines, so whole-value matching cannot protect raw PEM output.
+        for line in text.splitlines():
+            fragment = line.strip(' \t\r')
+            if not fragment:
+                continue
+            variants = _credential_variants(fragment)
+            self.context_values.update(variants)
+            values = self.secret_values if len(fragment) >= 8 else self.multiline_values
+            values.update(variants)
+
+    def __call__(self, text):
+        text = _URI_USERINFO.sub(r'\g<scheme>[REDACTED]@', text)
+        for pattern in (self.context_pattern, self.basic_auth_pattern, self.authentication_pattern):
+            if pattern:
+                text = pattern.sub(lambda match: match.group('prefix') + '[REDACTED]', text)
+        if self.secret_pattern:
+            text = self.secret_pattern.sub('[REDACTED]', text)
+        if self.multiline_pattern:
+            text = self.multiline_pattern.sub(
+                lambda match: match.group('prefix') + '[REDACTED]' + match.group('suffix'), text,
+            )
+        return text
+
+
+_LOG_REDACTOR = CredentialRedactor()
+_HANDLER_FORMAT = None
+_REPORTED_SOURCE_HOSTS = set()
+
+
+def _redacting_handler_format(handler, record):
+    """Protect rendered messages and exceptions, including handlers added later."""
+    return _LOG_REDACTOR(_HANDLER_FORMAT(handler, record))
+
+
+def _redact_uncaught_exception(exc_type, exc_value, exc_traceback):
+    sys.stderr.write(_LOG_REDACTOR(''.join(traceback.format_exception(exc_type, exc_value, exc_traceback))))
+
+
+def _redact_thread_exception(args):
+    if args.exc_type is SystemExit:
+        return
+    name = args.thread.name if args.thread else 'unknown'
+    text = f'Exception in thread {name}:\n'
+    text += ''.join(traceback.format_exception(args.exc_type, args.exc_value, args.exc_traceback))
+    sys.stderr.write(_LOG_REDACTOR(text))
+
+
+def configure_log_redaction(config):
+    """Protect standard logging handlers and default CLI/thread tracebacks."""
+    global _HANDLER_FORMAT
+    _LOG_REDACTOR.add_config(config)
+    if logging.Handler.format is not _redacting_handler_format:
+        _HANDLER_FORMAT = logging.Handler.format
+        logging.Handler.format = _redacting_handler_format
+    if sys.excepthook is sys.__excepthook__:
+        sys.excepthook = _redact_uncaught_exception
+    if threading.excepthook is threading.__excepthook__:
+        threading.excepthook = _redact_thread_exception
+
+
+def log_source_host(logger, source, host):
+    """Report each source host once at INFO; repeated connections use DEBUG."""
+    identity = (source, str(host))
+    level = logging.DEBUG if identity in _REPORTED_SOURCE_HOSTS else logging.INFO
+    _REPORTED_SOURCE_HOSTS.add(identity)
+    logger.log(level, 'Connecting to %s source host: %s', source, host)
 
 
 def get_logger(name='singer'):

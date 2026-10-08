@@ -14,6 +14,7 @@ from urllib import parse
 
 from typing import Tuple, Optional, Dict, Callable, Any
 from pymongo import MongoClient
+from singer.logger import log_source_host
 from pymongo.database import Database
 from singer.utils import strftime as singer_strftime
 
@@ -225,6 +226,7 @@ class FastSyncTapMongoDB:
         Open connection
         """
 
+        log_source_host(LOGGER, 'MongoDB', self.connection_config['host'])
         self.database = MongoClient(self.connection_config['connection_string'])[
             self.connection_config['database']
         ]
