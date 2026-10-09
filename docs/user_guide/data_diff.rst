@@ -432,6 +432,8 @@ Before each data check, the source table must have a usable index whose first
 column is ``timestamp_column``. This applies to every table size and to initial
 full scans. Without that index, preflight returns ``BLOCKED`` and the data
 comparison does not run. Schema-only checks do not require an index.
+Checksum checks still require index preflight when their columns are unsupported.
+The checksum validation error stays in the results, and no checksum query runs.
 
 Checks that combine schema and data comparisons keep completed schema results.
 If preflight blocks the data comparison, the overall run is ``ERROR``. No data

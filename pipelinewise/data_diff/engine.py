@@ -522,6 +522,7 @@ def run_check(
         source_checksum_columns = []
         target_checksum_columns = []
         metric_checks = [item for item in checks if item != SCHEMA_CHECK]
+        requires_source_preflight = bool(metric_checks)
         if CHECKSUM_CHECK in metric_checks:
             try:
                 source_checksum_columns, target_checksum_columns = checksum_columns(
@@ -539,18 +540,13 @@ def run_check(
                     "error": str(exc),
                 }
 
-        if metric_checks:
+        if requires_source_preflight:
             metric_checks = tuple(metric_checks)
+            # Rejected checksum-only checks fingerprint a count query without executing it.
             source_sql = build_metric_query(
                 source, check["source_schema"], check["source_table"],
                 source_key_column["name"], source_timestamp_column["name"],
-                metric_checks, checksum_columns_for_query=source_checksum_columns,
-            )
-            target_sql = build_metric_query(
-                target, check["target_schema"], check["target_table"],
-                target_key_column["name"], target_timestamp_column["name"],
-                metric_checks,
-                checksum_columns_for_query=target_checksum_columns,
+                metric_checks or ("row_count",), checksum_columns_for_query=source_checksum_columns,
             )
             preflight = preflight_source(
                 source, check["source_schema"], check["source_table"],
@@ -559,7 +555,15 @@ def run_check(
             _publish_preflight(on_preflight, preflight)
             if preflight["status"] != "PASS":
                 return preflight, _ordered_results(results_by_type, checks, allow_missing=True), None
+            if not metric_checks:
+                return preflight, _ordered_results(results_by_type, checks), "ERROR"
 
+            target_sql = build_metric_query(
+                target, check["target_schema"], check["target_table"],
+                target_key_column["name"], target_timestamp_column["name"],
+                metric_checks,
+                checksum_columns_for_query=target_checksum_columns,
+            )
             if window_start is None:
                 try:
                     window_start = _historical_window_start(

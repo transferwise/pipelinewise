@@ -476,6 +476,14 @@ def test_empty_history_keeps_known_metadata_failures(checks, source_type, target
             "double precision", "double precision",
             [("row_checksum", "ERROR"), ("schema_compatibility", "PASS")],
         ),
+        (
+            ["row_checksum"], "double precision", "double precision",
+            [("row_checksum", "ERROR")],
+        ),
+        (
+            ["schema_compatibility", "row_checksum"], "double precision", "text",
+            [("schema_compatibility", "FAIL"), ("row_checksum", "ERROR")],
+        ),
     ],
 )
 def test_failed_preflight_keeps_metadata_results_without_reading_data(
@@ -484,9 +492,9 @@ def test_failed_preflight_keeps_metadata_results_without_reading_data(
     columns = {"id": _column("id", "bigint"), "ts": _column("ts", "timestamp")}
     source = RunAdapter({**columns, "value": _column("value", source_type)})
     target = RunAdapter({**columns, "value": _column("value", target_type)})
-    source._indexes = []
+    source.indexes = Mock(return_value=[])
     if preflight_status == "ERROR":
-        source.indexes = Mock(side_effect=RuntimeError("catalog unavailable"))
+        source.indexes.side_effect = RuntimeError("catalog unavailable")
     check = {
         "source_schema": "public", "source_table": "payments",
         "target_schema": "public", "target_table": "payments",
@@ -514,6 +522,7 @@ def test_failed_preflight_keeps_metadata_results_without_reading_data(
     assert [(result["check_type"], result["status"]) for result in results] == expected_results
     assert status is None
     assert published == [preflight]
+    source.indexes.assert_called_once_with("public", "payments")
     assert source.minimum_queries == target.minimum_queries == []
     assert source.executed == target.executed == []
 
@@ -548,33 +557,43 @@ def test_year_one_is_a_real_historical_boundary_and_is_not_rediscovered(discover
     )
 
 
-def test_unsupported_historical_metrics_do_not_discover_or_convert_window_bounds():
+@pytest.mark.parametrize("historical", [False, True])
+@pytest.mark.parametrize("checks", [["row_checksum"], ["row_checksum", "schema_compatibility"]])
+def test_unsupported_metrics_require_index_without_reading_data(historical, checks):
     columns = {
         "id": _column("id", "bigint"), "ts": _column("ts", "timestamp"),
         "value": _column("value", "double precision"),
     }
     source, target = RunAdapter(columns), RunAdapter(columns)
+    source.indexes = Mock(wraps=source.indexes)
     check = {
         "source_schema": "public", "source_table": "payments",
         "target_schema": "public", "target_table": "payments",
         "source_key_column": "id", "target_key_column": "id",
         "source_timestamp_column": "ts", "target_timestamp_column": "ts",
         "source_compare_columns": ["value"], "target_compare_columns": ["value"],
-        "checks": ["row_checksum"],
+        "checks": checks,
     }
     published = []
     with patch("pipelinewise.data_diff.engine.connect_source", return_value=source), patch(
         "pipelinewise.data_diff.engine.connect_target", return_value=target,
     ), patch("pipelinewise.data_diff.engine._utc_boundary") as convert_boundary:
         preflight, results, status = run_check(
-            check, {}, {}, None, datetime(2026, 7, 22, 13, tzinfo=timezone.utc),
+            check, {}, {}, None if historical else datetime(2026, 7, 22, 12, tzinfo=timezone.utc),
+            datetime(2026, 7, 22, 13, tzinfo=timezone.utc),
             on_preflight=published.append,
         )
 
+    assert preflight["status"] == "PASS"
+    assert preflight["has_leading_index"] is True
     assert status == "ERROR"
+    assert [result["check_type"] for result in results] == checks
     assert results[0]["status"] == "ERROR"
     assert "unsupported type family" in results[0]["error"]
+    if "schema_compatibility" in checks:
+        assert results[1]["status"] == "PASS"
     assert published == [preflight]
+    source.indexes.assert_called_once_with("public", "payments")
     assert source.minimum_queries == target.minimum_queries == []
     assert source.executed == target.executed == []
     convert_boundary.assert_not_called()
