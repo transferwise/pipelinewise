@@ -42,6 +42,7 @@ from pipelinewise.fastsync.commons.tap_postgres import FastSyncTapPostgres
 from pipelinewise.fastsync.commons import utils as fastsync_utils
 from pipelinewise.cli.multiprocess import Process
 from pipelinewise.data_diff.coverage import FAILED_STATUSES
+from pipelinewise.data_diff.alerts import format_data_diff_alert
 from pipelinewise.data_diff.repository import DataDiffRepository
 from pipelinewise.data_diff.runner import rerun_failed_check, run_due_checks
 from pipelinewise.data_diff.runtime import RuntimeConnectorConfigLoader
@@ -2064,11 +2065,10 @@ class PipelineWise:
 
     def _alert_data_diff_failures(self, summaries):
         """
-        Send one alert per failed check per window.
+        Send at most one alert per failed check in this invocation.
 
-        Failures are not batched: each alert carries the check name, its window, and
-        the run ID needed to remediate it. Alerts go to the owning tap's channel in
-        addition to the default one, and a tap with send_alert disabled is skipped.
+        Summarize failures with a representative ERROR, or the last FAIL. Keep
+        every failed summary for exit-status handling and persisted attempt history.
         """
         failures = [
             summary
@@ -2076,7 +2076,17 @@ class PipelineWise:
             if summary['status'] in FAILED_STATUSES
         ]
 
+        failures_by_check = {}
         for summary in failures:
+            check = summary['check']
+            key = (check['target_id'], check['tap_id'], check.get('check_id') or check['full_check_name'])
+            failures_by_check.setdefault(key, []).append(summary)
+
+        for check_failures in failures_by_check.values():
+            summary = next(
+                (failure for failure in reversed(check_failures) if failure['status'] == 'ERROR'),
+                check_failures[-1],
+            )
             check = summary['check']
             send_alert, tap_slack_channel = self._get_tap_alert_settings(
                 check['target_id'], check['tap_id']
@@ -2084,22 +2094,14 @@ class PipelineWise:
             if not send_alert:
                 continue
 
-            # A check that failed before it could be scheduled has no window or run
-            # to report, only the reason it could not run.
-            message = f"data-diff {summary['status']} {check['full_check_name']}"
-            if summary.get('window_start') and summary.get('window_end'):
-                message += (
-                    f"\n  window  {summary['window_start'].isoformat()}"
-                    f" → {summary['window_end'].isoformat()}"
-                )
-            if summary.get('run_id'):
-                message += f"\n  run_id  {summary['run_id']}"
-            if summary.get('error'):
-                message += f"\n  reason  {summary['error']}"
+            message, details, next_action = format_data_diff_alert(summary, failures=check_failures)
             self.alert_sender.send_to_all_handlers(
                 message=message,
                 level=BaseAlertHandler.ERROR,
                 tap_slack_channel=tap_slack_channel,
+                details=details,
+                next_action=next_action,
+                data_diff=True,
             )
 
         return failures

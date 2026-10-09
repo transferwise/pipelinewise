@@ -8,6 +8,10 @@
         },
         "channel": {
           "type": "string"
+        },
+        "data_diff_channel": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "required": [

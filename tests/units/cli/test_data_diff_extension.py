@@ -85,6 +85,26 @@ def test_main_schema_accepts_data_diff_extension(tmp_path):
         utils.validate(tap, utils.load_schema("tap"))
 
 
+def test_main_schema_accepts_optional_data_diff_slack_channel(tmp_path):
+    config = _config(tmp_path)
+    config.global_config['alert_handlers'] = {
+        'slack': {'token': 'test-token', 'channel': '#replication', 'data_diff_channel': '#data-diff'},
+    }
+
+    utils.validate(config.global_config, utils.load_schema('config'))
+
+
+@pytest.mark.parametrize('channel', ['', None, 123, True])
+def test_main_schema_rejects_invalid_data_diff_slack_channel(tmp_path, channel):
+    config = _config(tmp_path)
+    config.global_config['alert_handlers'] = {
+        'slack': {'token': 'test-token', 'channel': '#replication', 'data_diff_channel': channel},
+    }
+
+    with pytest.raises(InvalidConfigException):
+        utils.validate(config.global_config, utils.load_schema('config'))
+
+
 def test_main_schema_validates_initial_full_scan_at_both_levels(tmp_path):
     config = _config(tmp_path)
     tap = config.targets["postgres"]["taps"][0]

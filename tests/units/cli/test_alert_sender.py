@@ -12,6 +12,130 @@ from pipelinewise.cli.alert_handlers.victorops_alert_handler import (
 )
 
 
+@pytest.mark.parametrize('data_diff_channel,tap_channel,expected_channels', [
+    (None, '#tap-owner', ['#default', '#tap-owner']),
+    ('#data-diff', '#tap-owner', ['#data-diff', '#tap-owner']),
+    ('#data-diff', None, ['#data-diff']),
+    ('#data-diff', '#data-diff', ['#data-diff']),
+    (None, '#default', ['#default']),
+])
+def test_structured_data_diff_alert_uses_configured_channel_and_tap_channel(
+    data_diff_channel, tap_channel, expected_channels,
+):
+    config = {'token': 'test-slack-token', 'channel': '#default'}
+    if data_diff_channel is not None:
+        config['data_diff_channel'] = data_diff_channel
+    sender = AlertSender({'slack': config})
+
+    with patch('slack.WebClient.chat_postMessage') as post:
+        result = sender.send_to_all_handlers(
+            message='FAIL data-diff payments/public.transfers — target has 20 fewer rows',
+            details='run_id : test-run\nrow_count 100000 99980 -20',
+            next_action='Check replication lag, then rerun test-run.',
+            tap_slack_channel=tap_channel,
+            data_diff=True,
+        )
+
+    assert result == {'sent': 1}
+    assert [call.kwargs['channel'] for call in post.call_args_list] == expected_channels
+    for call in post.call_args_list:
+        assert call.kwargs['text'].startswith(':exclamation: *FAIL data-diff')
+        attachment = call.kwargs['attachments'][0]
+        assert attachment['color'] == 'danger'
+        assert 'title' not in attachment
+        assert 'text' in attachment['mrkdwn_in']
+        assert '```run_id : test-run\nrow_count 100000 99980 -20```' in attachment['text']
+        assert 'Check replication lag, then rerun test-run.' in attachment['text']
+
+
+def test_replication_alert_keeps_legacy_slack_payload_and_default_channel():
+    sender = AlertSender({'slack': {
+        'token': 'test-slack-token', 'channel': '#default', 'data_diff_channel': '#data-diff',
+    }})
+
+    with patch('slack.WebClient.chat_postMessage') as post:
+        sender.send_to_all_handlers(
+            message='Replication failed', exc=ValueError('Connection failed'), tap_slack_channel='#tap-owner',
+        )
+
+    assert [call.kwargs['channel'] for call in post.call_args_list] == ['#default', '#tap-owner']
+    for call in post.call_args_list:
+        assert call.kwargs['text'] == '```Connection failed```'
+        assert call.kwargs['attachments'] == [{'color': 'danger', 'title': 'Replication failed'}]
+
+
+def test_legacy_slack_alert_without_exception_keeps_null_text():
+    sender = AlertSender({'slack': {'token': 'test-slack-token', 'channel': '#default'}})
+
+    with patch('slack.WebClient.chat_postMessage') as post:
+        sender.send_to_handler('slack', message='Replication failed')
+
+    assert post.call_args.kwargs == {
+        'channel': '#default', 'text': None,
+        'attachments': [{'color': 'danger', 'title': 'Replication failed'}],
+    }
+
+
+def test_slack_details_escape_mentions_links_and_embedded_code_fences():
+    sender = AlertSender({'slack': {'token': 'test-slack-token', 'channel': '#default'}})
+
+    with patch('slack.WebClient.chat_postMessage') as post:
+        sender.send_to_handler(
+            'slack', message='ERROR data-diff <@U123> & <https://example.org|tap>',
+            details='error_detail : <@U456> & ```unexpected diagnostic```',
+            next_action='Resolve <@U789> & rerun.', data_diff=True,
+        )
+
+    text = post.call_args.kwargs['text']
+    body = post.call_args.kwargs['attachments'][0]['text']
+    assert '&lt;@U123&gt; &amp; &lt;https://example.org|tap&gt;' in text
+    assert '&lt;@U456&gt; &amp;' in body
+    assert '&lt;@U789&gt; &amp;' in body
+    assert 'unexpected diagnostic' in body
+    assert body.count('```') == 2
+    assert '<@' not in text + body
+
+
+def test_dispatcher_sends_structured_details_to_victorops_without_slack_markup():
+    sender = AlertSender({
+        'slack': {'token': 'test-slack-token', 'channel': '#default', 'data_diff_channel': '#data-diff'},
+        'victorops': {'base_url': 'https://example.org/alerts', 'routing_key': 'route'},
+    })
+    message = 'FAIL data-diff payments/public.transfers — target has 20 fewer rows'
+    details = 'run_id : test-run\nrow_count 100000 99980 -20'
+    next_action = 'Check replication lag, then rerun test-run.'
+
+    with patch('slack.WebClient.chat_postMessage') as slack_post, patch('requests.post') as victorops_post:
+        victorops_post.return_value.status_code = 200
+        result = sender.send_to_all_handlers(
+            message=message, details=details, next_action=next_action,
+            tap_slack_channel='#tap-owner', data_diff=True,
+        )
+
+    assert result == {'sent': 2}
+    assert [call.kwargs['channel'] for call in slack_post.call_args_list] == ['#data-diff', '#tap-owner']
+    sent = json.loads(victorops_post.call_args.kwargs['data'])
+    combined = '\n'.join(str(value) for value in sent.values())
+    assert message in combined
+    assert details in combined
+    assert next_action in combined
+    assert sent['message_type'] == 'CRITICAL'
+    assert ':exclamation:' not in combined
+    assert '```' not in combined
+
+
+def test_structured_alert_with_no_configured_handlers_makes_no_external_calls():
+    with patch('slack.WebClient.chat_postMessage') as slack_post, patch('requests.post') as victorops_post:
+        result = AlertSender({}).send_to_all_handlers(
+            message='ERROR data-diff payments/public.transfers', details='error_detail : unavailable',
+            next_action='Resolve the error.', data_diff=True,
+        )
+
+    assert result == {'sent': 0}
+    slack_post.assert_not_called()
+    victorops_post.assert_not_called()
+
+
 class TestAlertSender:
     """
     Unit tests for PipelineWise CLI alert sender classes

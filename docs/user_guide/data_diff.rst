@@ -263,24 +263,88 @@ window. A skipped result does not verify data. Unknown bounds remain blank.
 Alerts
 ------
 
-Data-diff uses the tap's replication alert settings. No separate configuration
-is needed. See :ref:`alerts` for handlers, routing, suppression, and limitations.
+Data-diff uses the tap's replication alert settings. Set
+``alert_handlers.slack.data_diff_channel`` to use a separate global Slack channel.
+The tap-specific channel still receives a copy. Without this option, data-diff
+uses the global replication channel. See :ref:`alerts` for configuration,
+suppression, and limitations.
 
-One alert per failed attempt
-''''''''''''''''''''''''''''
+One alert per check per invocation
+''''''''''''''''''''''''''''''''''''''''
 
-Each ``FAIL`` or ``ERROR`` sends an alert with the check, window, reason, and run ID:
+Each check with a ``FAIL`` or ``ERROR`` sends at most one alert per command
+invocation, to each configured destination. ``FAIL`` means a comparison found
+differences. ``ERROR`` means the check could not complete. Slack shows a short
+heading, aligned details, and a next action. For example:
 
 .. code-block:: text
 
-    data-diff FAIL snowflake/payments/public/transfers
-      window  2026-07-29T10:00:00+00:00 → 2026-07-29T11:00:00+00:00
-      run_id  2bd3e725-38fc-48c1-b565-b4f20e5bc7dd
-      reason  row_count FAIL
+    :exclamation: FAIL data-diff payments/public.transfers — target has 20 fewer rows
 
-``SKIPPED``, ``DEFERRED``, and ``PASS`` send no alert. Alerts exclude aggregate
-values. Failures are neither batched nor deduplicated. One invocation can process
-24 catch-up windows and 24 retries per check, so it may send several alerts.
+    alert_utc_time    : 2026-10-09 09:30:05
+    run_id            : 2bd3e725-38fc-48c1-b565-b4f20e5bc7dd
+    attempt           : 3 (RETRY)
+    scheduled_utc     : 2026-10-09 09:00:00
+    source_table      : payments.public.transfers
+    target_table      : ANALYTICS.PAYMENTS.TRANSFERS
+    timestamp_column  : updated_at
+    window_start_utc  : 2026-10-09 08:00:00 (inclusive)
+    window_end_utc    : 2026-10-09 09:00:00 (exclusive)
+    query_seconds     : source=2.40, target=1.80
+
+    Check                 Source    Target    Difference
+    row_count             100000     99980           -20
+    distinct_key_count    100000     99980           -20
+
+    Difference = target - source
+
+    Next action: Check replication lag and investigate the mismatch.
+    Failed windows retry automatically on scheduled runs. To verify sooner,
+    use rerun_data_diff_check with --run-id and --remediation-ref.
+
+If several attempts fail, the alert shows the number of failed windows and
+attempts, with ``FAIL`` and ``ERROR`` totals. It shows the last processed
+``ERROR`` as the representative failure, or the last ``FAIL`` when no attempt
+has an ``ERROR``. For example:
+
+.. code-block:: text
+
+    failed_windows    : 25
+    failed_attempts   : 25
+    failure_statuses  : ERROR=25
+    shown_window      : representative failure
+
+The run ID, window, reason, counts, and query durations describe that one
+representative failure. They are not totals across windows. Every attempt and
+its results remain in the backend history.
+
+Slack puts the details and count table in a code block. Times use UTC. Window
+bounds include the start and exclude the end. An unresolved historical start is
+labelled as an initial scan. Bounds keep fractional seconds when present.
+Optional fields are omitted when unavailable.
+When timestamp column names differ, the alert names both source and target
+columns. Query durations describe the shared metric query and appear once per
+database.
+
+Alerts can include ``row_count`` and ``distinct_key_count`` values and their
+exact differences. They exclude key values, checksums, schema result objects,
+and row samples. Error details preserve line breaks; long details are shortened.
+
+A missing-index error recommends adding a source index starting with the
+timestamp column. Other errors recommend resolving the reported error.
+Failed windows for current scheduled checks retry automatically on scheduled
+runs. Use
+``pipelinewise rerun_data_diff_check --run-id <uuid> --remediation-ref <ticket>``
+to verify a saved failed attempt sooner. This also applies to failed manual
+reruns of current definitions. Inactive historical definitions do not retry
+automatically. When no run was saved, the alert directs you to the next scheduled
+execution instead of a saved-window rerun.
+
+``SKIPPED``, ``DEFERRED``, and ``PASS`` send no alert. One invocation can process
+24 catch-up windows and 24 retries per check, but sends at most one failure alert
+per check to each destination. The alert limit resets at the next invocation;
+it does not suppress recurring failures. Automatic retries, saved results,
+coverage, and the command's non-zero failure exit status are unchanged.
 
 Coverage and remediation
 ------------------------
@@ -389,3 +453,8 @@ Accepted indexes are:
 For a blocked check, ask the DBA to add or enable an accepted index. PipelineWise
 does not create indexes. Inspect ``dd_preflight_log`` for the verdict and index
 findings.
+
+Before upgrading, review the latest index findings in ``dd_preflight_log`` for
+the selected data checks. Add missing qualifying indexes, including on small
+tables whose older preflight verdict was ``PASS`` under the row-count exemption.
+Missing indexes continue to block each new window and its retries until fixed.
