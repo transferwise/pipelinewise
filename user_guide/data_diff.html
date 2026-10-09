@@ -183,7 +183,7 @@
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#cli-commands">CLI commands</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#alerts">Alerts</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#one-alert-per-failed-attempt">One alert per failed attempt</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#one-alert-per-check-per-invocation">One alert per check per invocation</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#coverage-and-remediation">Coverage and remediation</a><ul>
@@ -646,20 +646,78 @@ window. A skipped result does not verify data. Unknown bounds remain blank.</p>
 </section>
 <section id="alerts">
 <span id="data-diff-alerts"></span><h2>Alerts<a class="headerlink" href="#alerts" title="Link to this heading"></a></h2>
-<p>Data-diff uses the tap’s replication alert settings. No separate configuration
-is needed. See <a class="reference internal" href="alerts.html#alerts"><span class="std std-ref">Alerts</span></a> for handlers, routing, suppression, and limitations.</p>
-<section id="one-alert-per-failed-attempt">
-<h3>One alert per failed attempt<a class="headerlink" href="#one-alert-per-failed-attempt" title="Link to this heading"></a></h3>
-<p>Each <code class="docutils literal notranslate"><span class="pre">FAIL</span></code> or <code class="docutils literal notranslate"><span class="pre">ERROR</span></code> sends an alert with the check, window, reason, and run ID:</p>
-<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>data-diff FAIL snowflake/payments/public/transfers
-  window  2026-07-29T10:00:00+00:00 → 2026-07-29T11:00:00+00:00
-  run_id  2bd3e725-38fc-48c1-b565-b4f20e5bc7dd
-  reason  row_count FAIL
+<p>Data-diff uses the tap’s replication alert settings. Set
+<code class="docutils literal notranslate"><span class="pre">alert_handlers.slack.data_diff_channel</span></code> to use a separate global Slack channel.
+The tap-specific channel still receives a copy. Without this option, data-diff
+uses the global replication channel. See <a class="reference internal" href="alerts.html#alerts"><span class="std std-ref">Alerts</span></a> for configuration,
+suppression, and limitations.</p>
+<section id="one-alert-per-check-per-invocation">
+<h3>One alert per check per invocation<a class="headerlink" href="#one-alert-per-check-per-invocation" title="Link to this heading"></a></h3>
+<p>Each check with a <code class="docutils literal notranslate"><span class="pre">FAIL</span></code> or <code class="docutils literal notranslate"><span class="pre">ERROR</span></code> sends at most one alert per command
+invocation, to each configured destination. <code class="docutils literal notranslate"><span class="pre">FAIL</span></code> means a comparison found
+differences. <code class="docutils literal notranslate"><span class="pre">ERROR</span></code> means the check could not complete. Slack shows a short
+heading, aligned details, and a next action. For example:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>:exclamation: FAIL data-diff payments/public.transfers — target has 20 fewer rows
+
+alert_utc_time    : 2026-10-09 09:30:05
+run_id            : 2bd3e725-38fc-48c1-b565-b4f20e5bc7dd
+attempt           : 3 (RETRY)
+scheduled_utc     : 2026-10-09 09:00:00
+source_table      : payments.public.transfers
+target_table      : ANALYTICS.PAYMENTS.TRANSFERS
+timestamp_column  : updated_at
+window_start_utc  : 2026-10-09 08:00:00 (inclusive)
+window_end_utc    : 2026-10-09 09:00:00 (exclusive)
+query_seconds     : source=2.40, target=1.80
+
+Check                 Source    Target    Difference
+row_count             100000     99980           -20
+distinct_key_count    100000     99980           -20
+
+Difference = target - source
+
+Next action: Check replication lag and investigate the mismatch.
+Failed windows retry automatically on scheduled runs. To verify sooner,
+use rerun_data_diff_check with --run-id and --remediation-ref.
 </pre></div>
 </div>
-<p><code class="docutils literal notranslate"><span class="pre">SKIPPED</span></code>, <code class="docutils literal notranslate"><span class="pre">DEFERRED</span></code>, and <code class="docutils literal notranslate"><span class="pre">PASS</span></code> send no alert. Alerts exclude aggregate
-values. Failures are neither batched nor deduplicated. One invocation can process
-24 catch-up windows and 24 retries per check, so it may send several alerts.</p>
+<p>If several attempts fail, the alert shows the number of failed windows and
+attempts, with <code class="docutils literal notranslate"><span class="pre">FAIL</span></code> and <code class="docutils literal notranslate"><span class="pre">ERROR</span></code> totals. It shows the last processed
+<code class="docutils literal notranslate"><span class="pre">ERROR</span></code> as the representative failure, or the last <code class="docutils literal notranslate"><span class="pre">FAIL</span></code> when no attempt
+has an <code class="docutils literal notranslate"><span class="pre">ERROR</span></code>. For example:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>failed_windows    : 25
+failed_attempts   : 25
+failure_statuses  : ERROR=25
+shown_window      : representative failure
+</pre></div>
+</div>
+<p>The run ID, window, reason, counts, and query durations describe that one
+representative failure. They are not totals across windows. Every attempt and
+its results remain in the backend history.</p>
+<p>Slack puts the details and count table in a code block. Times use UTC. Window
+bounds include the start and exclude the end. An unresolved historical start is
+labelled as an initial scan. Bounds keep fractional seconds when present.
+Optional fields are omitted when unavailable.
+When timestamp column names differ, the alert names both source and target
+columns. Query durations describe the shared metric query and appear once per
+database.</p>
+<p>Alerts can include <code class="docutils literal notranslate"><span class="pre">row_count</span></code> and <code class="docutils literal notranslate"><span class="pre">distinct_key_count</span></code> values and their
+exact differences. They exclude key values, checksums, schema result objects,
+and row samples. Error details preserve line breaks; long details are shortened.</p>
+<p>A missing-index error recommends adding a source index starting with the
+timestamp column. Other errors recommend resolving the reported error.
+Failed windows for current scheduled checks retry automatically on scheduled
+runs. Use
+<code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">rerun_data_diff_check</span> <span class="pre">--run-id</span> <span class="pre">&lt;uuid&gt;</span> <span class="pre">--remediation-ref</span> <span class="pre">&lt;ticket&gt;</span></code>
+to verify a saved failed attempt sooner. This also applies to failed manual
+reruns of current definitions. Inactive historical definitions do not retry
+automatically. When no run was saved, the alert directs you to the next scheduled
+execution instead of a saved-window rerun.</p>
+<p><code class="docutils literal notranslate"><span class="pre">SKIPPED</span></code>, <code class="docutils literal notranslate"><span class="pre">DEFERRED</span></code>, and <code class="docutils literal notranslate"><span class="pre">PASS</span></code> send no alert. One invocation can process
+24 catch-up windows and 24 retries per check, but sends at most one failure alert
+per check to each destination. The alert limit resets at the next invocation;
+it does not suppress recurring failures. Automatic retries, saved results,
+coverage, and the command’s non-zero failure exit status are unchanged.</p>
 </section>
 </section>
 <section id="coverage-and-remediation">
@@ -728,32 +786,35 @@ PipelineWise reports the error and continues with other checks.</p>
 </section>
 <section id="preflight">
 <h3>Preflight<a class="headerlink" href="#preflight" title="Link to this heading"></a></h3>
-<p>Before reading data, preflight returns <code class="docutils literal notranslate"><span class="pre">BLOCKED</span></code> when both conditions apply:</p>
-<ul class="simple">
-<li><p>The source table has more than 100,000 estimated rows.</p></li>
-<li><p>No accepted index starts with <code class="docutils literal notranslate"><span class="pre">timestamp_column</span></code>.</p></li>
-</ul>
-<p>Tables at or below that limit can run without the index. PipelineWise reports
-the missing index but does not create one.</p>
-<p>Accepted indexes must start with the timestamp column:</p>
+<p>Before each data check, the source table must have a usable index whose first
+column is <code class="docutils literal notranslate"><span class="pre">timestamp_column</span></code>. This applies to every table size and to initial
+full scans. Without that index, preflight returns <code class="docutils literal notranslate"><span class="pre">BLOCKED</span></code> and the data
+comparison does not run. Schema-only checks do not require an index.
+Checksum checks still require index preflight when their columns are unsupported.
+The checksum validation error stays in the results, and no checksum query runs.</p>
+<p>Checks that combine schema and data comparisons keep completed schema results.
+If preflight blocks the data comparison, the overall run is <code class="docutils literal notranslate"><span class="pre">ERROR</span></code>. No data
+queries run, and verified coverage does not advance.</p>
+<p>Accepted indexes are:</p>
 <ul class="simple">
 <li><p>PostgreSQL: a plain, valid, ready B-tree index. Partial, expression, hash,
 BRIN, and still-building indexes do not satisfy this preflight policy.</p></li>
 <li><p>MySQL/MariaDB: a BTREE index with no prefix length on the timestamp column.
 <code class="docutils literal notranslate"><span class="pre">INVISIBLE</span></code> and <code class="docutils literal notranslate"><span class="pre">IGNORED</span></code> indexes do not satisfy the policy.</p></li>
 </ul>
-<p>Row counts come from catalog estimates, counting partitions once. PostgreSQL
-falls back to physical size when usable row estimates are missing. Refresh stale
-statistics with <code class="docutils literal notranslate"><span class="pre">ANALYZE</span></code> on PostgreSQL or <code class="docutils literal notranslate"><span class="pre">ANALYZE</span> <span class="pre">TABLE</span></code> on MySQL/MariaDB.
-These refresh estimates, not exact counts.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>Preflight checks metadata, not the query plan. A wide window may still use a
-full scan. Keep rolling windows narrow and set <code class="docutils literal notranslate"><span class="pre">statement_timeout</span></code> to limit
-each query’s duration.</p>
+<p>Preflight checks index metadata. A query may still use a full table scan.
+Keep rolling windows narrow and set <code class="docutils literal notranslate"><span class="pre">statement_timeout</span></code> to limit each
+query’s duration.</p>
 </div>
-<p>For a blocked check, ask the DBA to add or enable an accepted index. Inspect
-<code class="docutils literal notranslate"><span class="pre">dd_preflight_log</span></code> for the verdict, row estimate, limit, and index findings.</p>
+<p>For a blocked check, ask the DBA to add or enable an accepted index. PipelineWise
+does not create indexes. Inspect <code class="docutils literal notranslate"><span class="pre">dd_preflight_log</span></code> for the verdict and index
+findings.</p>
+<p>Before upgrading, review the latest index findings in <code class="docutils literal notranslate"><span class="pre">dd_preflight_log</span></code> for
+the selected data checks. Add missing qualifying indexes, including on small
+tables whose older preflight verdict was <code class="docutils literal notranslate"><span class="pre">PASS</span></code> under the row-count exemption.
+Missing indexes continue to block each new window and its retries until fixed.</p>
 </section>
 </section>
 </section>

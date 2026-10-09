@@ -65,6 +65,9 @@ latest outcome to update the watermark and its history:
 
 This shows the processing flow. The ERD shows the exact foreign keys.
 
+- ``dd_preflight_log`` records source index checks. ``table_rows`` and
+  ``row_limit`` are deprecated. They retain estimates and thresholds from older
+  runs and remain for compatibility. New records leave them NULL.
 - ``dd_run_attempts`` keeps every attempt.
 - ``dd_run_slot_state`` keeps the highest attempt number with ``PASS``, ``FAIL``,
   or ``ERROR`` status per scheduled slot.

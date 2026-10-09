@@ -184,7 +184,7 @@ const runMermaid = async (rerun) => {
                                     // Apply zoom to the now-rendered diagram, matching
                                     // the decoration visible diagrams receive.
                                     if (true) {
-                                        addZoomToSvgs(d3.selectAll(".mermaid[data-zoom-id=id-01146554-624b-4a68-89dd-44ea7073003e]").select(function() {
+                                        addZoomToSvgs(d3.selectAll(".mermaid[data-zoom-id=id-3321b6f6-66c6-4fec-b357-0b432cc1ebd2]").select(function() {
                                             return this.querySelector("svg");
                                         }));
                                     }
@@ -210,7 +210,7 @@ const runMermaid = async (rerun) => {
     if (true) {
         const mermaids_to_add_zoom = 1 === -1 ? mermaids_active.length : 1;
         if(mermaids_to_add_zoom > 0) {
-            var svgs = d3.selectAll(".mermaid[data-zoom-id=id-01146554-624b-4a68-89dd-44ea7073003e]").select(function() {
+            var svgs = d3.selectAll(".mermaid[data-zoom-id=id-3321b6f6-66c6-4fec-b357-0b432cc1ebd2]").select(function() {
                 return this.querySelector("svg");
             });
             // Wait until every active (visible) diagram has rendered. Deferred
@@ -542,7 +542,7 @@ window.runMermaid = runMermaid;</script>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="data_diff.html#cli-commands">CLI commands</a></li>
 <li class="toctree-l2"><a class="reference internal" href="data_diff.html#alerts">Alerts</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="data_diff.html#one-alert-per-failed-attempt">One alert per failed attempt</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_diff.html#one-alert-per-check-per-invocation">One alert per check per invocation</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="data_diff.html#coverage-and-remediation">Coverage and remediation</a><ul>
@@ -774,7 +774,7 @@ To share one role, set both credential pairs to that role.</p>
 <section id="schema">
 <h2>Schema<a class="headerlink" href="#schema" title="Link to this heading"></a></h2>
 <figure class="align-center" id="id1">
-<pre data-zoom-id="id-01146554-624b-4a68-89dd-44ea7073003e" class="mermaid">
+<pre data-zoom-id="id-3321b6f6-66c6-4fec-b357-0b432cc1ebd2" class="mermaid">
         %%{init: {&quot;er&quot;: {&quot;diagramPadding&quot;: 8, &quot;entityPadding&quot;: 8}}}%%
 erDiagram
     direction LR
@@ -923,6 +923,9 @@ dd_run_attempts
 </div>
 <p>This shows the processing flow. The ERD shows the exact foreign keys.</p>
 <ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">dd_preflight_log</span></code> records source index checks. <code class="docutils literal notranslate"><span class="pre">table_rows</span></code> and
+<code class="docutils literal notranslate"><span class="pre">row_limit</span></code> are deprecated. They retain estimates and thresholds from older
+runs and remain for compatibility. New records leave them NULL.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">dd_run_attempts</span></code> keeps every attempt.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">dd_run_slot_state</span></code> keeps the highest attempt number with <code class="docutils literal notranslate"><span class="pre">PASS</span></code>, <code class="docutils literal notranslate"><span class="pre">FAIL</span></code>,
 or <code class="docutils literal notranslate"><span class="pre">ERROR</span></code> status per scheduled slot.</p></li>

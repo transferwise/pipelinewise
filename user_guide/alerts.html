@@ -183,7 +183,7 @@
 </li>
 <li class="toctree-l2"><a class="reference internal" href="data_diff.html#cli-commands">CLI commands</a></li>
 <li class="toctree-l2"><a class="reference internal" href="data_diff.html#alerts">Alerts</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="data_diff.html#one-alert-per-failed-attempt">One alert per failed attempt</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_diff.html#one-alert-per-check-per-invocation">One alert per check per invocation</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="data_diff.html#coverage-and-remediation">Coverage and remediation</a><ul>
@@ -385,7 +385,8 @@
   <section id="alerts">
 <span id="id1"></span><h1>Alerts<a class="headerlink" href="#alerts" title="Link to this heading"></a></h1>
 <p>PipelineWise sends failure alerts through handlers configured in <code class="docutils literal notranslate"><span class="pre">config.yml</span></code>.
-Replication and data-diff share the same routing and per-tap suppression.</p>
+Replication and data-diff share the same routing and per-tap suppression.
+Data-diff can use a separate global Slack channel.</p>
 <section id="handlers">
 <h2>Handlers<a class="headerlink" href="#handlers" title="Link to this heading"></a></h2>
 <table class="docutils align-default" id="id2" style="width: 100%">
@@ -401,7 +402,8 @@ Replication and data-diff share the same routing and per-tap suppression.</p>
 </thead>
 <tbody>
 <tr class="row-even"><td><p>Slack</p></td>
-<td><p>Sends to the global channel and optional tap-specific channel.</p></td>
+<td><p>Sends to the global channel and optional tap-specific channel.
+Data-diff can replace the global destination with its own channel.</p></td>
 </tr>
 </tbody>
 </table>
@@ -431,13 +433,19 @@ the bot to each destination channel.</p>
 <span class="w">  </span><span class="nt">slack</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">token</span><span class="p">:</span><span class="w"> </span><span class="s">"{{</span><span class="nv"> </span><span class="s">env_var['SLACK_BOT_TOKEN']</span><span class="nv"> </span><span class="s">}}"</span>
 <span class="w">    </span><span class="nt">channel</span><span class="p">:</span><span class="w"> </span><span class="s">"#pipeline-alerts"</span>
+<span class="w">    </span><span class="nt">data_diff_channel</span><span class="p">:</span><span class="w"> </span><span class="s">"#data-diff-alerts"</span><span class="w">  </span><span class="c1"># Optional</span>
 </pre></div>
 </div>
+<p><code class="docutils literal notranslate"><span class="pre">channel</span></code> receives replication alerts. If <code class="docutils literal notranslate"><span class="pre">data_diff_channel</span></code> is set,
+data-diff uses it instead of <code class="docutils literal notranslate"><span class="pre">channel</span></code>. Otherwise, both use <code class="docutils literal notranslate"><span class="pre">channel</span></code>.
+<code class="docutils literal notranslate"><span class="pre">data_diff_channel</span></code> must be a nonempty string when supplied.</p>
 <p>Add a second destination for one tap:</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">slack_alert_channel</span><span class="p">:</span><span class="w"> </span><span class="s">"#orders-alerts"</span>
 </pre></div>
 </div>
-<p>The tap-specific channel receives a copy; it does not replace the global channel.</p>
+<p>The tap-specific channel receives a copy; it does not replace the global channel.
+When the tap-specific and global destination are the same, Slack receives one
+message. See <a class="reference internal" href="data_diff.html#data-diff-alerts"><span class="std std-ref">Alerts</span></a> for the data-diff message layout.</p>
 </section>
 <section id="victorops">
 <span id="victorops-alert-handler"></span><h2>VictorOps<a class="headerlink" href="#victorops" title="Link to this heading"></a></h2>
