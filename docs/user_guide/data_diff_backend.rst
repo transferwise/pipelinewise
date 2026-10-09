@@ -43,9 +43,9 @@ To share one role, set both credential pairs to that role.
 Schema
 ------
 
-.. mermaid:: ../../pipelinewise/backend_db/migrations/versions/003_schema.erd.mmd
+.. mermaid:: ../../pipelinewise/backend_db/migrations/versions/004_schema.erd.mmd
    :align: center
-   :caption: Data-diff backend schema after migration 003
+   :caption: Data-diff backend schema after migration 004
    :zoom:
 
 The first path stores definitions and run results. The second uses each slot's
@@ -65,9 +65,15 @@ latest outcome to update the watermark and its history:
 
 This shows the processing flow. The ERD shows the exact foreign keys.
 
-- ``dd_preflight_log`` records source index checks. ``table_rows`` and
-  ``row_limit`` are deprecated. They retain estimates and thresholds from older
-  runs and remain for compatibility. New records leave them NULL.
+- ``dd_preflight_log`` records source index checks. Without a qualifying index,
+  ``row_limit`` is 100,000 and ``table_rows`` contains the bounded count when
+  available. Counts below that limit are exact; a count of 100,000 means at
+  least that many rows.
+  Both fields are NULL when an index makes counting unnecessary. Older records
+  may contain estimates, and records written by 0.95.0 leave both fields NULL.
+- ``dd_index_warning_state`` remembers delivered source-index warnings. Its
+  identity uses the tap, source connection, table, and timestamp column. Check
+  revisions and target changes do not repeat the warning.
 - ``dd_run_attempts`` keeps every attempt.
 - ``dd_run_slot_state`` keeps the highest attempt number with ``PASS``, ``FAIL``,
   or ``ERROR`` status per scheduled slot.
@@ -83,11 +89,20 @@ Manual reruns use ``trigger_type = 'REMEDIATION'``. ``rerun_of_run_id`` links th
 to the original run.
 
 
-Migration 003
-'''''''''''''
+Migrations 003 and 004
+''''''''''''''''''''''
 
-Back up the backend before upgrading. Run ``import_config`` to apply migrations
-before running checks.
+Back up the backend before upgrading. After upgrading, run
+``pipelinewise import_config --dir <project>`` to apply migrations before
+running checks. Data-diff execution does not apply migrations itself.
+
+Migration 004 adds ``dd_index_warning_state`` so successful warning deliveries
+remain remembered across restarts and configuration imports. The marker is saved
+when any configured destination accepts the warning. Other destinations are
+still attempted, and failures are logged. Failed destinations are not retried
+after another destination accepts it. If all destinations fail, delivery can be
+tried again. A crash between delivery and saving its marker can produce a
+duplicate. No source tables or indexes are changed.
 
 Migration 003 supports historical scans whose start is not yet known:
 

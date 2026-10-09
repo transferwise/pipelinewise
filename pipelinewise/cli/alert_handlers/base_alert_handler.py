@@ -15,7 +15,7 @@ class BaseAlertHandler(ABC):
     ERROR = 'error'
 
     @abstractmethod
-    def send(self, message: str, level: str = ERROR, exc: Exception = None, **kwargs) -> None:
+    def send(self, message: str, level: str = ERROR, exc: Exception = None, **kwargs) -> int | None:
         """
         Send alert
 
@@ -25,6 +25,6 @@ class BaseAlertHandler(ABC):
             exc: optional exception that triggered the alert
 
         Returns:
-            Initialised alert handler object
+            Optional successful destination count
         """
         pass

@@ -1,8 +1,8 @@
 """Execute one bounded check: connect, preflight, then compare aggregates.
 
 Connections are read-only, UTC, and statement-timeout bounded. ``run_check`` is the
-entry point; ``preflight_source`` decides whether the source may be read at all and
-is persisted before either aggregate runs.
+entry point; ``preflight_source`` decides whether aggregate queries may run and is
+persisted before either aggregate runs.
 """
 
 import hashlib
@@ -40,6 +40,9 @@ from .comparison import (
     schema_compatibility_result,
 )
 from .credentials import pem_to_der
+
+SOURCE_ROW_LIMIT = 100_000
+SOURCE_INDEX_WARNING_ROWS = 50_000
 
 # Symbols re-exported from .adapters for use by callers and tests.
 __all__ = [
@@ -177,15 +180,18 @@ def preflight_source(
     sql: str,
     params: tuple,
 ) -> dict:
-    """Require a usable source index starting with the timestamp column.
+    """Require a leading timestamp index unless the source has under 100,000 rows.
 
     Use catalog metadata because plan row estimates describe rows returned, not
-    all rows read, so they do not bound scan cost. The optimizer may still choose
-    a full scan. Statement timeouts limit each query's duration.
+    all rows read. Unindexed tables instead use a bounded count of all visible
+    source rows. Statement timeouts limit every query, including that count.
     """
     # Index eligibility does not depend on the comparison window.
     del params
     fingerprint = hashlib.sha256(sql.encode("utf-8")).hexdigest()
+    indexes = []
+    has_leading_index = None
+    table_rows = None
     try:
         indexes = adapter.indexes(schema, table)
         has_leading_index = any(
@@ -194,44 +200,54 @@ def preflight_source(
             and index["columns"][0].lower() == timestamp_column.lower()
             for index in indexes
         )
-
-        findings = []
         if not has_leading_index:
-            unusable = [
-                index["index_name"]
-                for index in indexes
-                if not index.get("is_usable")
-                and index.get("columns")
-                and index["columns"][0].lower() == timestamp_column.lower()
-            ]
+            table_rows = adapter.count_rows_up_to(schema, table, SOURCE_ROW_LIMIT)
+        requires_index = table_rows is not None and table_rows >= SOURCE_ROW_LIMIT
+        findings = _missing_index_findings(indexes, timestamp_column) if requires_index else []
+        if not has_leading_index and not requires_index:
             findings.append(
-                f"No usable source index starts with timestamp column "
-                f"'{timestamp_column}'"
-                + (
-                    f"; ignored as unusable: {', '.join(unusable)}"
-                    if unusable else ""
-                )
-            )
-            findings.append(
-                "Add a source index beginning with the timestamp column; "
-                "PipelineWise will not create it automatically"
+                f'Allow the unindexed source table with {table_rows:,} rows; '
+                f'a usable leading timestamp index is required at {SOURCE_ROW_LIMIT:,} rows'
             )
         return {
-            "status": "PASS" if has_leading_index else "BLOCKED",
+            "status": "BLOCKED" if requires_index else "PASS",
             "query_fingerprint": fingerprint,
             "index_metadata": indexes,
             "findings": findings,
             "has_leading_index": has_leading_index,
+            'table_rows': table_rows,
+            'row_limit': None if has_leading_index else SOURCE_ROW_LIMIT,
+            'index_warning': table_rows is not None and SOURCE_INDEX_WARNING_ROWS <= table_rows < SOURCE_ROW_LIMIT,
         }
     except Exception as exc:
         return {
             "status": "ERROR",
             "query_fingerprint": fingerprint,
-            "index_metadata": [],
+            "index_metadata": indexes,
             "findings": [],
-            "has_leading_index": None,
+            "has_leading_index": has_leading_index,
+            'table_rows': table_rows,
+            'row_limit': SOURCE_ROW_LIMIT,
+            'index_warning': False,
             "error": str(exc),
         }
+
+
+def _missing_index_findings(indexes: list, timestamp_column: str) -> list:
+    """Explain why index metadata does not qualify the source table."""
+    unusable = [
+        index['index_name']
+        for index in indexes
+        if not index.get('is_usable')
+        and index.get('columns')
+        and index['columns'][0].lower() == timestamp_column.lower()
+    ]
+    return [
+        f"No usable source index starts with timestamp column '{timestamp_column}'"
+        + (f"; ignored as unusable: {', '.join(unusable)}" if unusable else ''),
+        'Add a source index beginning with the timestamp column; '
+        'PipelineWise will not create it automatically',
+    ]
 
 
 def connect_source(check: dict, connection_config: dict) -> DatabaseAdapter:

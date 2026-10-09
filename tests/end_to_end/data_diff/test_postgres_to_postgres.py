@@ -9,10 +9,12 @@ separate ``ddl_user``. Cross-dialect checksum agreement belongs to the other rou
 import json
 import os
 import shutil
+import uuid
 
 from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
 from alembic import command
@@ -21,8 +23,8 @@ from sqlalchemy.engine import URL
 from sqlalchemy.exc import DBAPIError
 
 from pipelinewise.data_diff.config import CheckDefinition
-from pipelinewise.data_diff.engine import HistoricalWindowNotReady
-from pipelinewise.data_diff.repository import DataDiffRepository, RunLeaseLostError
+from pipelinewise.data_diff.engine import HistoricalWindowNotReady, connect_source, preflight_source
+from pipelinewise.data_diff.repository import DataDiffRepository, RunLeaseLostError, index_warning_id
 from pipelinewise.data_diff.runner import run_due_checks
 from pipelinewise.data_diff.runtime import RuntimeConnectorConfigLoader
 
@@ -103,6 +105,108 @@ class TestPostgresToPostgresDataDiff:
                 'PIPELINEWISE_BACKEND', 'DDL_PASSWORD'
             ),
         }
+
+    def test_unindexed_preflight_counts_partitioned_rows_including_null_timestamps(self):
+        """Count current source rows, then stop counting once an index qualifies."""
+        table = f'dd preflight_{uuid.uuid4().hex}'
+        qualified = f'public."{table}"'
+        connection_config = {
+            field: self.e2e.get_conn_env_var('TAP_POSTGRES', environment_key)
+            for field, environment_key in (
+                ('host', 'HOST'), ('port', 'PORT'), ('user', 'USER'),
+                ('password', 'PASSWORD'), ('dbname', 'DB'),
+            )
+        }
+        check = {'source_type': 'tap-postgres', 'statement_timeout_seconds': 30}
+        sql = f'SELECT COUNT(*) AS row_count FROM {qualified} WHERE updated_at IS NOT NULL'
+        self.run_source_query(f'CREATE TABLE {qualified} (id BIGINT, updated_at TIMESTAMPTZ) PARTITION BY RANGE (id)')
+        try:
+            self.run_source_query(
+                f'CREATE TABLE public."{table}_early" PARTITION OF {qualified} '
+                'FOR VALUES FROM (MINVALUE) TO (50000); '
+                f'CREATE TABLE public."{table}_later" PARTITION OF {qualified} '
+                'FOR VALUES FROM (50000) TO (MAXVALUE)'
+            )
+            previous_count = 0
+            for row_count in (49_999, 50_000, 99_999, 100_000, 100_001):
+                self.run_source_query(
+                    f'INSERT INTO {qualified} (id) SELECT generate_series(%s, %s)',
+                    (previous_count + 1, row_count),
+                )
+                previous_count = row_count
+                adapter = connect_source(check, connection_config)
+                try:
+                    preflight = preflight_source(adapter, 'public', table, 'updated_at', sql, ())
+                    assert preflight['status'] == ('PASS' if row_count < 100_000 else 'BLOCKED'), preflight
+                    assert preflight['table_rows'] == min(row_count, 100_000)
+                    assert preflight['row_limit'] == 100_000
+                    assert preflight['has_leading_index'] is False
+                    assert preflight['index_warning'] is (50_000 <= row_count < 100_000)
+                    if preflight['status'] == 'PASS':
+                        assert adapter.execute_metrics(sql, (), ('row_count',)).values == {'row_count': '0'}
+                finally:
+                    adapter.close()
+
+            self.run_source_query(f'CREATE INDEX ON {qualified} (updated_at)')
+            adapter = connect_source(check, connection_config)
+            try:
+                count = Mock(wraps=adapter.count_rows_up_to)
+                adapter.count_rows_up_to = count
+                preflight = preflight_source(adapter, 'public', table, 'updated_at', sql, ())
+                assert preflight['status'] == 'PASS', preflight
+                assert preflight['has_leading_index'] is True
+                assert preflight['table_rows'] is preflight['row_limit'] is None
+                assert preflight['index_warning'] is False
+                count.assert_not_called()
+            finally:
+                adapter.close()
+        finally:
+            self.run_source_query(f'DROP TABLE {qualified} CASCADE')
+
+    def test_index_warning_persists_only_after_delivery_across_connections_and_revisions(self):
+        """Keep acknowledged warnings while letting undelivered warnings retry."""
+        self.e2e.setup_pipelinewise_backend()
+        definition = _repository_definition(f'index_warning_{uuid.uuid4().hex}', 'warning_table')
+        backend = self._backend_config()
+        with DataDiffRepository.from_backend_config(backend) as repository:
+            repository.sync_definitions([definition], selected_taps=[definition.tap_id])
+            check, = repository.list_checks(tap_id=definition.tap_id)
+            warning_id = index_warning_id(check)
+            with repository.index_warning_notification(check) as notification:
+                assert notification.pending is True
+
+        assert self.run_backend_query(
+            f"SELECT COUNT(*) FROM public.dd_index_warning_state WHERE warning_id = '{warning_id}'"
+        ) == [(0,)]
+        with DataDiffRepository.from_backend_config(backend) as repository:
+            with repository.index_warning_notification(check) as notification:
+                assert notification.pending is True
+                notification.mark_sent()
+                assert self.run_backend_query(
+                    f"SELECT COUNT(*) FROM public.dd_index_warning_state WHERE warning_id = '{warning_id}'"
+                ) == [(0,)]
+
+        assert self.run_backend_query(
+            f"SELECT check_id::text FROM public.dd_index_warning_state WHERE warning_id = '{warning_id}'"
+        ) == [(str(check['check_id']),)]
+        with DataDiffRepository.from_backend_config(backend) as repository:
+            revised = replace(definition, frequency='*/30 * * * *')
+            repository.sync_definitions([revised], selected_taps=[definition.tap_id])
+            updated_check, = repository.list_checks(tap_id=definition.tap_id)
+            assert updated_check['check_id'] != check['check_id']
+            assert index_warning_id(updated_check) == warning_id
+            with repository.index_warning_notification(updated_check) as notification:
+                assert notification.pending is False
+
+        assert self.run_backend_query(
+            "SELECT has_table_privilege(current_user, 'public.dd_index_warning_state', 'SELECT'), "
+            "has_table_privilege(current_user, 'public.dd_index_warning_state', 'INSERT'), "
+            "has_table_privilege(current_user, 'public.dd_index_warning_state', 'UPDATE')"
+        ) == [(True, True, True)]
+        if backend['user'] != backend['ddl_user']:
+            assert self.run_backend_query(
+                "SELECT has_table_privilege(current_user, 'public.dd_index_warning_state', 'DELETE')"
+            ) == [(False,)]
 
     @staticmethod
     def _run_success(command):
@@ -1088,6 +1192,7 @@ class TestPostgresToPostgresDataDiff:
                 'dd_check_definitions', 'dd_preflight_log', 'dd_run_attempts', 'dd_run_results',
                 'dd_run_slot_state', 'dd_watermark_state',
                 'dd_watermark_events',
+                'dd_index_warning_state',
             } <= tables
             assert {
                 'dd_current_coverage', 'dd_remediation_history',
@@ -1130,7 +1235,7 @@ class TestPostgresToPostgresDataDiff:
             )[0][0] is None
             assert self.run_backend_query(
                 'SELECT version_num FROM public.alembic_version'
-            ) == [('003',)]
+            ) == [('004',)]
             # Alembic stamped its version, so a second import is a no-op migration.
             assert self.run_backend_query(
                 'SELECT COUNT(*) FROM public.alembic_version'

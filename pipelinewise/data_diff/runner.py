@@ -119,13 +119,14 @@ def execute_started_run(
 ) -> dict:
     """Execute and persist one already-created scheduled or remediation attempt."""
     # Seeded complete, so every reader can index it without a fallback.
-    recorded = {"preflight_id": None, "window_start": window_start}
+    recorded = {"preflight_id": None, "preflight": None, "window_start": window_start}
 
     def _record(preflight):
         # Called by run_check before either aggregate executes.
         recorded["preflight_id"] = backend.record_preflight(
             run["run_id"], check["check_id"], preflight
         )
+        recorded["preflight"] = preflight
 
     def _record_window_start(start):
         backend.set_run_window_start(run["run_id"], start)
@@ -223,6 +224,7 @@ def _execute_and_persist(
             "window_start": None,
             "window_end": window_end,
             "error": str(exc),
+            "preflight": recorded["preflight"],
             "attempt": run["attempt"],
             "trigger_type": run["trigger_type"],
         }
@@ -249,6 +251,7 @@ def _execute_and_persist(
             "window_start": recorded["window_start"],
             "window_end": window_end,
             "error": str(exc),
+            "preflight": recorded["preflight"],
             "attempt": run["attempt"],
             "trigger_type": run["trigger_type"],
         }

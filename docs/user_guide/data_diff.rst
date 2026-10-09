@@ -282,6 +282,8 @@ heading, aligned details, and a next action. For example:
     :exclamation: FAIL data-diff payments/public.transfers — target has 20 fewer rows
 
     alert_utc_time    : 2026-10-09 09:30:05
+    tap_id            : payments
+    target_id         : snowflake
     run_id            : 2bd3e725-38fc-48c1-b565-b4f20e5bc7dd
     attempt           : 3 (RETRY)
     scheduled_utc     : 2026-10-09 09:00:00
@@ -298,9 +300,12 @@ heading, aligned details, and a next action. For example:
 
     Difference = target - source
 
-    Next action: Check replication lag and investigate the mismatch.
-    Failed windows retry automatically on scheduled runs. To verify sooner,
-    use rerun_data_diff_check with --run-id and --remediation-ref.
+**Next action:**
+
+- Check replication lag and investigate the mismatch.
+- Failed windows retry automatically on scheduled runs.
+- To verify sooner, use ``rerun_data_diff_check`` with ``--run-id`` and
+  ``--remediation-ref``.
 
 If several attempts fail, the alert shows the number of failed windows and
 attempts, with ``FAIL`` and ``ERROR`` totals. It shows the last processed
@@ -331,7 +336,10 @@ exact differences. They exclude key values, checksums, schema result objects,
 and row samples. Error details preserve line breaks; long details are shortened.
 
 A missing-index error recommends adding a source index starting with the
-timestamp column. Other errors recommend resolving the reported error.
+timestamp column. Its details show the primary index finding, including any
+ignored indexes, without repeating the advice from ``Next action``.
+The full error and preflight findings remain in the backend history.
+Other errors recommend resolving the reported error.
 Failed windows for current scheduled checks retry automatically on scheduled
 runs. Use
 ``pipelinewise rerun_data_diff_check --run-id <uuid> --remediation-ref <ticket>``
@@ -340,11 +348,57 @@ reruns of current definitions. Inactive historical definitions do not retry
 automatically. When no run was saved, the alert directs you to the next scheduled
 execution instead of a saved-window rerun.
 
-``SKIPPED``, ``DEFERRED``, and ``PASS`` send no alert. One invocation can process
+``SKIPPED``, ``DEFERRED``, and ``PASS`` send no failure alert. A source-index
+warning is separate from the check's outcome. One invocation can process
 24 catch-up windows and 24 retries per check, but sends at most one failure alert
 per check to each destination. The alert limit resets at the next invocation;
 it does not suppress recurring failures. Automatic retries, saved results,
 coverage, and the command's non-zero failure exit status are unchanged.
+
+Source-index warning
+''''''''''''''''''''
+
+A table without a qualifying timestamp index can still run data checks while it
+has fewer than 100,000 rows. From 50,000 rows, PipelineWise sends a warning so
+the owner can arrange an index before checks become blocked. For example:
+
+.. code-block:: text
+
+    :exclamation: WARNING data-diff payments/public.transfers — approaching source index requirement
+
+    alert_utc_time    : 2026-10-09 09:30:05
+    tap_id            : payments
+    target_id         : snowflake
+    source_table      : payments.public.transfers
+    timestamp_column  : updated_at
+    source_rows       : 75,000
+    index_required_at : 100,000 rows
+    index_status      : No qualifying source index
+    data_diff_status  : Checks can still run
+
+**Next action:**
+
+- Arrange a usable source index starting with updated_at before the table
+  reaches 100,000 rows.
+- At 100,000 rows or more, data checks will be blocked until that index exists.
+
+PipelineWise attempts every configured alert destination and logs delivery
+failures. Once any destination accepts the warning, it is remembered for each
+source table and timestamp column within a tap. Later runs do not retry failed
+destinations after that success. Retries, restarts, and configuration imports
+do not repeat the warning. Adding an index or shrinking the table does not reset
+that reminder. Changing the source table or timestamp column creates a new
+reminder.
+
+If all destinations fail, delivery is retried on a later eligible run. A crash
+after delivery but before saving the reminder can cause a duplicate warning.
+Only current check definitions send this warning. Inactive historical reruns
+do not send it. Existing tap alert settings still apply. A delivery failure
+does not change the data check's result.
+
+These limits do not guarantee a quick index build. Table width, server load,
+and long-running transactions also affect index creation. Arrange the index
+early for a growing table. See :ref:`data_diff_preflight` for the exact rule.
 
 Coverage and remediation
 ------------------------
@@ -425,19 +479,41 @@ Source safety
   ``max_key`` retain actual key values. Restrict access to these results.
 - ``row_checksum`` adds CPU work. Monitor source load during rollout.
 
+.. _data_diff_preflight:
+
 Preflight
 '''''''''
 
-Before each data check, the source table must have a usable index whose first
-column is ``timestamp_column``. This applies to every table size and to initial
-full scans. Without that index, preflight returns ``BLOCKED`` and the data
-comparison does not run. Schema-only checks do not require an index.
-Checksum checks still require index preflight when their columns are unsupported.
-The checksum validation error stays in the results, and no checksum query runs.
+Before each data check, PipelineWise looks for a usable source index whose first
+column is ``timestamp_column``. With that index, preflight does not count rows.
+Without it, a bounded source count applies these fixed rules:
+
+.. list-table:: Source tables without a qualifying timestamp index
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Source rows
+     - Behaviour
+   * - Fewer than 50,000
+     - Allow data checks without a warning.
+   * - 50,000 to 99,999
+     - Allow data checks and send the source-index warning once.
+   * - 100,000 or more
+     - Return ``BLOCKED`` and require a qualifying index.
+
+These rules include initial full scans. Schema-only checks require neither an
+index nor a row count. Checksum checks still run preflight when their columns
+are unsupported. The checksum validation error stays in the results, and no
+checksum query runs.
+
+The count is exact below the limit and stops at 100,000 rows. A recorded count
+of 100,000 means at least that many rows. Preflight uses no row estimates or
+query plans. A count failure or timeout returns ``ERROR`` instead of assuming
+the table is small.
 
 Checks that combine schema and data comparisons keep completed schema results.
-If preflight blocks the data comparison, the overall run is ``ERROR``. No data
-queries run, and verified coverage does not advance.
+If preflight blocks the data comparison, the overall run is ``ERROR``. No
+comparison queries run, and verified coverage does not advance.
 
 Accepted indexes are:
 
@@ -448,7 +524,8 @@ Accepted indexes are:
 
 .. note::
 
-   Preflight checks index metadata. A query may still use a full table scan.
+   Preflight checks index metadata, not the query plan. A query may still use a
+   full table scan.
    Keep rolling windows narrow and set ``statement_timeout`` to limit each
    query's duration.
 
@@ -456,7 +533,9 @@ For a blocked check, ask the DBA to add or enable an accepted index. PipelineWis
 does not create indexes. Inspect ``dd_preflight_log`` for the verdict and index
 findings.
 
-Before upgrading, review the latest index findings in ``dd_preflight_log`` for
-the selected data checks. Add missing qualifying indexes, including on small
-tables whose older preflight verdict was ``PASS`` under the row-count exemption.
-Missing indexes continue to block each new window and its retries until fixed.
+After upgrading, run ``pipelinewise import_config --dir <project>`` before
+running checks. This applies backend migration 004, which remembers delivered
+source-index warnings. See :ref:`data_diff_backend`.
+Review the latest findings in ``dd_preflight_log`` and arrange qualifying
+indexes for growing tables. At 100,000 rows or more, a missing index blocks
+each new window and its retries until fixed.

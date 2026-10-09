@@ -3,7 +3,7 @@ from decimal import Decimal
 
 import pytest
 
-from pipelinewise.data_diff.alerts import format_data_diff_alert
+from pipelinewise.data_diff.alerts import format_data_diff_alert, format_data_diff_index_warning
 
 
 NOW = datetime(2026, 10, 9, 9, 30, 5, tzinfo=timezone.utc)
@@ -68,6 +68,7 @@ def test_mismatch_alert_contains_operational_context_and_canonical_counts():
     assert message == 'FAIL data-diff payments/public.transfers — target has 20 fewer rows'
     assert _fields(details) == {
         'alert_utc_time': '2026-10-09 09:30:05',
+        'tap_id': 'payments',
         'run_id': RUN_ID,
         'attempt': '3 (RETRY)',
         'scheduled_utc': '2026-10-09 09:00:00',
@@ -209,11 +210,53 @@ def test_blocked_initial_scan_identifies_missing_index_and_preserves_cutoff():
     assert fields['window_start_utc'] == 'unresolved (initial scan)'
     assert fields['window_end_utc'] == '2026-10-09 09:00:00 (exclusive)'
     assert fields['error_detail'] == summary['error']
-    assert 'index' in next_action.lower()
-    assert 'updated_at' in next_action
-    assert 'retry automatically' in next_action
-    assert '--run-id' in next_action
-    assert '--remediation-ref' in next_action
+    assert next_action.splitlines() == [
+        '- Add a usable source index starting with updated_at.',
+        '- Failed windows retry automatically on scheduled runs.',
+        '- To verify sooner, use `rerun_data_diff_check` with `--run-id` and `--remediation-ref`.',
+    ]
+
+
+@pytest.mark.parametrize('diagnostic', [
+    "No usable source index starts with timestamp column 'updated_at'",
+    "No usable source index starts with timestamp column 'updated_at'; ignored as unusable: idx_partial",
+])
+def test_blocked_alert_shows_index_advice_once_and_preserves_diagnostics(diagnostic):
+    findings = [
+        diagnostic,
+        'Add a source index beginning with the timestamp column; PipelineWise will not create it automatically',
+    ]
+    error = '; '.join(findings)
+    summary = _summary(
+        status='ERROR', results=[],
+        preflight={'status': 'BLOCKED', 'findings': findings}, error=error,
+    )
+
+    message, details, next_action = format_data_diff_alert(summary, now=NOW)
+
+    fields = _fields(details)
+    assert message.endswith('source index missing')
+    assert fields['tap_id'] == 'payments'
+    assert fields['error_detail'] == diagnostic
+    assert 'Add a source index' not in details
+    assert 'PipelineWise will not create it' not in details
+    assert next_action.count('Add a usable source index starting with updated_at.') == 1
+    assert summary['error'] == error
+    assert summary['preflight']['findings'] == findings
+
+
+@pytest.mark.parametrize('preflight_status', ['BLOCKED', 'ERROR', 'PASS'])
+def test_alert_retains_error_details_that_are_not_repeated_index_advice(preflight_status):
+    findings = ['Source diagnostic', 'Further diagnostic']
+    error = 'Additional source diagnostic' if preflight_status == 'BLOCKED' else '; '.join(findings)
+    summary = _summary(
+        status='ERROR', results=[],
+        preflight={'status': preflight_status, 'findings': findings}, error=error,
+    )
+
+    _, details, _ = format_data_diff_alert(summary, now=NOW)
+
+    assert _fields(details)['error_detail'] == error
 
 
 def test_generic_execution_error_has_a_distinct_heading_and_recovery_action():
@@ -240,6 +283,7 @@ def test_alerts_before_run_creation_omit_unavailable_metadata():
     assert message.startswith('ERROR data-diff payments/public.transfers')
     fields = _fields(details)
     assert fields['alert_utc_time'] == '2026-10-09 09:30:05'
+    assert fields['tap_id'] == 'payments'
     assert fields['source_table'] == 'public.transfers'
     assert fields['error_detail'] == 'Unable to schedule check'
     missing_fields = {'run_id', 'attempt', 'scheduled_utc', 'target_table', 'query_seconds', 'window_start_utc'}
@@ -389,3 +433,70 @@ def test_multiline_error_is_preserved_but_oversized_errors_are_bounded():
     assert error[:2000] in details
     assert error[:2001] not in details
     assert len(details) < 3000
+
+
+@pytest.mark.parametrize('table_rows', [50000, 75000, 99999])
+def test_index_warning_identifies_table_and_exact_count_without_claiming_failure(table_rows):
+    check = _summary()['check']
+    preflight = {'status': 'PASS', 'table_rows': table_rows, 'row_limit': 100000, 'index_warning': True}
+
+    message, details, next_action = format_data_diff_index_warning(check, preflight, now=NOW)
+
+    assert message == 'WARNING data-diff payments/public.transfers — approaching source index requirement'
+    assert _fields(details) == {
+        'alert_utc_time': '2026-10-09 09:30:05',
+        'tap_id': 'payments',
+        'target_id': 'snowflake',
+        'source_table': 'payments.public.transfers',
+        'timestamp_column': 'updated_at',
+        'source_rows': f'{table_rows:,}',
+        'index_required_at': '100,000 rows',
+        'index_status': 'No qualifying source index',
+        'data_diff_status': 'Checks can still run',
+    }
+    assert next_action.splitlines() == [
+        '- Arrange a usable source index starting with updated_at before the table reaches 100,000 rows.',
+        '- At 100,000 rows or more, data checks will be blocked until that index exists.',
+    ]
+    assert 'ERROR' not in message
+    assert 'run_id' not in details
+    assert 'rerun' not in next_action
+    assert preflight['status'] == 'PASS'
+
+
+def test_index_warning_normalizes_time_and_omits_unavailable_context():
+    check = {
+        'full_check_name': 'public/transfers', 'source_table': 'transfers', 'source_timestamp_column': 'updated_at',
+    }
+    message, details, _ = format_data_diff_index_warning(
+        check, {'table_rows': 75000, 'row_limit': 100000},
+        now=datetime(2026, 10, 9, 11, 30, 5, 999999, tzinfo=timezone(timedelta(hours=2))),
+    )
+
+    assert message.startswith('WARNING data-diff public/transfers')
+    assert _fields(details)['alert_utc_time'] == '2026-10-09 09:30:05'
+    assert _fields(details)['source_table'] == 'transfers'
+    assert 'tap_id' not in _fields(details)
+    assert 'target_id' not in _fields(details)
+    assert 'None' not in details
+
+
+def test_index_warning_uses_only_allowed_metadata_and_keeps_it_on_single_lines():
+    check = {
+        **_summary()['check'],
+        'tap_id': 'payments\nextra_line',
+        'source_timestamp_column': 'updated_at\r\nextra_column',
+        'password': 'password-secret',
+        'username': 'username-secret',
+    }
+    preflight = {'table_rows': 75000, 'row_limit': 100000, 'findings': ['unrelated-secret']}
+
+    message, details, next_action = format_data_diff_index_warning(check, preflight, now=NOW)
+
+    rendered = '\n'.join((message, details, next_action))
+    assert 'payments\\nextra_line' in message
+    assert _fields(details)['timestamp_column'] == 'updated_at\\r\\nextra_column'
+    assert next_action.count('\n') == 1
+    assert 'password-secret' not in rendered
+    assert 'username-secret' not in rendered
+    assert 'unrelated-secret' not in rendered

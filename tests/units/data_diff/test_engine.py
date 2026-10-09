@@ -34,12 +34,18 @@ def _usable_index(columns, name="idx", **overrides):
 
 
 class FakeAdapter(DatabaseAdapter):
-    def __init__(self, *, indexes):
+    def __init__(self, *, indexes, table_rows=100_000):
         super().__init__(Mock(), statement_timeout_seconds=30)
         self._indexes = indexes
+        self._table_rows = table_rows
+        self.row_count_queries = []
 
     def indexes(self, _schema, _table):
         return self._indexes
+
+    def count_rows_up_to(self, schema, table, limit):
+        self.row_count_queries.append((schema, table, limit))
+        return min(self._table_rows, limit)
 
 
 class RunAdapter(FakeAdapter):
@@ -326,12 +332,14 @@ def test_schema_only_run_uses_metadata_without_executing_aggregate_query(histori
     assert source.executed == []
     assert target.executed == []
     assert source.minimum_queries == target.minimum_queries == []
+    assert source.row_count_queries == target.row_count_queries == []
     source.indexes.assert_not_called()
 
 
 @pytest.mark.parametrize("historical", [False, True])
 @pytest.mark.parametrize("later_side", ["source", "target"])
-def test_run_check_binds_the_same_window_on_source_and_target(historical, later_side):
+@pytest.mark.parametrize('unindexed_rows', [None, 49_999, 75_000])
+def test_run_check_binds_the_same_window_on_source_and_target(historical, later_side, unindexed_rows):
     source = RunAdapter({
         "id": _column("id", "bigint"),
         "updated_at": _column("updated_at", "timestamp without time zone"),
@@ -340,6 +348,9 @@ def test_run_check_binds_the_same_window_on_source_and_target(historical, later_
         "ID": _column("ID", "NUMBER"),
         "UPDATED_AT": _column("UPDATED_AT", "TIMESTAMP_NTZ"),
     }, values={"row_count": "2"})
+    if unindexed_rows is not None:
+        source._indexes = []
+        source._table_rows = unindexed_rows
     check = {
         "source_schema": "public", "source_table": "payments",
         "target_schema": "PUBLIC", "target_table": "PAYMENTS",
@@ -379,6 +390,9 @@ def test_run_check_binds_the_same_window_on_source_and_target(historical, later_
         )
 
     assert preflight["status"] == status == "PASS"
+    assert preflight['index_warning'] is (unindexed_rows == 75_000)
+    assert source.row_count_queries == ([] if unindexed_rows is None else [('public', 'payments', 100_000)])
+    assert target.row_count_queries == []
     assert published == [preflight]
     assert results[0]["status"] == "PASS"
     expected_start = overlap_start if historical else regular_start
@@ -458,7 +472,7 @@ def test_empty_history_keeps_known_metadata_failures(checks, source_type, target
 
 
 @pytest.mark.parametrize("historical", [False, True])
-@pytest.mark.parametrize("preflight_status", ["BLOCKED", "ERROR"])
+@pytest.mark.parametrize('preflight_status,error_phase', [('BLOCKED', None), ('ERROR', 'catalog'), ('ERROR', 'count')])
 @pytest.mark.parametrize(
     "checks,source_type,target_type,expected_results",
     [
@@ -487,14 +501,16 @@ def test_empty_history_keeps_known_metadata_failures(checks, source_type, target
     ],
 )
 def test_failed_preflight_keeps_metadata_results_without_reading_data(
-    historical, preflight_status, checks, source_type, target_type, expected_results,
+    historical, preflight_status, error_phase, checks, source_type, target_type, expected_results,
 ):
     columns = {"id": _column("id", "bigint"), "ts": _column("ts", "timestamp")}
     source = RunAdapter({**columns, "value": _column("value", source_type)})
     target = RunAdapter({**columns, "value": _column("value", target_type)})
     source.indexes = Mock(return_value=[])
-    if preflight_status == "ERROR":
+    if error_phase == 'catalog':
         source.indexes.side_effect = RuntimeError("catalog unavailable")
+    elif error_phase == 'count':
+        source.count_rows_up_to = Mock(side_effect=TimeoutError('bounded row count timed out'))
     check = {
         "source_schema": "public", "source_table": "payments",
         "target_schema": "public", "target_table": "payments",
@@ -680,8 +696,111 @@ def test_preflight_accepts_a_leading_timestamp_index_without_reading_row_estimat
     assert preflight["status"] == "PASS", preflight
     assert preflight["index_metadata"] == indexes
     assert preflight["has_leading_index"] is True
-    assert "table_rows" not in preflight
-    assert "row_limit" not in preflight
+    assert preflight['table_rows'] is None
+    assert preflight['row_limit'] is None
+    assert preflight['index_warning'] is False
+    assert adapter.row_count_queries == []
+
+
+@pytest.mark.parametrize('table_rows,expected_status,expected_warning', [
+    (0, 'PASS', False),
+    (1, 'PASS', False),
+    (49_999, 'PASS', False),
+    (50_000, 'PASS', True),
+    (99_999, 'PASS', True),
+    (100_000, 'BLOCKED', False),
+    (100_001, 'BLOCKED', False),
+    (1_000_000, 'BLOCKED', False),
+])
+@pytest.mark.parametrize('initial_scan', [False, True])
+def test_unindexed_preflight_counts_the_whole_source_at_exact_boundaries(
+    table_rows, expected_status, expected_warning, initial_scan,
+):
+    adapter = FakeAdapter(indexes=[], table_rows=table_rows)
+    params = (None, '2026-10-09') if initial_scan else ('2026-10-08', '2026-10-09')
+
+    preflight = preflight_source(adapter, 'public', 'payments', 'updated_at', 'SELECT 1', params)
+
+    assert preflight['status'] == expected_status
+    assert preflight['index_warning'] is expected_warning
+    assert preflight['table_rows'] == min(table_rows, 100_000)
+    assert preflight['row_limit'] == 100_000
+    assert preflight['has_leading_index'] is False
+    assert adapter.row_count_queries == [('public', 'payments', 100_000)]
+    assert preflight['findings']
+
+
+@pytest.mark.parametrize('indexes', [
+    [_usable_index(['id', 'updated_at'])],
+    [_usable_index(['updated_at'], is_usable=False, is_partial=True)],
+    [_usable_index(['updated_at'], is_usable=False, is_hidden=True)],
+])
+def test_small_table_exemption_does_not_make_an_unusable_index_qualify(indexes):
+    preflight = preflight_source(
+        FakeAdapter(indexes=indexes, table_rows=99_999),
+        'public', 'payments', 'updated_at', 'SELECT 1', (),
+    )
+
+    assert preflight['status'] == 'PASS'
+    assert preflight['has_leading_index'] is False
+    assert preflight['index_warning'] is True
+    assert preflight['index_metadata'] == indexes
+
+
+@pytest.mark.parametrize('adapter_type', [PostgresAdapter, MySQLAdapter])
+@pytest.mark.parametrize('table_rows', [0, 75_000, 100_000])
+@pytest.mark.parametrize('as_dict', [False, True])
+def test_bounded_source_count_quotes_the_table_and_never_filters_rows(adapter_type, table_rows, as_dict):
+    connection = MagicMock()
+    cursor = connection.cursor.return_value.__enter__.return_value
+    cursor.fetchone.return_value = {'table_rows': table_rows} if as_dict else (table_rows,)
+    adapter = adapter_type(connection, 30)
+
+    count = adapter.count_rows_up_to('odd"schema', 'partition`parent', 100_000)
+
+    assert count == table_rows
+    sql, params = cursor.execute.call_args.args
+    assert f'SELECT 1 FROM {adapter.qualified_table("odd\"schema", "partition`parent")}' in sql
+    assert 'SELECT COUNT(*) AS table_rows FROM (' in sql
+    assert 'LIMIT %s) AS ppw_preflight_rows' in sql
+    assert 'WHERE' not in sql
+    assert 'ONLY' not in sql
+    assert params == (100_000,)
+    assert adapter.statement_timeout_seconds == 30
+
+
+@pytest.mark.parametrize('row', [None, (), {}, {'table_rows': None}, (True,), (-1,), (100_001,), ('10',), (1.5,)])
+def test_malformed_bounded_source_count_fails_closed(row):
+    connection = MagicMock()
+    cursor = connection.cursor.return_value.__enter__.return_value
+    cursor.fetchone.return_value = row
+    adapter = PostgresAdapter(connection, 30)
+    adapter.indexes = Mock(return_value=[])
+
+    preflight = preflight_source(adapter, 'public', 'payments', 'updated_at', 'SELECT 1', ())
+
+    assert preflight['status'] == 'ERROR'
+    assert preflight['table_rows'] is None
+    assert preflight['index_warning'] is False
+    assert 'valid integer' in preflight['error']
+
+
+def test_bounded_source_count_timeout_keeps_index_evidence_and_fails_closed():
+    connection = MagicMock()
+    cursor = connection.cursor.return_value.__enter__.return_value
+    cursor.execute.side_effect = TimeoutError('bounded source count timed out')
+    adapter = PostgresAdapter(connection, 30)
+    indexes = [_usable_index(['updated_at'], name='partial_idx', is_usable=False)]
+    adapter.indexes = Mock(return_value=indexes)
+
+    preflight = preflight_source(adapter, 'public', 'payments', 'updated_at', 'SELECT 1', ())
+
+    assert preflight['status'] == 'ERROR'
+    assert preflight['error'] == 'bounded source count timed out'
+    assert preflight['index_metadata'] == indexes
+    assert preflight['has_leading_index'] is False
+    assert preflight['table_rows'] is None
+    assert preflight['index_warning'] is False
 
 
 def test_preflight_records_an_error_without_blocking_the_run_silently():

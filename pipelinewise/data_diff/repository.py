@@ -1,7 +1,9 @@
 """Data-diff persistence built on the shared backend database module."""
 
+import json
 import uuid
 
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Iterable, Optional
 
@@ -80,6 +82,30 @@ class RunLeaseLostError(RuntimeError):
             f'Run {run_id} is no longer RUNNING (status: {status}); '
             'its lease expired or it was already completed. Late results were discarded.'
         )
+
+
+class IndexWarningNotification:
+    """Delivery confirmation for one source-index warning under a backend lock."""
+
+    def __init__(self, *, pending: bool):
+        self.pending = pending
+        self._sent = False
+
+    def mark_sent(self):
+        """Confirm that an alert transport accepted the warning."""
+        self._sent = True
+
+
+def index_warning_id(check: dict):
+    """Keep one warning identity across equivalent checks and config revisions."""
+    source_identity = [
+        'pipelinewise.data_diff.index_warning',
+        *(check[field] for field in (
+            'tap_id', 'source_type', 'source_database', 'source_schema',
+            'source_table', 'source_timestamp_column',
+        )),
+    ]
+    return uuid.uuid5(uuid.NAMESPACE_URL, json.dumps(source_identity, separators=(',', ':')))
 
 
 def _skipped_run(reason, previous=None, *, slot_status=None):
@@ -640,8 +666,8 @@ class DataDiffRepository:
                 INSERT INTO {SCHEMA}.dd_preflight_log(
                     preflight_id, check_id, status, checked_at,
                     query_fingerprint, index_metadata, findings, error,
-                    has_leading_index
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    table_rows, row_limit, has_leading_index
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     preflight_id, check_id, preflight["status"],
@@ -649,6 +675,8 @@ class DataDiffRepository:
                     psycopg2.extras.Json(preflight.get("index_metadata", [])),
                     psycopg2.extras.Json(preflight.get("findings", [])),
                     preflight.get("error"),
+                    preflight.get('table_rows'),
+                    preflight.get('row_limit'),
                     preflight.get("has_leading_index"),
                 ),
             )
@@ -657,6 +685,32 @@ class DataDiffRepository:
                 (preflight_id, run_id),
             )
         return preflight_id
+
+    @contextmanager
+    def index_warning_notification(self, check: dict):
+        """Serialize delivery and remember acknowledged warnings across runs.
+
+        Mark the yielded notification sent only after an alert transport confirms
+        delivery. A crash after delivery but before commit can repeat the warning.
+        """
+        warning_id = index_warning_id(check)
+        with self.cursor() as cursor:
+            cursor.execute(
+                'SELECT pg_advisory_xact_lock(hashtext(%s))',
+                (f'pipelinewise.data_diff.index_warning.{warning_id}',),
+            )
+            cursor.execute(
+                f'SELECT warning_id FROM {SCHEMA}.dd_index_warning_state WHERE warning_id = %s',
+                (warning_id,),
+            )
+            notification = IndexWarningNotification(pending=cursor.fetchone() is None)
+            yield notification
+            if notification.pending and notification._sent:
+                cursor.execute(
+                    f'INSERT INTO {SCHEMA}.dd_index_warning_state(warning_id, check_id, sent_at) '
+                    'VALUES (%s, %s, %s)',
+                    (warning_id, check['check_id'], datetime.now(timezone.utc)),
+                )
 
     def finish_run(
         self,

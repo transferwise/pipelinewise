@@ -75,9 +75,12 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
 - Separate backend app roles receive schema/sequence access plus `SELECT`,
   `INSERT`, and `UPDATE`, but no `DELETE`/DDL. A shared app/DDL identity removes
   that separation intentionally.
-- Source preflight requires a usable index whose first column is the timestamp
-  column, including initial full scans. Schema-only checks are exempt. Inspect
-  index metadata without query plans or row estimates, and require a statement
+- Source preflight accepts a usable index whose first column is the timestamp
+  column without counting rows. Otherwise use an exact count capped at 100,000:
+  allow fewer rows, warn once per physical tap/source/table/timestamp identity
+  from 50,000, and block at 100,000. Remember successful warning deliveries in
+  the backend across retries, restarts, and imports. Schema-only checks are
+  exempt. Use neither query plans nor row estimates, and require a statement
   timeout. Treat `min_key`/`max_key` values in `dd_run_results` as sensitive;
   avoid casual logging.
 

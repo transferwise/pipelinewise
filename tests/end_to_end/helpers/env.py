@@ -701,6 +701,7 @@ class E2EEnv:
             'DROP TABLE IF EXISTS public.dd_run_results CASCADE; '
             'DROP TABLE IF EXISTS public.dd_run_attempts CASCADE; '
             'DROP TABLE IF EXISTS public.dd_preflight_log CASCADE; '
+            'DROP TABLE IF EXISTS public.dd_index_warning_state CASCADE; '
             'DROP TABLE IF EXISTS public.dd_check_definitions CASCADE; '
             'DROP TABLE IF EXISTS public.alembic_version CASCADE'
         )

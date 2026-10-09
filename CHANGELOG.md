@@ -1,3 +1,19 @@
+0.96.0 (2026-10-09)
+-------------------
+
+- Allow data-diff without a qualifying timestamp index below 100,000 source
+  rows. Send one advance warning from 50,000 rows and require the index at
+  100,000. Count only up to that limit, with a timeout. After upgrading, run
+  `pipelinewise import_config --dir <project>` to apply backend migration 004
+  before running checks. See
+  [data-diff preflight](docs/user_guide/data_diff.rst#preflight)
+- Remember source-index warnings when any alert destination accepts them.
+  Attempt every destination and log failures. Retry delivery only if all fail
+- Show an explicit tap ID in data-diff alerts. Put next actions in a bulleted
+  list and remove repeated missing-index advice. Keep the full diagnostic
+  details in the backend history. See
+  [data-diff alerts](docs/user_guide/data_diff.rst#alerts)
+
 0.95.0 (2026-10-09)
 -------------------
 

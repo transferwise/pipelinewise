@@ -182,6 +182,26 @@ class DatabaseAdapter:
         """Return ordered index-column metadata for the table."""
         raise NotImplementedError
 
+    def count_rows_up_to(self, schema: str, table: str, limit: int) -> int:
+        """Count source-visible rows up to a limit under the connection timeout.
+
+        Count the same table, including inherited or partitioned rows, that the
+        comparison reads. NULL timestamps still contribute to the table size.
+        """
+        if isinstance(limit, bool) or not isinstance(limit, int) or limit <= 0:
+            raise DataDiffExecutionError('The preflight row limit must be a positive integer')
+        with self.connection.cursor() as cursor:
+            cursor.execute(
+                f'SELECT COUNT(*) AS table_rows FROM '
+                f'(SELECT 1 FROM {self.qualified_table(schema, table)} LIMIT %s) AS ppw_preflight_rows',
+                (limit,),
+            )
+            row = cursor.fetchone()
+        count = row.get('table_rows') if isinstance(row, dict) else (row[0] if row else None)
+        if isinstance(count, bool) or not isinstance(count, int) or not 0 <= count <= limit:
+            raise DataDiffExecutionError('The bounded preflight row count is not a valid integer')
+        return count
+
     def minimum_timestamp(self, schema: str, table: str, column: dict, cutoff: datetime):
         """Read the earliest non-NULL timestamp before the settled cutoff in UTC."""
         timestamp = self.quote(column["name"])

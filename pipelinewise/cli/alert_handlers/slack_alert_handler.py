@@ -1,10 +1,14 @@
 """
 PipelineWise CLI - Slack alert handler
 """
+import logging
+
 from slack import WebClient
 
 from .errors import InvalidAlertHandlerException
 from .base_alert_handler import BaseAlertHandler
+
+LOGGER = logging.getLogger(__name__)
 
 # Map alert levels to slack compatible color names
 ALERT_LEVEL_SLACK_COLORS = {
@@ -46,7 +50,8 @@ class SlackAlertHandler(BaseAlertHandler):
     def send(
         self, message: str, level: str = BaseAlertHandler.ERROR, exc: Exception = None,
         tap_slack_channel: str = None, details: str = None, next_action: str = None, data_diff: bool = False,
-    ) -> None:
+        best_effort: bool = False,
+    ) -> int | None:
         """
         Send alert
 
@@ -58,9 +63,10 @@ class SlackAlertHandler(BaseAlertHandler):
             details: optional plain-text diagnostic body
             next_action: optional instruction displayed after the body
             data_diff: use the configured data-diff channel instead of the default
+            best_effort: attempt every channel and log delivery failures instead of raising
 
         Returns:
-            Initialised alert handler object
+            Successful destination count in best-effort mode, otherwise None
         """
         channel = (self.data_diff_channel or self.channel) if data_diff else self.channel
         channels = [channel]
@@ -75,12 +81,23 @@ class SlackAlertHandler(BaseAlertHandler):
             text = f':exclamation: *{_markdown_text(message)}*'
             body = f'```{_markdown_text(details)}```'
             if next_action:
-                body += f'\n*Next action:* {_markdown_text(next_action)}'
+                body += f'\n\n*Next action:*\n{_markdown_text(next_action)}'
             attachment.update(text=body, mrkdwn_in=['text'], fallback=message)
 
+        sent = 0
         for channel in channels:
-            self.client.chat_postMessage(
-                channel=channel,
-                text=text,
-                attachments=[attachment],
-            )
+            try:
+                self.client.chat_postMessage(
+                    channel=channel,
+                    text=text,
+                    attachments=[attachment],
+                )
+                sent += 1
+            except Exception as delivery_error:
+                if not best_effort:
+                    raise
+                LOGGER.warning('Cannot send Slack alert to %s: %s', channel, delivery_error)
+
+        if best_effort:
+            return sent
+        return None
