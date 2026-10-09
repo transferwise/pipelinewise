@@ -43,6 +43,7 @@ Global configuration
      slack:
        token: "{{ env_var['SLACK_BOT_TOKEN'] }}"
        channel: "#pipeline-alerts"
+       data_diff_channel: "#data-diff-alerts"  # Optional
 
    allowed_resync_max_size:
      table_mb: 50000
@@ -73,6 +74,11 @@ Global configuration
      - No
      - None
      - Configures Slack or VictorOps failure delivery. See :ref:`alerts`.
+   * - ``alert_handlers.slack.data_diff_channel``
+     - No
+     - Slack ``channel``
+     - Sets a separate global Slack destination for data-diff alerts.
+       Tap-specific copies remain enabled. See :ref:`slack_alert_handler`.
    * - ``allowed_resync_max_size`` / ``table_mb``
      - No
      - No limit

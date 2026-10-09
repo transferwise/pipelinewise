@@ -112,8 +112,6 @@ PASS_PREFLIGHT = {
     "query_fingerprint": "a" * 64,
     "index_metadata": [],
     "findings": [],
-    "table_rows": 42,
-    "row_limit": 100_000,
     "has_leading_index": True,
 }
 
@@ -306,15 +304,24 @@ def test_run_summary_includes_result_errors_without_metric_values(mock_run):
     assert backend.finished[0][1]["error"] == summary["error"]
 
 
+@pytest.mark.parametrize("historical", [False, True])
+@pytest.mark.parametrize("schema_status", ["PASS", "FAIL"])
+@pytest.mark.parametrize("preflight_status", ["BLOCKED", "ERROR"])
 @patch("pipelinewise.data_diff.runner.run_check")
-def test_run_summary_includes_blocked_preflight_reason(mock_run):
+def test_failed_preflight_persists_schema_result_without_passing_the_run(
+    mock_run, historical, schema_status, preflight_status,
+):
     preflight = {
         **PASS_PREFLIGHT,
-        "status": "BLOCKED",
-        "findings": ["No usable source timestamp index"],
+        "status": preflight_status,
+        "findings": ["No usable source timestamp index"] if preflight_status == "BLOCKED" else [],
+        "error": "catalog unavailable" if preflight_status == "ERROR" else None,
+        "has_leading_index": False if preflight_status == "BLOCKED" else None,
     }
-    mock_run.side_effect = _fake_run_check(preflight, [], None)
-    backend = FakeBackend(_check())
+    results = [{"check_type": "schema_compatibility", "status": schema_status}]
+    mock_run.side_effect = _fake_run_check(preflight, results, None)
+    check = {**_check(), "checks": ["schema_compatibility", "row_count", "distinct_key_count"]}
+    backend = (HistoricalBackend if historical else FakeBackend)(check)
 
     summary = run_due_checks(
         backend,
@@ -323,8 +330,13 @@ def test_run_summary_includes_blocked_preflight_reason(mock_run):
     )[0]
 
     assert summary["status"] == "ERROR"
-    assert summary["error"] == "No usable source timestamp index"
+    assert summary["error"] == (preflight["error"] or preflight["findings"][0])
+    assert summary["results"] == results
+    assert backend.finished[0][0][1:3] == ("ERROR", results)
     assert backend.finished[0][1]["error"] == summary["error"]
+    assert backend.window_starts == []
+    if historical:
+        assert summary["window_start"] is None
 
 
 def test_completed_slot_is_reported_as_skipped():

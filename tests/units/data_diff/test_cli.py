@@ -1,6 +1,6 @@
 import json
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
@@ -73,15 +73,16 @@ def _stored_check():
     }
 
 
-def _summary(status="PASS"):
+def _summary(status="PASS", *, check=None, **overrides):
     instant = datetime(2026, 7, 22, 13, tzinfo=timezone.utc)
     return {
-        "check": _stored_check(),
+        "check": check if check is not None else _stored_check(),
         "status": status,
         "window_start": instant,
         "window_end": instant,
         "run_id": uuid4(),
         "attempt": 2,
+        **overrides,
     }
 
 
@@ -559,7 +560,7 @@ def _alerting_pipelinewise(taps):
     return pipelinewise
 
 
-def test_each_failed_window_alerts_to_the_owning_tap_channel():
+def test_separate_check_definitions_alert_to_the_owning_tap_channel():
     pipelinewise = _alerting_pipelinewise(
         [{"id": "tap", "send_alert": True, "slack_alert_channel": "#tap-owner"}]
     )
@@ -576,9 +577,162 @@ def test_each_failed_window_alerts_to_the_owning_tap_channel():
         pipelinewise.alert_sender.send_to_all_handlers.call_args_list, failures
     ):
         assert call.kwargs["tap_slack_channel"] == "#tap-owner"
-        assert summary["check"]["full_check_name"] in call.kwargs["message"]
-        assert str(summary["run_id"]) in call.kwargs["message"]
-        assert summary["window_start"].isoformat() in call.kwargs["message"]
+        assert 'tap/public.payments' in call.kwargs['message']
+        assert str(summary['run_id']) in call.kwargs['details']
+        assert summary['window_start'].strftime('%Y-%m-%d %H:%M:%S') in call.kwargs['details']
+        assert call.kwargs['data_diff'] is True
+        assert call.kwargs['level'] == 'error'
+
+
+def test_backlogged_check_sends_one_alert_and_retains_every_failed_attempt():
+    pipelinewise = _alerting_pipelinewise(
+        [{'id': 'tap', 'send_alert': True, 'slack_alert_channel': '#tap-owner'}]
+    )
+    check = _stored_check()
+    instant = datetime(2026, 7, 22, 13, tzinfo=timezone.utc)
+    failures = [
+        _summary(
+            'ERROR', check=check,
+            scheduled_for=instant + timedelta(hours=offset),
+            window_start=instant + timedelta(hours=offset - 1),
+            window_end=instant + timedelta(hours=offset),
+            trigger_type='RETRY' if offset < 24 else 'SCHEDULED',
+            preflight={'status': 'BLOCKED', 'has_leading_index': False},
+            error="No usable source index starts with timestamp column 'updated_at'",
+        )
+        for offset in range(25)
+    ]
+
+    returned = pipelinewise._alert_data_diff_failures([
+        _summary('PASS', check=check), *failures,
+        _summary('SKIPPED', check=check), _summary('DEFERRED', check=check),
+    ])
+
+    assert len(returned) == 25
+    assert all(actual is expected for actual, expected in zip(returned, failures))
+    pipelinewise.alert_sender.send_to_all_handlers.assert_called_once()
+    kwargs = pipelinewise.alert_sender.send_to_all_handlers.call_args.kwargs
+    assert kwargs['tap_slack_channel'] == '#tap-owner'
+    assert '25 failed windows' in kwargs['message']
+    fields = dict(
+        (label.strip(), value.strip())
+        for label, separator, value in (line.partition(':') for line in kwargs['details'].splitlines())
+        if separator
+    )
+    assert fields['failed_windows'] == '25'
+    assert fields['failed_attempts'] == '25'
+    assert fields['failure_statuses'] == 'ERROR=25'
+    assert fields['shown_window'] == 'representative failure'
+    assert fields['run_id'] == str(failures[-1]['run_id'])
+    assert fields['attempt'] == '2 (SCHEDULED)'
+
+
+@pytest.mark.parametrize('statuses,representative_index', [
+    (['FAIL', 'FAIL'], 1),
+    (['ERROR', 'FAIL'], 0),
+    (['ERROR', 'FAIL', 'ERROR', 'FAIL'], 2),
+])
+def test_grouped_alert_prefers_latest_execution_error_over_mismatch(statuses, representative_index):
+    pipelinewise = _alerting_pipelinewise([{'id': 'tap'}])
+    check = _stored_check()
+    failures = [
+        _summary(status, check=check, error=f'failure-{offset}')
+        for offset, status in enumerate(statuses)
+    ]
+
+    returned = pipelinewise._alert_data_diff_failures(failures)
+
+    assert returned == failures
+    pipelinewise.alert_sender.send_to_all_handlers.assert_called_once()
+    kwargs = pipelinewise.alert_sender.send_to_all_handlers.call_args.kwargs
+    representative = failures[representative_index]
+    assert kwargs['message'].startswith(representative['status'])
+    assert str(representative['run_id']) in kwargs['details']
+    assert representative['error'] in kwargs['details']
+    assert all(
+        str(summary['run_id']) not in kwargs['details']
+        for summary in failures if summary is not representative
+    )
+
+
+@pytest.mark.parametrize('identity_change', ['check_id', 'tap_id', 'target_id'])
+def test_check_or_owning_tap_or_target_boundaries_are_not_merged(identity_change):
+    pipelinewise = _alerting_pipelinewise([{'id': 'tap'}, {'id': 'other-tap'}])
+    first = _stored_check()
+    changed_identity = {'check_id': uuid4(), 'tap_id': 'other-tap', 'target_id': 'other-target'}
+    second = {**first, identity_change: changed_identity[identity_change]}
+    if identity_change == 'target_id':
+        pipelinewise.config['targets'].append({'id': second['target_id'], 'taps': [{'id': 'tap'}]})
+    summaries = [_summary('ERROR', check=first), _summary('ERROR', check=second)]
+
+    assert pipelinewise._alert_data_diff_failures(summaries) == summaries
+
+    assert pipelinewise.alert_sender.send_to_all_handlers.call_count == 2
+
+
+def test_different_definition_revisions_keep_separate_alerts_for_the_same_table():
+    pipelinewise = _alerting_pipelinewise([{'id': 'tap'}])
+    current = _stored_check()
+    inactive = {**current, 'check_id': uuid4(), 'revision': 1, 'is_current': False}
+    failures = [_summary('ERROR', check=inactive), _summary('FAIL', check=current)]
+
+    assert pipelinewise._alert_data_diff_failures(failures) == failures
+
+    assert pipelinewise.alert_sender.send_to_all_handlers.call_count == 2
+    calls = pipelinewise.alert_sender.send_to_all_handlers.call_args_list
+    assert str(failures[0]['run_id']) in calls[0].kwargs['details']
+    assert str(failures[1]['run_id']) in calls[1].kwargs['details']
+
+
+def test_checks_without_stored_ids_are_grouped_by_full_name():
+    pipelinewise = _alerting_pipelinewise([{'id': 'tap'}])
+    first = _stored_check()
+    first.pop('check_id')
+    second = {**first, 'source_table': 'other', 'full_check_name': 'target/tap/public/other'}
+    failures = [
+        _summary('ERROR', check=first), _summary('ERROR', check={**first}),
+        _summary('FAIL', check=second),
+    ]
+
+    assert pipelinewise._alert_data_diff_failures(failures) == failures
+
+    assert pipelinewise.alert_sender.send_to_all_handlers.call_count == 2
+    calls = pipelinewise.alert_sender.send_to_all_handlers.call_args_list
+    assert str(failures[1]['run_id']) in calls[0].kwargs['details']
+    assert str(failures[2]['run_id']) in calls[1].kwargs['details']
+
+
+def test_alert_limit_resets_between_invocations():
+    pipelinewise = _alerting_pipelinewise([{'id': 'tap'}])
+    check = _stored_check()
+    failures = [_summary('ERROR', check=check), _summary('ERROR', check=check)]
+
+    assert pipelinewise._alert_data_diff_failures(failures) == failures
+    assert pipelinewise._alert_data_diff_failures(failures) == failures
+
+    assert pipelinewise.alert_sender.send_to_all_handlers.call_count == 2
+
+
+def test_grouped_failures_on_muted_taps_remain_returned_without_alerts():
+    pipelinewise = _alerting_pipelinewise([{'id': 'tap', 'send_alert': False}])
+    check = _stored_check()
+    failures = [_summary('FAIL', check=check), _summary('ERROR', check=check)]
+
+    assert pipelinewise._alert_data_diff_failures(failures) == failures
+
+    pipelinewise.alert_sender.send_to_all_handlers.assert_not_called()
+
+
+def test_grouped_failures_for_missing_taps_still_send_one_default_alert():
+    pipelinewise = _alerting_pipelinewise([{'id': 'another-tap'}])
+    check = _stored_check()
+    failures = [_summary('FAIL', check=check), _summary('ERROR', check=check)]
+
+    assert pipelinewise._alert_data_diff_failures(failures) == failures
+
+    pipelinewise.alert_sender.send_to_all_handlers.assert_called_once()
+    assert pipelinewise.alert_sender.send_to_all_handlers.call_args.kwargs['tap_slack_channel'] is None
+    pipelinewise.logger.warning.assert_called_once()
 
 
 def test_failed_check_alert_includes_failure_reason():
@@ -587,8 +741,8 @@ def test_failed_check_alert_includes_failure_reason():
 
     pipelinewise._alert_data_diff_failures([{**_summary("ERROR"), "error": reason}])
 
-    message = pipelinewise.alert_sender.send_to_all_handlers.call_args.kwargs["message"]
-    assert f"reason  {reason}" in message
+    details = pipelinewise.alert_sender.send_to_all_handlers.call_args.kwargs['details']
+    assert reason in details
 
 
 def test_send_alert_disabled_on_the_tap_silences_its_checks():

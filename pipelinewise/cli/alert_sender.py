@@ -98,7 +98,10 @@ class AlertSender:
         message: str,
         level: str = BaseAlertHandler.ERROR,
         exc: Exception = None,
-        tap_slack_channel: str = None
+        tap_slack_channel: str = None,
+        details: str = None,
+        next_action: str = None,
+        data_diff: bool = False,
     ) -> bool:
         """
         Sends an alert message to a specific alert handler type
@@ -109,6 +112,9 @@ class AlertSender:
             level: alert level
             exc: optional exception that triggered the alert
             tap_slack_channel: optional specific tap slack channel
+            details: optional plain-text diagnostic body
+            next_action: optional instruction displayed after the body
+            data_diff: use the configured data-diff Slack channel
 
         Returns:
             True if alert sent successfully
@@ -120,15 +126,25 @@ class AlertSender:
         handler = self.__init_handler_class(alert_handler)
 
         if alert_handler_type == 'slack':
-            handler.send(message=message, level=level, exc=exc, tap_slack_channel=tap_slack_channel)
+            extra = {}
+            if details is not None:
+                extra.update(details=details, next_action=next_action)
+            if data_diff:
+                extra['data_diff'] = True
+            handler.send(message=message, level=level, exc=exc, tap_slack_channel=tap_slack_channel, **extra)
         else:
+            if details is not None:
+                message += f'\n{details}'
+            if next_action:
+                message += f'\nNext action: {next_action}'
             handler.send(message=message, level=level, exc=exc)
 
         # Alert sent successfully
         return True
 
     def send_to_all_handlers(
-        self, message: str, level: str = BaseAlertHandler.ERROR, exc: Exception = None, tap_slack_channel: str = None
+        self, message: str, level: str = BaseAlertHandler.ERROR, exc: Exception = None,
+        tap_slack_channel: str = None, details: str = None, next_action: str = None, data_diff: bool = False,
     ) -> dict:
         """
         Get all the configured alert handlers and send alert
@@ -139,12 +155,18 @@ class AlertSender:
             level: alert level
             exc: optional exception that triggered the alert
             tap_slack_channel: optional specific tap slack channel
+            details: optional plain-text diagnostic body
+            next_action: optional instruction displayed after the body
+            data_diff: use the configured data-diff Slack channel
 
         Returns:
             Dictionary with number of successfully sent alerts
         """
         sents = [
-            self.send_to_handler(handler_type, message, level, exc, tap_slack_channel)
+            self.send_to_handler(
+                handler_type, message, level, exc, tap_slack_channel,
+                details=details, next_action=next_action, data_diff=data_diff,
+            )
             for handler_type in self.alert_handlers
         ]
         return {'sent': len(sents)}

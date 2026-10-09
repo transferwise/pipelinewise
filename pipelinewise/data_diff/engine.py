@@ -18,7 +18,6 @@ import pymysql
 
 from .adapters import (
     CHECKSUM_CHECK,
-    MAX_SAFE_FULL_SCAN_ROWS,
     METRIC_EXPRESSIONS,
     SCHEMA_CHECK,
     TIMESTAMP_TYPES,
@@ -112,8 +111,6 @@ def _metadata_preflight(check: dict, column_pairs: list) -> dict:
         "query_fingerprint": fingerprint,
         "index_metadata": [],
         "findings": ["Metadata-only check; no source data query was executed"],
-        "table_rows": None,
-        "row_limit": None,
         "has_leading_index": None,
     }
 
@@ -180,23 +177,17 @@ def preflight_source(
     sql: str,
     params: tuple,
 ) -> dict:
-    """Block a check whose source table is large and cannot be read by timestamp.
+    """Require a usable source index starting with the timestamp column.
 
-    Deliberately catalog metadata rather than a query plan. A plan reports rows
-    *emitted* rather than rows read, so its estimates cannot bound source cost, and it
-    costs a round trip per run. Table size and index shape are cheap and stable.
-
-    This certifies the table is *readable* by timestamp, not that any given window
-    will use the index: a window selecting most of the table is planned as a
-    sequential scan, correctly. statement_timeout_seconds is the real cost bound.
+    Use catalog metadata because plan row estimates describe rows returned, not
+    all rows read, so they do not bound scan cost. The optimizer may still choose
+    a full scan. Statement timeouts limit each query's duration.
     """
-    # Hence the window is ignored -- readability is a property of the table, not of
-    # one window, and a plan check per run would not change any verdict here.
+    # Index eligibility does not depend on the comparison window.
     del params
     fingerprint = hashlib.sha256(sql.encode("utf-8")).hexdigest()
     try:
         indexes = adapter.indexes(schema, table)
-        table_rows = adapter.table_rows(schema, table)
         has_leading_index = any(
             index.get("is_usable")
             and index.get("columns")
@@ -221,23 +212,15 @@ def preflight_source(
                     if unusable else ""
                 )
             )
-        blocked = not has_leading_index and table_rows > MAX_SAFE_FULL_SCAN_ROWS
-        if blocked:
             findings.append(
-                f"Source table holds {table_rows} rows (safe limit "
-                f"{MAX_SAFE_FULL_SCAN_ROWS}) and every window must scan all of them. "
                 "Add a source index beginning with the timestamp column; "
                 "PipelineWise will not create it automatically"
             )
         return {
-            "status": "BLOCKED" if blocked else "PASS",
+            "status": "PASS" if has_leading_index else "BLOCKED",
             "query_fingerprint": fingerprint,
             "index_metadata": indexes,
             "findings": findings,
-            # Persisted so a PASS is auditable: the size and the limit that let it
-            # through, not only prose in the findings of a BLOCK.
-            "table_rows": table_rows,
-            "row_limit": MAX_SAFE_FULL_SCAN_ROWS,
             "has_leading_index": has_leading_index,
         }
     except Exception as exc:
@@ -246,8 +229,6 @@ def preflight_source(
             "query_fingerprint": fingerprint,
             "index_metadata": [],
             "findings": [],
-            "table_rows": None,
-            "row_limit": MAX_SAFE_FULL_SCAN_ROWS,
             "has_leading_index": None,
             "error": str(exc),
         }
@@ -541,6 +522,7 @@ def run_check(
         source_checksum_columns = []
         target_checksum_columns = []
         metric_checks = [item for item in checks if item != SCHEMA_CHECK]
+        requires_source_preflight = bool(metric_checks)
         if CHECKSUM_CHECK in metric_checks:
             try:
                 source_checksum_columns, target_checksum_columns = checksum_columns(
@@ -558,18 +540,13 @@ def run_check(
                     "error": str(exc),
                 }
 
-        if metric_checks:
+        if requires_source_preflight:
             metric_checks = tuple(metric_checks)
+            # Rejected checksum-only checks fingerprint a count query without executing it.
             source_sql = build_metric_query(
                 source, check["source_schema"], check["source_table"],
                 source_key_column["name"], source_timestamp_column["name"],
-                metric_checks, checksum_columns_for_query=source_checksum_columns,
-            )
-            target_sql = build_metric_query(
-                target, check["target_schema"], check["target_table"],
-                target_key_column["name"], target_timestamp_column["name"],
-                metric_checks,
-                checksum_columns_for_query=target_checksum_columns,
+                metric_checks or ("row_count",), checksum_columns_for_query=source_checksum_columns,
             )
             preflight = preflight_source(
                 source, check["source_schema"], check["source_table"],
@@ -577,8 +554,16 @@ def run_check(
             )
             _publish_preflight(on_preflight, preflight)
             if preflight["status"] != "PASS":
-                return preflight, [], None
+                return preflight, _ordered_results(results_by_type, checks, allow_missing=True), None
+            if not metric_checks:
+                return preflight, _ordered_results(results_by_type, checks), "ERROR"
 
+            target_sql = build_metric_query(
+                target, check["target_schema"], check["target_table"],
+                target_key_column["name"], target_timestamp_column["name"],
+                metric_checks,
+                checksum_columns_for_query=target_checksum_columns,
+            )
             if window_start is None:
                 try:
                     window_start = _historical_window_start(

@@ -74,7 +74,8 @@ CREATE TABLE `address` (
   `date_updated` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `supplier_supplier_id` smallint(6) NOT NULL,
   `zip_code_zip_code_id` bigint(20) NOT NULL,
-  PRIMARY KEY (`address_id`)
+  PRIMARY KEY (`address_id`),
+  KEY `address_date_updated_idx` (`date_updated`)
 ) ENGINE=MyISAM AUTO_INCREMENT=1001 DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1104,7 +1105,8 @@ CREATE TABLE `order` (
   `order_id` int(11) NOT NULL AUTO_INCREMENT,
   `date_created` datetime DEFAULT CURRENT_TIMESTAMP,
   `date_updated` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`order_id`)
+  PRIMARY KEY (`order_id`),
+  KEY `order_date_updated_idx` (`date_updated`)
 ) ENGINE=MyISAM AUTO_INCREMENT=1001 DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1431,7 +1433,8 @@ CREATE TABLE `weight_unit` (
   `original_date_created` varchar(50),
   `date_created` datetime DEFAULT CURRENT_TIMESTAMP,
   `date_updated` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`weight_unit_id`)
+  PRIMARY KEY (`weight_unit_id`),
+  KEY `weight_unit_date_updated_idx` (`date_updated`)
 ) ENGINE=MyISAM AUTO_INCREMENT=25 DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 

@@ -737,15 +737,26 @@ def test_preflight_is_linked_to_its_running_attempt_under_lock():
         'check_id': check_id, 'status': 'RUNNING', 'preflight_id': None,
     }
     repository = _repository_with_cursor(cursor)
+    indexes = [{"index_name": "updated_at_idx", "columns": ["updated_at"], "is_usable": True}]
+    findings = ["Usable timestamp-leading index"]
 
     preflight_id = repository.record_preflight(
-        run_id, check_id, {'status': 'PASS', 'query_fingerprint': '0' * 64},
+        run_id, check_id, {
+            'status': 'PASS', 'query_fingerprint': '0' * 64, 'has_leading_index': True,
+            'index_metadata': indexes, 'findings': findings,
+        },
     )
 
     statements = [call.args for call in cursor.execute.call_args_list]
     assert 'FOR UPDATE' in statements[0][0]
     assert statements[0][1] == (run_id,)
     assert 'INSERT INTO public.dd_preflight_log' in statements[1][0]
+    assert 'table_rows' not in statements[1][0]
+    assert 'row_limit' not in statements[1][0]
+    assert len(statements[1][1]) == 9
+    assert statements[1][1][5].adapted == indexes
+    assert statements[1][1][6].adapted == findings
+    assert statements[1][1][8] is True
     assert 'SET preflight_id = %s' in statements[2][0]
     assert statements[2][1] == (preflight_id, run_id)
 
