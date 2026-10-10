@@ -10,6 +10,9 @@ MIGRATION = importlib.import_module(
 HISTORICAL_MIGRATION = importlib.import_module(
     "pipelinewise.backend_db.migrations.versions.003_unresolved_historical_windows"
 )
+INDEX_WARNING_MIGRATION = importlib.import_module(
+    'pipelinewise.backend_db.migrations.versions.004_source_index_warning_state'
+)
 
 UPGRADE_STATE_COLUMN_RENAMES = [
     "ALTER TABLE public.dd_watermark_state "
@@ -205,3 +208,34 @@ def test_historical_window_downgrade_restores_revision_002_constraints_and_comme
         "CHECK (status IN ('RUNNING', 'PASS', 'FAIL', 'ERROR'))"
     ) in statements
     assert "COMMENT ON COLUMN public.dd_run_attempts.status IS NULL" in statements
+
+
+@pytest.mark.parametrize('application_user', [None, 'backend_app', 'backend"app'])
+def test_index_warning_upgrade_creates_persistent_state_with_separate_role_access(application_user):
+    with patch.object(INDEX_WARNING_MIGRATION.op, 'execute') as execute, \
+            patch.object(INDEX_WARNING_MIGRATION.op, 'get_context') as context:
+        context.return_value.config.get_main_option.return_value = application_user
+        INDEX_WARNING_MIGRATION.upgrade()
+
+    statements = _executed_sql(execute)
+    assert INDEX_WARNING_MIGRATION.revision == '004'
+    assert INDEX_WARNING_MIGRATION.down_revision == '003'
+    create = ' '.join(statements[0].split())
+    assert create.startswith('CREATE TABLE public.dd_index_warning_state')
+    assert 'warning_id UUID PRIMARY KEY' in create
+    assert 'check_id UUID NOT NULL REFERENCES public.dd_check_definitions(check_id) ON DELETE RESTRICT' in create
+    assert 'sent_at TIMESTAMPTZ NOT NULL' in create
+    grants = [sql for sql in statements if sql.startswith('GRANT ')]
+    if application_user:
+        quoted_role = '"' + application_user.replace('"', '""') + '"'
+        assert grants == [f'GRANT SELECT, INSERT, UPDATE ON public.dd_index_warning_state TO {quoted_role}']
+    else:
+        assert grants == []
+    assert not any('GRANT DELETE' in sql for sql in statements)
+
+
+def test_index_warning_downgrade_removes_only_new_state():
+    with patch.object(INDEX_WARNING_MIGRATION.op, 'execute') as execute:
+        INDEX_WARNING_MIGRATION.downgrade()
+
+    assert _executed_sql(execute) == ['DROP TABLE public.dd_index_warning_state']

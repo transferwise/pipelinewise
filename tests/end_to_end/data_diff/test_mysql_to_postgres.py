@@ -8,6 +8,13 @@ database and agrees with the PostgreSQL replica.
 
 import json
 import os
+import uuid
+
+from unittest.mock import Mock
+
+import pytest
+
+from pipelinewise.data_diff.engine import connect_source, preflight_source
 
 from ..helpers import assertions, tasks
 from ..helpers.env import E2EEnv
@@ -44,6 +51,69 @@ class TestMySqlToPostgresDataDiff:
             f'{TARGET_ID}/{TAP_ID}/'
             f"{self.e2e.get_conn_env_var('TAP_MYSQL', 'DB')}/{SOURCE_TABLE}"
         )
+
+    @pytest.mark.parametrize('connector', ['TAP_MYSQL', 'TAP_ORACLE_MYSQL'])
+    def test_unindexed_preflight_counts_rows_including_null_timestamps(self, connector):
+        """Exercise exact boundaries with MariaDB and genuine MySQL row counts."""
+        connection_config = {
+            field: self.e2e.get_conn_env_var(connector, environment_key)
+            for field, environment_key in (
+                ('host', 'HOST'), ('port', 'PORT'), ('user', 'USER'),
+                ('password', 'PASSWORD'), ('dbname', 'DB'),
+            )
+        }
+        run_source_query = (
+            self.e2e.run_query_tap_mysql if connector == 'TAP_MYSQL' else self.e2e.run_query_tap_oracle_mysql
+        )
+        table = f'dd preflight_{uuid.uuid4().hex}'
+        qualified = f'`{connection_config["dbname"]}`.`{table}`'
+        check = {'source_type': 'tap-mysql', 'statement_timeout_seconds': 30}
+        sql = f'SELECT COUNT(*) AS row_count FROM {qualified} WHERE updated_at IS NOT NULL'
+        digits = ' UNION ALL '.join(f'SELECT {digit} AS n' for digit in range(10))
+        positions = ('ones', 'tens', 'hundreds', 'thousands', 'ten_thousands')
+        number = ' + '.join(f'{10 ** position} * {alias}.n' for position, alias in enumerate(positions))
+        numbers = ' CROSS JOIN '.join(f'({digits}) AS {alias}' for alias in positions)
+        run_source_query(f'CREATE TABLE {qualified} (id BIGINT PRIMARY KEY, updated_at DATETIME)')
+        try:
+            previous_count = 0
+            for row_count in (49_999, 50_000, 99_999, 100_000, 100_001):
+                if row_count - previous_count == 1:
+                    run_source_query(f'INSERT INTO {qualified} (id) VALUES (%s)', (row_count,))
+                else:
+                    run_source_query(
+                        f'INSERT INTO {qualified} (id) SELECT {number} + 1 FROM {numbers} '
+                        f'WHERE {number} >= %s AND {number} < %s',
+                        (previous_count, row_count),
+                    )
+                previous_count = row_count
+                adapter = connect_source(check, connection_config)
+                try:
+                    preflight = preflight_source(adapter, connection_config['dbname'], table, 'updated_at', sql, ())
+                    assert preflight['status'] == ('PASS' if row_count < 100_000 else 'BLOCKED'), preflight
+                    assert preflight['table_rows'] == min(row_count, 100_000)
+                    assert preflight['row_limit'] == 100_000
+                    assert preflight['has_leading_index'] is False
+                    assert preflight['index_warning'] is (50_000 <= row_count < 100_000)
+                    if preflight['status'] == 'PASS':
+                        assert adapter.execute_metrics(sql, (), ('row_count',)).values == {'row_count': '0'}
+                finally:
+                    adapter.close()
+
+            run_source_query(f'CREATE INDEX dd_timestamp ON {qualified} (updated_at)')
+            adapter = connect_source(check, connection_config)
+            try:
+                count = Mock(wraps=adapter.count_rows_up_to)
+                adapter.count_rows_up_to = count
+                preflight = preflight_source(adapter, connection_config['dbname'], table, 'updated_at', sql, ())
+                assert preflight['status'] == 'PASS', preflight
+                assert preflight['has_leading_index'] is True
+                assert preflight['table_rows'] is preflight['row_limit'] is None
+                assert preflight['index_warning'] is False
+                count.assert_not_called()
+            finally:
+                adapter.close()
+        finally:
+            run_source_query(f'DROP TABLE {qualified}')
 
     @staticmethod
     def _run_success(command):
