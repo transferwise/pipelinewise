@@ -9,8 +9,11 @@ separate ``ddl_user``. Cross-dialect checksum agreement belongs to the other rou
 import json
 import os
 import shutil
+import time
 import uuid
 
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
@@ -19,6 +22,8 @@ from unittest.mock import Mock
 import pytest
 from alembic import command
 from alembic.config import Config
+from psycopg2.errors import DivisionByZero
+from psycopg2.extensions import TRANSACTION_STATUS_IDLE
 from sqlalchemy.engine import URL
 from sqlalchemy.exc import DBAPIError
 
@@ -207,6 +212,109 @@ class TestPostgresToPostgresDataDiff:
             assert self.run_backend_query(
                 "SELECT has_table_privilege(current_user, 'public.dd_index_warning_state', 'DELETE')"
             ) == [(False,)]
+
+    def test_concurrent_index_warnings_wait_for_delivery_and_send_once(self):
+        """Make an overlapping run wait until the first delivery is committed."""
+        self.e2e.setup_pipelinewise_backend()
+        definition = _repository_definition(f'concurrent_warning_{uuid.uuid4().hex}', 'warning_table')
+        backend = self._backend_config()
+        accepted_deliveries = []
+
+        with DataDiffRepository.from_backend_config(backend) as first:
+            first.sync_definitions([definition], selected_taps=[definition.tap_id])
+            check, = first.list_checks(tap_id=definition.tap_id)
+            first_connection = first.database.connect()
+            first_pid = first_connection.get_backend_pid()
+
+            with DataDiffRepository.from_backend_config(backend) as second, ThreadPoolExecutor(max_workers=1) as worker:
+                with second.cursor() as cursor:
+                    cursor.execute('SET statement_timeout = 20000')
+                second_pid = second.database.connect().get_backend_pid()
+                assert first_pid != second_pid
+
+                def attempt_second_delivery():
+                    with second.index_warning_notification(check) as notification:
+                        if notification.pending:
+                            accepted_deliveries.append('second')
+                            notification.mark_sent()
+                        return notification.pending
+
+                with first.index_warning_notification(check) as notification:
+                    assert notification.pending is True
+                    waiting = worker.submit(attempt_second_delivery)
+                    deadline = time.monotonic() + 10
+                    # A raw cursor observes the waiter without committing the transaction holding its lock.
+                    with first_connection.cursor() as cursor:
+                        while time.monotonic() < deadline:
+                            cursor.execute('SELECT %s = ANY(pg_blocking_pids(%s))', (first_pid, second_pid))
+                            if cursor.fetchone()[0]:
+                                break
+                            if waiting.done():
+                                pytest.fail(f'Second warning did not wait: pending={waiting.result()}')
+                            time.sleep(0.05)
+                        else:
+                            pytest.fail('Second warning did not block on the first connection within 10 seconds')
+                    assert not waiting.done()
+                    accepted_deliveries.append('first')
+                    notification.mark_sent()
+
+                assert waiting.result(timeout=20) is False
+
+        assert accepted_deliveries == ['first']
+        assert self.run_backend_query(
+            f"SELECT check_id::text FROM public.dd_index_warning_state WHERE warning_id = '{index_warning_id(check)}'"
+        ) == [(str(check['check_id']),)]
+
+    def test_index_warning_retries_after_acknowledged_transaction_rolls_back(self, monkeypatch):
+        """Recover a delivered warning whose backend transaction failed before commit."""
+        self.e2e.setup_pipelinewise_backend()
+        definition = _repository_definition(f'rollback_warning_{uuid.uuid4().hex}', 'warning_table')
+        backend = self._backend_config()
+        accepted_deliveries = []
+
+        with DataDiffRepository.from_backend_config(backend) as repository:
+            repository.sync_definitions([definition], selected_taps=[definition.tap_id])
+            check, = repository.list_checks(tap_id=definition.tap_id)
+            atomic_cursor = repository.cursor
+
+            @contextmanager
+            def abort_before_commit():
+                with atomic_cursor() as cursor:
+                    yield cursor
+                    cursor.execute(
+                        'SELECT COUNT(*) AS count FROM public.dd_index_warning_state WHERE warning_id = %s',
+                        (str(index_warning_id(check)),),
+                    )
+                    assert cursor.fetchone()['count'] == 1
+                    cursor.execute('SELECT 1 / 0')
+
+            with monkeypatch.context() as patch:
+                patch.setattr(repository, 'cursor', abort_before_commit)
+                with pytest.raises(DivisionByZero):
+                    with repository.index_warning_notification(check) as notification:
+                        assert notification.pending is True
+                        accepted_deliveries.append('before_rollback')
+                        notification.mark_sent()
+            assert repository.database.connect().get_transaction_status() == TRANSACTION_STATUS_IDLE
+
+        assert self.run_backend_query(
+            f"SELECT COUNT(*) FROM public.dd_index_warning_state WHERE warning_id = '{index_warning_id(check)}'"
+        ) == [(0,)]
+        with DataDiffRepository.from_backend_config(backend) as repository:
+            with repository.cursor() as cursor:
+                cursor.execute('SET statement_timeout = 10000')
+            with repository.index_warning_notification(check) as notification:
+                assert notification.pending is True
+                accepted_deliveries.append('after_rollback')
+                notification.mark_sent()
+
+        with DataDiffRepository.from_backend_config(backend) as repository:
+            with repository.index_warning_notification(check) as notification:
+                assert notification.pending is False
+        assert accepted_deliveries == ['before_rollback', 'after_rollback']
+        assert self.run_backend_query(
+            f"SELECT check_id::text FROM public.dd_index_warning_state WHERE warning_id = '{index_warning_id(check)}'"
+        ) == [(str(check['check_id']),)]
 
     @staticmethod
     def _run_success(command):

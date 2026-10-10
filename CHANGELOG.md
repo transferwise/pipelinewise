@@ -1,4 +1,4 @@
-0.96.0 (2026-10-09)
+0.96.0 (2026-10-10)
 -------------------
 
 - Allow data-diff without a qualifying timestamp index below 100,000 source
