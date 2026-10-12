@@ -965,6 +965,13 @@ URI userinfo. Short secrets are also redacted after <code class="docutils litera
 authentication error formats, such as <code class="docutils literal notranslate"><span class="pre">authentication</span> <span class="pre">failed</span> <span class="pre">(&lt;secret&gt;)</span></code> and
 <code class="docutils literal notranslate"><span class="pre">invalid</span> <span class="pre">credentials:</span> <span class="pre">&lt;secret&gt;</span></code>. Database names and counts remain visible when
 they match those values. Unlabelled short values in other text remain visible.</p>
+<p>Snowflake data errors replace the server message with a redacted summary in
+Singer, FastSync, and data-diff logs and alerts. This covers duplicate-row errors,
+SQLSTATE <code class="docutils literal notranslate"><span class="pre">22xxx</span></code> data errors, and messages containing <code class="docutils literal notranslate"><span class="pre">Row</span> <span class="pre">Values:</span></code>. The error
+type, error code, SQLSTATE, and query ID remain visible when provided by Snowflake.
+Other errors, including missing objects and permissions, keep their diagnostic
+text. Use the query ID to investigate in Snowflake with an authorised role.
+Redaction does not change whether a run fails or how replication state is saved.</p>
 <p>Snowflake native and managed Iceberg PartialSync log column versioning at INFO
 after the rename succeeds. The message follows Singer’s format:</p>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Column "AMOUNT" in table ""DATABASE"."SCHEMA"."TABLE"" has been renamed to "AMOUNT_20261007_120000_123456"

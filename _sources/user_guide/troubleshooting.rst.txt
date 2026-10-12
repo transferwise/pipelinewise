@@ -722,6 +722,14 @@ authentication error formats, such as ``authentication failed (<secret>)`` and
 ``invalid credentials: <secret>``. Database names and counts remain visible when
 they match those values. Unlabelled short values in other text remain visible.
 
+Snowflake data errors replace the server message with a redacted summary in
+Singer, FastSync, and data-diff logs and alerts. This covers duplicate-row errors,
+SQLSTATE ``22xxx`` data errors, and messages containing ``Row Values:``. The error
+type, error code, SQLSTATE, and query ID remain visible when provided by Snowflake.
+Other errors, including missing objects and permissions, keep their diagnostic
+text. Use the query ID to investigate in Snowflake with an authorised role.
+Redaction does not change whether a run fails or how replication state is saved.
+
 Snowflake native and managed Iceberg PartialSync log column versioning at INFO
 after the rename succeeds. The message follows Singer's format:
 
