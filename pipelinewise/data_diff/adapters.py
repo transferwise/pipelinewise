@@ -12,6 +12,7 @@ from decimal import Decimal
 from time import perf_counter
 
 import psycopg2.extras
+from singer.snowflake_errors import sanitize_snowflake_errors
 
 
 # Distinguishes "probed, no visibility column" from "not probed yet"; None is a real
@@ -444,6 +445,7 @@ class MySQLAdapter(DatabaseAdapter):
 class SnowflakeAdapter(DatabaseAdapter):
     """Snowflake metadata and aggregate operations."""
 
+    @sanitize_snowflake_errors
     def resolve_columns(self, schema, table, requested, *, allow_missing=False):
         import snowflake.connector
 
@@ -495,6 +497,7 @@ class SnowflakeAdapter(DatabaseAdapter):
             f"- {CHECKSUM_OFFSET})"
         )
 
+    @sanitize_snowflake_errors
     def execute_metrics(self, sql, params, checks):
         import snowflake.connector
 

@@ -15,6 +15,7 @@ from datetime import datetime
 
 import psycopg2
 import pymysql
+from singer.snowflake_errors import sanitize_snowflake_errors
 
 from .adapters import (
     CHECKSUM_CHECK,
@@ -377,6 +378,7 @@ def _mysql_ssl_context(connection_config: dict):
     return context, temp_dir
 
 
+@sanitize_snowflake_errors
 def connect_target(check: dict, connection_config: dict) -> DatabaseAdapter:
     """Open a supported read-only target connection with UTC and timeout controls."""
     # Never 0, which both engines read as "no limit". See connect_source.
