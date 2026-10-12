@@ -320,7 +320,11 @@ def test_snowflake_e2e_matrix_contract():
         'decimal-migration': (
             'e2e_tests_11',
             (
-                'tests/end_to_end/test_numeric_replication.py::test_legacy_decimal_float_migration_requires_opt_in',
+                'tests/end_to_end/test_numeric_replication.py::test_legacy_decimal_float_migration_requires_opt_in[postgres-native]',
+                'tests/end_to_end/test_numeric_replication.py::test_legacy_decimal_float_migration_requires_opt_in[mysql-native]',
+                'tests/end_to_end/test_numeric_replication.py::test_legacy_decimal_float_migration_requires_opt_in[mysql-v3]',
+                'tests/end_to_end/test_numeric_replication.py::test_legacy_decimal_float_migration_requires_opt_in[mariadb-native]',
+                'tests/end_to_end/test_numeric_replication.py::test_legacy_decimal_float_migration_requires_opt_in[mariadb-v3]',
             ),
         ),
         'decimal-fallback-postgres': (
@@ -329,6 +333,7 @@ def test_snowflake_e2e_matrix_contract():
                 'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[postgres-native]',
                 'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[postgres-v3]',
                 'tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_with_custom_buffer_size.py',
+                'tests/end_to_end/test_numeric_replication.py::test_legacy_decimal_float_migration_requires_opt_in[postgres-v3]',
             ),
         ),
         'transformation-parity': (
@@ -454,6 +459,7 @@ def test_snowflake_e2e_matrix_contract():
     split_test_counts = {
         'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake': 6,
         'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake': 6,
+        'tests/end_to_end/test_numeric_replication.py::test_legacy_decimal_float_migration_requires_opt_in': 6,
     }
     assert all(
         selected_tests.count(test_id) == split_test_counts.get(test_id, 1)

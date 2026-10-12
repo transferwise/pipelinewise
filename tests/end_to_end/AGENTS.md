@@ -97,12 +97,18 @@ run_e2e \
   'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[postgres-native]' \
   tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_transformations_are_private_through_publication
 
-run_e2e tests/end_to_end/test_numeric_replication.py::test_legacy_decimal_float_migration_requires_opt_in
+run_e2e \
+  'tests/end_to_end/test_numeric_replication.py::test_legacy_decimal_float_migration_requires_opt_in[postgres-native]' \
+  'tests/end_to_end/test_numeric_replication.py::test_legacy_decimal_float_migration_requires_opt_in[mysql-native]' \
+  'tests/end_to_end/test_numeric_replication.py::test_legacy_decimal_float_migration_requires_opt_in[mysql-v3]' \
+  'tests/end_to_end/test_numeric_replication.py::test_legacy_decimal_float_migration_requires_opt_in[mariadb-native]' \
+  'tests/end_to_end/test_numeric_replication.py::test_legacy_decimal_float_migration_requires_opt_in[mariadb-v3]'
 
 run_e2e \
   'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[postgres-native]' \
   'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[postgres-v3]' \
-  tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_with_custom_buffer_size.py
+  tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_with_custom_buffer_size.py \
+  'tests/end_to_end/test_numeric_replication.py::test_legacy_decimal_float_migration_requires_opt_in[postgres-v3]'
 
 run_e2e \
   tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_singer_and_fastsync_preserve_mapped_types_and_values \
