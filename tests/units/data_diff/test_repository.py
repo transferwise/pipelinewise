@@ -7,7 +7,7 @@ from uuid import uuid4
 import pytest
 
 from pipelinewise.data_diff.config import CheckDefinition
-from pipelinewise.data_diff.repository import DataDiffRepository, RunLeaseLostError
+from pipelinewise.data_diff.repository import DataDiffRepository, RunLeaseLostError, index_warning_id
 
 
 def _definition(config_hash_seed="one", *, tap_id="tap", source_table="payments"):
@@ -751,14 +751,122 @@ def test_preflight_is_linked_to_its_running_attempt_under_lock():
     assert 'FOR UPDATE' in statements[0][0]
     assert statements[0][1] == (run_id,)
     assert 'INSERT INTO public.dd_preflight_log' in statements[1][0]
-    assert 'table_rows' not in statements[1][0]
-    assert 'row_limit' not in statements[1][0]
-    assert len(statements[1][1]) == 9
+    assert 'table_rows, row_limit, has_leading_index' in statements[1][0]
+    assert len(statements[1][1]) == 11
     assert statements[1][1][5].adapted == indexes
     assert statements[1][1][6].adapted == findings
-    assert statements[1][1][8] is True
+    assert statements[1][1][8:] == (None, None, True)
     assert 'SET preflight_id = %s' in statements[2][0]
     assert statements[2][1] == (preflight_id, run_id)
+
+
+@pytest.mark.parametrize('table_rows, status', [(75000, 'PASS'), (100000, 'BLOCKED')])
+def test_preflight_records_bounded_size_evidence_for_an_unindexed_table(table_rows, status):
+    run_id, check_id = uuid4(), uuid4()
+    cursor = Mock()
+    cursor.fetchone.return_value = {'check_id': check_id, 'status': 'RUNNING', 'preflight_id': None}
+    repository = _repository_with_cursor(cursor)
+
+    repository.record_preflight(run_id, check_id, {
+        'status': status, 'query_fingerprint': '0' * 64, 'has_leading_index': False,
+        'table_rows': table_rows, 'row_limit': 100000,
+    })
+
+    insert = cursor.execute.call_args_list[1]
+    assert insert.args[1][8:] == (table_rows, 100000, False)
+
+
+def _warning_check():
+    return {**_definition().__dict__, 'check_id': uuid4()}
+
+
+def test_index_warning_identity_survives_reimport_new_definitions_and_target_changes():
+    original = _warning_check()
+    changed = {
+        **original, 'check_id': uuid4(), 'revision': 2, 'target_id': 'another_target',
+        'full_check_name': 'another_target/tap/public/payments', 'frequency': '0 0 * * *',
+        'source_compare_columns': ('another_column',),
+    }
+
+    assert index_warning_id(original) == index_warning_id(changed)
+
+
+@pytest.mark.parametrize('field', [
+    'tap_id', 'source_type', 'source_database', 'source_schema', 'source_table', 'source_timestamp_column',
+])
+def test_index_warning_identity_distinguishes_the_source_scope(field):
+    original = _warning_check()
+    changed = {**original, field: 'another_value'}
+
+    assert index_warning_id(original) != index_warning_id(changed)
+
+
+def test_index_warning_is_recorded_only_after_confirmed_delivery_under_the_lock():
+    check = _warning_check()
+    cursor = Mock()
+    cursor.fetchone.return_value = None
+    repository = _repository_with_cursor(cursor)
+
+    with repository.index_warning_notification(check) as notification:
+        assert notification.pending
+        assert len(cursor.execute.call_args_list) == 2
+        lock, lookup = cursor.execute.call_args_list
+        assert lock.args == (
+            'SELECT pg_advisory_xact_lock(hashtext(%s))',
+            (f'pipelinewise.data_diff.index_warning.{index_warning_id(check)}',),
+        )
+        assert 'FROM public.dd_index_warning_state WHERE warning_id = %s' in lookup.args[0]
+        assert lookup.args[1] == (index_warning_id(check),)
+        notification.mark_sent()
+        assert len(cursor.execute.call_args_list) == 2
+
+    insert = cursor.execute.call_args_list[2]
+    assert insert.args[0].startswith('INSERT INTO public.dd_index_warning_state')
+    assert insert.args[1][:2] == (index_warning_id(check), check['check_id'])
+    assert insert.args[1][2].tzinfo is timezone.utc
+
+
+def test_a_delivered_index_warning_is_not_sent_or_written_again():
+    check = _warning_check()
+    cursor = Mock()
+    cursor.fetchone.return_value = {'warning_id': index_warning_id(check)}
+    repository = _repository_with_cursor(cursor)
+
+    with repository.index_warning_notification(check) as notification:
+        assert notification.pending is False
+        notification.mark_sent()
+
+    assert len(cursor.execute.call_args_list) == 2
+
+
+def test_an_unconfirmed_warning_remains_eligible_on_the_next_invocation():
+    cursor = Mock()
+    cursor.fetchone.return_value = None
+    repository = _repository_with_cursor(cursor)
+    check = _warning_check()
+
+    for _ in range(2):
+        with repository.index_warning_notification(check) as notification:
+            assert notification.pending
+
+    assert len(cursor.execute.call_args_list) == 4
+    assert not any('INSERT' in call.args[0] for call in cursor.execute.call_args_list)
+
+
+def test_an_interrupted_notification_does_not_persist_a_delivery_marker():
+    cursor = Mock()
+    cursor.fetchone.return_value = None
+    repository = _repository_with_cursor(cursor)
+    check = _warning_check()
+
+    with pytest.raises(RuntimeError, match='transport failed'):
+        with repository.index_warning_notification(check) as notification:
+            assert notification.pending
+            raise RuntimeError('transport failed')
+
+    with repository.index_warning_notification(check) as notification:
+        assert notification.pending
+    assert not any('INSERT' in call.args[0] for call in cursor.execute.call_args_list)
 
 
 @pytest.mark.parametrize('status', ['PASS', 'FAIL', 'ERROR', 'DEFERRED'])

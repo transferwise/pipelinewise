@@ -1,12 +1,15 @@
 import json
 
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
 import pytest
 
+from pipelinewise.cli.alert_sender import AlertSender
 from pipelinewise.cli.pipelinewise import PipelineWise
+from pipelinewise.data_diff.repository import index_warning_id
 from tests.units.cli.cli_args import CliArgs
 
 
@@ -36,6 +39,30 @@ class RepositoryContext:
             'created': len(definitions),
             'historical_scans_pending': self.historical_scans_pending,
         }
+
+
+class WarningRepository(RepositoryContext):
+    def __init__(self):
+        super().__init__()
+        self.sent_warning_ids = set()
+        self.warning_requests = []
+        self.is_open = False
+
+    def __enter__(self):
+        self.is_open = True
+        return self
+
+    def __exit__(self, *_args):
+        self.is_open = False
+
+    @contextmanager
+    def index_warning_notification(self, check):
+        warning_id = index_warning_id(check)
+        self.warning_requests.append((warning_id, self.is_open))
+        notification = Mock(pending=warning_id not in self.sent_warning_ids)
+        yield notification
+        if notification.mark_sent.called:
+            self.sent_warning_ids.add(warning_id)
 
 
 def _pipelinewise(**args):
@@ -556,8 +583,208 @@ def test_import_reports_backend_sync_failure_after_partial_discovery():
 
 def _alerting_pipelinewise(taps):
     pipelinewise = _pipelinewise(target="target", tap="tap")
-    pipelinewise.config = {"targets": [{"id": "target", "taps": taps}]}
+    pipelinewise.config = {
+        'backend_db': {'host': 'backend'}, 'targets': [{'id': 'target', 'taps': taps}],
+    }
     return pipelinewise
+
+
+def _index_warning_summary(status='PASS', **check_changes):
+    return _summary(status, check={
+        **_stored_check(), 'source_type': 'tap-postgres', 'source_database': 'source', **check_changes,
+    }, preflight={
+        'status': 'PASS', 'has_leading_index': False, 'table_rows': 75_000,
+        'row_limit': 100_000, 'index_warning': True,
+    })
+
+
+def test_small_table_warning_is_sent_without_failing_the_check_and_before_repository_closes():
+    pipelinewise = _alerting_pipelinewise([{'id': 'tap', 'slack_alert_channel': '#tap-owner'}])
+    pipelinewise.alert_sender.send_to_all_handlers.return_value = {'sent': 1}
+    repository = WarningRepository()
+    summary = _index_warning_summary()
+    with patch(
+        'pipelinewise.cli.pipelinewise.DataDiffRepository.from_backend_config', return_value=repository,
+    ), patch('pipelinewise.cli.pipelinewise.run_due_checks', return_value=[summary]):
+        pipelinewise.run_data_diff_checks()
+
+    assert summary['status'] == 'PASS'
+    assert repository.warning_requests == [(index_warning_id(summary['check']), True)]
+    assert repository.sent_warning_ids == {index_warning_id(summary['check'])}
+    assert repository.is_open is False
+    pipelinewise.alert_sender.send_to_all_handlers.assert_called_once()
+    kwargs = pipelinewise.alert_sender.send_to_all_handlers.call_args.kwargs
+    assert kwargs['level'] == 'warning'
+    assert kwargs['data_diff'] is True
+    assert kwargs['best_effort'] is True
+    assert kwargs['tap_slack_channel'] == '#tap-owner'
+    assert kwargs['message'].startswith('WARNING data-diff tap/public.payments')
+    assert '75,000' in kwargs['details']
+
+
+def test_index_warning_is_not_repeated_for_catchup_retries_or_equivalent_reimported_checks():
+    pipelinewise = _alerting_pipelinewise([{'id': 'tap'}])
+    pipelinewise.alert_sender.send_to_all_handlers.return_value = {'sent': 1}
+    repository = WarningRepository()
+    summary = _index_warning_summary()
+    equivalent = _index_warning_summary(revision=3, frequency='*/15 * * * *')
+    pipelinewise._alert_data_diff_index_warnings(repository, [summary] * 25 + [equivalent])
+    pipelinewise._alert_data_diff_index_warnings(repository, [equivalent])
+
+    pipelinewise.alert_sender.send_to_all_handlers.assert_called_once()
+    assert len(repository.warning_requests) == 2
+    assert len(repository.sent_warning_ids) == 1
+
+
+@pytest.mark.parametrize('failed_destination', ['#data-diff', '#tap-owner', 'victorops'])
+def test_partial_warning_delivery_is_remembered_and_not_repeated(failed_destination):
+    pipelinewise = _alerting_pipelinewise([{'id': 'tap', 'slack_alert_channel': '#tap-owner'}])
+    handlers = {'slack': {
+        'token': 'test-token', 'channel': '#replication', 'data_diff_channel': '#data-diff',
+    }}
+    if failed_destination == 'victorops':
+        handlers['victorops'] = {'base_url': 'https://example.invalid', 'routing_key': 'test'}
+    pipelinewise.alert_sender = AlertSender(handlers)
+    repository = WarningRepository()
+    summary = _index_warning_summary()
+
+    def slack_delivery(**kwargs):
+        if kwargs['channel'] == failed_destination:
+            raise RuntimeError('channel unavailable')
+        return {'ok': True}
+
+    with patch('slack.WebClient.chat_postMessage', side_effect=slack_delivery) as slack_post, patch(
+        'requests.post', side_effect=RuntimeError('VictorOps unavailable'),
+    ) as victorops_post:
+        pipelinewise._alert_data_diff_index_warnings(repository, [summary])
+        pipelinewise._alert_data_diff_index_warnings(repository, [summary])
+
+    assert [call.kwargs['channel'] for call in slack_post.call_args_list] == ['#data-diff', '#tap-owner']
+    assert victorops_post.call_count == (1 if failed_destination == 'victorops' else 0)
+    assert repository.sent_warning_ids == {index_warning_id(summary['check'])}
+    assert summary['status'] == 'PASS'
+
+
+def test_warning_retries_after_every_destination_fails_until_one_accepts():
+    pipelinewise = _alerting_pipelinewise([{'id': 'tap', 'slack_alert_channel': '#tap-owner'}])
+    pipelinewise.alert_sender = AlertSender({'slack': {
+        'token': 'test-token', 'channel': '#replication', 'data_diff_channel': '#data-diff',
+    }})
+    repository = WarningRepository()
+    summary = _index_warning_summary()
+
+    with patch('slack.WebClient.chat_postMessage', side_effect=RuntimeError('Slack unavailable')) as slack_post:
+        for _ in range(2):
+            pipelinewise._alert_data_diff_index_warnings(repository, [summary] * 25)
+            assert repository.sent_warning_ids == set()
+        assert slack_post.call_count == 4
+
+        slack_post.side_effect = None
+        pipelinewise._alert_data_diff_index_warnings(repository, [summary])
+        pipelinewise._alert_data_diff_index_warnings(repository, [summary])
+
+    assert slack_post.call_count == 6
+    assert repository.sent_warning_ids == {index_warning_id(summary['check'])}
+    assert summary['status'] == 'PASS'
+
+
+def test_muted_destination_does_not_suppress_the_enabled_destination_for_the_same_source():
+    pipelinewise = _alerting_pipelinewise([{'id': 'tap', 'slack_alert_channel': '#tap-owner'}])
+    pipelinewise.config['targets'].append({
+        'id': 'muted-target', 'taps': [{'id': 'tap', 'send_alert': False}],
+    })
+    pipelinewise.alert_sender.send_to_all_handlers.return_value = {'sent': 1}
+    repository = WarningRepository()
+    enabled = _index_warning_summary()
+    muted = _index_warning_summary(target_id='muted-target')
+
+    pipelinewise._alert_data_diff_index_warnings(repository, [enabled, muted])
+
+    pipelinewise.alert_sender.send_to_all_handlers.assert_called_once()
+    kwargs = pipelinewise.alert_sender.send_to_all_handlers.call_args.kwargs
+    assert kwargs['tap_slack_channel'] == '#tap-owner'
+    assert 'target_id         : target' in kwargs['details']
+    assert repository.sent_warning_ids == {index_warning_id(enabled['check'])}
+
+
+@pytest.mark.parametrize('latest', ['BLOCKED', 'indexed', 'below_warning', 'ERROR'])
+def test_latest_source_observation_supersedes_an_old_index_warning(latest):
+    pipelinewise = _alerting_pipelinewise([{'id': 'tap'}])
+    repository = WarningRepository()
+    first = _index_warning_summary()
+    preflight = {**first['preflight'], 'index_warning': False}
+    if latest in {'BLOCKED', 'ERROR'}:
+        preflight.update(status=latest, table_rows=100_000 if latest == 'BLOCKED' else None)
+    elif latest == 'indexed':
+        preflight.update(has_leading_index=True, table_rows=None)
+    else:
+        preflight['table_rows'] = 49_999
+    last = {**first, 'preflight': preflight}
+
+    pipelinewise._alert_data_diff_index_warnings(repository, [first, last])
+
+    pipelinewise.alert_sender.send_to_all_handlers.assert_not_called()
+    assert repository.warning_requests == []
+
+
+@pytest.mark.parametrize('send_alert,is_current,status', [
+    (False, True, 'PASS'), (True, False, 'PASS'), (True, True, 'SKIPPED'),
+])
+def test_index_warning_respects_disabled_alerts_inactive_definitions_and_skipped_runs(send_alert, is_current, status):
+    pipelinewise = _alerting_pipelinewise([{'id': 'tap', 'send_alert': send_alert}])
+    repository = WarningRepository()
+    summary = _index_warning_summary(status, is_current=is_current)
+
+    pipelinewise._alert_data_diff_index_warnings(repository, [summary])
+
+    pipelinewise.alert_sender.send_to_all_handlers.assert_not_called()
+    assert repository.sent_warning_ids == set()
+
+
+@pytest.mark.parametrize('failure', ['transport', 'no_handlers', 'backend'])
+def test_failed_warning_delivery_is_attempted_once_per_invocation_and_can_be_retried(failure):
+    pipelinewise = _alerting_pipelinewise([{'id': 'tap'}])
+    repository = WarningRepository()
+    summary = _index_warning_summary()
+    if failure == 'transport':
+        pipelinewise.alert_sender.send_to_all_handlers.side_effect = RuntimeError('Slack unavailable')
+    elif failure == 'no_handlers':
+        pipelinewise.alert_sender.send_to_all_handlers.return_value = {'sent': 0}
+    else:
+        original = repository.index_warning_notification
+        repository.index_warning_notification = Mock(side_effect=RuntimeError('Backend unavailable'))
+
+    pipelinewise._alert_data_diff_index_warnings(repository, [summary] * 25)
+
+    assert summary['status'] == 'PASS'
+    assert repository.sent_warning_ids == set()
+    assert pipelinewise.alert_sender.send_to_all_handlers.call_count == (0 if failure == 'backend' else 1)
+    if failure != 'no_handlers':
+        pipelinewise.logger.warning.assert_called_once()
+    if failure == 'backend':
+        repository.index_warning_notification = original
+    pipelinewise.alert_sender.send_to_all_handlers.reset_mock(side_effect=True)
+    pipelinewise.alert_sender.send_to_all_handlers.return_value = {'sent': 1}
+
+    pipelinewise._alert_data_diff_index_warnings(repository, [summary])
+
+    pipelinewise.alert_sender.send_to_all_handlers.assert_called_once()
+    assert repository.sent_warning_ids == {index_warning_id(summary['check'])}
+
+
+def test_manual_remediation_also_sends_a_pending_index_warning():
+    pipelinewise = _alerting_pipelinewise([{'id': 'tap'}])
+    pipelinewise.args.run_id = str(uuid4())
+    pipelinewise.args.remediation_ref = 'index-review'
+    pipelinewise.alert_sender.send_to_all_handlers.return_value = {'sent': 1}
+    repository = WarningRepository()
+    with patch(
+        'pipelinewise.cli.pipelinewise.DataDiffRepository.from_backend_config', return_value=repository,
+    ), patch('pipelinewise.cli.pipelinewise.rerun_failed_check', return_value=_index_warning_summary()):
+        pipelinewise.rerun_data_diff_check()
+
+    pipelinewise.alert_sender.send_to_all_handlers.assert_called_once()
+    assert len(repository.sent_warning_ids) == 1
 
 
 def test_separate_check_definitions_alert_to_the_owning_tap_channel():
@@ -577,6 +804,7 @@ def test_separate_check_definitions_alert_to_the_owning_tap_channel():
         pipelinewise.alert_sender.send_to_all_handlers.call_args_list, failures
     ):
         assert call.kwargs["tap_slack_channel"] == "#tap-owner"
+        assert 'best_effort' not in call.kwargs
         assert 'tap/public.payments' in call.kwargs['message']
         assert str(summary['run_id']) in call.kwargs['details']
         assert summary['window_start'].strftime('%Y-%m-%d %H:%M:%S') in call.kwargs['details']

@@ -252,6 +252,33 @@ def test_both_empty_historical_run_is_deferred_without_coverage(mock_run):
     assert backend.finished[0][1]['error'] == summary['error']
 
 
+@pytest.mark.parametrize('failure,expected_status', [
+    (TimeoutError('Metric query timed out'), 'ERROR'),
+    (HistoricalWindowNotReady('Neither side has settled history'), 'DEFERRED'),
+])
+@patch('pipelinewise.data_diff.runner.run_check')
+def test_index_warning_evidence_survives_a_later_query_failure(mock_run, failure, expected_status):
+    preflight = {
+        **PASS_PREFLIGHT, 'has_leading_index': False, 'table_rows': 75_000,
+        'row_limit': 100_000, 'index_warning': True,
+    }
+
+    def execute(*_args, on_preflight, **_kwargs):
+        on_preflight(preflight)
+        raise failure
+
+    mock_run.side_effect = execute
+    backend = HistoricalBackend(_check())
+    summary, = run_due_checks(
+        backend, _connection_configs, now=datetime(2026, 7, 22, 13, 1, tzinfo=timezone.utc),
+    )
+
+    assert summary['status'] == expected_status
+    assert summary['preflight'] is preflight
+    assert backend.preflights == [preflight]
+    assert len(backend.finished) == 1
+
+
 @pytest.mark.parametrize("query_fails", [False, True])
 @patch("pipelinewise.data_diff.runner.run_check")
 def test_resolved_historical_start_is_saved_and_reported_even_when_query_fails(mock_run, query_fails):

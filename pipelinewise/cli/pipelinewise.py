@@ -42,8 +42,8 @@ from pipelinewise.fastsync.commons.tap_postgres import FastSyncTapPostgres
 from pipelinewise.fastsync.commons import utils as fastsync_utils
 from pipelinewise.cli.multiprocess import Process
 from pipelinewise.data_diff.coverage import FAILED_STATUSES
-from pipelinewise.data_diff.alerts import format_data_diff_alert
-from pipelinewise.data_diff.repository import DataDiffRepository
+from pipelinewise.data_diff.alerts import format_data_diff_alert, format_data_diff_index_warning
+from pipelinewise.data_diff.repository import DataDiffRepository, index_warning_id
 from pipelinewise.data_diff.runner import rerun_failed_check, run_due_checks
 from pipelinewise.data_diff.runtime import RuntimeConnectorConfigLoader
 
@@ -2106,6 +2106,49 @@ class PipelineWise:
 
         return failures
 
+    def _alert_data_diff_index_warnings(self, repository, summaries):
+        """Send an index warning once for the latest observation of each source table."""
+        observations = {}
+        for summary in summaries:
+            preflight = summary.get('preflight') or {}
+            check = summary['check']
+            if (
+                'index_warning' in preflight
+                and summary['status'] != 'SKIPPED'
+                and check.get('is_current') is not False
+            ):
+                observations.setdefault(index_warning_id(check), []).append(summary)
+
+        for table_summaries in observations.values():
+            preflight = table_summaries[-1]['preflight']
+            if preflight.get('status') != 'PASS' or preflight.get('index_warning') is not True:
+                continue
+            try:
+                for summary in reversed(table_summaries):
+                    check = summary['check']
+                    send_alert, tap_slack_channel = self._get_tap_alert_settings(check['target_id'], check['tap_id'])
+                    if send_alert:
+                        break
+                else:
+                    continue
+                with repository.index_warning_notification(check) as notification:
+                    if not notification.pending:
+                        continue
+                    message, details, next_action = format_data_diff_index_warning(check, preflight)
+                    delivery = self.alert_sender.send_to_all_handlers(
+                        message=message,
+                        level=BaseAlertHandler.WARNING,
+                        tap_slack_channel=tap_slack_channel,
+                        details=details,
+                        next_action=next_action,
+                        data_diff=True,
+                        best_effort=True,
+                    )
+                    if delivery.get('sent', 0) > 0:
+                        notification.mark_sent()
+            except Exception as exc:
+                self.logger.warning('Cannot send data-diff index warning for %s: %s', check['full_check_name'], exc)
+
     def list_data_diff_checks(self):
         """List persisted definitions, schedule state, and timestamp coverage."""
         with self._data_diff_repository() as repository:
@@ -2169,6 +2212,7 @@ class PipelineWise:
                 check_filter=self.args.check,
                 force=self.args.force,
             )
+            self._alert_data_diff_index_warnings(repository, summaries)
 
         self._print_data_diff_summaries(summaries)
         if self._alert_data_diff_failures(summaries):
@@ -2183,6 +2227,7 @@ class PipelineWise:
                 self.args.run_id,
                 self.args.remediation_ref,
             )
+            self._alert_data_diff_index_warnings(repository, [summary])
 
         print(
             tabulate(

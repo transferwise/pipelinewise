@@ -1,4 +1,4 @@
-"""Readable, credential-free summaries for data-diff failure alerts."""
+"""Readable, credential-free summaries for data-diff alerts."""
 
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
@@ -98,9 +98,21 @@ def _table_name(check: dict, side: str):
     return '.'.join(part for part in parts if part) or None
 
 
+def _check_name(check: dict) -> str:
+    if all(check.get(key) for key in ('tap_id', 'source_schema', 'source_table')):
+        name = f"{check['tap_id']}/{check['source_schema']}.{check['source_table']}"
+    else:
+        name = check['full_check_name']
+    return _single_line(name)
+
+
 def _metadata(summary: dict, now: datetime) -> list:
     check = summary['check']
-    fields = [('alert_utc_time', _utc_timestamp(now.replace(microsecond=0)))]
+    fields = [
+        ('alert_utc_time', _utc_timestamp(now.replace(microsecond=0))),
+        ('tap_id', check.get('tap_id')),
+        ('target_id', check.get('target_id')),
+    ]
     if summary.get('run_id'):
         fields.append(('run_id', str(summary['run_id'])))
     if summary.get('attempt') is not None:
@@ -111,7 +123,6 @@ def _metadata(summary: dict, now: datetime) -> list:
     if summary.get('scheduled_for'):
         fields.append(('scheduled_utc', _utc_timestamp(summary['scheduled_for'])))
     fields.extend((
-        ('target_id', check.get('target_id')),
         ('source_table', _table_name(check, 'source')),
         ('target_table', _table_name(check, 'target')),
     ))
@@ -138,23 +149,36 @@ def _next_action(summary: dict) -> str:
         action = 'Check replication lag and investigate the mismatch.'
     else:
         action = 'Resolve the reported error.'
+    instructions = [action]
     if not summary.get('run_id'):
-        instruction = (
+        instructions.append(
             'Run the check again after resolving the problem.'
             if summary['check'].get('is_current') is False
             else 'Scheduled runs will attempt this check again.'
         )
     elif summary['check'].get('is_current') is False:
-        instruction = (
+        instructions.append(
             'This definition is inactive. To verify this window, use '
-            'rerun_data_diff_check with --run-id and --remediation-ref.'
+            '`rerun_data_diff_check` with `--run-id` and `--remediation-ref`.'
         )
     else:
-        instruction = (
-            'Failed windows retry automatically on scheduled runs. To verify sooner, '
-            'use rerun_data_diff_check with --run-id and --remediation-ref.'
-        )
-    return f'{action} {instruction}'
+        instructions.extend((
+            'Failed windows retry automatically on scheduled runs.',
+            'To verify sooner, use `rerun_data_diff_check` with `--run-id` and `--remediation-ref`.',
+        ))
+    return '\n'.join(f'- {instruction}' for instruction in instructions)
+
+
+def _error_detail(summary: dict):
+    if not summary.get('error'):
+        return None
+    reason = str(summary['error'])
+    preflight = summary.get('preflight') or {}
+    findings = preflight.get('findings') or []
+    if preflight.get('status') == 'BLOCKED' and findings and reason == '; '.join(findings):
+        # The primary finding is diagnostic; Next action already supplies the index advice.
+        return findings[0]
+    return reason
 
 
 def _failure_totals(failures: list) -> tuple[int, list]:
@@ -186,11 +210,7 @@ def format_data_diff_alert(summary: dict, *, failures: list = None, now: datetim
     results = summary.get('results') or []
     rows = _count_rows(results)
     check = summary['check']
-    if all(check.get(key) for key in ('tap_id', 'source_schema', 'source_table')):
-        name = f"{check['tap_id']}/{check['source_schema']}.{check['source_table']}"
-    else:
-        name = check['full_check_name']
-    name = _single_line(name)
+    name = _check_name(check)
     description = _headline(summary, rows)
     fields = _metadata(summary, now or datetime.now(timezone.utc))
     if failures and len(failures) > 1:
@@ -207,11 +227,37 @@ def format_data_diff_alert(summary: dict, *, failures: list = None, now: datetim
         f'{name:<18}: {_single_line(value)}'
         for name, value in fields
     )
-    if summary.get('error'):
-        reason = str(summary['error'])
+    reason = _error_detail(summary)
+    if reason:
         if len(reason) > MAX_ERROR_LENGTH:
             reason = reason[:MAX_ERROR_LENGTH] + '\n[error truncated]'
         details += f'\n{"error_detail":<18}: {reason}'
     if rows:
         details += '\n\n' + _count_table(rows)
     return message, details, _next_action(summary)
+
+
+def format_data_diff_index_warning(check: dict, preflight: dict, *, now: datetime = None) -> tuple[str, str, str]:
+    """Describe an unindexed table approaching the data-check row limit."""
+    row_limit = f"{preflight['row_limit']:,}"
+    column = _single_line(check['source_timestamp_column'])
+    fields = [
+        ('alert_utc_time', _utc_timestamp((now or datetime.now(timezone.utc)).replace(microsecond=0))),
+        ('tap_id', check.get('tap_id')),
+        ('target_id', check.get('target_id')),
+        ('source_table', _table_name(check, 'source')),
+        ('timestamp_column', column),
+        ('source_rows', f"{preflight['table_rows']:,}"),
+        ('index_required_at', f'{row_limit} rows'),
+        ('index_status', 'No qualifying source index'),
+        ('data_diff_status', 'Checks can still run'),
+    ]
+    message = f'WARNING data-diff {_check_name(check)} — approaching source index requirement'
+    details = '\n'.join(
+        f'{name:<18}: {_single_line(value)}' for name, value in fields if value is not None
+    )
+    next_action = '\n'.join((
+        f'- Arrange a usable source index starting with {column} before the table reaches {row_limit} rows.',
+        f'- At {row_limit} rows or more, data checks will be blocked until that index exists.',
+    ))
+    return message, details, next_action

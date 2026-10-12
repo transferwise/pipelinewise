@@ -26,12 +26,17 @@ def test_structured_data_diff_alert_uses_configured_channel_and_tap_channel(
     if data_diff_channel is not None:
         config['data_diff_channel'] = data_diff_channel
     sender = AlertSender({'slack': config})
+    next_action = (
+        '- Check replication lag and investigate the mismatch.\n'
+        '- Failed windows retry automatically on scheduled runs.\n'
+        '- To verify sooner, use `rerun_data_diff_check` with `--run-id` and `--remediation-ref`.'
+    )
 
     with patch('slack.WebClient.chat_postMessage') as post:
         result = sender.send_to_all_handlers(
             message='FAIL data-diff payments/public.transfers — target has 20 fewer rows',
             details='run_id : test-run\nrow_count 100000 99980 -20',
-            next_action='Check replication lag, then rerun test-run.',
+            next_action=next_action,
             tap_slack_channel=tap_channel,
             data_diff=True,
         )
@@ -45,7 +50,7 @@ def test_structured_data_diff_alert_uses_configured_channel_and_tap_channel(
         assert 'title' not in attachment
         assert 'text' in attachment['mrkdwn_in']
         assert '```run_id : test-run\nrow_count 100000 99980 -20```' in attachment['text']
-        assert 'Check replication lag, then rerun test-run.' in attachment['text']
+        assert attachment['text'].endswith(f'\n\n*Next action:*\n{next_action}')
 
 
 def test_replication_alert_keeps_legacy_slack_payload_and_default_channel():
@@ -103,7 +108,7 @@ def test_dispatcher_sends_structured_details_to_victorops_without_slack_markup()
     })
     message = 'FAIL data-diff payments/public.transfers — target has 20 fewer rows'
     details = 'run_id : test-run\nrow_count 100000 99980 -20'
-    next_action = 'Check replication lag, then rerun test-run.'
+    next_action = '- Check replication lag.\n- Failed windows retry automatically on scheduled runs.'
 
     with patch('slack.WebClient.chat_postMessage') as slack_post, patch('requests.post') as victorops_post:
         victorops_post.return_value.status_code = 200
@@ -119,6 +124,7 @@ def test_dispatcher_sends_structured_details_to_victorops_without_slack_markup()
     assert message in combined
     assert details in combined
     assert next_action in combined
+    assert f'\n\nNext action:\n{next_action}' in sent['entity_display_name']
     assert sent['message_type'] == 'CRITICAL'
     assert ':exclamation:' not in combined
     assert '```' not in combined
@@ -134,6 +140,142 @@ def test_structured_alert_with_no_configured_handlers_makes_no_external_calls():
     assert result == {'sent': 0}
     slack_post.assert_not_called()
     victorops_post.assert_not_called()
+
+
+@pytest.mark.parametrize('failed_channel', ['#data-diff', '#tap-owner'])
+def test_best_effort_warning_keeps_partial_slack_delivery(failed_channel):
+    sender = AlertSender({'slack': {
+        'token': 'test-slack-token', 'channel': '#default', 'data_diff_channel': '#data-diff',
+    }})
+
+    def post_message(**kwargs):
+        if kwargs['channel'] == failed_channel:
+            raise SlackApiError('Channel unavailable', {'error': 'channel_not_found'})
+        return []
+
+    with (
+        patch('slack.WebClient.chat_postMessage', side_effect=post_message) as post,
+        patch('pipelinewise.cli.alert_handlers.slack_alert_handler.LOGGER.warning') as warning,
+    ):
+        result = sender.send_to_all_handlers(
+            message='WARNING data-diff payments/public.transfers — source index needed soon',
+            details='source_rows : 75000', tap_slack_channel='#tap-owner', data_diff=True, best_effort=True,
+        )
+
+    assert result == {'sent': 1}
+    assert [call.kwargs['channel'] for call in post.call_args_list] == ['#data-diff', '#tap-owner']
+    assert failed_channel in str(warning.call_args.args)
+
+
+def test_best_effort_slack_reports_successful_destination_count():
+    handler = SlackAlertHandler({
+        'token': 'test-slack-token', 'channel': '#default', 'data_diff_channel': '#data-diff',
+    })
+
+    with patch('slack.WebClient.chat_postMessage', return_value=[]) as post:
+        delivered = handler.send(
+            message='Source index needed soon', tap_slack_channel='#tap-owner', data_diff=True, best_effort=True,
+        )
+
+    assert delivered == 2
+    assert [call.kwargs['channel'] for call in post.call_args_list] == ['#data-diff', '#tap-owner']
+
+
+def test_best_effort_warning_reports_no_delivery_when_every_slack_channel_fails():
+    sender = AlertSender({'slack': {
+        'token': 'test-slack-token', 'channel': '#default', 'data_diff_channel': '#data-diff',
+    }})
+
+    with (
+        patch(
+            'slack.WebClient.chat_postMessage',
+            side_effect=SlackApiError('Channel unavailable', {'error': 'channel_not_found'}),
+        ) as post,
+        patch('pipelinewise.cli.alert_handlers.slack_alert_handler.LOGGER.warning') as warning,
+    ):
+        result = sender.send_to_all_handlers(
+            message='Source index needed soon', tap_slack_channel='#tap-owner', data_diff=True, best_effort=True,
+        )
+
+    assert result == {'sent': 0}
+    assert [call.kwargs['channel'] for call in post.call_args_list] == ['#data-diff', '#tap-owner']
+    logged = str([call.args for call in warning.call_args_list])
+    assert '#data-diff' in logged
+    assert '#tap-owner' in logged
+
+
+@pytest.mark.parametrize('handler_order', [('slack', 'victorops'), ('victorops', 'slack')])
+def test_best_effort_warning_keeps_delivery_when_another_handler_fails(handler_order):
+    configs = {
+        'slack': {'token': 'test-slack-token', 'channel': '#default', 'data_diff_channel': '#data-diff'},
+        'victorops': {'base_url': 'https://example.org/alerts', 'routing_key': 'route'},
+    }
+    sender = AlertSender({handler: configs[handler] for handler in handler_order})
+
+    with (
+        patch('slack.WebClient.chat_postMessage', return_value=[]) as slack_post,
+        patch('requests.post', side_effect=ValueError('VictorOps unavailable')) as victorops_post,
+        patch('pipelinewise.cli.alert_sender.LOGGER.warning') as warning,
+    ):
+        result = sender.send_to_all_handlers(
+            message='Source index needed soon', data_diff=True, best_effort=True,
+        )
+
+    assert result == {'sent': 1}
+    slack_post.assert_called_once()
+    victorops_post.assert_called_once()
+    assert 'victorops' in str(warning.call_args.args)
+
+
+def test_best_effort_warning_with_no_handlers_reports_no_delivery():
+    with patch('slack.WebClient.chat_postMessage') as slack_post, patch('requests.post') as victorops_post:
+        result = AlertSender({}).send_to_all_handlers(
+            message='Source index needed soon', data_diff=True, best_effort=True,
+        )
+
+    assert result == {'sent': 0}
+    slack_post.assert_not_called()
+    victorops_post.assert_not_called()
+
+
+@pytest.mark.parametrize('failed_channel,expected_channels', [
+    ('#data-diff', ['#data-diff']),
+    ('#tap-owner', ['#data-diff', '#tap-owner']),
+])
+def test_ordinary_alert_raises_after_slack_delivery_failure(failed_channel, expected_channels):
+    sender = AlertSender({'slack': {
+        'token': 'test-slack-token', 'channel': '#default', 'data_diff_channel': '#data-diff',
+    }})
+
+    def post_message(**kwargs):
+        if kwargs['channel'] == failed_channel:
+            raise SlackApiError('Channel unavailable', {'error': 'channel_not_found'})
+        return []
+
+    with patch('slack.WebClient.chat_postMessage', side_effect=post_message) as post:
+        with pytest.raises(SlackApiError):
+            sender.send_to_all_handlers(
+                message='Data-diff comparison failed', tap_slack_channel='#tap-owner', data_diff=True,
+            )
+
+    assert [call.kwargs['channel'] for call in post.call_args_list] == expected_channels
+
+
+def test_ordinary_alert_handler_failure_stops_dispatch():
+    sender = AlertSender({
+        'victorops': {'base_url': 'https://example.org/alerts', 'routing_key': 'route'},
+        'slack': {'token': 'test-slack-token', 'channel': '#default'},
+    })
+
+    with (
+        patch('requests.post', side_effect=ValueError('VictorOps unavailable')) as victorops_post,
+        patch('slack.WebClient.chat_postMessage') as slack_post,
+    ):
+        with pytest.raises(ValueError, match='VictorOps unavailable'):
+            sender.send_to_all_handlers(message='Replication failed')
+
+    victorops_post.assert_called_once()
+    slack_post.assert_not_called()
 
 
 class TestAlertSender:

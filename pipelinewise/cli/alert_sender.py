@@ -102,6 +102,7 @@ class AlertSender:
         details: str = None,
         next_action: str = None,
         data_diff: bool = False,
+        best_effort: bool = False,
     ) -> bool:
         """
         Sends an alert message to a specific alert handler type
@@ -115,6 +116,7 @@ class AlertSender:
             details: optional plain-text diagnostic body
             next_action: optional instruction displayed after the body
             data_diff: use the configured data-diff Slack channel
+            best_effort: retain partial Slack delivery and log failed destinations
 
         Returns:
             True if alert sent successfully
@@ -131,12 +133,15 @@ class AlertSender:
                 extra.update(details=details, next_action=next_action)
             if data_diff:
                 extra['data_diff'] = True
-            handler.send(message=message, level=level, exc=exc, tap_slack_channel=tap_slack_channel, **extra)
+            if best_effort:
+                extra['best_effort'] = True
+            sent = handler.send(message=message, level=level, exc=exc, tap_slack_channel=tap_slack_channel, **extra)
+            return sent > 0 if best_effort else True
         else:
             if details is not None:
                 message += f'\n{details}'
             if next_action:
-                message += f'\nNext action: {next_action}'
+                message += f'\n\nNext action:\n{next_action}'
             handler.send(message=message, level=level, exc=exc)
 
         # Alert sent successfully
@@ -145,6 +150,7 @@ class AlertSender:
     def send_to_all_handlers(
         self, message: str, level: str = BaseAlertHandler.ERROR, exc: Exception = None,
         tap_slack_channel: str = None, details: str = None, next_action: str = None, data_diff: bool = False,
+        best_effort: bool = False,
     ) -> dict:
         """
         Get all the configured alert handlers and send alert
@@ -158,15 +164,21 @@ class AlertSender:
             details: optional plain-text diagnostic body
             next_action: optional instruction displayed after the body
             data_diff: use the configured data-diff Slack channel
+            best_effort: attempt every handler and log failures instead of raising
 
         Returns:
-            Dictionary with number of successfully sent alerts
+            Dictionary with number of handlers that delivered to at least one destination
         """
-        sents = [
-            self.send_to_handler(
-                handler_type, message, level, exc, tap_slack_channel,
-                details=details, next_action=next_action, data_diff=data_diff,
-            )
-            for handler_type in self.alert_handlers
-        ]
-        return {'sent': len(sents)}
+        sent = 0
+        extra = {'best_effort': True} if best_effort else {}
+        for handler_type in self.alert_handlers:
+            try:
+                sent += self.send_to_handler(
+                    handler_type, message, level, exc, tap_slack_channel,
+                    details=details, next_action=next_action, data_diff=data_diff, **extra,
+                )
+            except Exception as delivery_error:
+                if not best_effort:
+                    raise
+                LOGGER.warning('Cannot send alert using %s handler: %s', handler_type, delivery_error)
+        return {'sent': sent}
