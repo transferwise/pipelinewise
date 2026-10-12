@@ -277,6 +277,7 @@ def test_snowflake_e2e_matrix_contract():
             'e2e_tests_06',
             (
                 'tests/end_to_end/target_snowflake/tap_postgres/test_iceberg_v3_postgres_to_sf.py',
+                'tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py::TestIcebergV3MySQLToSnowflake::test_fullsync_hands_over_to_singer_on_managed_iceberg_v3',
             ),
         ),
         'mariadb-iceberg': (
@@ -284,7 +285,6 @@ def test_snowflake_e2e_matrix_contract():
             (
                 'tests/end_to_end/target_snowflake/tap_mariadb/test_iceberg_v3_mariadb_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_mongodb/test_replicate_mongodb_to_sf.py',
-                'tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py::TestIcebergV3MySQLToSnowflake::test_fullsync_hands_over_to_singer_on_managed_iceberg_v3',
             ),
         ),
         'mysql-iceberg': (
@@ -314,7 +314,6 @@ def test_snowflake_e2e_matrix_contract():
             'e2e_tests_10',
             (
                 'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[postgres-native]',
-                'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[postgres-v3]',
                 'tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_transformations_are_private_through_publication',
             ),
         ),
@@ -362,6 +361,7 @@ def test_snowflake_e2e_matrix_contract():
             (
                 'tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_table_size_check.py',
                 'tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf.py',
+                'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[postgres-v3]',
             ),
         ),
         'decimal-fastsync-mysql-family': (

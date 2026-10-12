@@ -68,12 +68,13 @@ run_e2e \
   tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_with_split_large_files.py \
   tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py::TestIcebergV3MySQLToSnowflake::test_iceberg_replication_preserves_keys_and_supplementary_unicode
 
-run_e2e tests/end_to_end/target_snowflake/tap_postgres/test_iceberg_v3_postgres_to_sf.py
+run_e2e \
+  tests/end_to_end/target_snowflake/tap_postgres/test_iceberg_v3_postgres_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py::TestIcebergV3MySQLToSnowflake::test_fullsync_hands_over_to_singer_on_managed_iceberg_v3
 
 run_e2e \
   tests/end_to_end/target_snowflake/tap_mariadb/test_iceberg_v3_mariadb_to_sf.py \
-  tests/end_to_end/target_snowflake/tap_mongodb/test_replicate_mongodb_to_sf.py \
-  tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py::TestIcebergV3MySQLToSnowflake::test_fullsync_hands_over_to_singer_on_managed_iceberg_v3
+  tests/end_to_end/target_snowflake/tap_mongodb/test_replicate_mongodb_to_sf.py
 
 run_e2e \
   tests/end_to_end/target_snowflake/test_source_transformation_exports.py \
@@ -94,7 +95,6 @@ run_e2e \
 
 run_e2e \
   'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[postgres-native]' \
-  'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[postgres-v3]' \
   tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_transformations_are_private_through_publication
 
 run_e2e tests/end_to_end/test_numeric_replication.py::test_legacy_decimal_float_migration_requires_opt_in
@@ -137,7 +137,8 @@ run_sf_decimal \
 
 run_e2e \
   tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_table_size_check.py \
-  tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf.py
+  tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf.py \
+  'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[postgres-v3]'
 
 run_e2e \
   'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[mysql-native]' \
