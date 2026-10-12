@@ -184,7 +184,7 @@ const runMermaid = async (rerun) => {
                                     // Apply zoom to the now-rendered diagram, matching
                                     // the decoration visible diagrams receive.
                                     if (true) {
-                                        addZoomToSvgs(d3.selectAll(".mermaid[data-zoom-id=id-3321b6f6-66c6-4fec-b357-0b432cc1ebd2]").select(function() {
+                                        addZoomToSvgs(d3.selectAll(".mermaid[data-zoom-id=id-af1668a5-d1a2-44fd-a23b-d20f7ec221c1]").select(function() {
                                             return this.querySelector("svg");
                                         }));
                                     }
@@ -210,7 +210,7 @@ const runMermaid = async (rerun) => {
     if (true) {
         const mermaids_to_add_zoom = 1 === -1 ? mermaids_active.length : 1;
         if(mermaids_to_add_zoom > 0) {
-            var svgs = d3.selectAll(".mermaid[data-zoom-id=id-3321b6f6-66c6-4fec-b357-0b432cc1ebd2]").select(function() {
+            var svgs = d3.selectAll(".mermaid[data-zoom-id=id-af1668a5-d1a2-44fd-a23b-d20f7ec221c1]").select(function() {
                 return this.querySelector("svg");
             });
             // Wait until every active (visible) diagram has rendered. Deferred
@@ -525,7 +525,7 @@ window.runMermaid = runMermaid;</script>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Data-diff backend database</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#configuration">Configuration</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#schema">Schema</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#migration-003">Migration 003</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#migrations-003-and-004">Migrations 003 and 004</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#reporting-queries">Reporting queries</a></li>
@@ -543,6 +543,7 @@ window.runMermaid = runMermaid;</script>
 <li class="toctree-l2"><a class="reference internal" href="data_diff.html#cli-commands">CLI commands</a></li>
 <li class="toctree-l2"><a class="reference internal" href="data_diff.html#alerts">Alerts</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="data_diff.html#one-alert-per-check-per-invocation">One alert per check per invocation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_diff.html#source-index-warning">Source-index warning</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="data_diff.html#coverage-and-remediation">Coverage and remediation</a><ul>
@@ -774,11 +775,12 @@ To share one role, set both credential pairs to that role.</p>
 <section id="schema">
 <h2>Schema<a class="headerlink" href="#schema" title="Link to this heading"></a></h2>
 <figure class="align-center" id="id1">
-<pre data-zoom-id="id-3321b6f6-66c6-4fec-b357-0b432cc1ebd2" class="mermaid">
+<pre data-zoom-id="id-af1668a5-d1a2-44fd-a23b-d20f7ec221c1" class="mermaid">
         %%{init: {&quot;er&quot;: {&quot;diagramPadding&quot;: 8, &quot;entityPadding&quot;: 8}}}%%
 erDiagram
     direction LR
     dd_check_definitions ||--o{ dd_preflight_log : check_id
+    dd_check_definitions ||--o{ dd_index_warning_state : check_id
     dd_check_definitions ||--o{ dd_run_attempts : check_id
     dd_preflight_log o|--o{ dd_run_attempts : preflight_id
     dd_run_attempts o|--o{ dd_run_attempts : rerun_of_run_id
@@ -831,9 +833,15 @@ erDiagram
         JSONB index_metadata
         JSONB findings
         TEXT error &quot;nullable&quot;
-        BIGINT table_rows &quot;nullable&quot;
-        BIGINT row_limit &quot;nullable&quot;
+        BIGINT table_rows &quot;nullable; exact below row_limit, otherwise capped lower bound&quot;
+        BIGINT row_limit &quot;nullable; unindexed table row cap&quot;
         BOOLEAN has_leading_index &quot;nullable&quot;
+    }
+
+    dd_index_warning_state[&quot;dd_index_warning_state&lt;br/&gt;Delivered source-index warnings retained&lt;br/&gt;across config revisions and scheduled runs&quot;] {
+        UUID warning_id PK &quot;deterministic tap and physical source/timestamp identity&quot;
+        UUID check_id FK &quot;historical definition that first delivered the warning&quot;
+        TIMESTAMPTZ sent_at
     }
 
     dd_run_attempts[&quot;dd_run_attempts&lt;br/&gt;Execution attempts updated from RUNNING&lt;br/&gt;to a terminal outcome&quot;] {
@@ -905,7 +913,7 @@ erDiagram
     }
 
     </pre><figcaption>
-<p><span class="caption-text">Data-diff backend schema after migration 003</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
+<p><span class="caption-text">Data-diff backend schema after migration 004</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
 </figcaption>
 </figure>
 <p>The first path stores definitions and run results. The second uses each slot’s
@@ -923,9 +931,15 @@ dd_run_attempts
 </div>
 <p>This shows the processing flow. The ERD shows the exact foreign keys.</p>
 <ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">dd_preflight_log</span></code> records source index checks. <code class="docutils literal notranslate"><span class="pre">table_rows</span></code> and
-<code class="docutils literal notranslate"><span class="pre">row_limit</span></code> are deprecated. They retain estimates and thresholds from older
-runs and remain for compatibility. New records leave them NULL.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dd_preflight_log</span></code> records source index checks. Without a qualifying index,
+<code class="docutils literal notranslate"><span class="pre">row_limit</span></code> is 100,000 and <code class="docutils literal notranslate"><span class="pre">table_rows</span></code> contains the bounded count when
+available. Counts below that limit are exact; a count of 100,000 means at
+least that many rows.
+Both fields are NULL when an index makes counting unnecessary. Older records
+may contain estimates, and records written by 0.95.0 leave both fields NULL.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dd_index_warning_state</span></code> remembers delivered source-index warnings. Its
+identity uses the tap, source connection, table, and timestamp column. Check
+revisions and target changes do not repeat the warning.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">dd_run_attempts</span></code> keeps every attempt.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">dd_run_slot_state</span></code> keeps the highest attempt number with <code class="docutils literal notranslate"><span class="pre">PASS</span></code>, <code class="docutils literal notranslate"><span class="pre">FAIL</span></code>,
 or <code class="docutils literal notranslate"><span class="pre">ERROR</span></code> status per scheduled slot.</p></li>
@@ -939,10 +953,18 @@ increment <code class="docutils literal notranslate"><span class="pre">attempt</
 recalculates coverage. Earlier attempts and results remain in history.
 Manual reruns use <code class="docutils literal notranslate"><span class="pre">trigger_type</span> <span class="pre">=</span> <span class="pre">'REMEDIATION'</span></code>. <code class="docutils literal notranslate"><span class="pre">rerun_of_run_id</span></code> links them
 to the original run.</p>
-<section id="migration-003">
-<h3>Migration 003<a class="headerlink" href="#migration-003" title="Link to this heading"></a></h3>
-<p>Back up the backend before upgrading. Run <code class="docutils literal notranslate"><span class="pre">import_config</span></code> to apply migrations
-before running checks.</p>
+<section id="migrations-003-and-004">
+<h3>Migrations 003 and 004<a class="headerlink" href="#migrations-003-and-004" title="Link to this heading"></a></h3>
+<p>Back up the backend before upgrading. After upgrading, run
+<code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">import_config</span> <span class="pre">--dir</span> <span class="pre">&lt;project&gt;</span></code> to apply migrations before
+running checks. Data-diff execution does not apply migrations itself.</p>
+<p>Migration 004 adds <code class="docutils literal notranslate"><span class="pre">dd_index_warning_state</span></code> so successful warning deliveries
+remain remembered across restarts and configuration imports. The marker is saved
+when any configured destination accepts the warning. Other destinations are
+still attempted, and failures are logged. Failed destinations are not retried
+after another destination accepts it. If all destinations fail, delivery can be
+tried again. A crash between delivery and saving its marker can produce a
+duplicate. No source tables or indexes are changed.</p>
 <p>Migration 003 supports historical scans whose start is not yet known:</p>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">window_start</span></code> can be NULL until the historical start is found.</p></li>

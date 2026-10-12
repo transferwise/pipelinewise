@@ -166,7 +166,7 @@
 <li class="toctree-l1"><a class="reference internal" href="data_diff_backend.html">Data-diff backend database</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="data_diff_backend.html#configuration">Configuration</a></li>
 <li class="toctree-l2"><a class="reference internal" href="data_diff_backend.html#schema">Schema</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="data_diff_backend.html#migration-003">Migration 003</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_diff_backend.html#migrations-003-and-004">Migrations 003 and 004</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="data_diff_backend.html#reporting-queries">Reporting queries</a></li>
@@ -184,6 +184,7 @@
 <li class="toctree-l2"><a class="reference internal" href="#cli-commands">CLI commands</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#alerts">Alerts</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#one-alert-per-check-per-invocation">One alert per check per invocation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#source-index-warning">Source-index warning</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#coverage-and-remediation">Coverage and remediation</a><ul>
@@ -660,6 +661,8 @@ heading, aligned details, and a next action. For example:</p>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>:exclamation: FAIL data-diff payments/public.transfers — target has 20 fewer rows
 
 alert_utc_time    : 2026-10-09 09:30:05
+tap_id            : payments
+target_id         : snowflake
 run_id            : 2bd3e725-38fc-48c1-b565-b4f20e5bc7dd
 attempt           : 3 (RETRY)
 scheduled_utc     : 2026-10-09 09:00:00
@@ -675,12 +678,15 @@ row_count             100000     99980           -20
 distinct_key_count    100000     99980           -20
 
 Difference = target - source
-
-Next action: Check replication lag and investigate the mismatch.
-Failed windows retry automatically on scheduled runs. To verify sooner,
-use rerun_data_diff_check with --run-id and --remediation-ref.
 </pre></div>
 </div>
+<p><strong>Next action:</strong></p>
+<ul class="simple">
+<li><p>Check replication lag and investigate the mismatch.</p></li>
+<li><p>Failed windows retry automatically on scheduled runs.</p></li>
+<li><p>To verify sooner, use <code class="docutils literal notranslate"><span class="pre">rerun_data_diff_check</span></code> with <code class="docutils literal notranslate"><span class="pre">--run-id</span></code> and
+<code class="docutils literal notranslate"><span class="pre">--remediation-ref</span></code>.</p></li>
+</ul>
 <p>If several attempts fail, the alert shows the number of failed windows and
 attempts, with <code class="docutils literal notranslate"><span class="pre">FAIL</span></code> and <code class="docutils literal notranslate"><span class="pre">ERROR</span></code> totals. It shows the last processed
 <code class="docutils literal notranslate"><span class="pre">ERROR</span></code> as the representative failure, or the last <code class="docutils literal notranslate"><span class="pre">FAIL</span></code> when no attempt
@@ -705,7 +711,10 @@ database.</p>
 exact differences. They exclude key values, checksums, schema result objects,
 and row samples. Error details preserve line breaks; long details are shortened.</p>
 <p>A missing-index error recommends adding a source index starting with the
-timestamp column. Other errors recommend resolving the reported error.
+timestamp column. Its details show the primary index finding, including any
+ignored indexes, without repeating the advice from <code class="docutils literal notranslate"><span class="pre">Next</span> <span class="pre">action</span></code>.
+The full error and preflight findings remain in the backend history.
+Other errors recommend resolving the reported error.
 Failed windows for current scheduled checks retry automatically on scheduled
 runs. Use
 <code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">rerun_data_diff_check</span> <span class="pre">--run-id</span> <span class="pre">&lt;uuid&gt;</span> <span class="pre">--remediation-ref</span> <span class="pre">&lt;ticket&gt;</span></code>
@@ -713,11 +722,52 @@ to verify a saved failed attempt sooner. This also applies to failed manual
 reruns of current definitions. Inactive historical definitions do not retry
 automatically. When no run was saved, the alert directs you to the next scheduled
 execution instead of a saved-window rerun.</p>
-<p><code class="docutils literal notranslate"><span class="pre">SKIPPED</span></code>, <code class="docutils literal notranslate"><span class="pre">DEFERRED</span></code>, and <code class="docutils literal notranslate"><span class="pre">PASS</span></code> send no alert. One invocation can process
+<p><code class="docutils literal notranslate"><span class="pre">SKIPPED</span></code>, <code class="docutils literal notranslate"><span class="pre">DEFERRED</span></code>, and <code class="docutils literal notranslate"><span class="pre">PASS</span></code> send no failure alert. A source-index
+warning is separate from the check’s outcome. One invocation can process
 24 catch-up windows and 24 retries per check, but sends at most one failure alert
 per check to each destination. The alert limit resets at the next invocation;
 it does not suppress recurring failures. Automatic retries, saved results,
 coverage, and the command’s non-zero failure exit status are unchanged.</p>
+</section>
+<section id="source-index-warning">
+<h3>Source-index warning<a class="headerlink" href="#source-index-warning" title="Link to this heading"></a></h3>
+<p>A table without a qualifying timestamp index can still run data checks while it
+has fewer than 100,000 rows. From 50,000 rows, PipelineWise sends a warning so
+the owner can arrange an index before checks become blocked. For example:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>:exclamation: WARNING data-diff payments/public.transfers — approaching source index requirement
+
+alert_utc_time    : 2026-10-09 09:30:05
+tap_id            : payments
+target_id         : snowflake
+source_table      : payments.public.transfers
+timestamp_column  : updated_at
+source_rows       : 75,000
+index_required_at : 100,000 rows
+index_status      : No qualifying source index
+data_diff_status  : Checks can still run
+</pre></div>
+</div>
+<p><strong>Next action:</strong></p>
+<ul class="simple">
+<li><p>Arrange a usable source index starting with updated_at before the table
+reaches 100,000 rows.</p></li>
+<li><p>At 100,000 rows or more, data checks will be blocked until that index exists.</p></li>
+</ul>
+<p>PipelineWise attempts every configured alert destination and logs delivery
+failures. Once any destination accepts the warning, it is remembered for each
+source table and timestamp column within a tap. Later runs do not retry failed
+destinations after that success. Retries, restarts, and configuration imports
+do not repeat the warning. Adding an index or shrinking the table does not reset
+that reminder. Changing the source table or timestamp column creates a new
+reminder.</p>
+<p>If all destinations fail, delivery is retried on a later eligible run. A crash
+after delivery but before saving the reminder can cause a duplicate warning.
+Only current check definitions send this warning. Inactive historical reruns
+do not send it. Existing tap alert settings still apply. A delivery failure
+does not change the data check’s result.</p>
+<p>These limits do not guarantee a quick index build. Table width, server load,
+and long-running transactions also affect index creation. Arrange the index
+early for a growing table. See <a class="reference internal" href="#data-diff-preflight"><span class="std std-ref">Preflight</span></a> for the exact rule.</p>
 </section>
 </section>
 <section id="coverage-and-remediation">
@@ -785,16 +835,44 @@ PipelineWise reports the error and continues with other checks.</p>
 </ul>
 </section>
 <section id="preflight">
-<h3>Preflight<a class="headerlink" href="#preflight" title="Link to this heading"></a></h3>
-<p>Before each data check, the source table must have a usable index whose first
-column is <code class="docutils literal notranslate"><span class="pre">timestamp_column</span></code>. This applies to every table size and to initial
-full scans. Without that index, preflight returns <code class="docutils literal notranslate"><span class="pre">BLOCKED</span></code> and the data
-comparison does not run. Schema-only checks do not require an index.
-Checksum checks still require index preflight when their columns are unsupported.
-The checksum validation error stays in the results, and no checksum query runs.</p>
+<span id="data-diff-preflight"></span><h3>Preflight<a class="headerlink" href="#preflight" title="Link to this heading"></a></h3>
+<p>Before each data check, PipelineWise looks for a usable source index whose first
+column is <code class="docutils literal notranslate"><span class="pre">timestamp_column</span></code>. With that index, preflight does not count rows.
+Without it, a bounded source count applies these fixed rules:</p>
+<table class="docutils align-default" id="id3">
+<caption><span class="caption-text">Source tables without a qualifying timestamp index</span><a class="headerlink" href="#id3" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 30.0%" />
+<col style="width: 70.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Source rows</p></th>
+<th class="head"><p>Behaviour</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Fewer than 50,000</p></td>
+<td><p>Allow data checks without a warning.</p></td>
+</tr>
+<tr class="row-odd"><td><p>50,000 to 99,999</p></td>
+<td><p>Allow data checks and send the source-index warning once.</p></td>
+</tr>
+<tr class="row-even"><td><p>100,000 or more</p></td>
+<td><p>Return <code class="docutils literal notranslate"><span class="pre">BLOCKED</span></code> and require a qualifying index.</p></td>
+</tr>
+</tbody>
+</table>
+<p>These rules include initial full scans. Schema-only checks require neither an
+index nor a row count. Checksum checks still run preflight when their columns
+are unsupported. The checksum validation error stays in the results, and no
+checksum query runs.</p>
+<p>The count is exact below the limit and stops at 100,000 rows. A recorded count
+of 100,000 means at least that many rows. Preflight uses no row estimates or
+query plans. A count failure or timeout returns <code class="docutils literal notranslate"><span class="pre">ERROR</span></code> instead of assuming
+the table is small.</p>
 <p>Checks that combine schema and data comparisons keep completed schema results.
-If preflight blocks the data comparison, the overall run is <code class="docutils literal notranslate"><span class="pre">ERROR</span></code>. No data
-queries run, and verified coverage does not advance.</p>
+If preflight blocks the data comparison, the overall run is <code class="docutils literal notranslate"><span class="pre">ERROR</span></code>. No
+comparison queries run, and verified coverage does not advance.</p>
 <p>Accepted indexes are:</p>
 <ul class="simple">
 <li><p>PostgreSQL: a plain, valid, ready B-tree index. Partial, expression, hash,
@@ -804,17 +882,20 @@ BRIN, and still-building indexes do not satisfy this preflight policy.</p></li>
 </ul>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>Preflight checks index metadata. A query may still use a full table scan.
+<p>Preflight checks index metadata, not the query plan. A query may still use a
+full table scan.
 Keep rolling windows narrow and set <code class="docutils literal notranslate"><span class="pre">statement_timeout</span></code> to limit each
 query’s duration.</p>
 </div>
 <p>For a blocked check, ask the DBA to add or enable an accepted index. PipelineWise
 does not create indexes. Inspect <code class="docutils literal notranslate"><span class="pre">dd_preflight_log</span></code> for the verdict and index
 findings.</p>
-<p>Before upgrading, review the latest index findings in <code class="docutils literal notranslate"><span class="pre">dd_preflight_log</span></code> for
-the selected data checks. Add missing qualifying indexes, including on small
-tables whose older preflight verdict was <code class="docutils literal notranslate"><span class="pre">PASS</span></code> under the row-count exemption.
-Missing indexes continue to block each new window and its retries until fixed.</p>
+<p>After upgrading, run <code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">import_config</span> <span class="pre">--dir</span> <span class="pre">&lt;project&gt;</span></code> before
+running checks. This applies backend migration 004, which remembers delivered
+source-index warnings. See <a class="reference internal" href="data_diff_backend.html#data-diff-backend"><span class="std std-ref">Data-diff backend database</span></a>.
+Review the latest findings in <code class="docutils literal notranslate"><span class="pre">dd_preflight_log</span></code> and arrange qualifying
+indexes for growing tables. At 100,000 rows or more, a missing index blocks
+each new window and its retries until fixed.</p>
 </section>
 </section>
 </section>
