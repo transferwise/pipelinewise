@@ -9,6 +9,7 @@ from cryptography.hazmat.primitives import serialization
 
 from singer import get_logger
 from singer.decimal_support import decimal_float_value, decimal_key, is_decimal_schema
+from singer.snowflake_errors import sanitize_snowflake_errors
 from target_snowflake import flattening
 from target_snowflake import managed_iceberg
 from target_snowflake import stream_utils
@@ -279,6 +280,7 @@ class DbSync:
         else:
             self.upload_client = SnowflakeUploadClient(connection_config, self)
 
+    @sanitize_snowflake_errors
     def open_connection(self):
         """Open snowflake connection"""
         stream = None
@@ -304,6 +306,7 @@ class DbSync:
             }
         )
 
+    @sanitize_snowflake_errors
     def query(self, query: Union[str, List[str]], params: Dict = None, max_records=0) -> List[Dict]:
         """Run an SQL query in snowflake"""
         result = []
@@ -608,6 +611,7 @@ class DbSync:
             json.dumps({'inserts': inserts, 'updates': updates, 'size_bytes': size_bytes})
         )
 
+    @sanitize_snowflake_errors
     def _load_file_merge(self, s3_key, stream, columns_with_trans, update_columns=None) -> Tuple[int, int]:
         # MERGE does insert and update
         inserts = 0
@@ -632,6 +636,7 @@ class DbSync:
                     updates = results[0].get('number of rows updated', 0)
         return inserts, updates
 
+    @sanitize_snowflake_errors
     def _load_file_copy(self, s3_key, stream, columns_with_trans) -> int:
         # COPY does insert only
         inserts = 0

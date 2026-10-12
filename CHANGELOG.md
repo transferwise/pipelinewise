@@ -1,3 +1,11 @@
+0.96.1 (2026-10-12)
+-------------------
+
+- Redact Snowflake data-error messages in Singer, FastSync, and data-diff logs
+  and alerts. Preserve the error type, error code, SQLSTATE, and query ID for
+  diagnosis. Keep failure and replication-state handling unchanged. See
+  [logging diagnostics](docs/user_guide/troubleshooting.rst#logging-and-diagnostics)
+
 0.96.0 (2026-10-10)
 -------------------
 
