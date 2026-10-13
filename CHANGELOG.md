@@ -1,3 +1,9 @@
+0.96.2 (2026-10-13)
+-------------------
+
+- Keep MySQL 9.7 row-based replication running when query events include the
+  cascade-trigger status variable
+
 0.96.1 (2026-10-12)
 -------------------
 

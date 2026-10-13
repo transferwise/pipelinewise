@@ -54,6 +54,7 @@ CHECKPOINT_PROBE_MAX_EVENTS = 256
 BINLOG_START_POSITION = 4
 CHECKPOINT_SCAN_PAGE_SIZE = 10000
 CHECKPOINT_SCAN_LOG_INTERVAL = 100000
+Q_ENABLE_CASCADE_TRIGGERS = 0x15
 
 MYSQL_TIMESTAMP_TYPES = {
     FIELD_TYPE.TIMESTAMP,
@@ -91,6 +92,27 @@ def preserve_empty_binlog_sets():
 
 
 preserve_empty_binlog_sets()
+
+
+def preserve_cascade_trigger_status_var():
+    """Teach mysql-replication 0.46 to consume MySQL 9.7 query status key 0x15."""
+    method_name = '_read_status_vars_value_for_key'
+    read_value = getattr(QueryEvent, method_name)
+    if getattr(read_value, '_pipelinewise_reads_cascade_trigger_status', False):
+        return
+
+    @wraps(read_value)
+    def read_status_var(event, key):
+        if key == Q_ENABLE_CASCADE_TRIGGERS:
+            event.enable_cascade_triggers = event.packet.read_uint8()
+            return
+        return read_value(event, key)
+
+    read_status_var._pipelinewise_reads_cascade_trigger_status = True
+    setattr(QueryEvent, method_name, read_status_var)
+
+
+preserve_cascade_trigger_status_var()
 
 
 def binlog_filename_key(filename: str) -> Tuple[str, int]:
