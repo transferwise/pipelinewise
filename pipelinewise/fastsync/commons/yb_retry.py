@@ -103,7 +103,6 @@ def _backoff_seconds(attempt, initial, maximum):
     return random.uniform(0, min(maximum, initial * (2 ** (attempt - 1))))
 
 
-# pylint: disable=too-many-arguments,too-many-positional-arguments
 def retry_read(operation, description, max_attempts=DEFAULT_MAX_ATTEMPTS,
                initial_backoff=DEFAULT_INITIAL_BACKOFF_SECONDS,
                max_backoff=DEFAULT_MAX_BACKOFF_SECONDS, before_retry=None):

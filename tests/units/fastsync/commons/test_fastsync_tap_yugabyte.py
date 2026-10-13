@@ -8,7 +8,7 @@ from unittest import TestCase
 from unittest.mock import MagicMock, Mock, patch
 
 from pipelinewise.fastsync.commons.tap_yugabyte import FastSyncTapYugabyte
-from pipelinewise.fastsync.commons import tap_yugabyte
+from pipelinewise.fastsync.commons import tap_yugabyte, yb_retry
 from pipelinewise.fastsync.commons.partial_sync_boundary import (
     PartialSyncBoundary,
 )
@@ -504,30 +504,30 @@ class TestFastSyncTapYugabyte(TestCase):
                 self.yugabyte.copy_table('public.my_table', 'unused.csv')
 
         self.assertEqual(
-            tap_yugabyte._MISMATCHED_SCHEMA_RETRY_ATTEMPTS,
+            yb_retry.DEFAULT_MAX_ATTEMPTS,
             self.yugabyte.curr.copy_expert.call_count,
         )
         self.assertEqual(
-            tap_yugabyte._MISMATCHED_SCHEMA_RETRY_ATTEMPTS - 1,
+            yb_retry.DEFAULT_MAX_ATTEMPTS - 1,
             sleep_mock.call_count,
         )
 
-    def test_copy_table_does_not_retry_unrelated_internal_errors(self):
-        """An InternalError_ that is not MISMATCHED_SCHEMA must propagate without retrying"""
+    def test_copy_table_does_not_retry_permanent_errors(self):
+        """A permanent SQLSTATE must fail on the first attempt without retrying"""
         table_columns = [{'safe_sql_value': '"id"'}]
         self.yugabyte.curr = MagicMock()
         self.yugabyte._snapshot_ht = 123456789
-        other_internal_error = psycopg2.errors.InternalError_('some other internal error')
-        self.yugabyte.curr.copy_expert.side_effect = other_internal_error
+        self.yugabyte.curr.copy_expert.side_effect = _InsufficientPrivilege('permission denied for yb_read_time')
 
         with patch.object(
             self.yugabyte, 'get_table_columns', return_value=table_columns
         ), patch.object(
-            tap_yugabyte.split_gzip, 'open', return_value=io.BytesIO()
+            tap_yugabyte.split_gzip, 'open', side_effect=lambda *args, **kwargs: io.BytesIO()
         ), patch.object(tap_yugabyte.time, 'sleep') as sleep_mock:
-            with self.assertRaises(psycopg2.errors.InternalError_):
+            with self.assertRaises(yb_retry.PermanentSourceError) as raised:
                 self.yugabyte.copy_table('public.my_table', 'unused.csv')
 
+        self.assertIsInstance(raised.exception.__cause__, _InsufficientPrivilege)
         self.assertEqual(1, self.yugabyte.curr.copy_expert.call_count)
         sleep_mock.assert_not_called()
 
@@ -602,6 +602,11 @@ class TestFastSyncTapYugabyte(TestCase):
             keys = self.yugabyte.get_primary_keys('public.no_pk_table')
 
         self.assertIsNone(keys)
+
+
+class _InsufficientPrivilege(psycopg2.Error):
+    """psycopg2's pgcode is read-only, so a permanent SQLSTATE is shadowed on a subclass."""
+    pgcode = '42501'
 
 
 def _psycopg2_error(message):

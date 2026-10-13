@@ -259,7 +259,6 @@ def bucket_in_sql(pk_columns, buckets, escape_percent=False):
     return f'{bucket_expr(pk_columns, buckets, escape_percent)} IN ({values})'
 
 
-# pylint: disable=too-many-arguments,too-many-positional-arguments
 def bucket_branches_sql(fq_table_name, pk_columns, buckets, order_by,
                         extra_predicate=None, escape_percent=False):
     """One ordered branch per bucket, `UNION ALL`ed -- the body of the subquery.
@@ -870,7 +869,6 @@ def _column_is_ordered(indoption):
     return (indoption & INDOPTION_HASH) == 0
 
 
-# pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-return-statements
 def _no_index_possible(blockers):
     return {'strategy': STRATEGY_PLAIN_SCAN, 'index_ddl': None,
             'index_required': False, 'note': None, 'blockers': blockers}

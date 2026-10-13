@@ -21,7 +21,7 @@ import psycopg2
 import yaml
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from tap_yugabyte import keyset  # noqa: E402  pylint: disable=wrong-import-position
+from tap_yugabyte import keyset  # noqa: E402
 
 OK, ACTION, BLOCK = 'OK', 'ACTION', 'BLOCK'
 

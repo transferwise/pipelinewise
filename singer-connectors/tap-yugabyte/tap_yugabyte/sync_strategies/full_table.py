@@ -33,7 +33,6 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
-import psycopg2
 import psycopg2.extras
 import singer
 from singer import metrics, utils
