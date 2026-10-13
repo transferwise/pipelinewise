@@ -2,6 +2,8 @@ from datetime import datetime, timedelta, timezone
 from itertools import product
 from uuid import uuid4
 
+import pytest
+
 from pipelinewise.data_diff.coverage import (
     advance_coverage,
     calculate_coverage,
@@ -17,7 +19,7 @@ def _run(start, end, status, *, slot=None, attempt=1, run_id=None):
     return {
         "run_id": run_id or uuid4(),
         "scheduled_for": _instant(slot if slot is not None else end),
-        "window_start": _instant(start),
+        "window_start": _instant(start) if start is not None else None,
         "window_end": _instant(end),
         "attempt": attempt,
         "status": status,
@@ -76,6 +78,58 @@ def test_metadata_only_definition_never_advances_coverage():
     assert coverage["verified_end"] == _instant(10)
     assert coverage["verified_status"] == "BLOCKED"
     assert "Metadata-only" in coverage["reason"]
+
+
+def test_unresolved_historical_error_blocks_later_success_without_inventing_a_start():
+    unresolved = _run(None, 11, 'ERROR')
+
+    coverage = calculate_coverage([unresolved, _run(11, 12, 'PASS')])
+
+    assert coverage == {
+        'verified_start': None,
+        'verified_end': None,
+        'furthest_observed_end': _instant(12),
+        'verified_status': 'BLOCKED',
+        'blocking_run_id': unresolved['run_id'],
+        'reason': f"Run {unresolved['run_id']} has not resolved its historical comparison start",
+    }
+
+
+def test_resolved_remediation_replaces_unresolved_historical_blocker():
+    original = _run(None, 11, 'ERROR')
+    later = _run(11, 12, 'PASS')
+    previous = calculate_coverage([original, later])
+
+    coverage = calculate_coverage([original, later, _run(5, 11, 'PASS', attempt=2)])
+
+    assert coverage['verified_start'] == _instant(5)
+    assert coverage['verified_end'] == _instant(12)
+    assert coverage['verified_status'] == 'CONTIGUOUS'
+    assert coverage['blocking_run_id'] is None
+    assert coverage_event_type(previous, coverage) == 'ADVANCE'
+
+
+def test_year_one_is_a_real_resolved_boundary():
+    run = _run(None, 11, 'PASS')
+    run['window_start'] = datetime.min.replace(tzinfo=timezone.utc)
+
+    coverage = calculate_coverage([run])
+
+    assert coverage['verified_start'] == run['window_start']
+    assert coverage['verified_end'] == _instant(11)
+    assert coverage['verified_status'] == 'CONTIGUOUS'
+
+
+@pytest.mark.parametrize('old_end,new_end,event', [
+    (None, None, 'BLOCK'),
+    (None, _instant(12), 'ADVANCE'),
+    (_instant(12), None, 'INVALIDATE'),
+])
+def test_coverage_events_accept_unresolved_boundaries(old_end, new_end, event):
+    assert coverage_event_type(
+        {'verified_end': old_end},
+        {'verified_end': new_end, 'verified_status': 'BLOCKED'},
+    ) == event
 
 
 def test_missing_interval_is_reported_as_blocked_without_failure_run():

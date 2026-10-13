@@ -6,6 +6,10 @@ FastSync
 FastSync bypasses Singer JSON for supported bulk transfers and uses native
 database export, staging, copy, and merge operations. It has two components:
 
+SQL-source decimals retain supported precision and scale in PostgreSQL and both
+Snowflake table formats. See :ref:`exact_decimal_mapping` for numeric fallback,
+PartialSync versioning, and FullSync replacement behavior.
+
 .. list-table::
    :header-rows: 1
    :widths: 22 38 40
@@ -90,6 +94,10 @@ or log-based tables. It does not wait for the next scheduled launch.
 If FullSync fails, Singer does not advance that table past an incomplete initial
 load. Restart the same command after correcting the failure.
 
+An explicit ``fast_sync`` without ``--tables`` skips configured entries that
+are missing or unselected in ``properties.json``. See :ref:`resync` for command
+selection and PostgreSQL slot-reset behaviour.
+
 
 Snowflake Iceberg publication
 -----------------------------
@@ -110,6 +118,18 @@ FastSync availability and its zero-flattening requirement are specific to these
 routes. A compatible Singer-only source such as Salesforce can load managed v3
 through ``target-snowflake`` without gaining a FastSync component; it retains
 its normal flattening setting and sends ``FULL_TABLE`` streams through Singer.
+
+
+Snowflake source-side transformations
+-------------------------------------
+
+PostgreSQL and MySQL/MariaDB FullSync and PartialSync apply configured top-level
+transformations in the source ``SELECT``, before generating CSV. Native and
+managed Iceberg v3 staging, S3 uploads, and archived load files contain only the
+configured transformed output. Unsupported rules fail before export rather than
+falling back to Snowflake updates. Source range selection and replication
+bookmarks remain unchanged. See :ref:`transformations` for execution order,
+conditional rules, supported SQL semantics, and upgrade recovery requirements.
 
 
 Snowflake string widths

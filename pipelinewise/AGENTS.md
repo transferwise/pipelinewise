@@ -70,16 +70,19 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
   always delete marked rows, and enable target metadata.
 - Dev MySQL requires TLS (`ssl={'': True}`). PyMySQL interpolates bound SQL, so
   double literal tokens, e.g. `DATE_FORMAT(t, '%%Y')`.
-- PostgreSQL `reltuples == 0` after ANALYZE-then-load does not prove emptiness;
-  partitioned parents can duplicate child estimates. Sum leaf partitions.
 - SIGTERM normally does not raise `SystemExit`; durable handling needs an
   installed signal handler, and injected `SystemExit` is not proof.
 - Separate backend app roles receive schema/sequence access plus `SELECT`,
   `INSERT`, and `UPDATE`, but no `DELETE`/DDL. A shared app/DDL identity removes
   that separation intentionally.
-- Source preflight checks estimates and timestamp-index shape—not exact counts
-  or actual index use—and requires a statement timeout. Treat `min_key`/`max_key`
-  values in `dd_run_results` as sensitive; avoid casual logging.
+- Source preflight accepts a usable index whose first column is the timestamp
+  column without counting rows. Otherwise use an exact count capped at 100,000:
+  allow fewer rows, warn once per physical tap/source/table/timestamp identity
+  from 50,000, and block at 100,000. Remember successful warning deliveries in
+  the backend across retries, restarts, and imports. Schema-only checks are
+  exempt. Use neither query plans nor row estimates, and require a statement
+  timeout. Treat `min_key`/`max_key` values in `dd_run_results` as sensitive;
+  avoid casual logging.
 
 ## Snowflake and Iceberg contract
 
@@ -118,6 +121,12 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
   through Snowflake FullSync and PartialSync. MySQL/MariaDB export may remove
   only NUL and uses an `utf8mb4` projection and default connection; PostgreSQL
   COPY retains Unicode and the same remaining value set.
+- PostgreSQL/MySQL/MariaDB-to-Snowflake FullSync/PartialSync transformations run
+  in the source SELECT before CSV/S3/archive/staging. Preserve legacy FastSync
+  conditional-first ordering and source normalization; reject unsupported
+  semantics before export. Keep range filtering on raw source columns and
+  reject transformed INCREMENTAL keys before reading bookmarks. Version recovery
+  identity when transformation execution semantics change.
 - Key recovery by stable source stream, index active attempts by physical
   target, and hold both locks throughout; reject source, target, staging, role,
   transformation, or boundary drift. `RecoveryCoordinator` owns target runtime

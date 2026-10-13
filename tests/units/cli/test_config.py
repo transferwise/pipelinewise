@@ -94,6 +94,86 @@ class TestConfig:
             'pidfile': '/var/singer-connector/pipelinewise.pid',
         }
 
+    def test_target_runtime_identifies_source_for_legacy_and_numeric_keys(self):
+        """Supported targets receive source identity for their key compatibility policy."""
+        config = Config(PIPELINEWISE_TEST_HOME)
+        postgres_tap = self._table_format_tap()
+        mysql_tap = self._table_format_tap(type='tap-mysql')
+
+        assert config.generate_inheritable_config(postgres_tap, 'target-snowflake')['source_tap_type'] == 'tap-postgres'
+        assert 'source_tap_type' not in config.generate_inheritable_config(postgres_tap, 'target-postgres')
+        for target_type in ('target-snowflake', 'target-postgres'):
+            assert config.generate_inheritable_config(mysql_tap, target_type)['source_tap_type'] == 'tap-mysql'
+        assert 'source_tap_type' not in config.generate_inheritable_config(mysql_tap, 'target-s3-csv')
+        assert 'source_tap_type' not in config.generate_inheritable_config(
+            self._table_format_tap(type='tap-salesforce'), 'target-snowflake',
+        )
+
+    @pytest.mark.parametrize('tap_type', ['tap-mysql', 'tap-postgres'])
+    @pytest.mark.parametrize('enabled', [False, True])
+    def test_decimal_float_versioning_is_tap_scoped_and_reaches_snowflake(self, tap_type, enabled):
+        setting = Config.VERSION_LEGACY_FLOAT_COLUMNS_SETTING
+        tap = self._table_format_tap(type=tap_type, **{setting: enabled})
+        target = self._table_format_target()
+
+        Config.validate_snowflake_decimal_versioning(tap, target)
+        assert Config(PIPELINEWISE_TEST_HOME).generate_inheritable_config(
+            tap, 'target-snowflake',
+        )[setting] is enabled
+
+    def test_decimal_float_versioning_defaults_false_only_for_supported_snowflake_routes(self):
+        setting = Config.VERSION_LEGACY_FLOAT_COLUMNS_SETTING
+        config = Config(PIPELINEWISE_TEST_HOME)
+
+        assert config.generate_inheritable_config(
+            self._table_format_tap(type='tap-postgres'), 'target-snowflake',
+        )[setting] is False
+        assert setting not in config.generate_inheritable_config(
+            self._table_format_tap(type='tap-postgres'), 'target-postgres',
+        )
+        assert setting not in config.generate_inheritable_config(
+            self._table_format_tap(type='tap-salesforce'), 'target-snowflake',
+        )
+
+    @pytest.mark.parametrize('value', [None, 0, 1, 'false'])
+    def test_decimal_float_versioning_schema_rejects_non_booleans(self, value):
+        with pytest.raises(InvalidConfigException):
+            cli.utils.validate(
+                self._table_format_tap(**{
+                    Config.VERSION_LEGACY_FLOAT_COLUMNS_SETTING: value,
+                }),
+                cli.utils.load_schema('tap'),
+            )
+
+    @pytest.mark.parametrize('placement', ['root', 'db_conn'])
+    def test_decimal_float_versioning_rejects_shared_target_placement(self, placement):
+        setting = Config.VERSION_LEGACY_FLOAT_COLUMNS_SETTING
+        target = self._table_format_target()
+        (target if placement == 'root' else target['db_conn'])[setting] = True
+
+        with pytest.raises(InvalidConfigException, match=setting):
+            Config.validate_snowflake_decimal_versioning_placement(target)
+
+    def test_decimal_float_versioning_rejects_tap_connection_placement(self):
+        setting = Config.VERSION_LEGACY_FLOAT_COLUMNS_SETTING
+        tap = self._table_format_tap(db_conn={setting: True})
+
+        with pytest.raises(InvalidConfigException, match='tap root'):
+            Config.validate_snowflake_decimal_versioning(tap, self._table_format_target())
+
+    @pytest.mark.parametrize('tap_type,target_type', [
+        ('tap-salesforce', 'target-snowflake'),
+        ('tap-postgres', 'target-postgres'),
+    ])
+    def test_decimal_float_versioning_rejects_unsupported_routes(self, tap_type, target_type):
+        setting = Config.VERSION_LEGACY_FLOAT_COLUMNS_SETTING
+        tap = self._table_format_tap(type=tap_type, **{setting: True})
+        target = self._table_format_target()
+        target['type'] = target_type
+
+        with pytest.raises(InvalidConfigException, match=setting):
+            Config.validate_snowflake_decimal_versioning(tap, target)
+
     @staticmethod
     def _table_format_tap(**settings):
         return {
@@ -334,6 +414,8 @@ class TestConfig:
         assert 'iceberg_version' not in native_config
         assert iceberg_config['target_table_format'] == 'iceberg'
         assert iceberg_config['iceberg_version'] == 3
+        assert all(runtime['source_tap_type'] == 'tap-postgres'
+                   for runtime in (omitted_config, native_config, iceberg_config))
         assert 'target_table_format' not in main_taps['omitted_tap']
         assert 'iceberg_version' not in main_taps['omitted_tap']
         assert main_taps['native_tap']['target_table_format'] == 'native'
@@ -628,6 +710,7 @@ class TestConfig:
             'warehouse': 'MY_WAREHOUSE',
         }
         assert cli.utils.load_json(json_files['tap_config_json']) == {
+            'decimal_target': 'snowflake',
             'dbname': '<DB_NAME>',
             'host': '<HOST>',
             'port': 3306,
@@ -662,6 +745,7 @@ class TestConfig:
             },
             'temp_dir': './pipelinewise-test-config/tmp',
             'tap_id': 'mysql_sample',
+            'source_tap_type': 'tap-mysql',
             'query_tag': '{"ppw_component": "tap-mysql", "tap_id": "mysql_sample", '
             '"database": "{{database}}", "schema": "{{schema}}", "table": "{{table}}"}',
             'validate_records': False,
@@ -670,6 +754,7 @@ class TestConfig:
             'split_file_chunk_size_mb': 500,
             'split_file_max_chunks': 25,
             'archive_load_files': False,
+            'version_legacy_float_columns': False,
         }
 
         # Delete the generated JSON config directory
@@ -747,6 +832,7 @@ class TestConfig:
             'warehouse': 'MY_WAREHOUSE',
         }
         assert cli.utils.load_json(json_files['tap_config_json']) == {
+            'decimal_target': 'snowflake',
             'dbname': '<DB_NAME>',
             'host': '<HOST>',
             'port': 3306,
@@ -781,6 +867,7 @@ class TestConfig:
             },
             'temp_dir': './pipelinewise-test-config/tmp',
             'tap_id': 'tap_two',
+            'source_tap_type': 'tap-mysql',
             'query_tag': '{"ppw_component": "tap-mysql", "tap_id": "tap_two", '
             '"database": "{{database}}", "schema": "{{schema}}", "table": "{{table}}"}',
             'validate_records': False,
@@ -789,6 +876,7 @@ class TestConfig:
             'split_file_chunk_size_mb': 500,
             'split_file_max_chunks': 25,
             'archive_load_files': False,
+            'version_legacy_float_columns': False,
         }
 
         tap_one_existence = os.path.exists(f'{json_config_dir}/test_snowflake_target/tap_one')

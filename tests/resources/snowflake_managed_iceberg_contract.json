@@ -35,6 +35,18 @@
   },
   "behavior_cases": {
     "3": {
+      "decimal_cases": [
+        {
+          "schema": {"type": ["null", "string"], "format": "singer.decimal", "decimal": {"precision": 38, "scale": 18}},
+          "declared_type": "NUMERIC(38,18)",
+          "canonical_type": "NUMBER(38,18)"
+        },
+        {
+          "schema": {"type": ["null", "string"], "format": "singer.decimal", "decimal": {"precision": 18, "scale": 0}},
+          "declared_type": "NUMERIC(18,0)",
+          "canonical_type": "NUMBER(18,0)"
+        }
+      ],
       "logical_types": [
         {
           "logical_type": "binary",

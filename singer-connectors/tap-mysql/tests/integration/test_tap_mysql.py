@@ -1,4 +1,3 @@
-import os
 import re
 import unittest
 from unittest.mock import patch
@@ -1031,8 +1030,8 @@ class TestBinlogReplication(unittest.TestCase):
     def test_binlog_stream_with_gtid(self):
         global SINGER_MESSAGES
 
-        engine = os.getenv('TAP_MYSQL_ENGINE', MYSQL_ENGINE)
-        gtid = binlog.fetch_current_gtid_pos(self.conn, os.environ['TAP_MYSQL_ENGINE'])
+        engine = test_utils.get_source_engine(self.conn)
+        gtid = binlog.fetch_current_gtid_pos(self.conn, engine)
 
         config = test_utils.get_db_config()
         config['use_gtid'] = True
@@ -1092,10 +1091,10 @@ class TestBinlogReplication(unittest.TestCase):
         self.assertIsNotNone(singer.get_bookmark(self.state, 'tap_mysql_test-binlog_2', 'log_pos'))
         self.assertIsNotNone(singer.get_bookmark(self.state, 'tap_mysql_test-binlog_2', 'gtid'))
 
-    def test_binlog_stream_switching_from_binlog_to_gtid_with_mysql_fails(self):
+    def test_binlog_stream_switching_from_binlog_to_gtid_with_mysql_succeeds(self):
         global SINGER_MESSAGES
 
-        engine = os.getenv('TAP_MYSQL_ENGINE', MYSQL_ENGINE)
+        engine = test_utils.get_source_engine(self.conn)
 
         if engine != MYSQL_ENGINE:
             self.skipTest('This test is only meant for Mysql flavor')
@@ -1117,19 +1116,23 @@ class TestBinlogReplication(unittest.TestCase):
         config['use_gtid'] = True
         config['engine'] = engine
 
-        with self.assertRaises(ValueError) as context:
-            tap_mysql.do_sync(self.conn, config, self.catalog, self.state)
+        tap_mysql.do_sync(self.conn, config, self.catalog, self.state)
 
-        self.assertEqual(
-            "Couldn't find any gtid in state bookmarks to resume logical replication; "
-            'missing GTID bookmarks: tap_mysql_test-binlog_1, tap_mysql_test-binlog_2. '
-            'Perform a full resync of the affected streams before replication.',
-            str(context.exception))
+        self.assertTrue(any(isinstance(message, singer.RecordMessage) for message in SINGER_MESSAGES))
+        for stream_id in ('tap_mysql_test-binlog_1', 'tap_mysql_test-binlog_2'):
+            self.assertIsNotNone(singer.get_bookmark(self.state, stream_id, 'log_file'))
+            self.assertIsNotNone(singer.get_bookmark(self.state, stream_id, 'log_pos'))
+            self.assertIsNotNone(singer.get_bookmark(self.state, stream_id, 'gtid'))
+            self.assertIs(singer.get_bookmark(self.state, stream_id, 'gtid_complete'), True)
+
+        SINGER_MESSAGES.clear()
+        tap_mysql.do_sync(self.conn, config, self.catalog, self.state)
+        self.assertFalse(any(isinstance(message, singer.RecordMessage) for message in SINGER_MESSAGES))
 
     def test_binlog_stream_switching_from_binlog_to_gtid_with_mariadb_success(self):
         global SINGER_MESSAGES
 
-        engine = os.getenv('TAP_MYSQL_ENGINE', MYSQL_ENGINE)
+        engine = test_utils.get_source_engine(self.conn)
 
         if engine != MARIADB_ENGINE:
             self.skipTest('This test is only meant for Mariadb flavor')
@@ -1413,16 +1416,143 @@ class TestSessionSqls(unittest.TestCase):
 
         self.executed_queries.append(sql)
 
-    def test_open_connections_with_default_session_sqls(self):
-        """Default session parameters should be applied if no custom session SQLs"""
-        with patch('tap_mysql.connection.MySQLConnection.connect'):
+    def test_open_connections_with_default_mysql_session_sqls(self):
+        """MySQL must not receive MariaDB-only session parameters."""
+        with patch('tap_mysql.connection.MySQLConnection.connect'), \
+                patch('tap_mysql.connection.MySQLConnection.get_server_info', return_value='8.0.39'):
             with patch('tap_mysql.connection.run_sql') as run_sql_mock:
                 run_sql_mock.side_effect = self.run_sql_mock
                 conn = MySQLConnectionMock(config=test_utils.get_db_config())
                 connect_with_backoff(conn)
 
-        # Test if session variables applied on connection
-        self.assertEqual(self.executed_queries, tap_mysql.connection.DEFAULT_SESSION_SQLS)
+        self.assertEqual(self.executed_queries, [
+            *tap_mysql.connection.DEFAULT_SESSION_SQLS,
+            tap_mysql.connection.MYSQL_MAX_EXECUTION_TIME_SQL,
+        ])
+
+    def test_open_connections_with_default_mariadb_session_sqls(self):
+        """The handshake detects MariaDB when engine is omitted."""
+        with patch('tap_mysql.connection.MySQLConnection.connect'), \
+                patch(
+                    'tap_mysql.connection.MySQLConnection.get_server_info',
+                    return_value='11.4.10-MariaDB-log',
+                ):
+            with patch('tap_mysql.connection.run_sql') as run_sql_mock:
+                run_sql_mock.side_effect = self.run_sql_mock
+                conn = MySQLConnectionMock(config=test_utils.get_db_config())
+                connect_with_backoff(conn)
+
+        self.assertEqual(
+            self.executed_queries,
+            [
+                *tap_mysql.connection.DEFAULT_SESSION_SQLS,
+                tap_mysql.connection.MARIADB_MAX_STATEMENT_TIME_SQL,
+            ],
+        )
+
+    def test_explicit_engine_overrides_detected_server_for_session_defaults(self):
+        """Explicit engine selection takes precedence over the server handshake."""
+        with patch('tap_mysql.connection.MySQLConnection.connect'), \
+                patch(
+                    'tap_mysql.connection.MySQLConnection.get_server_info',
+                    return_value='11.4.10-MariaDB-log',
+                ) as get_server_info:
+            with patch('tap_mysql.connection.run_sql') as run_sql_mock:
+                run_sql_mock.side_effect = self.run_sql_mock
+                conn = MySQLConnectionMock(config={
+                    **test_utils.get_db_config(),
+                    'engine': MYSQL_ENGINE,
+                })
+                connect_with_backoff(conn)
+
+        self.assertEqual(self.executed_queries, [
+            *tap_mysql.connection.DEFAULT_SESSION_SQLS,
+            tap_mysql.connection.MYSQL_MAX_EXECUTION_TIME_SQL,
+        ])
+        get_server_info.assert_not_called()
+
+    def test_detected_defaults_apply_to_connected_server(self):
+        """Omitted engine selects defaults accepted by the actual source flavor."""
+        conn = MySQLConnection({
+            **test_utils.get_db_config(),
+            'cursorclass': pymysql.cursors.Cursor,
+        })
+
+        with connect_with_backoff(conn) as open_conn:
+            version = open_conn.get_server_info()
+            with open_conn.cursor() as cursor:
+                cursor.execute(
+                    'SELECT @@session.time_zone, @@session.wait_timeout, @@session.net_read_timeout, '
+                    '@@session.net_write_timeout, @@session.innodb_lock_wait_timeout')
+                self.assertEqual(cursor.fetchone(), ('+00:00', 28800, 3600, 3600, 3600))
+                if 'mariadb' in version.lower():
+                    cursor.execute('SELECT @@session.max_statement_time')
+                    self.assertEqual(float(cursor.fetchone()[0]), 0.0)
+                else:
+                    cursor.execute('SELECT @@session.max_execution_time')
+                    self.assertEqual(cursor.fetchone()[0], 0)
+
+    def test_explicit_engines_tolerate_only_unavailable_builtin_timeouts(self):
+        """Both override directions work without hiding unsupported custom SQL."""
+        for engine in ('mysql', 'mariadb'):
+            with self.subTest(engine=engine):
+                conn = MySQLConnection({
+                    **test_utils.get_db_config(), 'engine': engine,
+                    'cursorclass': pymysql.cursors.Cursor,
+                    'session_sqls': ['SET SESSION net_write_timeout=7200'],
+                })
+                with patch.object(tap_mysql.connection.LOGGER, 'warning') as warning, \
+                        connect_with_backoff(conn) as open_conn:
+                    detected_engine = 'mariadb' if 'mariadb' in open_conn.get_server_info().lower() else 'mysql'
+                    self.assertEqual(open_conn.resolved_engine, engine)
+                    with open_conn.cursor() as cursor:
+                        cursor.execute('SELECT @@session.net_write_timeout, @@session.time_zone')
+                        self.assertEqual(cursor.fetchone(), (7200, '+00:00'))
+                    if engine == detected_engine:
+                        warning.assert_not_called()
+                    else:
+                        self.assertTrue(any('Built-in timeout not applied' in args.args[0]
+                                            for args in warning.call_args_list))
+                        # The same SQL supplied explicitly must still fail.
+                        open_conn.session_sqls = [
+                            tap_mysql.connection.MYSQL_MAX_EXECUTION_TIME_SQL if engine == 'mysql'
+                            else tap_mysql.connection.MARIADB_MAX_STATEMENT_TIME_SQL
+                        ]
+                        with self.assertRaises(pymysql.err.OperationalError) as raised:
+                            tap_mysql.connection.run_session_sqls(open_conn)
+                        self.assertEqual(raised.exception.args[0], 1193)
+
+    def test_partial_session_override_keeps_other_connected_defaults(self):
+        conn = MySQLConnection({
+            **test_utils.get_db_config(),
+            'cursorclass': pymysql.cursors.Cursor,
+            'session_sqls': ['SET SESSION net_write_timeout=7200'],
+        })
+
+        with connect_with_backoff(conn) as open_conn:
+            with open_conn.cursor() as cursor:
+                cursor.execute(
+                    'SELECT @@session.time_zone, @@session.wait_timeout, @@session.net_read_timeout, '
+                    '@@session.net_write_timeout, @@session.innodb_lock_wait_timeout')
+                self.assertEqual(cursor.fetchone(), ('+00:00', 28800, 3600, 7200, 3600))
+                if 'mariadb' in open_conn.get_server_info().lower():
+                    cursor.execute('SELECT @@session.max_statement_time')
+                    self.assertEqual(float(cursor.fetchone()[0]), 0.0)
+                else:
+                    cursor.execute('SELECT @@session.max_execution_time')
+                    self.assertEqual(cursor.fetchone()[0], 0)
+
+    def test_statement_timeout_can_override_detected_default(self):
+        conn = MySQLConnection({**test_utils.get_db_config(), 'cursorclass': pymysql.cursors.Cursor})
+        with connect_with_backoff(conn) as open_conn:
+            variable = 'max_statement_time' if open_conn.resolved_engine == 'mariadb' else 'max_execution_time'
+            open_conn.session_sqls = [f'SET SESSION {variable}=123']
+            tap_mysql.connection.run_session_sqls(open_conn)
+            with open_conn.cursor() as cursor:
+                cursor.execute(f'SELECT @@session.{variable}, @@session.net_write_timeout')
+                timeout, write_timeout = cursor.fetchone()
+                self.assertEqual(float(timeout), 123.0)
+                self.assertEqual(write_timeout, 3600)
 
     def test_open_connections_with_session_sqls(self):
         """Custom session parameters should be applied if defined"""
@@ -1431,15 +1561,26 @@ class TestSessionSqls(unittest.TestCase):
             'SET SESSION wait_timeout=28800'
         ]
 
-        with patch('tap_mysql.connection.MySQLConnection.connect'):
+        with patch('tap_mysql.connection.MySQLConnection.connect'), \
+                patch(
+                    'tap_mysql.connection.MySQLConnection.get_server_info',
+                    return_value='11.4.10-MariaDB-log',
+                ):
             with patch('tap_mysql.connection.run_sql') as run_sql_mock:
                 run_sql_mock.side_effect = self.run_sql_mock
                 conn = MySQLConnectionMock(config={**test_utils.get_db_config(),
                                                    **{'session_sqls': session_sqls}})
                 connect_with_backoff(conn)
 
-        # Test if session variables applied on connection
-        self.assertEqual(self.executed_queries, session_sqls)
+        # Defaults run first so custom statements can override them.
+        self.assertEqual(
+            self.executed_queries,
+            [
+                *tap_mysql.connection.DEFAULT_SESSION_SQLS,
+                tap_mysql.connection.MARIADB_MAX_STATEMENT_TIME_SQL,
+                *session_sqls,
+            ],
+        )
 
     def test_open_connections_with_invalid_session_sqls(self):
         """Invalid SQLs in session_sqls should be ignored"""
@@ -1449,16 +1590,27 @@ class TestSessionSqls(unittest.TestCase):
             'SET SESSION wait_timeout=28800'
         ]
 
-        with patch('tap_mysql.connection.MySQLConnection.connect'):
+        with patch('tap_mysql.connection.MySQLConnection.connect'), \
+                patch(
+                    'tap_mysql.connection.MySQLConnection.get_server_info',
+                    return_value='11.4.10-MariaDB-log',
+                ):
             with patch('tap_mysql.connection.run_sql') as run_sql_mock:
                 run_sql_mock.side_effect = self.run_sql_mock
                 conn = MySQLConnectionMock(config={**test_utils.get_db_config(),
                                                    **{'session_sqls': session_sqls}})
                 connect_with_backoff(conn)
 
-        # Test if session variables applied on connection
-        self.assertEqual(self.executed_queries, ['SET SESSION max_statement_time=0',
-                                                 'SET SESSION wait_timeout=28800'])
+        # Defaults remain active and valid custom statements run afterward.
+        self.assertEqual(
+            self.executed_queries,
+            [
+                *tap_mysql.connection.DEFAULT_SESSION_SQLS,
+                tap_mysql.connection.MARIADB_MAX_STATEMENT_TIME_SQL,
+                'SET SESSION max_statement_time=0',
+                'SET SESSION wait_timeout=28800',
+            ],
+        )
 
 
 class TestBitBooleanMapping(unittest.TestCase):

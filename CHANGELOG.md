@@ -1,8 +1,14 @@
-0.90.1 (2026-09-22)
+0.97.0 (2026-10-13)
 -------------------
 
 **tap-yugabyte**
 
+- Reject malformed LOG_BASED WAL payloads before consuming a commit, so invalid
+  JSON, UTF-8, missing row fields, or empty column/identity lists cannot advance
+  a checkpoint past missing rows
+- Advance LOG_BASED checkpoints and WAL flush eligibility only after consuming commit
+  records; retain starting checkpoints when no commit is consumed and never regress
+  checkpoints below a newer target acknowledgement
 - Add FULL_TABLE replication, resuming an interrupted sync with parameterized
   primary-key keyset pagination instead of Postgres heap-specific `xmin`,
   since YugabyteDB's DocDB storage has no equivalent
@@ -36,6 +42,9 @@
 - Add native PartialSync support (`partial-yugabyte-to-snowflake`) for
   bounded-range resyncs to Snowflake, reusing PostgreSQL's dialect-safe
   boundary predicate since YSQL follows PostgreSQL identifier-quoting rules
+- Apply configured transformations in the source `SELECT` for
+  `yugabyte-to-snowflake` FullSync and `partial-yugabyte-to-snowflake`
+  PartialSync, before CSV generation, as the PostgreSQL route does
 - Add `load_balance`/`topology_keys` `db_conn` options, forwarded to both
   LOG_BASED streaming and FastSync/PartialSync bulk connections, to enable
   YugabyteDB's native client-side load balancing
@@ -52,74 +61,292 @@
   already has files at the shared install path from a prior `psycopg2-binary`
   install
 
-0.90.0 (2026-09-21)
+0.96.1 (2026-10-12)
 -------------------
 
-**Replication correctness**
+- Redact Snowflake data-error messages in Singer, FastSync, and data-diff logs
+  and alerts. Preserve the error type, error code, SQLSTATE, and query ID for
+  diagnosis. Keep failure and replication-state handling unchanged. See
+  [logging diagnostics](docs/user_guide/troubleshooting.rst#logging-and-diagnostics)
 
-- Keep MySQL and MariaDB file/position and GTID checkpoints behind incomplete
-  transactions so restarts retain table mappings and all rows; preserve
-  complete server/domain history for GTID restart and reconnect
-- Keep MariaDB savepoints inside their transaction until commit, and advance
-  past schema-filtered standalone transactions only at proven boundaries
-- Skip already acknowledged events per stream when restarting from a shared
-  binlog position, preventing replay from overwriting newer target rows
-- Process binlog row events at the sampled end position instead of skipping
-  the final event, and honour MariaDB file/position bookmarks without GTID
-- Delete the previous target identity when a MySQL or MariaDB primary-key value
-  changes during binlog replication
-- Preserve distinct composite and empty-string primary keys in Snowflake target
-  buffers, avoiding silent row loss and duplicate merge inputs
-- Withhold Snowflake target state until the corresponding streams are durable,
-  including the first checkpoint when per-stream flushing is enabled
-- Start Singer from the replica's applied primary-binlog coordinates after
-  FastSync, replaying changes missing from a lagging replica snapshot
-- Preserve supplementary Unicode through MySQL and MariaDB Singer, FullSync,
-  and PartialSync with an `utf8mb4` connection default and FastSync projection
-- Scope binlog column rediscovery to the affected schema and stream so another
-  table's ignored columns cannot suppress schema updates
-- Recognize MySQL's `geomcollection` type in Singer discovery and FastSync
-  mappings instead of silently omitting geometry-collection columns
-- Preserve MySQL and MariaDB TIME microseconds and signs in Singer records
+0.96.0 (2026-10-10)
+-------------------
 
-**Compatibility and operations**
+- Allow data-diff without a qualifying timestamp index below 100,000 source
+  rows. Send one advance warning from 50,000 rows and require the index at
+  100,000. Count only up to that limit, with a timeout. After upgrading, run
+  `pipelinewise import_config --dir <project>` to apply backend migration 004
+  before running checks. See
+  [data-diff preflight](docs/user_guide/data_diff.rst#preflight)
+- Remember source-index warnings when any alert destination accepts them.
+  Attempt every destination and log failures. Retry delivery only if all fail
+- Show an explicit tap ID in data-diff alerts. Put next actions in a bulleted
+  list and remove repeated missing-index advice. Keep the full diagnostic
+  details in the backend history. See
+  [data-diff alerts](docs/user_guide/data_diff.rst#alerts)
 
-- Run the dev-project and GitHub E2E MySQL and MariaDB sources with
-  `binlog_row_metadata=FULL` while retaining mysql-replication 0.46, proving
-  current replication remains compatible ahead of a future decoder upgrade
-- Recheck ROW/FULL binlog settings on resumed replication and fail instead of
-  silently skipping events whose table metadata is unavailable
-- Require a one-time FullSync for existing MySQL/MariaDB GTID checkpoints that
-  lack the new complete-history marker; older checkpoints can omit source history
-- List every selected stream with missing or legacy GTIDs in startup errors
-  so operators can identify the required resync scope
-- Reject unsafe legacy row-event bookmarks with a resync requirement; reject
-  multi-channel replica coordinates, XA transactions, selected-table TRUNCATE,
-  and unsupported partial-JSON or compressed binlog events instead of
-  acknowledging lost data
+0.95.0 (2026-10-09)
+-------------------
+
+- Require a usable source index starting with the timestamp column for every
+  data-diff data check, including initial historical scans and small tables.
+  Remove the row-count threshold. Add a qualifying index before running checks
+  on sources that previously relied on the small-table exemption. See
+  [data-diff preflight](docs/user_guide/data_diff.rst#preflight)
+- Stop collecting row estimates for new preflight records. Keep the old audit
+  columns and historical values for compatibility
+- Keep completed schema results when data-diff preflight blocks data queries.
+  Keep the run in ERROR so it does not advance verified coverage
+- Show clearer data-diff Slack alerts with run details, count differences, and
+  next steps. Limit failure alerts to one per check per invocation while keeping
+  every attempt and automatic retries. Set `alert_handlers.slack.data_diff_channel`
+  to route them to a separate channel while retaining tap-specific copies. See
+  [data-diff alerts](docs/user_guide/data_diff.rst#alerts)
+
+0.94.1 (2026-10-08)
+-------------------
+
+- Log the selected source hostname for MariaDB, MySQL, PostgreSQL, and MongoDB
+  once per process in FastSync and Singer
+- Redact credentials from connector logs and exception tracebacks. Preserve
+  database names and counts when they match a username or short password.
+  Include MySQL TLS private-key contents in streamed logs and short secrets
+  in Bearer headers and recognised authentication errors
+- Log Snowflake native and Iceberg PartialSync column versioning at INFO,
+  including the table, column, and archived column name. See
+  [logging diagnostics](docs/user_guide/troubleshooting.rst#logging-and-diagnostics)
+- Update the bundled Singer version and package pins so wheel installations
+  include the logging helpers
+- Run MongoDB source logging regression tests in connector CI
+
+0.94.0 (2026-10-07)
+-------------------
+
+**Decimal precision**
+
+- Preserve declared `DECIMAL` and `NUMERIC` precision and scale from
+  MariaDB, MySQL, and PostgreSQL in Snowflake native, Snowflake managed Iceberg
+  v3, and PostgreSQL targets where supported. Keep existing PostgreSQL `REAL`
+  and `DOUBLE PRECISION` decimal columns, including keys, on their live type.
+  Clamp retained floating-point overflow and underflow instead of failing a row
+- Preserve representable tiny decimals when PostgreSQL FastSync casts to
+  floating point
+- Create new Snowflake decimal columns as fixed-point numbers where supported.
+  Keep existing legacy `FLOAT` decimal columns, including keys that now map to
+  text, by default. Set `version_legacy_float_columns: true` on a supported tap to
+  retain the old non-key column and add its precision-preserving replacement.
+  Keep legacy floating-point decimal keys unchanged even with the option enabled.
+  Continue versioning other changed non-key decimal declarations, and reject
+  PartialSync range column versioning before altering the target
+- Keep columns and rows flowing when decimal declarations exceed target limits.
+  Use compatible numeric declarations or double precision with warnings; clamp
+  finite floating-point overflow. Store PostgreSQL numeric primary keys in Snowflake
+  as canonical text so bounded `NaN` keys remain loadable; keep other decimal keys
+  as text only when their numeric mapping would lose identity
+- Replay conservatively from legacy floating-point decimal bookmarks, then save
+  exact bookmarks. Keep exact boundaries valid after a source declaration narrows.
+  Correct PostgreSQL negative-scale metadata and prevent repeated column versioning.
+  Keep other source/target combinations unchanged
+- Treat nonnumeric `equals` conditions on decimal fields as non-matches. Reject
+  decimal `regex_match` conditions before processing records
+- Retry PostgreSQL logical replication without wal2json numeric string output
+  when the plugin rejects that option, independent of server message language
+- Group retained floating-point decimal keys by their loaded target value.
+  Apply colliding changes in source event order within each Singer batch instead
+  of failing or inserting duplicate staged keys
+
+**MariaDB and MySQL column types**
+
+- Replicate MariaDB/MySQL `SET`, `TINYBLOB`, `BLOB`, `MEDIUMBLOB`, `LONGBLOB`,
+  and `YEAR` columns through Singer and FastSync. Snowflake stores sets as text,
+  blobs as `BINARY(67108864)`, and years as `NUMBER(38,0)`. During Singer loads,
+  keep existing Snowflake primary-key columns on their live target type.
+  Keep legacy PostgreSQL text `YEAR` keys unchanged. Keep legacy key subsets on
+  Snowflake and PostgreSQL until FullSync adopts newly supported key columns.
+  Match retained text BLOB keys to historical FastSync rows
+- Allow `MASK-NUMBER` transformations on `YEAR` columns in Singer
+
+**Packaging and CI**
+
+- Bundle PipelineWise Singer with the main codebase and install it through the
+  existing Makefile and Docker workflows
+- Run decimal and Snowflake runtime integration tests in CI across twenty E2E
+  shards. Cover failed loads, schema safeguards, and state acknowledgements
+- Grant host networking explicitly when building test images in CI so current
+  Docker builders can start the E2E environment
+
+**Upgrade**
+
+Run `import_config` before resuming replication after upgrading to refresh the
+generated tap settings and decimal schemas. No backfill or resync is required
+for non-key column versioning. FullSync retains its table-replacement behavior
+and removes historical column versions. Existing PostgreSQL numeric primary keys
+on Snowflake remain floating-point. Existing Snowflake primary-key columns need
+FullSync only when intentionally changing them to the current mapping. See the
+[decimal mapping rules](docs/user_guide/schema_changes.rst).
+
+0.93.1 (2026-10-06)
+-------------------
+
+- Skip missing or unselected catalog entries during `fast_sync` without
+  `--tables`. Leave state and PostgreSQL slots unchanged when no tables qualify.
+  See the [resync guide](docs/user_guide/resync.rst).
+
+0.93.0 (2026-09-28)
+-------------------
+
+**Data-diff**
+
+- Show failure reasons in Slack, CLI results, and run history. Keep aggregate
+  values out of alerts
+- Use rolling windows from the first data run by default. Set
+  `initial_full_scan: true` to check shared history first. This starts at the
+  later source/target minimum before the cutoff and excludes NULL timestamps
+- Retry `FAIL` and `ERROR` windows at the next cron interval. Keep their original
+  definitions and bounds. Limit retries to once per window per interval and
+  process up to 24 retries and 24 scheduled windows per check per invocation
+- Protect results and preflight evidence from expired workers. Continue other
+  checks if one result cannot be saved
+- Show pending initial scans, verified starts, and reasons for skipped checks
+
+Existing checks without the setting keep their configuration hash and rolling
+windows. New checks scan history only when enabled. See the
+[data-diff guide](docs/user_guide/data_diff.rst) for empty-table handling and
+retry rules.
+
+Back up the backend before upgrading. Run `import_config` to apply migration 003.
+Unresolved or deferred run history blocks downgrade to 002, even after later
+checks pass.
+
+**CI**
+
+- Rebalance Snowflake E2E tests across ten required parallel shards so slow
+  publication and MySQL Iceberg cases run concurrently without losing coverage
+
+0.92.0 (2026-09-25)
+-------------------
+
+**FastSync transformations**
+
+- Apply PostgreSQL and MySQL/MariaDB Snowflake FullSync and PartialSync
+  transformations in the source SELECT before CSV generation, so new export,
+  S3/archive, and staging files contain only the configured transformed output
+- Remove the corresponding Snowflake post-load transformation updates for
+  native and managed Iceberg v3 publication
+- Preserve conditional-first FastSync ordering, source export normalization,
+  output aliases and types, Unicode/NULL handling, and original range selection
+- Reject unsupported transformation or condition semantics before export
+  instead of falling back to transferring untransformed values
+- Validate source-side rule syntax and transformed replication keys during
+  configuration validation and import, before connecting to databases
+- Check source regex support on the export connection before creating CSV files
+- Reject ambiguous regex character classes that could bypass masking on MySQL
+- Validate transformations before creating Iceberg recovery attempts so rejected
+  rules can be corrected and retried
+- Preserve numeric conditions on PostgreSQL BIT VARYING columns
+- Validate each transformation against the existing mapped target type and
+  reject outputs that cannot fit, without changing the column's mapping
+- Check every existing native PartialSync column before export and merge;
+  reject type or precision loss while retaining compatible text widening
+- Add a read-only native PartialSync compatibility report for deployment checks
+- Reuse FastSync metadata queries and mappings in the report; distinguish invalid
+  input from execution errors and include sanitized diagnostic codes and locations
+- Test Singer, native FastSync, and Iceberg target types and transformation
+  results, and document existing differences between those paths
+- Reject transformed INCREMENTAL replication keys before reading their raw
+  maximum, preventing sensitive values from entering checkpoint files
+- Reject retained managed-Iceberg attempts for transformed streams created
+  under the previous target-side execution contract; finish recovery before
+  upgrading, and manage historical raw staging/archive files separately
+
+0.91.1 (2026-09-23)
+-------------------
+
+- Set MySQL and MariaDB ``net_write_timeout=3600`` for Singer, FullSync, and
+  PartialSync so source connections tolerate longer target stalls
+- Disable MySQL SELECT timeouts with ``max_execution_time=0``; keep MariaDB's
+  ``max_statement_time=0`` default
+- Warn and continue if the server lacks a built-in statement-timeout variable;
+  keep unknown-variable errors fatal for custom ``session_sqls``
+- Avoid recursive FastSync reconnects when session setup fails
+- Preserve pending Iceberg recovery when the default network write timeout changes
+- Wait 30 and 60 seconds between PipelineWise-managed binlog retries; keep the
+  cause and error code in retry warnings and the traceback on terminal disconnects
+
+0.91.0 (2026-09-22)
+-------------------
+
+**MySQL and MariaDB replication**
+
+- Checkpoint file/position and GTID replication only at complete transaction
+  boundaries
+- Keep MariaDB savepoints inside their transaction until commit
+- Advance filtered standalone transactions only at verified boundaries
+- Preserve complete multi-server and multi-domain GTID history and per-stream
+  replay positions across restarts; older versions cannot safely resume these
+  checkpoints
+- Process row events at the sampled endpoint and support MariaDB file/position
+  bookmarks without GTID
+- Support MariaDB 11.4 binlog events with a zero ``End_log_pos``
+- Handle non-UTF8 text in binlog metadata during bookmark validation
+- Remove the old target row when a primary key changes
+- Preserve composite and empty-string primary keys in Snowflake buffers
+- Emit Snowflake state only after the matching stream data is durable
+- Persist Singer state atomically and drain final process output before deciding
+  whether the run succeeded
+- Resume Singer after replica FastSync from the replica's applied primary
+  coordinates
+- Preserve supplementary Unicode in Singer, FullSync, and PartialSync with
+  ``utf8mb4``
+- Limit column rediscovery to the affected schema and stream
+- Replicate MySQL ``geomcollection`` columns through Singer and FastSync
+- Preserve signs and microseconds in MySQL and MariaDB ``TIME`` values
+- Use an explicit MySQL or MariaDB engine, or detect it when omitted,
+  consistently across Singer, FullSync, and PartialSync for session defaults,
+  GTID handling, status queries, and managed Iceberg v3 JSON aliases
+- Disable MariaDB statement timeouts by default
+- Run configured ``session_sqls`` after connector defaults so they can override
+  the defaults
+- Support current MySQL binary-log status statements with legacy syntax fallback
+
+**Recovery and compatibility**
+
+- Resume legacy file-position and GTID bookmarks from retained binlogs without
+  requiring FastSync; stop if usable file coordinates or binlogs are unavailable
+- Reduce source round trips and report progress while recovering unsafe legacy
+  bookmarks from retained binlogs
+- Inspect up to 256 neutral binlog events when validating a checkpoint; stop
+  without advancing state if the result remains inconclusive
+- Retry lost file-position binlog connections twice from target-acknowledged
+  state and retain all attempts in one terminal log; keep existing reconnects
+  for GTID and metadata connections
+- Recheck ROW/FULL binlog settings on resumed runs and stop when table metadata
+  is unavailable
+- Reject multi-channel replica coordinates, XA, selected-table ``TRUNCATE``,
+  partial-JSON, and compressed binlog events before state advances
 - Infer MariaDB GTIDs from file/position bookmarks only at verified transaction
-  boundaries, avoiding acknowledgements of partially consumed transactions
-- Accept MariaDB rotated-binlog headers, including header-only files at verified
-  EOF, without unnecessary resync demands
-- Report undecodable bookmarks and missing or anonymous GTID markers with
-  actionable recovery errors
-- Stop file/position binlog reads on connection loss so retries use durable
-  checkpoints rather than the decoder's potentially mid-transaction position;
-  retain retries for separate table-metadata connections
-- Retain complete GTID sets in state; older versions cannot reliably resume
-  multi-server or multi-domain checkpoints. Resolve pending managed-Iceberg
-  recovery with its original charset before adopting the new default
-- Support current MySQL binary-log status statements with legacy syntax
-  fallback; existing missing or corrupted target data still requires resync
+  boundaries
+- Accept MariaDB rotated-binlog headers and header-only files at verified EOF
+- Report invalid bookmarks and missing or anonymous transaction GTID markers
+  with recovery guidance
+- Stop managed-Iceberg restaging before re-export if the resolved MySQL or
+  MariaDB source engine differs from the persisted attempt
+- Explain how to recover older Iceberg attempts with no saved source engine
+  without deleting recovery evidence
+- Finish pending managed-Iceberg MySQL/MariaDB attempts with the previous version
+  before upgrading; the ``utf8mb4`` default, omitted ``engine``, and configured
+  ``session_sqls`` change recovery identity, and re-export requires a saved engine
+- Resync target data already missing or corrupted before this release; these
+  fixes prevent new omissions but do not repair existing data
 
-**Dependencies**
+**Dependencies and testing**
 
-- Update the Snowflake Python connector to 4.7.3 in core and target-snowflake,
-  PyMySQL to 1.1.3 in core and tap-mysql, and the target's Boto3 pin to 1.43.94
-- Update sqlparse to 0.6.0 to include denial-of-service fixes in PartialSync SQL
-  parsing and validation
-- Retain mysql-replication 0.46: newer releases require additional source-binlog
-  metadata for reliable type decoding, so that upgrade needs separate validation
+- Update the Snowflake connector to 4.7.3, PyMySQL to 1.1.3, and Boto3 to
+  1.43.94
+- Update sqlparse to 0.6.0 for PartialSync denial-of-service fixes
+- Retain mysql-replication 0.46 until newer releases are validated with full
+  source-binlog metadata
+- Test dev-project and GitHub E2E sources with ``binlog_row_metadata=FULL``
 
 0.89.0 (2026-09-18)
 -------------------

@@ -9,6 +9,7 @@ import time
 
 from dataclasses import dataclass
 from subprocess import PIPE, STDOUT, Popen
+from singer.logger import CredentialRedactor
 
 from . import utils
 from .errors import StreamBufferTooLargeException
@@ -475,6 +476,23 @@ def log_file_with_status(log_file: str, status: str) -> str:
     return f'{log_file}.{status}'
 
 
+def _command_log_redactor(command):
+    """Also protect logs from taps using their own Singer installation."""
+    arguments = shlex.split(command)
+    configs = []
+    for flag, path in zip(arguments, arguments[1:]):
+        if flag in ('--config', '--tap', '--target') and os.path.isfile(path):
+            try:
+                with open(path, encoding='utf-8') as config_file:
+                    config = json.load(config_file)
+                if isinstance(config, dict):
+                    configs.append(config)
+            except (OSError, ValueError):
+                # Let the connector report its own invalid configuration.
+                continue
+    return CredentialRedactor(configs)
+
+
 def run_command(command: str, log_file: str = None, line_callback: callable = None):
     """
     Runs a shell command with or without log file with STDOUT and STDERR
@@ -485,7 +503,8 @@ def run_command(command: str, log_file: str = None, line_callback: callable = No
         line_callback: function to call on each line on stdout and stderr
     """
     piped_command = f"/bin/bash -o pipefail -c '{command}'"
-    LOGGER.debug('Running command %s', piped_command)
+    redact = _command_log_redactor(command)
+    LOGGER.debug('Running command %s', redact(piped_command))
 
     # Logfile is needed: Continuously polling STDOUT and STDERR and writing into a log file
     # Once the command finished STDERR redirects to STDOUT and returns _only_ STDOUT
@@ -504,20 +523,23 @@ def run_command(command: str, log_file: str = None, line_callback: callable = No
         with Popen(shlex.split(piped_command), stdout=PIPE, stderr=STDOUT) as proc:
             with open(log_file_running, 'a+', encoding='utf-8') as logfile:
                 stdout = ''
-                while True:
-                    line = proc.stdout.readline()
-                    if line:
-                        decoded_line = line.decode('utf-8')
+                for line in iter(proc.stdout.readline, b''):
+                    decoded_line = line.decode('utf-8')
+                    # State and control messages drive acknowledgement and retries, not human logging.
+                    if not (
+                        decoded_line.startswith('PIPELINEWISE_CONTROL:') or utils.is_state_message(decoded_line)
+                    ):
+                        decoded_line = redact(decoded_line)
 
-                        if line_callback is not None:
-                            decoded_line = line_callback(decoded_line)
+                    if line_callback is not None:
+                        decoded_line = line_callback(decoded_line)
 
-                        stdout += decoded_line
+                    stdout += decoded_line
 
-                        logfile.write(decoded_line)
-                        logfile.flush()
-                    if proc.poll() is not None:
-                        break
+                    logfile.write(decoded_line)
+                    logfile.flush()
+
+                proc.wait()
 
         proc_rc = proc.poll()
         if proc_rc != 0:
@@ -542,7 +564,7 @@ def run_command(command: str, log_file: str = None, line_callback: callable = No
         proc_tuple = proc.communicate()
         proc_rc = proc.returncode
         stdout = proc_tuple[0].decode('utf-8')
-        stderr = proc_tuple[1].decode('utf-8')
+        stderr = redact(proc_tuple[1].decode('utf-8'))
 
         if proc_rc != 0:
             LOGGER.error(stderr)

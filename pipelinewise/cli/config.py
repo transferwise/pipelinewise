@@ -9,9 +9,14 @@ import json
 from typing import Dict, List, Union
 
 from pipelinewise.data_diff.config import extract_check_definitions
+from pipelinewise.fastsync.commons.source_transformations import (
+    UnsupportedSourceTransformation,
+    validate_bookmark_column,
+    validate_source_transformation_config,
+)
 from pipelinewise.utils import safe_column_name
 from . import fastsync_capabilities, utils
-from .errors import InvalidConfigException
+from .errors import InvalidConfigException, InvalidTransformationException
 
 
 class Config:
@@ -20,6 +25,7 @@ class Config:
     TABLE_FORMAT_NATIVE = fastsync_capabilities.TABLE_FORMAT_NATIVE
     TABLE_FORMAT_ICEBERG = fastsync_capabilities.TABLE_FORMAT_ICEBERG
     ICEBERG_VERSION = 3
+    VERSION_LEGACY_FLOAT_COLUMNS_SETTING = 'version_legacy_float_columns'
     TARGET_FORMAT_KEYS = {
         'iceberg_create',
         'iceberg_version',
@@ -73,6 +79,7 @@ class Config:
                 os.path.join(yaml_dir, yaml_file), vault_secret
             )
             cls.validate_target_table_format_placement(target_data)
+            cls.validate_snowflake_decimal_versioning_placement(target_data)
             cls.validate_snowflake_query_history_poll_timeout(target_data)
             utils.validate(instance=target_data, schema=target_schema)
 
@@ -119,6 +126,8 @@ class Config:
                 sys.exit(1)
 
             cls.validate_target_table_format(tap_data, targets[target_id])
+            cls.validate_snowflake_decimal_versioning(tap_data, targets[target_id])
+            cls.validate_source_transformations(tap_data, targets[target_id])
 
             # Add generated extra keys that not available in the YAML
             tap_data['files'] = config.get_connector_files(
@@ -243,7 +252,11 @@ class Config:
                         'send_alert': tap.get('send_alert', True),
                         'enabled': True,
                     }
-                for key in ('target_table_format', 'iceberg_version'):
+                for key in (
+                    'target_table_format',
+                    'iceberg_version',
+                    self.VERSION_LEGACY_FLOAT_COLUMNS_SETTING,
+                ):
                     if key in tap:
                         tap_setting[key] = tap[key]
                 if tap.get('slack_alert_channel'):
@@ -300,7 +313,7 @@ class Config:
             extra_config_keys = {}
 
         # Generate tap config dict
-        tap_config = self.generate_tap_connection_config(tap, extra_config_keys)
+        tap_config = self.generate_tap_connection_config(tap, extra_config_keys, target.get('type'))
 
         # Generate tap selection
         tap_selection = {'selection': self.generate_selection(tap)}
@@ -309,7 +322,7 @@ class Config:
         tap_transformation = {'transformations': self.generate_transformations(tap)}
 
         # Generate tap inheritable_config dict
-        tap_inheritable_config = self.generate_inheritable_config(tap)
+        tap_inheritable_config = self.generate_inheritable_config(tap, target.get('type'))
 
         tap_dir = self.get_tap_dir(target.get('id'), tap.get('id'))
         self.logger.info('SAVING TAP JSONS to %s', tap_dir)
@@ -331,15 +344,21 @@ class Config:
         utils.save_json(tap_selection, tap_selection_path)
 
     @classmethod
-    def generate_tap_connection_config(cls, tap: Dict, extra_config_keys: Dict) -> Dict:
+    def generate_tap_connection_config(cls, tap: Dict, extra_config_keys: Dict, target_type=None) -> Dict:
         """
         Generate tap connection config which is a merged dictionary of db_connection and optional extra_keys
         Args:
             tap: tap config
             extra_config_keys:  extra keys to add to the db conn config
+            target_type: destination connector used to enable exact decimal transport
         Returns: Dictionary of tap connection config
         """
         tap_config = {**tap.get('db_conn'), **extra_config_keys}
+        tap_config.pop('decimal_target', None)
+        if tap.get('type') in ('tap-mysql', 'tap-postgres') and target_type in (
+            'target-snowflake', 'target-postgres',
+        ):
+            tap_config['decimal_target'] = target_type.removeprefix('target-')
         if (
             tap.get('type') == 'tap-mysql'
             and tap.get('target_table_format') == cls.TABLE_FORMAT_ICEBERG
@@ -388,6 +407,30 @@ class Config:
         return selection
 
     @classmethod
+    def validate_source_transformations(cls, tap: Dict, target: Dict) -> None:
+        """Validate source-select rules before either validate or import discovers columns."""
+        if target['type'] != 'target-snowflake' or tap['type'] not in {'tap-mysql', 'tap-postgres'}:
+            return
+        capabilities = fastsync_capabilities.resolve_fastsync_capabilities(
+            tap['type'], target['type'], tap.get('target_table_format'),
+        )
+        if not capabilities.available:
+            return
+        transformation_config = {'transformations': cls.generate_transformations(tap)}
+        default_replication_method = utils.get_tap_default_replication_method(tap)
+        for schema in tap.get('schemas', []):
+            for table in schema.get('tables', []):
+                table_name = f'{schema["source_schema"]}.{table["table_name"]}'
+                try:
+                    validate_source_transformation_config(table_name, transformation_config)
+                    if table.get('replication_method', default_replication_method) == 'INCREMENTAL':
+                        validate_bookmark_column(table_name, table.get('replication_key'), transformation_config)
+                except UnsupportedSourceTransformation as exc:
+                    raise InvalidTransformationException(
+                        f'Invalid source transformation for tap {tap["id"]!r}, table {table_name!r}: {exc}'
+                    ) from exc
+
+    @classmethod
     def generate_transformations(cls, tap: Dict) -> List[Dict]:
         """
         Generate the transformations data from the given tap config
@@ -419,7 +462,7 @@ class Config:
 
         return transformations
 
-    def generate_inheritable_config(self, tap: Dict) -> Dict:
+    def generate_inheritable_config(self, tap: Dict, target_type: str = None) -> Dict:
         """
         Generate the inheritable config which is the custom config that should be fed to the target at runtime
         Args:
@@ -459,6 +502,14 @@ class Config:
             {
                 'temp_dir': self.get_temp_dir(),
                 'tap_id': tap.get('id'),
+                # Targets need source identity for legacy MySQL keys and PostgreSQL NaN keys.
+                'source_tap_type': (
+                    tap.get('type') if (
+                        tap.get('type') == 'tap-mysql' and target_type in ('target-snowflake', 'target-postgres')
+                        or tap.get('type') == 'tap-postgres' and target_type == 'target-snowflake'
+                    )
+                    else None
+                ),
                 'query_tag': json.dumps(
                     {
                         'ppw_component': tap.get('type'),
@@ -512,10 +563,54 @@ class Config:
                 ),
                 'target_table_format': tap.get('target_table_format'),
                 'iceberg_version': tap.get('iceberg_version'),
+                self.VERSION_LEGACY_FLOAT_COLUMNS_SETTING: (
+                    tap.get(self.VERSION_LEGACY_FLOAT_COLUMNS_SETTING, False)
+                    if target_type == 'target-snowflake'
+                    and tap.get('type') in {'tap-mysql', 'tap-postgres'}
+                    else None
+                ),
             }
         )
 
         return tap_inheritable_config
+
+    @classmethod
+    def validate_snowflake_decimal_versioning_placement(cls, target: Dict) -> None:
+        """Keep the per-tap decimal migration choice out of shared targets."""
+        if not isinstance(target, dict):
+            return
+        connection = target.get('db_conn')
+        if cls.VERSION_LEGACY_FLOAT_COLUMNS_SETTING in target or (
+            isinstance(connection, dict)
+            and cls.VERSION_LEGACY_FLOAT_COLUMNS_SETTING in connection
+        ):
+            raise InvalidConfigException(
+                f'Target "{target.get("id")}" cannot set '
+                f'{cls.VERSION_LEGACY_FLOAT_COLUMNS_SETTING}. Configure it on each '
+                'MariaDB, MySQL, or PostgreSQL tap that writes to Snowflake.'
+            )
+
+    @classmethod
+    def validate_snowflake_decimal_versioning(cls, tap: Dict, target: Dict) -> None:
+        """Limit the opt-in migration to supported SQL-to-Snowflake routes."""
+        setting = cls.VERSION_LEGACY_FLOAT_COLUMNS_SETTING
+        connection = tap.get('db_conn')
+        if isinstance(connection, dict) and setting in connection:
+            raise InvalidConfigException(
+                f'Tap "{tap.get("id")}" must configure {setting} at the tap root.'
+            )
+        if setting not in tap:
+            return
+        if target.get('type') != 'target-snowflake':
+            raise InvalidConfigException(
+                f'Tap "{tap.get("id")}" sets {setting}, but target '
+                f'"{target.get("id")}" is not target-snowflake.'
+            )
+        if tap.get('type') not in {'tap-mysql', 'tap-postgres'}:
+            raise InvalidConfigException(
+                f'Tap "{tap.get("id")}" sets {setting}, but only MariaDB, MySQL, '
+                'and PostgreSQL sources support this option.'
+            )
 
     @classmethod
     def validate_target_table_format_placement(cls, target: Dict) -> None:

@@ -63,7 +63,13 @@ class PartialSyncUploadOrderTestCase(TestCase):
                 self.assertEqual(tmp_dir, temp_directory)
                 return 'staging/part.csv.gz'
 
-            def publish(*load_args):
+            def publish(
+                *load_args, boundary_column, decimal_columns,
+                version_legacy_float_columns,
+            ):
+                self.assertEqual(boundary_column, 'foo_column')
+                self.assertEqual(decimal_columns, ())
+                self.assertFalse(version_legacy_float_columns)
                 timeline.append('publish')
                 if staging_error:
                     raise staging_error

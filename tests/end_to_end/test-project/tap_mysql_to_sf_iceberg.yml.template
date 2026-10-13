@@ -12,7 +12,6 @@ db_conn:
   password: "${TAP_MYSQL_PASSWORD}"
   dbname: "${TAP_MYSQL_DB}"
   use_gtid: true
-  engine: mariadb
 
 target: "snowflake"
 target_table_format: iceberg

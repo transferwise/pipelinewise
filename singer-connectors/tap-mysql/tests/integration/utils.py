@@ -3,7 +3,7 @@ import pymysql
 import singer
 import tap_mysql
 import tap_mysql.sync_strategies.common as common
-from tap_mysql.connection import MySQLConnection
+from tap_mysql.connection import connect_with_backoff, MySQLConnection
 
 DB_NAME = 'tap_mysql_test'
 
@@ -42,6 +42,12 @@ def get_test_connection(extra_config=None):
     mysql_conn.autocommit_mode = True
 
     return mysql_conn
+
+
+def get_source_engine(connection):
+    """Return the engine detected from the integration-test source."""
+    with connect_with_backoff(connection) as source:
+        return source.resolved_engine
 
 
 def discover_catalog(connection, catalog):

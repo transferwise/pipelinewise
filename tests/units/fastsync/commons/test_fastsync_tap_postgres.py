@@ -278,9 +278,10 @@ class TestFastSyncTapPostgres(TestCase):
         with self.assertRaisesRegex(
             RuntimeError,
             'PostgreSQL 11.2 or later.*server_version_num 110001',
-        ):
+        ) as error:
             FastSyncTapPostgres.get_connection(creds, prioritize_primary=True)
 
+        self.assertIsInstance(error.exception, tap_postgres.UnsupportedPostgresVersionError)
         connect_mock.return_value.close.assert_called_once_with()
 
     @patch('pipelinewise.fastsync.commons.tap_postgres.psycopg2.connect')
@@ -728,15 +729,15 @@ class TestFastSyncTapPostgres(TestCase):
 
     def test_fetch_current_incremental_key_pos_decimal_key_value_return_state(self):
         """
-        test fetch_current_incremental_key_pos where result is decimal, it should return a state with float key value
+        Decimal bookmarks preserve every digit as a JSON string.
         """
         with patch.object(self.postgres, 'query') as query_mock:
-            query_mock.return_value = [{'key_value': Decimal(4.222222222)}]
+            query_mock.return_value = [{'key_value': Decimal('12345678901234567890.123456789')}]
 
             state = self.postgres.fetch_current_incremental_key_pos('schema.table1', 'id')
 
             self.assertDictEqual({
                 'replication_key': 'id',
-                'replication_key_value': 4.222222222,
+                'replication_key_value': '12345678901234567890.123456789',
                 'version': 1,
             }, state)

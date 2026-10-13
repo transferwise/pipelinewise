@@ -85,6 +85,45 @@ def test_main_schema_accepts_data_diff_extension(tmp_path):
         utils.validate(tap, utils.load_schema("tap"))
 
 
+def test_main_schema_accepts_optional_data_diff_slack_channel(tmp_path):
+    config = _config(tmp_path)
+    config.global_config['alert_handlers'] = {
+        'slack': {'token': 'test-token', 'channel': '#replication', 'data_diff_channel': '#data-diff'},
+    }
+
+    utils.validate(config.global_config, utils.load_schema('config'))
+
+
+@pytest.mark.parametrize('channel', ['', None, 123, True])
+def test_main_schema_rejects_invalid_data_diff_slack_channel(tmp_path, channel):
+    config = _config(tmp_path)
+    config.global_config['alert_handlers'] = {
+        'slack': {'token': 'test-token', 'channel': '#replication', 'data_diff_channel': channel},
+    }
+
+    with pytest.raises(InvalidConfigException):
+        utils.validate(config.global_config, utils.load_schema('config'))
+
+
+def test_main_schema_validates_initial_full_scan_at_both_levels(tmp_path):
+    config = _config(tmp_path)
+    tap = config.targets["postgres"]["taps"][0]
+    schema = utils.load_schema("tap")
+    table_check = tap["schemas"][0]["tables"][0]["data_diff"]
+    tap["data_diff_defaults"]["initial_full_scan"] = False
+    table_check["initial_full_scan"] = True
+    utils.validate(tap, schema)
+
+    tap["data_diff_defaults"]["initial_full_scan"] = "false"
+    with pytest.raises(InvalidConfigException):
+        utils.validate(tap, schema)
+
+    tap["data_diff_defaults"]["initial_full_scan"] = False
+    table_check["initial_full_scan"] = "true"
+    with pytest.raises(InvalidConfigException):
+        utils.validate(tap, schema)
+
+
 def test_main_schema_rejects_unused_data_diff_name(tmp_path):
     config = _config(tmp_path)
     tap = config.targets["postgres"]["taps"][0]

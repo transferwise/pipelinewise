@@ -1,9 +1,15 @@
 import unittest
-from unittest.mock import ANY, Mock, patch
+from unittest.mock import ANY, MagicMock, Mock, patch
 
 from singer import Catalog, CatalogEntry, Schema
 
-from tap_mysql import binlog_stream_requires_historical, do_discover, sync_binlog_streams
+from tap_mysql import (
+    _runtime_config,
+    binlog_stream_requires_historical,
+    do_discover,
+    do_sync,
+    sync_binlog_streams,
+)
 
 
 class TestTapMysql(unittest.TestCase):
@@ -43,6 +49,42 @@ class TestTapMysql(unittest.TestCase):
 
         discover_catalog_mock.assert_called_once_with(ANY, None)
 
+    @patch('tap_mysql.discover_catalog')
+    def test_detected_mariadb_engine_enables_iceberg_json_aliases(
+            self, discover_catalog_mock):
+        discovered = Mock()
+        discover_catalog_mock.return_value = discovered
+        mysql_conn = Mock(configured_engine=None, resolved_engine='mariadb')
+        config = {
+            'target_table_format': 'iceberg',
+            'iceberg_version': 3,
+            'filter_dbs': 'source_db',
+        }
+
+        do_discover(mysql_conn, _runtime_config(mysql_conn, config))
+
+        discover_catalog_mock.assert_called_once_with(
+            mysql_conn,
+            'source_db',
+            detect_json_aliases=True,
+        )
+        discovered.dump.assert_called_once_with()
+        self.assertNotIn('engine', config)
+
+    @patch('tap_mysql.connect_with_backoff')
+    def test_runtime_engine_resolver_opens_closed_connection_when_detection_is_needed(
+            self, connect_with_backoff_mock):
+        mysql_conn = Mock(configured_engine=None, resolved_engine=None, open=False)
+        open_conn = Mock(resolved_engine='mariadb')
+        connection_context = MagicMock()
+        connection_context.__enter__.return_value = open_conn
+        connect_with_backoff_mock.return_value = connection_context
+
+        runtime_config = _runtime_config(mysql_conn, {})
+
+        self.assertEqual(runtime_config['engine'], 'mariadb')
+        connect_with_backoff_mock.assert_called_once_with(mysql_conn)
+
     @patch('tap_mysql.metrics.job_timer')
     @patch('tap_mysql.binlog.sync_binlog_stream')
     def test_sync_binlog_streams_emits_automatic_properties_in_schema(self, sync_binlog_mock, _):
@@ -60,6 +102,41 @@ class TestTapMysql(unittest.TestCase):
 
         self.assertIn('_sdc_deleted_at', emitted_schemas[0]['properties'])
         sync_binlog_mock.assert_called_once()
+
+    @patch('tap_mysql.sync_binlog_streams')
+    @patch('tap_mysql.sync_non_binlog_streams')
+    @patch('tap_mysql.get_binlog_streams', return_value=Catalog(streams=[]))
+    @patch('tap_mysql.get_non_binlog_streams', return_value=Catalog(streams=[]))
+    def test_sync_uses_detected_engine_without_mutating_config(
+            self, _, __, sync_non_binlog_streams_mock, sync_binlog_streams_mock):
+        mysql_conn = Mock(configured_engine=None, resolved_engine='mariadb')
+        config = {'use_gtid': True}
+
+        do_sync(mysql_conn, config, Catalog(streams=[]), {})
+
+        self.assertEqual(config, {'use_gtid': True})
+        sync_non_binlog_streams_mock.assert_called_once_with(
+            mysql_conn, ANY, {}, True, 'mariadb')
+        runtime_config = sync_binlog_streams_mock.call_args.args[2]
+        self.assertIsNot(runtime_config, config)
+        self.assertEqual(runtime_config['engine'], 'mariadb')
+        self.assertIs(runtime_config['use_gtid'], True)
+
+    @patch('tap_mysql.sync_binlog_streams')
+    @patch('tap_mysql.sync_non_binlog_streams')
+    @patch('tap_mysql.get_binlog_streams', return_value=Catalog(streams=[]))
+    @patch('tap_mysql.get_non_binlog_streams', return_value=Catalog(streams=[]))
+    def test_sync_explicit_engine_wins_over_detected_engine(
+            self, _, __, sync_non_binlog_streams_mock, sync_binlog_streams_mock):
+        mysql_conn = Mock(configured_engine=None, resolved_engine='mariadb')
+        config = {'engine': 'MYSQL'}
+
+        do_sync(mysql_conn, config, Catalog(streams=[]), {})
+
+        sync_non_binlog_streams_mock.assert_called_once_with(
+            mysql_conn, ANY, {}, False, 'mysql')
+        self.assertEqual(sync_binlog_streams_mock.call_args.args[2]['engine'], 'mysql')
+        self.assertEqual(config, {'engine': 'MYSQL'})
 
     def test_binlog_stream_requires_historical_with_log_coordinates_returns_false(self):
 

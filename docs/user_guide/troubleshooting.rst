@@ -151,21 +151,29 @@ Lost connection to MySQL server (Errno 104, Connection reset by peer)
     during query ([Errno 104] Connection reset by peer)')
 
 *Why it happens:*
-Server session defaults are not conducive to PipelineWise type workloads.
+A large export or a slow target can exceed the source's network write timeout.
+Network interruptions, server restarts, and failovers can also break a connection.
+
+For Singer file/position binlog disconnects, PipelineWise retries from
+target-acknowledged state after 30 seconds, then after 60 seconds. The first
+two disconnects log warnings without tracebacks. A third disconnect fails the
+run with a traceback; unrelated errors are not suppressed.
 
 *How to fix:*
-Add the following ``session_sqls`` block to your ``tap.yml``:
+PipelineWise applies its session defaults first, then runs configured
+``session_sqls``. Singer, FullSync, and PartialSync default to a one-hour
+``net_write_timeout``. If a longer blocked write is expected, override only
+that setting:
 
 .. code-block:: yaml
 
     dbname: "your_database"
     session_sqls:
-      - SET SESSION max_statement_time=0
-      - SET SESSION net_write_timeout=3600
-      - SET SESSION time_zone="+0:00"
-      - SET SESSION wait_timeout=28800
-      - SET SESSION net_read_timeout=3600
-      - SET SESSION innodb_lock_wait_timeout=3600
+      - SET SESSION net_write_timeout=7200
+
+Statement timeouts are disabled automatically with MariaDB
+``max_statement_time=0`` or MySQL ``max_execution_time=0``. Use only the setting
+supported by the source engine when overriding it.
 
 .. _troubleshooting_mysql_utf8mb3:
 
@@ -696,6 +704,38 @@ Runtime files are written below ``PIPELINEWISE_CONFIG_DIRECTORY``, which default
 to ``~/.pipelinewise``. Tap logs are stored under
 ``<target_id>/<tap_id>/log/`` and use ``.running``, ``.success``, or ``.failed``
 suffixes. See :ref:`logging` for details.
+
+MariaDB/MySQL, PostgreSQL, and MongoDB connections log their source hostname at
+INFO once per host per process in FastSync and Singer. Repeated connections to
+the same host use DEBUG. The hostname reflects the selected primary or replica
+connection. MongoDB logs the configured seed hostname or host list.
+
+Configured passwords, tokens, passphrases, AWS secrets, and MySQL ``ssl_key``
+contents are redacted from connector logs and default exception tracebacks,
+including worker threads.
+Configured multiline secrets are also redacted when connector output arrives
+one line at a time. Short fragments are masked only in credential fields or as
+complete lines. Replication state and control messages retain their original contents.
+Usernames and short passwords are redacted in credential fields and connection
+URI userinfo. Short secrets are also redacted after ``Bearer`` and in recognised
+authentication error formats, such as ``authentication failed (<secret>)`` and
+``invalid credentials: <secret>``. Database names and counts remain visible when
+they match those values. Unlabelled short values in other text remain visible.
+
+Snowflake data errors replace the server message with a redacted summary in
+Singer, FastSync, and data-diff logs and alerts. This covers duplicate-row errors,
+SQLSTATE ``22xxx`` data errors, and messages containing ``Row Values:``. The error
+type, error code, SQLSTATE, and query ID remain visible when provided by Snowflake.
+Other errors, including missing objects and permissions, keep their diagnostic
+text. Use the query ID to investigate in Snowflake with an authorised role.
+Redaction does not change whether a run fails or how replication state is saved.
+
+Snowflake native and managed Iceberg PartialSync log column versioning at INFO
+after the rename succeeds. The message follows Singer's format:
+
+.. code-block:: text
+
+    Column "AMOUNT" in table ""DATABASE"."SCHEMA"."TABLE"" has been renamed to "AMOUNT_20261007_120000_123456"
 
 To follow the progress of a running sync:
 

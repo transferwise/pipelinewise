@@ -13,6 +13,7 @@ from pipelinewise.fastsync.commons.partial_sync_boundary import (
     PartialSyncBoundary,
     PartialSyncBoundaryError,
 )
+from pipelinewise.fastsync.commons.snowflake_decimal_evolution import with_retained_decimal_types
 from pipelinewise.fastsync.partialsync import utils
 
 
@@ -44,6 +45,7 @@ class _PartialSyncRun:
     boundary: Optional[PartialSyncBoundary] = None
     where_clause_sql: Optional[str] = None
     source_columns: Any = None
+    decimal_columns: Any = ()
     primary_keys: Any = None
     file_parts: List[str] = field(default_factory=list)
     size_bytes: int = 0
@@ -55,6 +57,36 @@ class _PartialSyncRun:
     )
     grants_attempted: bool = False
     target_sf: Any = None
+    native_target_exists: bool = False
+
+
+def _source_column_definitions(spec):
+    """Return staging definitions without PipelineWise metadata columns."""
+    metadata_columns = {
+        common_utils.SDC_EXTRACTED_AT,
+        common_utils.SDC_BATCHED_AT,
+        common_utils.SDC_DELETED_AT,
+    }
+    return [
+        column.definition
+        for column in spec.columns
+        if column.name not in metadata_columns
+    ]
+
+
+def _decimal_float_columns(source_columns, decimal_columns):
+    """Return decimal columns whose effective PartialSync staging type is floating point."""
+    decimal_columns = {str(name).strip('"').upper() for name in decimal_columns or ()}
+    result = set()
+    for definition in source_columns or ():
+        match = utils.SOURCE_COLUMN_DEFINITION.fullmatch(definition)
+        if match is None:
+            continue
+        name = match.group('name').strip('"').replace('""', '"')
+        data_type = match.group('data_type').strip().upper().removesuffix(' NOT NULL').rstrip().split('(', 1)[0]
+        if name.upper() in decimal_columns and data_type in {'FLOAT', 'DOUBLE', 'DOUBLE PRECISION', 'REAL'}:
+            result.add(name)
+    return result
 
 
 def partial_sync_table(
@@ -146,13 +178,14 @@ def _resolve_partial_target(run: _PartialSyncRun) -> None:
 
 
 def _require_native_partial_target(run: _PartialSyncRun) -> None:
-    iceberg_routes.require_native_target_format(
+    table_format = iceberg_routes.require_native_target_format(
         run.snowflake,
         run.args,
         run.target_schema,
         run.table_name,
         allow_missing=True,
     )
+    run.native_target_exists = table_format == iceberg_routes.TABLE_FORMAT_NATIVE
 
 
 def _recover_partial_attempt(run: _PartialSyncRun) -> bool:
@@ -205,7 +238,7 @@ def _recover_partial_attempt(run: _PartialSyncRun) -> bool:
 
 
 def _export_partial_source(run: _PartialSyncRun) -> bool:
-    run.source = run.source_adapter.create(run.args, run.iceberg_requested)
+    run.source = run.source_adapter.create(run.args, run.iceberg_version)
     try:
         run.source_adapter.open(run.source)
         ready = (
@@ -216,10 +249,14 @@ def _export_partial_source(run: _PartialSyncRun) -> bool:
         if not ready:
             return False
 
+        export_options = {'boundary': run.boundary}
+        decimal_float_columns = _decimal_float_columns(run.source_columns, run.decimal_columns)
+        if decimal_float_columns:
+            export_options['decimal_float_columns'] = decimal_float_columns
         run.file_parts = run.source.export_source_table_data(
             run.args,
             run.args.target.get('tap_id'),
-            boundary=run.boundary,
+            **export_options,
         )
         if run.iceberg_requested:
             _validate_partial_export(run)
@@ -229,8 +266,12 @@ def _export_partial_source(run: _PartialSyncRun) -> bool:
 
 
 def _prepare_iceberg_partial_export(run: _PartialSyncRun) -> bool:
+    resolved_engine = run.source_adapter.resolved_source_engine(run.source)
+    if run.attempt is not None:
+        iceberg_routes.validate_recovery_source_engine(run.attempt, resolved_engine)
     snowflake_types = run.source.map_column_types_to_target(run.table_name)
     run.source_columns = snowflake_types.get('columns', [])
+    run.decimal_columns = snowflake_types.get('decimal_columns', ())
     run.primary_keys = snowflake_types.get('primary_key')
     current_spec = iceberg_routes.create_spec(
         run.args,
@@ -239,6 +280,19 @@ def _prepare_iceberg_partial_export(run: _PartialSyncRun) -> bool:
         run.source_columns,
         run.primary_keys,
     )
+    if (
+        run.decimal_columns
+        and not run.args.drop_target_table
+    ):
+        current_spec = with_retained_decimal_types(
+            current_spec,
+            run.publisher.inspect_table(current_spec.name).spec,
+            decimal_columns=run.decimal_columns,
+            version_legacy_float_columns=run.args.target.get(
+                'version_legacy_float_columns', False
+            ),
+        )
+        run.source_columns = _source_column_definitions(current_spec)
     if run.attempt is not None:
         run.spec = run.attempt.table_spec
         iceberg_routes.validate_recovery_source_spec(run.spec, current_spec)
@@ -254,6 +308,7 @@ def _prepare_iceberg_partial_export(run: _PartialSyncRun) -> bool:
         run.publisher.plan_partial_sync(run.attempt, run.spec)
         return True
 
+    run.source.validate_source_transformations(run.table_name)
     run.spec = current_spec
     iceberg_routes.require_partial_sync_primary_key(
         run.primary_keys, run.table_name
@@ -279,6 +334,11 @@ def _prepare_iceberg_partial_export(run: _PartialSyncRun) -> bool:
         run.boundary,
         recovery_identity=run.recovery_identity,
         staging_config=run.staging_config,
+        resolved_source_engine=resolved_engine,
+        decimal_columns=run.decimal_columns,
+        version_legacy_float_columns=run.args.target.get(
+            'version_legacy_float_columns', False
+        ),
     )
     run.publisher.plan_partial_sync(run.attempt, run.spec)
     return True
@@ -291,6 +351,7 @@ def _prepare_native_partial_export(run: _PartialSyncRun) -> bool:
     start_value, end_value = boundary_values
     snowflake_types = run.source.map_column_types_to_target(run.table_name)
     run.source_columns = snowflake_types.get('columns', [])
+    run.decimal_columns = snowflake_types.get('decimal_columns', ())
     run.primary_keys = snowflake_types.get('primary_key')
     run.boundary = _resolved_boundary(
         run, snowflake_types, start_value, end_value
@@ -300,6 +361,19 @@ def _prepare_native_partial_export(run: _PartialSyncRun) -> bool:
     if run.has_dynamic_boundary:
         _resolve_partial_target(run)
         _require_native_partial_target(run)
+
+    if run.native_target_exists and not run.args.drop_target_table:
+        columns_diff = utils.diff_source_target_columns(
+            {'sf_object': run.snowflake, 'schema': run.target_schema, 'table': run.target_table},
+            run.source_columns,
+            primary_keys=run.primary_keys,
+            boundary_column=run.column_name,
+            decimal_columns=run.decimal_columns,
+            version_legacy_float_columns=run.args.target.get(
+                'version_legacy_float_columns', False
+            ),
+        )
+        run.source_columns = columns_diff['staging_columns']
 
     run.bookmark = common_utils.get_bookmark_for_table(
         run.table_name,
@@ -340,6 +414,15 @@ def _validate_partial_export(run: _PartialSyncRun) -> None:
         exported_types.get('columns', []),
         exported_types.get('primary_key'),
     )
+    if run.decimal_columns:
+        exported_spec = with_retained_decimal_types(
+            exported_spec,
+            run.spec,
+            decimal_columns=run.decimal_columns,
+            version_legacy_float_columns=run.args.target.get(
+                'version_legacy_float_columns', False
+            ),
+        )
     iceberg_routes.validate_recovery_source_spec(run.spec, exported_spec)
 
 
@@ -412,11 +495,7 @@ def _publish_partial_iceberg(run: _PartialSyncRun) -> bool:
         run.size_bytes,
         is_temporary=True,
         staging_table_name=run.attempt.staging_table,
-    )
-    run.snowflake.obfuscate_columns(
-        run.target_schema,
-        run.table_name,
-        staging_table_name=run.attempt.staging_table,
+        columns=run.source_columns,
     )
     staged_row_count, staged_fingerprint = run.publisher.staging_evidence(
         run.attempt, run.spec, inserted_rows
@@ -451,6 +530,11 @@ def _publish_partial_native(run: _PartialSyncRun) -> bool:
         run.s3_key_pattern,
         run.size_bytes,
         run.where_clause_sql,
+        boundary_column=run.column_name,
+        decimal_columns=run.decimal_columns,
+        version_legacy_float_columns=run.args.target.get(
+            'version_legacy_float_columns', False
+        ),
     )
     run.publication_status['attempted'] = True
     run.temp_created = False
@@ -506,9 +590,14 @@ def _resolved_boundary(
     start_value,
     end_value,
 ) -> PartialSyncBoundary:
-    return PartialSyncBoundary(
+    boundary = PartialSyncBoundary(
         run.column_name,
         start_value,
         end_value,
         drop_target=run.args.drop_target_table,
     ).resolved(_source_column_names(mapped_types))
+    column_index = _source_column_names(mapped_types).index(boundary.column_name)
+    data_type = mapped_types['columns'][column_index].rsplit(' ', 1)[-1].upper()
+    if not boundary.drop_target and data_type in ('FLOAT', 'VARCHAR(134217728)'):
+        run.source.validate_partial_boundary(run.table_name, boundary.column_name)
+    return boundary

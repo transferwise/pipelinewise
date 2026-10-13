@@ -43,6 +43,7 @@ Global configuration
      slack:
        token: "{{ env_var['SLACK_BOT_TOKEN'] }}"
        channel: "#pipeline-alerts"
+       data_diff_channel: "#data-diff-alerts"  # Optional
 
    allowed_resync_max_size:
      table_mb: 50000
@@ -73,6 +74,11 @@ Global configuration
      - No
      - None
      - Configures Slack or VictorOps failure delivery. See :ref:`alerts`.
+   * - ``alert_handlers.slack.data_diff_channel``
+     - No
+     - Slack ``channel``
+     - Sets a separate global Slack destination for data-diff alerts.
+       Tap-specific copies remain enabled. See :ref:`slack_alert_handler`.
    * - ``allowed_resync_max_size`` / ``table_mb``
      - No
      - No limit
@@ -92,9 +98,8 @@ Global configuration
      - Limits application-role connection attempts. The migration connection
        does not currently inherit this timeout.
 
-The backend is a control-plane database, not a replication target. Separate its
-service, database, runtime role, DDL role, credentials, and storage from every
-target. See :ref:`data_diff_backend`.
+Use a separate database and credentials for the backend and replication targets.
+See :ref:`data_diff_backend` for setup and isolation options.
 
 
 Tap configuration
@@ -113,6 +118,7 @@ Tap configuration
      password: "{{ env_var['POSTGRES_PASSWORD'] }}"
      dbname: "orders"
    target: "snowflake"
+   version_legacy_float_columns: false
    batch_size_rows: 20000
    stream_buffer_size: 0
    schemas:
@@ -167,6 +173,11 @@ Tap configuration
      - No
      - ``true``
      - Suppresses tap and data-diff alerts when ``false``.
+   * - ``data_diff_defaults.initial_full_scan``
+     - No
+     - ``false``
+     - Set ``true`` to check shared history on the first data run. Tables can override this.
+       See :ref:`data_diff_initial_scan`.
    * - ``slack_alert_channel``
      - No
      - Global channel
@@ -225,6 +236,15 @@ Tap configuration
      - Managed-Iceberg version discriminator. Its only supported value is integer
        ``3``; it is required with ``target_table_format: iceberg`` and invalid
        otherwise.
+   * - ``version_legacy_float_columns``
+     - ``false``
+     - For MariaDB/MySQL or PostgreSQL taps writing to Snowflake, set ``true``
+       to retain an eligible non-key legacy floating-point decimal column under a
+       timestamped name and create its fixed-point replacement. New decimal
+       columns use the current precision-preserving mapping regardless of this
+       setting. Existing floating-point decimal keys remain unchanged even when
+       this option is enabled. Configure it at the tap root, not in ``db_conn``
+       or the shared target.
    * - ``validate_records``
      - ``false``
      - Validates Singer records against their emitted schema before loading.
@@ -308,7 +328,10 @@ Schemas and tables
      - Applies load-time field protection. See :ref:`transformations`.
    * - ``data_diff``
      - No
-     - Configures independent aggregate reconciliation. See :ref:`data_diff`.
+     - Compares source and target data on its own schedule. See :ref:`data_diff`.
+   * - ``data_diff.initial_full_scan``
+     - No
+     - Overrides the tap default. Set ``true`` to scan shared history first.
 
 Connector-specific schema or table mappings, such as ``s3_csv_mapping``, are
 documented on their connector page.

@@ -1,7 +1,7 @@
 --
 -- PostgreSQL port of the MySQL "World" database.
 --
--- The sample data used in the world database is Copyright Statistics 
+-- The sample data used in the world database is Copyright Statistics
 -- Finland, http://www.stat.fi/worldinfigures.
 --
 -- The sample database available at https://github.com/morenoh149/postgresDBSamples

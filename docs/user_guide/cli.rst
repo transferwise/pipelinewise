@@ -65,8 +65,8 @@ Command summary
      - Run due data-diff checks.
      - Persists attempts and coverage.
    * - ``rerun_data_diff_check``
-     - Re-run one failed immutable window.
-     - Persists a remediation attempt.
+     - Retry a failed window with its original settings and bounds.
+     - Saves a new attempt.
 
 
 Project lifecycle
@@ -95,7 +95,9 @@ Review :ref:`connector_support` before enabling a template.
    pipelinewise validate --dir <project>
 
 Checks YAML syntax, required fields, connector types, schema mapping, and tap
-target references. It does not connect to a source or target.
+target references. PostgreSQL/MySQL-to-Snowflake routes also validate source-side
+transformation syntax and reject transformed INCREMENTAL keys. It does not
+connect to a source or target or verify live column types.
 
 
 .. _cli_import_config:
@@ -122,14 +124,18 @@ Useful options:
    * - ``--secret <file>``
      - Reads the Ansible Vault password needed by encrypted YAML values.
 
-The command validates, connects to sources, performs discovery, and writes
-generated files below ``~/.pipelinewise``. Data-diff definitions are reconciled
-for each tap only after its connector generation and discovery succeed. A failed
-tap retains its existing definitions while successful taps are reconciled. An
-explicitly selected tap missing from the project YAML is treated as removed, so
-its definitions are deactivated. The command prints its summary and exits
-non-zero when a selected tap or backend reconciliation fails. ``import`` remains
-a deprecated alias.
+The command validates config, discovers source tables, and writes runtime files
+below ``~/.pipelinewise``. It updates each tap's data-diff definitions after
+connector generation and discovery succeed. Failed taps keep their definitions.
+An explicitly selected tap missing from YAML has its definitions deactivated.
+
+The summary counts pending initial scans for current checks on successfully
+imported taps. It includes ``DEFERRED`` scans. It excludes scans already
+started, retries, schema-only checks, and rolling-window checks.
+The count is unavailable if the backend update fails.
+
+A tap or backend failure appears in the summary and exits non-zero. ``import``
+is a deprecated alias.
 
 .. warning::
 
@@ -342,6 +348,12 @@ Data-diff
 Options include ``--output-format table|json`` and ``--include-versioned``.
 ``--tap`` requires ``--target``.
 
+- ``Full scan`` (JSON: ``initial_full_scan``): the configured scan mode.
+- ``Initial scan pending`` (``historical_scan_pending``): awaiting the first
+  historical comparison. Includes ``DEFERRED`` scans, but excludes running or
+  failed scans. A pending scan has no verified coverage.
+- ``Verified start`` (``verified_start``): the start of verified coverage.
+
 
 .. _cli_run_data_diff_checks:
 
@@ -353,8 +365,17 @@ Options include ``--output-format table|json`` and ``--include-versioned``.
    pipelinewise run_data_diff_checks --target <target_id> --tap <tap_id>
    pipelinewise run_data_diff_checks --all
 
-``--check`` selects a check name, logical key, or version ID. ``--force`` creates
-another attempt for the current UTC slot when a terminal attempt already exists.
+``--check`` selects a check name, logical key, or version ID. ``--force`` reruns
+the current UTC slot after its previous attempt finishes. It cannot replace a
+running attempt.
+
+``FAIL`` and ``ERROR`` windows retry at the next cron interval. See
+:ref:`data_diff_retries` for saved boundaries and retry limits.
+``DEFERRED`` means neither side has history before the cutoff. See
+:ref:`data_diff_initial_scan` for empty-table handling.
+
+Skipped checks show a reason and any known slot status and window. Unknown
+bounds are blank. Skipping a check does not verify data.
 
 
 .. _cli_rerun_data_diff_check:
@@ -368,8 +389,8 @@ another attempt for the current UTC slot when a terminal attempt already exists.
      --run-id <uuid> \
      --remediation-ref <ticket_or_incident>
 
-Both options are required. The original attempt remains immutable. See
-:ref:`data_diff` for scheduling, coverage, and remediation semantics.
+Both options are required. The original attempt stays in history. See
+:ref:`data_diff_retries` for retry timing and saved window boundaries.
 
 
 Secrets

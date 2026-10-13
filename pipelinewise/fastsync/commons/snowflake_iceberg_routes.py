@@ -1,8 +1,10 @@
 """Shared route ordering for Snowflake Iceberg publication attempts."""
 
 from . import utils
+from .source_transformations import stream_name_for_table
 from .tap_mysql import (
     DEFAULT_CHARSET,
+    DEFAULT_NET_WRITE_TIMEOUT_SQL,
     DEFAULT_SESSION_SQLS,
     DEFAULT_USE_GTID,
 )
@@ -25,6 +27,7 @@ from .snowflake_iceberg_recovery import (
     FINALIZATION_METADATA,
     FINALIZATION_S3_CLEANUP,
     FINALIZATION_STAGING_CLEANUP,
+    RecoveryManifestError,
     RetryableQueryHistoryRecoveryError,
 )
 from .snowflake_iceberg_versions import (
@@ -67,6 +70,8 @@ def query_history_poll_timeout_seconds(target_config):
 def validate_route_config(target_config):
     """Reject unsupported direct FastSync Iceberg configurations."""
     query_history_poll_timeout_seconds(target_config)
+    if not isinstance(target_config.get('version_legacy_float_columns', False), bool):
+        raise ValueError('version_legacy_float_columns must be true or false')
     if 'iceberg_create' in target_config:
         raise ValueError(
             'Snowflake FastSync no longer supports iceberg_create; configure '
@@ -193,29 +198,39 @@ def fastsync_recovery_identity(
         'replica_user': source_config.get('replica_user'),
         'table': source_table,
     }
-    if engine in ('mysql', 'mariadb'):
+    if source_route == 'mysql_to_snowflake':
+        configured_session_sqls = source_config.get('session_sqls')
         source_identity.update({
             'charset': source_config.get('charset', DEFAULT_CHARSET),
-            'session_sqls': list(
-                source_config.get('session_sqls', DEFAULT_SESSION_SQLS)
-            ),
+            'session_sqls': [
+                # The new transport timeout must not invalidate existing recovery manifests.
+                *(sql for sql in DEFAULT_SESSION_SQLS if sql != DEFAULT_NET_WRITE_TIMEOUT_SQL),
+                *(configured_session_sqls if isinstance(configured_session_sqls, list) else []),
+            ],
             'use_gtid': source_config.get('use_gtid', DEFAULT_USE_GTID),
         })
     elif engine == 'postgres':
         source_identity['ssl'] = source_config.get('ssl')
 
+    if _uses_source_transformations(args.transform or {}, source_table):
+        source_identity['transformation_execution'] = 'source_select_v1'
+
+    target_identity = {
+        'account': target_config.get('account'),
+        'database': target_config.get('dbname'),
+        'schema': target_schema,
+        'table': target_table,
+        'user': target_config.get('user'),
+        'role': target_config.get('role'),
+        'target_table_format': target_config['target_table_format'],
+        'iceberg_version': iceberg_version,
+    }
+    if partial_boundary is not None and target_config.get('version_legacy_float_columns', False):
+        target_identity['version_legacy_float_columns'] = True
+
     identity = {
         'source': source_identity,
-        'target': {
-            'account': target_config.get('account'),
-            'database': target_config.get('dbname'),
-            'schema': target_schema,
-            'table': target_table,
-            'user': target_config.get('user'),
-            'role': target_config.get('role'),
-            'target_table_format': target_config['target_table_format'],
-            'iceberg_version': iceberg_version,
-        },
+        'target': target_identity,
         'staging': dict(staging_config),
     }
     if partial_boundary is not None:
@@ -231,6 +246,17 @@ def fastsync_recovery_identity(
         },
         target_table_format=target_config['target_table_format'],
         iceberg_version=iceberg_version,
+    )
+
+
+def _uses_source_transformations(transformation_config, source_table):
+    """Invalidate retained raw staging only for affected or malformed rules."""
+    stream_name = stream_name_for_table(source_table)
+    return any(
+        not isinstance(rule, dict)
+        or not isinstance(rule.get('tap_stream_name'), str)
+        or rule['tap_stream_name'].lower() == stream_name
+        for rule in transformation_config.get('transformations', [])
     )
 
 
@@ -268,6 +294,25 @@ def plan_staging_uploads(publisher, attempt, snowflake, file_parts):
     s3_keys = utils.get_expected_s3_keys(snowflake, file_parts)
     publisher.record_planned_uploads(attempt, s3_keys)
     return s3_keys
+
+
+def validate_recovery_source_engine(attempt, resolved_source_engine):
+    """Require the saved bookmark's engine before re-exporting source data."""
+    if resolved_source_engine is None:
+        return
+    saved_engine = attempt.manifest_payload.resolved_source_engine
+    if saved_engine is None:
+        raise RecoveryManifestError(
+            'Cannot re-export this Iceberg recovery attempt: its manifest has no saved '
+            'source engine and may predate engine binding. Finish this attempt with the '
+            'PipelineWise version and configuration that created it. Do not edit state '
+            'or delete recovery files to bypass this check.'
+        )
+    if saved_engine != resolved_source_engine:
+        raise RecoveryManifestError(
+            'Cannot re-export an Iceberg recovery attempt with a different source engine: '
+            f'saved={saved_engine!r}, current={resolved_source_engine!r}'
+        )
 
 
 def validate_recovery_source_spec(

@@ -49,9 +49,11 @@ throughput or source/target availability problem; increasing frequency makes it
 worse.
 
 For LOG_BASED sources, source-log retention must exceed the maximum time between
-the last target acknowledgement and successful recovery. For data-diff, schedule
-``run_data_diff_checks`` independently from replication and leave enough
-``window_end`` lag for the target to settle.
+the last target acknowledgement and successful recovery.
+
+Schedule ``run_data_diff_checks`` separately from replication. Leave enough
+``window_end`` lag for the target to catch up. Failed windows retry at the next
+check interval, not on every scheduler invocation. See :ref:`data_diff_retries`.
 
 
 Retries and recovery

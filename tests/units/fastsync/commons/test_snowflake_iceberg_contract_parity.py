@@ -44,6 +44,17 @@ def _v3_behavior_cases():
     return _contract_fixture()['behavior_cases']['3']
 
 
+def test_core_preserves_shared_decimal_dimensions():
+    """Parameterized decimal DDL agrees with the connector's schema contract."""
+    from singer.decimal_support import decimal_sql_type
+
+    for case in _v3_behavior_cases()['decimal_cases']:
+        declared = decimal_sql_type(case['schema'], 'snowflake')
+        assert declared == case['declared_type']
+        column = IcebergTableSpec.from_fastsync('DB', 'SCHEMA', 'TABLE', [f'"AMOUNT" {declared}'], ())
+        assert column.columns[0].data_type == case['canonical_type']
+
+
 def test_core_matches_contract():
     """Core exposes exactly the shared supported-version declaration."""
     expected_contract = _contract_fixture()['declarative_contract']
