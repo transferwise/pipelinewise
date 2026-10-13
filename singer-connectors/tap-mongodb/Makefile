@@ -17,7 +17,7 @@ populate_db:
 
 install_dep:
 	. venv/bin/activate; \
-	python3 -m pip install -e .[test,dev]
+	python3 -m pip install -e ../singer-python -e .[test,dev]
 
 check_dep:
 	. venv/bin/activate; \

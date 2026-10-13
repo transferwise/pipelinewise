@@ -76,6 +76,15 @@ class TestCli:
         with open(f'{temp_path}pipelinewise/bin/mysql-to-snowflake', 'a', encoding='UTF-8'):
             pass
 
+        pipelinewise.tap['files']['properties'] = f'{temp_path}properties.json'
+        with open(pipelinewise.tap['files']['properties'], 'w', encoding='UTF-8') as properties_file:
+            json.dump({'streams': [
+                {'stream': name, 'metadata': [{'breadcrumb': [], 'metadata': {
+                    'schema-name': 'db_test_mysql', 'selected': True,
+                }}]}
+                for name in ('table_one', 'table_two')
+            ]}, properties_file)
+
         return pipelinewise
 
     @staticmethod
@@ -146,8 +155,11 @@ class TestCli:
 
     def _assert_run_command_exit_with_error_1(self, command):
         with patch('pipelinewise.cli.pipelinewise.PipelineWise.run_tap_singer'):
-            args = CliArgs(target='target_one', tap='tap_one')
-            pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
+            if command == 'fast_sync':
+                pipelinewise = self._init_for_sync_tables_states_cleanup()
+            else:
+                args = CliArgs(target='target_one', tap='tap_one')
+                pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
             with pytest.raises(SystemExit) as pytest_wrapped_e:
                 ppw_command = getattr(pipelinewise, command)
                 ppw_command()
@@ -953,12 +965,60 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         pipelinewise.tap['type'] = tap_type
 
         with patch('pipelinewise.cli.pipelinewise.pidfile.PIDFile'), patch(
-            'pipelinewise.cli.pipelinewise.utils.load_json',
-            return_value={'selection': [{'replication_method': replication_method}]},
+            'pipelinewise.cli.pipelinewise.PipelineWise._get_sync_tables_setting_from_selection_file',
+            return_value={
+                'full_sync': ['public.one'] if replication_method == 'LOG_BASED' else [], 'partial_sync': {},
+            },
         ), patch.object(pipelinewise, 'do_sync_tables') as do_sync_tables:
             pipelinewise.fast_sync()
 
         do_sync_tables.assert_called_once_with(reset_postgres_slot=expected_reset)
+
+    @pytest.mark.parametrize('selected', [False, True])
+    def test_postgres_slot_reset_requires_an_enabled_log_based_table(self, selected):
+        pipelinewise = self._init_for_sync_tables_states_cleanup()
+        pipelinewise.tap['type'] = ConnectorType.TAP_POSTGRES.value
+        properties_path = pipelinewise.tap['files']['properties']
+        with open(properties_path, encoding='UTF-8') as properties_file:
+            properties = json.load(properties_file)
+        properties['streams'][0]['metadata'][0]['metadata']['selected'] = selected
+        with open(properties_path, 'w', encoding='UTF-8') as properties_file:
+            json.dump(properties, properties_file)
+
+        assert pipelinewise._should_reset_postgres_slot_for_fast_sync() is selected
+
+    @pytest.mark.parametrize('catalog_state', ['missing', 'disabled', 'empty-selection'])
+    def test_implicit_fast_sync_without_eligible_tables_preserves_state_and_slot(self, catalog_state):
+        pipelinewise = self._init_for_sync_tables_states_cleanup()
+        pipelinewise.tap['type'] = ConnectorType.TAP_POSTGRES.value
+        state_path = pipelinewise.tap['files']['state']
+        self._make_sample_state_file(state_path)
+        original_state = Path(state_path).read_bytes()
+        properties_path = pipelinewise.tap['files']['properties']
+        with open(properties_path, encoding='UTF-8') as properties_file:
+            properties = json.load(properties_file)
+        if catalog_state == 'missing':
+            properties['streams'] = []
+        elif catalog_state == 'disabled':
+            for stream in properties['streams']:
+                stream['metadata'][0]['metadata']['selected'] = False
+        else:
+            pipelinewise.tap['files']['selection'] = '/tmp/pwtest/selection.json'
+            Path(pipelinewise.tap['files']['selection']).write_text('{"selection": []}', encoding='UTF-8')
+        with open(properties_path, 'w', encoding='UTF-8') as properties_file:
+            json.dump(properties, properties_file)
+
+        with patch('pipelinewise.cli.pipelinewise.pidfile.PIDFile'), patch.object(
+            pipelinewise, '_preflight_postgres_slot_reset',
+        ) as preflight, patch(
+            'pipelinewise.cli.pipelinewise.FastSyncTapPostgres.reset_slot',
+        ) as reset_slot, patch('pipelinewise.cli.pipelinewise.Process') as process:
+            pipelinewise.fast_sync()
+
+        preflight.assert_not_called()
+        reset_slot.assert_not_called()
+        process.assert_not_called()
+        assert Path(state_path).read_bytes() == original_state
 
     @pytest.mark.parametrize('force', [False, True])
     def test_fast_sync_resets_slot_once_before_mixed_workers_with_or_without_force(self, force):
@@ -1793,23 +1853,57 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         with patch('pipelinewise.cli.pipelinewise.utils.load_json') as mocked_load_json:
             self.pipelinewise.tap = {
                 'files': {
-                    'selection': 'foo.json'
+                    'selection': 'foo.json', 'properties': 'properties.json',
                 }
             }
-            mocked_load_json.return_value = {
+            mocked_load_json.side_effect = [{
                 'selection': [
                     {'tap_stream_id': 'foo'},
                     {'tap_stream_id': 'bar'},
                     {'tap_stream_id': 'baz', 'sync_start_from': 'PARTIAL'},
                     {'tap_stream_id': 'par', 'sync_start_from': 'PARTIAL_par'},
                 ]
-            }
+            }, {'streams': [
+                {'stream': name, 'metadata': [{'breadcrumb': [], 'metadata': {'selected': True}}]}
+                for name in ('foo', 'bar', 'baz', 'par')
+            ]}]
             actual_selected_tables = self.pipelinewise._get_sync_tables_setting_from_selection_file(tables)
             expected_selected_tables = {
                 'full_sync': ['foo', 'bar'],
                 'partial_sync': {'baz': 'PARTIAL', 'par': 'PARTIAL_par'}
             }
             assert actual_selected_tables == expected_selected_tables
+
+    @pytest.mark.parametrize('schema_key', ['schema-name', 'database-name'])
+    @pytest.mark.parametrize('method', ['*', 'full_table'])
+    def test_implicit_fast_sync_uses_only_enabled_catalog_tables(self, tmp_path, schema_key, method):
+        boundary = {'column': 'id', 'value': '5'}
+        selection = {'selection': [
+            {'tap_stream_id': 'db-One-Table', 'replication_method': 'FULL_TABLE'},
+            {'tap_stream_id': 'db-Two', 'replication_method': 'LOG_BASED', 'sync_start_from': boundary},
+            {'tap_stream_id': 'db-disabled', 'replication_method': 'FULL_TABLE'},
+            {'tap_stream_id': 'db-missing', 'replication_method': 'LOG_BASED', 'sync_start_from': boundary},
+        ]}
+        properties = {'streams': [
+            {'stream': name, 'metadata': [
+                {'breadcrumb': [], 'metadata': {schema_key: 'db', 'selected': selected}},
+                {'breadcrumb': ['properties', 'id'], 'metadata': {'selected': True}},
+            ]}
+            for name, selected in [('One-Table', True), ('Two', True), ('disabled', False)]
+        ]}
+        self.pipelinewise.tap = {'files': {}}
+        for name, content in [('selection', selection), ('properties', properties)]:
+            path = tmp_path / f'{name}.json'
+            path.write_text(json.dumps(content), encoding='utf-8')
+            self.pipelinewise.tap['files'][name] = str(path)
+
+        assert self.pipelinewise._get_sync_tables_setting_from_selection_file(None, method) == {
+            'full_sync': ['db.One-Table'],
+            'partial_sync': {'db.Two': boundary} if method == '*' else {},
+        }
+        assert self.pipelinewise._get_sync_tables_setting_from_selection_file('db.disabled') == {
+            'full_sync': ['db.disabled'], 'partial_sync': {},
+        }
 
     def test_get_sync_tables_if_using_replication_method_only(self):
         """Test if the method for getting list of tables for syncing returns only tables with selected

@@ -9,6 +9,7 @@ from collections import namedtuple
 from decimal import Decimal
 from jsonschema import FormatChecker, Draft7Validator
 from singer import Catalog, Schema
+from singer.decimal_support import decimal_to_string, is_decimal_schema, schema_has_decimals, validate_decimal_record
 
 from transform_field import transform
 from transform_field import utils
@@ -31,6 +32,24 @@ TransMeta = namedtuple('TransMeta', ['field_id', 'type', 'when', 'field_paths'])
 REQUIRED_CONFIG_KEYS = [
     "transformations"
 ]
+
+
+def _field_schema(stream_schema, field_id):
+    if isinstance(stream_schema, Schema):
+        return stream_schema.properties[field_id].to_dict()
+    return stream_schema['properties'][field_id]
+
+
+def _validate_condition_types(stream_id, stream_schema, transformation):
+    for condition in transformation.when or []:
+        if 'regex_match' not in condition or condition.get('field_path'):
+            continue
+        condition_field = condition['column']
+        if is_decimal_schema(_field_schema(stream_schema, condition_field)):
+            raise InvalidTransformationException(
+                f'Cannot apply a `regex_match` condition to decimal field `{condition_field}` '
+                f'in stream `{stream_id}`'
+            )
 
 
 @unique
@@ -109,11 +128,10 @@ class TransformField:
             # Transform columns
             messages = self.messages
             schema = float_to_decimal(stream_meta.schema)
+            has_decimals = schema_has_decimals(schema)
             key_properties = stream_meta.key_properties
             validator = Draft7Validator(schema, format_checker=FormatChecker())
-            trans_meta = []
-            if stream in self.trans_meta:
-                trans_meta = self.trans_meta[stream]
+            trans_meta = self.trans_meta.get(stream, [])
 
             for i, message in enumerate(messages):
                 if isinstance(message, singer.RecordMessage):
@@ -123,9 +141,15 @@ class TransformField:
 
                         if trans.field_id in message.record:
                             transformed = transform.do_transform(
-                                message.record, trans.field_id, trans.type, trans.when, trans.field_paths
+                                message.record, trans.field_id, trans.type, trans.when, trans.field_paths, schema
                             )
+                            field_schema = schema.get('properties', {}).get(trans.field_id, {})
+                            if is_decimal_schema(field_schema):
+                                transformed = decimal_to_string(transformed, field_schema)
                             message.record[trans.field_id] = transformed
+
+                    if has_decimals:
+                        validate_decimal_record(message.record, schema)
 
                     if VALIDATE_RECORDS:
                         # Validate the transformed columns
@@ -259,12 +283,11 @@ class TransformField:
             trans_type = transformation.type
             field_id = transformation.field_id
 
-            if isinstance(stream_schema, Schema):
-                field_type = stream_schema.properties[field_id].type
-                field_format = stream_schema.properties[field_id].format
-            else:
-                field_type = stream_schema['properties'][field_id].get('type')
-                field_format = stream_schema['properties'][field_id].get('format')
+            field_schema = _field_schema(stream_schema, field_id)
+            field_type = field_schema.get('type')
+            field_format = field_schema.get('format')
+
+            _validate_condition_types(stream_id, stream_schema, transformation)
 
             # If the value we want to transform is a field in a JSON property
             # then no need to enforce rules below for now
@@ -288,8 +311,11 @@ class TransformField:
                         f' `{field_id}` in stream `{stream_id}`')
 
             elif trans_type == TransformationTypes.MASK_NUMBER.value:
-                if not (field_type is not None and (
-                        'number' in field_type or 'integer' in field_type) and not field_format):
+                if not is_decimal_schema(field_schema) and not (
+                    field_type is not None
+                    and ('number' in field_type or 'integer' in field_type)
+                    and (not field_format or ('integer' in field_type and field_format == 'singer.year'))
+                ):
                     raise InvalidTransformationException(
                         f'Cannot apply `{trans_type}` transformation type to a non-numeric field '
                         f'`{field_id}` in stream `{stream_id}`')

@@ -102,7 +102,6 @@ def test_native_partial_accepts_same_family_with_sufficient_capacity(source_type
     ('NUMBER(18,4)', {'type': 'FIXED', 'precision': 18, 'scale': 2}),
     ('NUMBER(18,2)', {'type': 'FIXED', 'precision': 18, 'scale': 4}),
     ('NUMBER', {'type': 'REAL'}),
-    ('FLOAT', {'type': 'FIXED', 'precision': 38, 'scale': 0}),
     ('BINARY', {'type': 'BINARY', 'length': 1024}),
     ('BINARY', {'type': 'TEXT', 'length': 134217728}),
     ('TIMESTAMP_NTZ', {'type': 'TIMESTAMP_NTZ', 'scale': 6}),

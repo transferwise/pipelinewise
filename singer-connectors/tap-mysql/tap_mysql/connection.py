@@ -5,6 +5,7 @@ import backoff
 import pymysql
 import ssl
 import singer
+from singer.logger import log_source_host
 
 from pymysql.constants import CLIENT
 
@@ -78,6 +79,7 @@ def default_session_sqls(connection, configured_engine=None):
                       max_tries=5,
                       factor=2)
 def connect_with_backoff(connection):
+    log_source_host(LOGGER, 'MySQL/MariaDB', connection.host)
     connection.connect()
     run_session_sqls(connection)
 

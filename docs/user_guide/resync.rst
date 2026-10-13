@@ -65,12 +65,17 @@ to Singer. ``--replication_method_only <method>`` filters by configured method.
 source and target impact. It does not override ``sync_start_from`` or change a
 configured PartialSync into a full-table reload.
 
+Without ``--tables``, PipelineWise syncs only configured tables enabled in
+``properties.json``. It skips missing or unselected catalog entries and does
+nothing if no tables qualify. Explicit ``--tables`` requests retain existing
+catalog validation.
+
 .. _resync_postgres_slot_reset:
 
 PostgreSQL source-slot reset
 ''''''''''''''''''''''''''''
 
-For a PostgreSQL tap containing LOG_BASED tables, this command drops and
+For a PostgreSQL tap containing enabled LOG_BASED tables, this command drops and
 recreates the tap-specific source slot once before any worker starts:
 
 .. code-block:: bash
@@ -80,7 +85,7 @@ recreates the tap-specific source slot once before any worker starts:
 Omit ``--tables`` and leave ``--replication_method_only`` at its ``*`` default
 so every selected table is rebuilt. The deprecated ``sync_tables`` alias has
 the same behaviour. ``--force`` is not required for the reset: it only bypasses
-the resync size limit. Taps without LOG_BASED tables do not reset a slot.
+the resync size limit. Taps without enabled LOG_BASED tables do not reset a slot.
 
 .. list-table:: PostgreSQL slot behaviour during replication
    :header-rows: 1

@@ -424,10 +424,10 @@ def test_transformations_are_private_through_publication(source_export, tmp_path
         return key
 
     def inspect_copy(self, s3_key, target_schema, table_name, size_bytes, is_temporary,
-                     skip_csv_header=False, staging_table_name=None):
+                     skip_csv_header=False, staging_table_name=None, columns=None):
         count = original_copy(
             self, s3_key, target_schema, table_name, size_bytes, is_temporary,
-            skip_csv_header, staging_table_name,
+            skip_csv_header, staging_table_name, columns,
         )
         staging_table = staging_table_name or f'{source_export.table_name}_temp'
         _assert_table(self, schema, staging_table, observed['expected'])

@@ -61,7 +61,7 @@ def test_regex_probe_preserves_connection_and_transient_errors(code):
 def test_reopening_export_connection_resets_capability_cache(monkeypatch):
     source = _mysql_source()
     source._source_regex_verified = True
-    source.get_connection_parameters = Mock(return_value=({}, False))
+    source.get_connection_parameters = Mock(return_value=({'host': 'source.example'}, False))
     source.run_session_sqls = Mock()
     connection = MagicMock()
     connection.get_server_info.return_value = '8.4.0'

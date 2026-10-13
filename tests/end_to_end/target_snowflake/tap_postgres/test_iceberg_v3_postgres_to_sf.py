@@ -201,8 +201,8 @@ class TestIcebergV3PostgresToSnowflake(TapPostgres):
         with urlopen(metadata_request, timeout=30) as response:  # nosec B310
             return json.load(response)["metadata"]
 
-    def _assert_country_approximate_numbers_are_double(self):
-        """PostgreSQL approximate-number mappings retain 64-bit precision."""
+    def _assert_country_numeric_types(self):
+        """Preserve approximate numbers and declared decimal precision and scale."""
         metadata = self._horizon_table_metadata("COUNTRY")
         current_schema = next(
             schema
@@ -216,12 +216,15 @@ class TestIcebergV3PostgresToSnowflake(TapPostgres):
 
         self.assertEqual(
             {
-                field_types["SURFACEAREA"],
-                field_types["LIFEEXPECTANCY"],
-                field_types["GNP"],
-                field_types["GNPOLD"],
+                name: field_types[name].replace(" ", "")
+                for name in ("SURFACEAREA", "LIFEEXPECTANCY", "GNP", "GNPOLD")
             },
-            {"double"},
+            {
+                "SURFACEAREA": "double",
+                "LIFEEXPECTANCY": "double",
+                "GNP": "decimal(10,2)",
+                "GNPOLD": "decimal(10,2)",
+            },
         )
 
     def _assert_fastsync_content(self, fastsync_id, large_json):
@@ -384,7 +387,7 @@ class TestIcebergV3PostgresToSnowflake(TapPostgres):
             "multiline_values",
         ):
             self._assert_managed_v3(table_name)
-        self._assert_country_approximate_numbers_are_double()
+        self._assert_country_numeric_types()
         self._assert_fastsync_content(fastsync_id, large_json)
         self._assert_large_text(fastsync_id)
         self._assert_large_text_column_width()

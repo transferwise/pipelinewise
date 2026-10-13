@@ -25,6 +25,8 @@ def mock_db_sync(config, schema, *args):
     db = Mock(record_update_mode=None, data_flattening_max_level=0)
     db.stream_schema_message = schema
     db.flatten_schema = schema['schema']['properties']
+    db.effective_key_properties.return_value = schema['key_properties']
+    db.load_column_value.side_effect = lambda name, value: value
     db.record_primary_key_string.side_effect = lambda record: DbSync.record_primary_key_string(db, record)
     return db
 

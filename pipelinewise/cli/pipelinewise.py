@@ -43,7 +43,8 @@ from pipelinewise.fastsync.commons.tap_yugabyte import FastSyncTapYugabyte
 from pipelinewise.fastsync.commons import utils as fastsync_utils
 from pipelinewise.cli.multiprocess import Process
 from pipelinewise.data_diff.coverage import FAILED_STATUSES
-from pipelinewise.data_diff.repository import DataDiffRepository
+from pipelinewise.data_diff.alerts import format_data_diff_alert, format_data_diff_index_warning
+from pipelinewise.data_diff.repository import DataDiffRepository, index_warning_id
 from pipelinewise.data_diff.runner import rerun_failed_check, run_due_checks
 from pipelinewise.data_diff.runtime import RuntimeConnectorConfigLoader
 
@@ -1498,11 +1499,8 @@ class PipelineWise:
         ):
             return False
 
-        selection = utils.load_json(self.tap['files']['selection']) or {}
-        return any(
-            table.get('replication_method') == self.LOG_BASED
-            for table in selection.get('selection', [])
-        )
+        selected_tables = self._get_sync_tables_setting_from_selection_file(None, self.LOG_BASED)
+        return bool(selected_tables['full_sync'] or selected_tables['partial_sync'])
 
     def do_sync_tables(self, fastsync_stream_ids=None, reset_postgres_slot: bool = False):
         """
@@ -1515,6 +1513,8 @@ class PipelineWise:
 
         selected_tables = self._get_sync_tables_setting_from_selection_file(
             tables_to_sync, self.args.replication_method_only)
+        if not selected_tables['full_sync'] and not selected_tables['partial_sync']:
+            return
 
         if selected_tables['partial_sync']:
             self._check_target_table_format_supports_fastsync('partial_sync')
@@ -2066,11 +2066,10 @@ class PipelineWise:
 
     def _alert_data_diff_failures(self, summaries):
         """
-        Send one alert per failed check per window.
+        Send at most one alert per failed check in this invocation.
 
-        Failures are not batched: each alert carries the check name, its window, and
-        the run ID needed to remediate it. Alerts go to the owning tap's channel in
-        addition to the default one, and a tap with send_alert disabled is skipped.
+        Summarize failures with a representative ERROR, or the last FAIL. Keep
+        every failed summary for exit-status handling and persisted attempt history.
         """
         failures = [
             summary
@@ -2078,7 +2077,17 @@ class PipelineWise:
             if summary['status'] in FAILED_STATUSES
         ]
 
+        failures_by_check = {}
         for summary in failures:
+            check = summary['check']
+            key = (check['target_id'], check['tap_id'], check.get('check_id') or check['full_check_name'])
+            failures_by_check.setdefault(key, []).append(summary)
+
+        for check_failures in failures_by_check.values():
+            summary = next(
+                (failure for failure in reversed(check_failures) if failure['status'] == 'ERROR'),
+                check_failures[-1],
+            )
             check = summary['check']
             send_alert, tap_slack_channel = self._get_tap_alert_settings(
                 check['target_id'], check['tap_id']
@@ -2086,25 +2095,60 @@ class PipelineWise:
             if not send_alert:
                 continue
 
-            # A check that failed before it could be scheduled has no window or run
-            # to report, only the reason it could not run.
-            message = f"data-diff {summary['status']} {check['full_check_name']}"
-            if summary.get('window_start') and summary.get('window_end'):
-                message += (
-                    f"\n  window  {summary['window_start'].isoformat()}"
-                    f" → {summary['window_end'].isoformat()}"
-                )
-            if summary.get('run_id'):
-                message += f"\n  run_id  {summary['run_id']}"
-            if summary.get('error'):
-                message += f"\n  reason  {summary['error']}"
+            message, details, next_action = format_data_diff_alert(summary, failures=check_failures)
             self.alert_sender.send_to_all_handlers(
                 message=message,
                 level=BaseAlertHandler.ERROR,
                 tap_slack_channel=tap_slack_channel,
+                details=details,
+                next_action=next_action,
+                data_diff=True,
             )
 
         return failures
+
+    def _alert_data_diff_index_warnings(self, repository, summaries):
+        """Send an index warning once for the latest observation of each source table."""
+        observations = {}
+        for summary in summaries:
+            preflight = summary.get('preflight') or {}
+            check = summary['check']
+            if (
+                'index_warning' in preflight
+                and summary['status'] != 'SKIPPED'
+                and check.get('is_current') is not False
+            ):
+                observations.setdefault(index_warning_id(check), []).append(summary)
+
+        for table_summaries in observations.values():
+            preflight = table_summaries[-1]['preflight']
+            if preflight.get('status') != 'PASS' or preflight.get('index_warning') is not True:
+                continue
+            try:
+                for summary in reversed(table_summaries):
+                    check = summary['check']
+                    send_alert, tap_slack_channel = self._get_tap_alert_settings(check['target_id'], check['tap_id'])
+                    if send_alert:
+                        break
+                else:
+                    continue
+                with repository.index_warning_notification(check) as notification:
+                    if not notification.pending:
+                        continue
+                    message, details, next_action = format_data_diff_index_warning(check, preflight)
+                    delivery = self.alert_sender.send_to_all_handlers(
+                        message=message,
+                        level=BaseAlertHandler.WARNING,
+                        tap_slack_channel=tap_slack_channel,
+                        details=details,
+                        next_action=next_action,
+                        data_diff=True,
+                        best_effort=True,
+                    )
+                    if delivery.get('sent', 0) > 0:
+                        notification.mark_sent()
+            except Exception as exc:
+                self.logger.warning('Cannot send data-diff index warning for %s: %s', check['full_check_name'], exc)
 
     def list_data_diff_checks(self):
         """List persisted definitions, schedule state, and timestamp coverage."""
@@ -2169,6 +2213,7 @@ class PipelineWise:
                 check_filter=self.args.check,
                 force=self.args.force,
             )
+            self._alert_data_diff_index_warnings(repository, summaries)
 
         self._print_data_diff_summaries(summaries)
         if self._alert_data_diff_failures(summaries):
@@ -2183,6 +2228,7 @@ class PipelineWise:
                 self.args.run_id,
                 self.args.remediation_ref,
             )
+            self._alert_data_diff_index_warnings(repository, [summary])
 
         print(
             tabulate(
@@ -2713,16 +2759,23 @@ TAP RUN SUMMARY
         selection = selection.get('selection')
         all_tables = {'full_sync': [], 'partial_sync': {}}
         tables_list = tables.split(',') if tables else tables
+        if tables is None:
+            properties_path = self.tap['files']['properties']
+            properties = utils.load_json(properties_path)
+            self._validate_tap_catalog(properties, properties_path)
+            catalog_tables = fastsync_utils.get_tables_from_properties(properties)
         if selection:
             for table in selection:
                 table_name = self._get_fixed_name_of_table(table['tap_stream_id'])
+                if tables is None and table_name not in catalog_tables:
+                    continue
                 if tables_list is None or table_name in tables_list:
                     if replication_method in ['*', table.get('replication_method')]:
                         if table.get('sync_start_from'):
                             all_tables['partial_sync'][table_name] = table['sync_start_from']
                         else:
                             all_tables['full_sync'].append(table_name)
-            return all_tables
+        return all_tables
 
     def __check_if_table_is_selected(self, table_in_properties):
         table_metadata = table_in_properties.get('metadata', [])

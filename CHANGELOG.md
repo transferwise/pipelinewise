@@ -1,4 +1,4 @@
-0.94.0 (2026-09-30)
+0.97.0 (2026-10-13)
 -------------------
 
 **tap-yugabyte**
@@ -60,6 +60,137 @@
   the driver swap is not silently skipped when a Docker anonymous volume
   already has files at the shared install path from a prior `psycopg2-binary`
   install
+
+0.96.1 (2026-10-12)
+-------------------
+
+- Redact Snowflake data-error messages in Singer, FastSync, and data-diff logs
+  and alerts. Preserve the error type, error code, SQLSTATE, and query ID for
+  diagnosis. Keep failure and replication-state handling unchanged. See
+  [logging diagnostics](docs/user_guide/troubleshooting.rst#logging-and-diagnostics)
+
+0.96.0 (2026-10-10)
+-------------------
+
+- Allow data-diff without a qualifying timestamp index below 100,000 source
+  rows. Send one advance warning from 50,000 rows and require the index at
+  100,000. Count only up to that limit, with a timeout. After upgrading, run
+  `pipelinewise import_config --dir <project>` to apply backend migration 004
+  before running checks. See
+  [data-diff preflight](docs/user_guide/data_diff.rst#preflight)
+- Remember source-index warnings when any alert destination accepts them.
+  Attempt every destination and log failures. Retry delivery only if all fail
+- Show an explicit tap ID in data-diff alerts. Put next actions in a bulleted
+  list and remove repeated missing-index advice. Keep the full diagnostic
+  details in the backend history. See
+  [data-diff alerts](docs/user_guide/data_diff.rst#alerts)
+
+0.95.0 (2026-10-09)
+-------------------
+
+- Require a usable source index starting with the timestamp column for every
+  data-diff data check, including initial historical scans and small tables.
+  Remove the row-count threshold. Add a qualifying index before running checks
+  on sources that previously relied on the small-table exemption. See
+  [data-diff preflight](docs/user_guide/data_diff.rst#preflight)
+- Stop collecting row estimates for new preflight records. Keep the old audit
+  columns and historical values for compatibility
+- Keep completed schema results when data-diff preflight blocks data queries.
+  Keep the run in ERROR so it does not advance verified coverage
+- Show clearer data-diff Slack alerts with run details, count differences, and
+  next steps. Limit failure alerts to one per check per invocation while keeping
+  every attempt and automatic retries. Set `alert_handlers.slack.data_diff_channel`
+  to route them to a separate channel while retaining tap-specific copies. See
+  [data-diff alerts](docs/user_guide/data_diff.rst#alerts)
+
+0.94.1 (2026-10-08)
+-------------------
+
+- Log the selected source hostname for MariaDB, MySQL, PostgreSQL, and MongoDB
+  once per process in FastSync and Singer
+- Redact credentials from connector logs and exception tracebacks. Preserve
+  database names and counts when they match a username or short password.
+  Include MySQL TLS private-key contents in streamed logs and short secrets
+  in Bearer headers and recognised authentication errors
+- Log Snowflake native and Iceberg PartialSync column versioning at INFO,
+  including the table, column, and archived column name. See
+  [logging diagnostics](docs/user_guide/troubleshooting.rst#logging-and-diagnostics)
+- Update the bundled Singer version and package pins so wheel installations
+  include the logging helpers
+- Run MongoDB source logging regression tests in connector CI
+
+0.94.0 (2026-10-07)
+-------------------
+
+**Decimal precision**
+
+- Preserve declared `DECIMAL` and `NUMERIC` precision and scale from
+  MariaDB, MySQL, and PostgreSQL in Snowflake native, Snowflake managed Iceberg
+  v3, and PostgreSQL targets where supported. Keep existing PostgreSQL `REAL`
+  and `DOUBLE PRECISION` decimal columns, including keys, on their live type.
+  Clamp retained floating-point overflow and underflow instead of failing a row
+- Preserve representable tiny decimals when PostgreSQL FastSync casts to
+  floating point
+- Create new Snowflake decimal columns as fixed-point numbers where supported.
+  Keep existing legacy `FLOAT` decimal columns, including keys that now map to
+  text, by default. Set `version_legacy_float_columns: true` on a supported tap to
+  retain the old non-key column and add its precision-preserving replacement.
+  Keep legacy floating-point decimal keys unchanged even with the option enabled.
+  Continue versioning other changed non-key decimal declarations, and reject
+  PartialSync range column versioning before altering the target
+- Keep columns and rows flowing when decimal declarations exceed target limits.
+  Use compatible numeric declarations or double precision with warnings; clamp
+  finite floating-point overflow. Store PostgreSQL numeric primary keys in Snowflake
+  as canonical text so bounded `NaN` keys remain loadable; keep other decimal keys
+  as text only when their numeric mapping would lose identity
+- Replay conservatively from legacy floating-point decimal bookmarks, then save
+  exact bookmarks. Keep exact boundaries valid after a source declaration narrows.
+  Correct PostgreSQL negative-scale metadata and prevent repeated column versioning.
+  Keep other source/target combinations unchanged
+- Treat nonnumeric `equals` conditions on decimal fields as non-matches. Reject
+  decimal `regex_match` conditions before processing records
+- Retry PostgreSQL logical replication without wal2json numeric string output
+  when the plugin rejects that option, independent of server message language
+- Group retained floating-point decimal keys by their loaded target value.
+  Apply colliding changes in source event order within each Singer batch instead
+  of failing or inserting duplicate staged keys
+
+**MariaDB and MySQL column types**
+
+- Replicate MariaDB/MySQL `SET`, `TINYBLOB`, `BLOB`, `MEDIUMBLOB`, `LONGBLOB`,
+  and `YEAR` columns through Singer and FastSync. Snowflake stores sets as text,
+  blobs as `BINARY(67108864)`, and years as `NUMBER(38,0)`. During Singer loads,
+  keep existing Snowflake primary-key columns on their live target type.
+  Keep legacy PostgreSQL text `YEAR` keys unchanged. Keep legacy key subsets on
+  Snowflake and PostgreSQL until FullSync adopts newly supported key columns.
+  Match retained text BLOB keys to historical FastSync rows
+- Allow `MASK-NUMBER` transformations on `YEAR` columns in Singer
+
+**Packaging and CI**
+
+- Bundle PipelineWise Singer with the main codebase and install it through the
+  existing Makefile and Docker workflows
+- Run decimal and Snowflake runtime integration tests in CI across twenty E2E
+  shards. Cover failed loads, schema safeguards, and state acknowledgements
+- Grant host networking explicitly when building test images in CI so current
+  Docker builders can start the E2E environment
+
+**Upgrade**
+
+Run `import_config` before resuming replication after upgrading to refresh the
+generated tap settings and decimal schemas. No backfill or resync is required
+for non-key column versioning. FullSync retains its table-replacement behavior
+and removes historical column versions. Existing PostgreSQL numeric primary keys
+on Snowflake remain floating-point. Existing Snowflake primary-key columns need
+FullSync only when intentionally changing them to the current mapping. See the
+[decimal mapping rules](docs/user_guide/schema_changes.rst).
+
+0.93.1 (2026-10-06)
+-------------------
+
+- Skip missing or unselected catalog entries during `fast_sync` without
+  `--tables`. Leave state and PostgreSQL slots unchanged when no tables qualify.
+  See the [resync guide](docs/user_guide/resync.rst).
 
 0.93.0 (2026-09-28)
 -------------------
