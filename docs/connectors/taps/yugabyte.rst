@@ -192,7 +192,9 @@ The full contract -- exact DDL, the rules that must not be varied, what each
 mistake costs, and the feature matrix -- is in
 ``singer-connectors/tap-yugabyte/INDEXES.md``.
 
-Check a tap config against a live source before running it::
+Check a tap config against a live source before running it:
+
+.. code-block:: bash
 
     singer-connectors/tap-yugabyte/tools/yb_index_check.py tap_yugabyte.yml \
       --host <host> --port 5433 --user <user> --dbname <db>
