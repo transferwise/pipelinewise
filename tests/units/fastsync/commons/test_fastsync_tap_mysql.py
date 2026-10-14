@@ -1062,3 +1062,21 @@ class TestFastSyncTapMySql(TestCase):
             'source_column_names': ['payload'],
         }
         mapper.assert_called_once_with('json', 'longtext')
+
+    def test_declared_binary_lengths_reach_target_mapping(self):
+        """Only bounded BINARY and VARBINARY declarations report a source byte length."""
+        self.mysql = FastSyncTapMySql(self.connection_config, Mock(return_value='BINARY(67108864)'))
+        columns = [
+            {'column_name': 'id', 'data_type': 'binary', 'column_type': 'binary(16)'},
+            {'column_name': 'Token', 'data_type': 'varbinary', 'column_type': 'VARBINARY(255)'},
+            {'column_name': 'empty', 'data_type': 'binary', 'column_type': 'binary(0)'},
+            {'column_name': 'payload', 'data_type': 'blob', 'column_type': 'blob'},
+            {'column_name': 'raw_data_hash', 'data_type': 'char', 'column_type': 'char(64)'},
+        ]
+
+        with patch.object(self.mysql, 'get_table_columns', return_value=columns), \
+                patch.object(self.mysql, 'get_primary_keys', return_value=['"ID"']):
+            result = self.mysql.map_column_types_to_target('my_db.my_table')
+
+        assert result['binary_lengths'] == {'ID': 16, 'TOKEN': 255, 'EMPTY': 0}
+        assert tap_mysql.declared_binary_lengths(columns[3:]) == {}

@@ -467,6 +467,64 @@ def test_mysql_extended_types_snowflake(source_export, tmp_path):
             _remove_s3_prefix(target, config['s3_key_prefix'])
 
 
+@pytest.mark.parametrize('source_export', [('mysql', False), ('mariadb', False)], indirect=True)
+def test_mysql_legacy_binary_width_partial_sync_snowflake(source_export, tmp_path):
+    """Merge bounded binary columns into native targets created before the widest BINARY mapping."""
+    source = source_export
+    namespace = f'ppw_legacy_binary_{uuid4().hex[:12]}'
+    schema = namespace.upper()
+    config = {**_target_config(schema, namespace), 'archive_load_files': False}
+    target = FastSyncTargetSnowflake(config)
+    keys = [bytes(15) + bytes([position]) for position in (1, 2, 3)]
+    source.create(
+        [('id', 'BINARY(16) PRIMARY KEY'), ('token', 'VARBINARY(32)'), ('position', 'INTEGER')],
+        [(keys[0], b'\x00\xff', 1), (keys[1], b'', 2), (keys[2], None, 3)],
+    )
+    args = _args(source, config, tmp_path, namespace, replication_key='position')
+    table = f'"{schema}"."{source.table_name.upper()}"'
+    request = (source.table, {
+        'column': 'position', 'start_value': '<S>1', 'end_value': '<S>2', 'drop_target_table': False,
+    })
+
+    def binary_lengths():
+        rows = [{key.lower(): value for key, value in row.items()} for row in target.query(
+            f'SHOW COLUMNS IN TABLE {table}',
+        )]
+        return {
+            row['column_name']: json.loads(row['data_type']).get('length')
+            for row in rows if row['column_name'] in ('ID', 'TOKEN')
+        }
+
+    try:
+        target.create_schema(schema)
+        # FastSync before 0.94 mapped MySQL BINARY and VARBINARY to Snowflake's default BINARY width.
+        target.create_table(schema, source.table, ['"ID" BINARY', '"TOKEN" BINARY', '"POSITION" NUMBER'], ['"ID"'])
+        target.query(
+            f'INSERT INTO {table} ("ID", "TOKEN", "POSITION") '
+            "SELECT TO_BINARY(column1, 'HEX'), TO_BINARY(column2, 'HEX'), column3 "
+            'FROM VALUES (%s, %s, 2), (%s, %s, 3)',
+            (keys[1].hex(), 'AA', keys[2].hex(), 'BB'),
+        )
+        assert binary_lengths() == {'ID': 8388608, 'TOKEN': 8388608}
+
+        result = partial_mysql.partial_sync_table(request, args)
+        assert result is True, result
+        assert binary_lengths() == {'ID': 8388608, 'TOKEN': 8388608}
+        assert target.query(
+            f'SELECT HEX_ENCODE("ID") AS "ID", HEX_ENCODE("TOKEN") AS "TOKEN", "POSITION" '
+            f'FROM {table} ORDER BY "POSITION"',
+        ) == [
+            {'ID': keys[0].hex().upper(), 'TOKEN': '00FF', 'POSITION': 1},
+            {'ID': keys[1].hex().upper(), 'TOKEN': '', 'POSITION': 2},
+            {'ID': keys[2].hex().upper(), 'TOKEN': 'BB', 'POSITION': 3},
+        ]
+    finally:
+        try:
+            target.query(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
+        finally:
+            _remove_s3_prefix(target, config['s3_key_prefix'])
+
+
 @pytest.mark.parametrize('source_export', [('postgres', False), ('mysql', False), ('mariadb', False)], indirect=True)
 def test_decimal_fastsync_postgres(source_export, tmp_path):
     """Each SQL source bulk-loads exact decimals and hands over to Singer PostgreSQL."""

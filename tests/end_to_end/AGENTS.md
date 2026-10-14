@@ -119,7 +119,8 @@ run_e2e \
 run_e2e \
   tests/end_to_end/test_numeric_replication.py::test_postgres_bounded_numeric_key_snowflake \
   tests/end_to_end/test_numeric_replication.py::test_mysql_bounded_decimal_key_snowflake \
-  tests/end_to_end/test_numeric_replication.py::test_mysql_extended_types_snowflake
+  tests/end_to_end/test_numeric_replication.py::test_mysql_extended_types_snowflake \
+  tests/end_to_end/test_numeric_replication.py::test_mysql_legacy_binary_width_partial_sync_snowflake
 
 run_sf_decimal \
   tests/integration/test_decimals.py::test_opt_in_exact_decimal_load_versions_history_and_retries_without_reversion \

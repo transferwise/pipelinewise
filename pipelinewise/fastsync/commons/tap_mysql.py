@@ -4,6 +4,7 @@ import decimal
 import glob
 import logging
 import os
+import re
 import pymysql
 from singer.logger import log_source_host
 import pymysql.cursors
@@ -43,6 +44,16 @@ DEFAULT_SESSION_SQLS = [
 MARIADB_MAX_STATEMENT_TIME_SQL = 'SET @@session.max_statement_time=0'
 MYSQL_MAX_EXECUTION_TIME_SQL = 'SET @@session.max_execution_time=0'
 _REPORTED_SESSION_ENGINE_SELECTIONS = set()
+
+
+def declared_binary_lengths(columns):
+    """Return declared MySQL BINARY and VARBINARY byte lengths keyed by uppercase column name."""
+    lengths = {}
+    for column in columns:
+        match = re.fullmatch(r'(?:var)?binary\((\d+)\)', str(column.get('column_type') or '').strip().lower())
+        if column.get('data_type') in ('binary', 'varbinary') and match:
+            lengths[column['column_name'].upper()] = int(match.group(1))
+    return lengths
 
 
 def resolve_source_engine(connection, configured_engine=None):
@@ -615,6 +626,9 @@ class FastSyncTapMySql:
         ]
         if decimal_columns:
             mapped['decimal_columns'] = decimal_columns
+        binary_lengths = declared_binary_lengths(mysql_columns)
+        if binary_lengths:
+            mapped['binary_lengths'] = binary_lengths
         return mapped
 
     def validate_partial_boundary(self, table_name, column_name):
