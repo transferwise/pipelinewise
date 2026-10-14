@@ -582,6 +582,11 @@ Not every historical omission can be detected from a saved position; resync
 affected tables when upgrading a tap suspected of dropping rows.</p></li>
 <li><p>MariaDB 11.4 zero <code class="docutils literal notranslate"><span class="pre">End_log_pos</span></code> values are supported. Do not enable
 <code class="docutils literal notranslate"><span class="pre">binlog_legacy_event_pos</span></code> for PipelineWise.</p></li>
+<li><p>MariaDB 11.2 and later log extra status variables on some DDL. For example,
+a statement that names a character set without a collation adds one.
+Binlog replication skips status variables that the bundled decoder does not
+recognize. It still reads the statement and continues. No server setting
+change is needed.</p></li>
 <li><p>PipelineWise retries a lost file/position connection twice from
 target-acknowledged state, waiting 30 seconds before the second attempt and
 60 seconds before the third. Recoverable disconnects log warnings; a
