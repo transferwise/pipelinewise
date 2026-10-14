@@ -447,15 +447,20 @@ and can hand ongoing replication over from that position after the merge.</p>
 <td><p>PipelineWise widens the target column before applying the merge.</p></td>
 <td><p>Values are unchanged; the wider column definition applies to the table.</p></td>
 </tr>
-<tr class="row-even"><td><p>Non-key decimal changes type, precision, or scale; it is not the range column</p></td>
+<tr class="row-even"><td><p>MariaDB/MySQL <code class="docutils literal notranslate"><span class="pre">BINARY</span></code> or <code class="docutils literal notranslate"><span class="pre">VARBINARY</span></code> target column is narrower than
+<code class="docutils literal notranslate"><span class="pre">BINARY(67108864)</span></code> but holds the declared source length</p></td>
+<td><p>Existing rows update; new rows insert. The target column keeps its width.</p></td>
+<td><p>Unchanged.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Non-key decimal changes type, precision, or scale; it is not the range column</p></td>
 <td><p>The old column is versioned; the new numeric column receives source values.</p></td>
 <td><p>Old values remain in the versioned column; the new column is <code class="docutils literal notranslate"><span class="pre">NULL</span></code>.</p></td>
 </tr>
-<tr class="row-odd"><td><p>Other incompatible type, width, or precision</p></td>
+<tr class="row-even"><td><p>Other incompatible type, width, or precision</p></td>
 <td><p>PartialSync fails before export; no merge or state advancement.</p></td>
 <td><p>Unchanged.</p></td>
 </tr>
-<tr class="row-even"><td><p>Target row absent from the source range</p></td>
+<tr class="row-odd"><td><p>Target row absent from the source range</p></td>
 <td><p>Deleted.</p></td>
 <td><p>Unchanged.</p></td>
 </tr>
@@ -469,7 +474,10 @@ PipelineWise therefore widens compatible native text columns and adds missing
 columns before starting DML. It checks all overlapping column types before
 export and again before the merge, even when no transformations are configured.
 Numeric precision and scale, binary width, and temporal precision must hold the
-mapped values; timestamp timezone types must match. Missing catalog dimensions
+mapped values; timestamp timezone types must match. A MariaDB/MySQL <code class="docutils literal notranslate"><span class="pre">BINARY</span></code>
+or <code class="docutils literal notranslate"><span class="pre">VARBINARY</span></code> source column only needs a target width that holds its declared
+length. For example, a <code class="docutils literal notranslate"><span class="pre">BINARY(16)</span></code> key merges into an existing
+<code class="docutils literal notranslate"><span class="pre">BINARY(8388608)</span></code> column. Missing catalog dimensions
 fail validation rather than being guessed. Compatible text widening and
 <a class="reference internal" href="schema_changes.html#exact-decimal-mapping"><span class="std std-ref">decimal column versioning</span></a> are automatic. Versioning
 is unavailable for primary keys or the PartialSync range column.
