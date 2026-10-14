@@ -1,3 +1,13 @@
+0.96.2 (2026-10-14)
+-------------------
+
+- Allow native Snowflake PartialSync into narrower `BINARY` target columns, such
+  as those created before 0.94.0. The column must hold the declared length of its
+  MariaDB/MySQL `BINARY` or `VARBINARY` source. Keep the existing target width.
+  Retry affected PartialSyncs without a FullSync. The compatibility report
+  applies the same check. See
+  [native-table merge outcomes](docs/user_guide/partial_sync.rst#native-table-merge-outcomes)
+
 0.96.1 (2026-10-12)
 -------------------
 

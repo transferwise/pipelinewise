@@ -46,6 +46,7 @@ class _PartialSyncRun:
     where_clause_sql: Optional[str] = None
     source_columns: Any = None
     decimal_columns: Any = ()
+    binary_lengths: Dict[str, int] = field(default_factory=dict)
     primary_keys: Any = None
     file_parts: List[str] = field(default_factory=list)
     size_bytes: int = 0
@@ -352,6 +353,7 @@ def _prepare_native_partial_export(run: _PartialSyncRun) -> bool:
     snowflake_types = run.source.map_column_types_to_target(run.table_name)
     run.source_columns = snowflake_types.get('columns', [])
     run.decimal_columns = snowflake_types.get('decimal_columns', ())
+    run.binary_lengths = snowflake_types.get('binary_lengths', {})
     run.primary_keys = snowflake_types.get('primary_key')
     run.boundary = _resolved_boundary(
         run, snowflake_types, start_value, end_value
@@ -372,6 +374,7 @@ def _prepare_native_partial_export(run: _PartialSyncRun) -> bool:
             version_legacy_float_columns=run.args.target.get(
                 'version_legacy_float_columns', False
             ),
+            binary_lengths=run.binary_lengths,
         )
         run.source_columns = columns_diff['staging_columns']
 

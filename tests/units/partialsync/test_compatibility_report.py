@@ -455,6 +455,24 @@ def test_report_opt_in_versions_only_columns_with_source_decimal_provenance():
     assert [row['status'] for row in result['columns']] == ['would_version', 'incompatible']
 
 
+def test_report_accepts_legacy_binary_width_only_with_declared_source_length():
+    target = report.MetadataSnowflakeClient({'dbname': 'db', 'default_target_schema': 'mapped'})
+    source_columns = report.MappedSourceColumns(
+        ['"ID" BINARY(67108864)', '"PAYLOAD" BINARY(67108864)'], (), {'ID': 16},
+    )
+    target_columns = [
+        column('ID', type='BINARY', length=8388608),
+        column('PAYLOAD', type='BINARY', length=8388608),
+    ]
+    with mock.patch.object(report, 'SnowflakeTableInspector') as inspector, \
+            mock.patch.object(report, 'mapped_source_columns', return_value=source_columns), \
+            mock.patch.object(target, 'query', return_value=target_columns):
+        inspector.return_value.discover_table_format.return_value = 'native'
+        result = report._table_report(mock.Mock(), mock.Mock(), target, 'source.orders')
+    assert result['status'] == 'incompatible'
+    assert [row['status'] for row in result['columns']] == ['compatible', 'incompatible']
+
+
 def test_report_carries_catalog_keys_and_configured_partial_boundary():
     properties = catalog('orders')
     properties['streams'][0]['metadata'][0]['metadata']['table-key-properties'] = ['amount']
