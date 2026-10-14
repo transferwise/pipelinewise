@@ -148,6 +148,19 @@ that host reachable, or drop the slot manually if it is not.
 Common tap settings are documented in :ref:`yaml_configuration`. Generate the
 full template with ``pipelinewise init``.
 
+Decimals
+--------
+
+``NUMERIC(p,s)`` and ``DECIMAL(p,s)`` keep their precision and scale on
+Snowflake native and PostgreSQL targets. This applies to every replication
+method and to FullSync and PartialSync. Values and decimal bookmarks travel as
+exact strings, so no digits are lost to floating point.
+
+Numeric primary keys stay fixed-point on Snowflake when their declaration fits.
+YugabyteDB rejects ``NaN`` in decimal columns, so these keys never need the
+text mapping that PostgreSQL keys use. See :ref:`exact_decimal_mapping` for the
+fallback used by wider or unconstrained declarations.
+
 Arrays, enums, composite types, and other user-defined types are discovered
 with inclusion ``unsupported`` and excluded from the sync. ``hstore`` is
 available on YugabyteDB and is exported as-is; it is not mapped to

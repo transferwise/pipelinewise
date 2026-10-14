@@ -98,6 +98,7 @@ run_e2e \
 
 run_e2e \
   'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[postgres-native]' \
+  'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[yugabyte-native]' \
   tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_transformations_are_private_through_publication
 
 run_e2e \
@@ -121,6 +122,7 @@ run_e2e \
 
 run_e2e \
   tests/end_to_end/test_numeric_replication.py::test_postgres_bounded_numeric_key_snowflake \
+  tests/end_to_end/test_numeric_replication.py::test_yugabyte_bounded_numeric_key_snowflake \
   tests/end_to_end/test_numeric_replication.py::test_mysql_bounded_decimal_key_snowflake \
   tests/end_to_end/test_numeric_replication.py::test_mysql_extended_types_snowflake
 

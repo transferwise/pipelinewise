@@ -14,6 +14,8 @@ from typing import Callable, Dict, Optional, Tuple
 from . import utils, split_gzip, yb_retry
 from .partial_sync_boundary import PartialSyncBoundary
 from .source_transformations import compile_source_select, quote_source_identifier, validate_bookmark_column
+from .source_numeric import decimal_text_expression, require_exact_decimal_boundary, warn_decimal_mapping
+from singer.decimal_support import postgres_numeric_scale
 from ...utils import safe_column_name
 
 LOGGER = logging.getLogger(__name__)
@@ -403,7 +405,7 @@ class FastSyncTapYugabyte:
             key_value = yb_key_value.isoformat() + 'T00:00:00'
 
         elif isinstance(yb_key_value, decimal.Decimal):
-            key_value = float(yb_key_value)
+            key_value = str(yb_key_value)
 
         return {
             'replication_key': replication_key,
@@ -475,6 +477,8 @@ class FastSyncTapYugabyte:
                     ,CASE WHEN udt_name = 'hstore' THEN 'hstore' ELSE data_type END AS data_type
                     ,safe_sql_value
                     ,character_maximum_length
+                    ,numeric_precision
+                    ,numeric_scale
                 FROM (SELECT
                 column_name,
                 data_type,
@@ -496,7 +500,9 @@ class FastSyncTapYugabyte:
                     WHEN data_type IN ('smallint', 'integer', 'bigint', 'serial', 'bigserial') THEN {integer_format} || ' AS ' || column_name
                     ELSE '"'||column_name||'"'
                 END AS safe_sql_value,
-                character_maximum_length
+                character_maximum_length,
+                numeric_precision,
+                numeric_scale
                 FROM information_schema.columns
                 WHERE table_schema = '{schema_name}'
                     AND table_name = '{table_name}'
@@ -511,27 +517,71 @@ class FastSyncTapYugabyte:
         Map YSQL column types to equivalent types in target
         """
         yb_columns = self.get_table_columns(table_name)
+        primary_keys = self.get_primary_keys(table_name)
+        key_names = {str(name).strip('"`').upper() for name in (primary_keys or ())}
         mapped_columns = []
         for pc in yb_columns:
-            column_type = (
-                'VARIANT'
-                if pc[1] == 'hstore' and self.hstore_as_json
-                else self.tap_type_to_target_type(pc[1])
-            )
-            # YSQL bit type can have length greater than 1
-            # most targets would want to map length 1 to boolean and the rest to number
-            if isinstance(column_type, list):
-                column_type = column_type[1 if pc[3] > 1 else 0]
-            mapping = '{} {}'.format(
-                safe_column_name(pc[0], self.target_quote), column_type
-            )
-            mapped_columns.append(mapping)
+            name = safe_column_name(pc[0], self.target_quote)
+            column_type = self._mapped_column_type(pc[1], pc[3], *pc[4:6], is_key=pc[0].upper() in key_names)
+            if pc[1] in ('numeric', 'decimal'):
+                precision, scale = pc[4], postgres_numeric_scale(pc[5])
+                declaration = 'NUMERIC' if precision is None else f'NUMERIC({precision},{scale})'
+                warn_decimal_mapping(name, declaration, column_type)
+            mapped_columns.append(f'{name} {column_type}')
 
-        return {
+        mapped = {
             'columns': mapped_columns,
-            'primary_key': self.get_primary_keys(table_name),
+            'primary_key': primary_keys,
             'source_column_names': [column[0] for column in yb_columns],
         }
+        decimal_columns = [column[0].upper() for column in yb_columns if column[1] in ('numeric', 'decimal')]
+        if decimal_columns:
+            mapped['decimal_columns'] = decimal_columns
+        return mapped
+
+    def validate_partial_boundary(self, table_name, column_name):
+        """Check the source declaration when a range maps to FLOAT or text."""
+        for column in self.get_table_columns(table_name):
+            if column[0] == column_name:
+                require_exact_decimal_boundary(column_name, column[1])
+                return
+
+    def _mapped_column_type(self, data_type, character_maximum_length, numeric_precision=None, numeric_scale=None,
+                            is_key=False):
+        """Share the target mapping between DDL and transformation validation."""
+        if data_type in ('numeric', 'decimal'):
+            kwargs = {'is_key': True} if is_key else {}
+            return self.tap_type_to_target_type(
+                data_type, character_maximum_length, numeric_precision, postgres_numeric_scale(numeric_scale), **kwargs,
+            )
+        column_type = (
+            'VARIANT' if data_type == 'hstore' and self.hstore_as_json else self.tap_type_to_target_type(data_type)
+        )
+        # YSQL bit type can have length greater than 1
+        # most targets would want to map length 1 to boolean and the rest to number
+        if isinstance(column_type, list):
+            column_type = column_type[1 if character_maximum_length > 1 else 0]
+        return column_type
+
+    def _decimal_key_projection(self, table_name, columns):
+        """Export text-mapped decimal keys canonically so equal numbers keep one identity."""
+        candidates = {column['column_name'] for column in columns
+                      if column.get('data_type') in ('numeric', 'decimal') and self._mapped_column_type(
+                          column['data_type'], None, column.get('numeric_precision'), column.get('numeric_scale'),
+                          is_key=True,
+                      ) == 'VARCHAR(134217728)'}
+        if not candidates:
+            return columns, ()
+        primary_keys = self.get_primary_keys(table_name) or ()
+        projected = []
+        for column in columns:
+            name = column['column_name']
+            if name in candidates and safe_column_name(name, self.target_quote) in primary_keys:
+                identifier = quote_source_identifier(name, 'postgres')
+                expression = decimal_text_expression(identifier, 'postgres')
+                column = dict(column, safe_sql_value=f'{expression} AS {identifier}')
+            projected.append(column)
+        return projected, primary_keys
 
     def copy_table(
         self,
@@ -544,6 +594,7 @@ class FastSyncTapYugabyte:
         split_file_max_chunks=20,
         compress=True,
         boundary=None,
+        decimal_float_columns=(),
     ):
         """
         Export data from table to a zipped csv
@@ -599,6 +650,7 @@ class FastSyncTapYugabyte:
                 self.curr.execute(f"SET yb_read_time TO '{self._snapshot_ht} ht'")
 
             table_columns = self.get_table_columns(full_table_name, max_num, date_type)
+            table_columns, _ = self._decimal_key_projection(full_table_name, table_columns)
             column_safe_sql_values = [c.get('safe_sql_value') for c in table_columns]
 
             # If self.get_table_columns returns zero row then table not exist
@@ -608,7 +660,7 @@ class FastSyncTapYugabyte:
             source_boundary = (
                 boundary.source_sql(
                     'postgres',
-                    [column[0] for column in table_columns],
+                    [column.get('column_name') or column[0] for column in table_columns],
                 )
                 if boundary is not None
                 else None
@@ -641,7 +693,9 @@ class FastSyncTapYugabyte:
                 f'SELECT {",".join(column_safe_sql_values)} '
                 f'FROM {schema_name}."{bare_table_name}"{where_clause}'
             )
-            transformed = self._compile_source_projection(full_table_name, table_columns, where_clause)
+            transformed = self._compile_source_projection(
+                full_table_name, table_columns, where_clause, decimal_float_columns=decimal_float_columns,
+            )
             if transformed is not None:
                 select_sql = (
                     f'SELECT _ppw_export.*, {",".join(metadata_columns)} '
@@ -671,17 +725,21 @@ class FastSyncTapYugabyte:
             before_retry=_discard_partial_export,
         )
 
-    def _compile_source_projection(self, table_name, table_columns, where_clause=''):
+    def _compile_source_projection(self, table_name, table_columns, where_clause='', decimal_float_columns=()):
         if self.source_transformations is None:
             return None
+        decimal_float_columns = {str(name).upper() for name in decimal_float_columns}
+        table_columns, primary_keys = self._decimal_key_projection(table_name, table_columns)
         columns = []
         for column in table_columns:
-            target_type = (
-                'VARIANT' if column['data_type'] == 'hstore' and self.hstore_as_json
-                else self.tap_type_to_target_type(column['data_type'])
-            )
-            if isinstance(target_type, list):
-                target_type = target_type[1 if column['character_maximum_length'] > 1 else 0]
+            if column['column_name'].upper() in decimal_float_columns:
+                target_type = 'FLOAT'
+            else:
+                target_type = self._mapped_column_type(
+                    column['data_type'], column.get('character_maximum_length'),
+                    column.get('numeric_precision'), column.get('numeric_scale'),
+                    is_key=safe_column_name(column['column_name'], self.target_quote) in primary_keys,
+                )
             columns.append(dict(column, target_type=target_type))
         table_reference = '.'.join(
             quote_source_identifier(part, 'postgres') for part in table_name.split('.')
@@ -697,18 +755,19 @@ class FastSyncTapYugabyte:
 
     def export_source_table_data(
             self, args: Namespace, tap_id: str,
-            boundary: PartialSyncBoundary = None) -> list:
+            boundary: PartialSyncBoundary = None, decimal_float_columns=()) -> list:
         """Exporting data from the source table"""
         filename = utils.gen_export_filename(tap_id=tap_id, table=args.table, sync_type='partialsync')
         filepath = os.path.join(args.temp_dir, filename)
 
-        self.copy_table(
-            args.table,
-            filepath,
-            split_large_files=args.target.get('split_large_files'),
-            split_file_chunk_size_mb=args.target.get('split_file_chunk_size_mb'),
-            split_file_max_chunks=args.target.get('split_file_max_chunks'),
-            boundary=boundary
-        )
+        copy_options = {
+            'split_large_files': args.target.get('split_large_files'),
+            'split_file_chunk_size_mb': args.target.get('split_file_chunk_size_mb'),
+            'split_file_max_chunks': args.target.get('split_file_max_chunks'),
+            'boundary': boundary,
+        }
+        if decimal_float_columns:
+            copy_options['decimal_float_columns'] = decimal_float_columns
+        self.copy_table(args.table, filepath, **copy_options)
         file_parts = glob.glob(f'{filepath}*')
         return file_parts

@@ -39,6 +39,7 @@ import singer
 from singer import utils
 from functools import partial
 from singer import metrics
+from singer.decimal_support import decimal_bookmark, is_decimal_schema
 
 import tap_yugabyte.db as yb_db
 import tap_yugabyte.keyset as keyset
@@ -120,6 +121,8 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
     # report that as a stall.
     replication_key_value = singer.get_bookmark(state, stream['tap_stream_id'], 'replication_key_value')
     replication_key_sql_datatype = md_map.get(('properties', replication_key)).get('sql-datatype')
+    state, replication_key_value, replication_key_sql_datatype = _decimal_bookmark_boundary(
+        stream, state, replication_key, replication_key_value, replication_key_sql_datatype)
 
     hstore_available = yb_db.hstore_available(conn_info)
     buckets = conn_info.get('keyset_buckets', keyset.BUCKETS_DEFAULT)
@@ -287,6 +290,29 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
                               replication_key_value, rows_saved,
                               conn_info['limit'])
     return state
+
+
+def _decimal_bookmark_boundary(stream, state, replication_key, value, sql_datatype):
+    """Convert a decimal bookmark to the exact boundary every attempt resumes from."""
+    key_schema = stream.get('schema', {}).get('properties', {}).get(replication_key, {})
+    if value is None or not is_decimal_schema(key_schema):
+        return state, value, sql_datatype
+    try:
+        if isinstance(value, float):
+            raise ValueError('Decimal bookmarks must be exact strings')
+        value = decimal_bookmark(value, key_schema)
+    except ValueError as exc:
+        raise ValueError(
+            f'Invalid decimal bookmark for stream {stream["tap_stream_id"]}, column {replication_key}'
+        ) from exc
+    if value is None:
+        LOGGER.warning('Replaying the full stream %s because decimal bookmark column %s has a nonfinite boundary',
+                       stream['tap_stream_id'], replication_key)
+    # Each retry rebuilds its statement from state, so it must see the converted boundary.
+    state = singer.write_bookmark(state, stream['tap_stream_id'], 'replication_key_value', value)
+    # A stored exact bookmark can remain outside a later, narrower typmod.
+    # YugabyteDB can still compare the current column with an unbounded numeric boundary.
+    return state, value, 'numeric'
 
 
 def _warn_if_bookmark_stalled(stream, state, replication_key, started_at,

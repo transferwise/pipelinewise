@@ -28,6 +28,7 @@ connection to one hybrid time.
 """
 
 import copy
+import decimal
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -164,6 +165,11 @@ def _sync_table_without_pk(conn_info, stream, state, desired_columns, md_map):
 # ------------------------------------------------- bucketed keyset scan
 
 
+def _bookmark_values(values):
+    """Keep NUMERIC key bounds exact in state; Singer serializes Decimal as float."""
+    return [str(value) if isinstance(value, decimal.Decimal) else value for value in values]
+
+
 def _fetch_max_pk_values(conn_info, fq_table_name, table_name, pk_columns, buckets):
     """Snapshot the largest primary-key tuple, bounding the scan against inserts
     that land while it runs.
@@ -192,7 +198,7 @@ def _fetch_max_pk_values(conn_info, fq_table_name, table_name, pk_columns, bucke
                 LOGGER.info('select %s', select_sql)
                 cur.execute(select_sql)
                 row = cur.fetchone()
-                return None if row is None else [row[i] for i in range(len(pk_columns))]
+                return None if row is None else _bookmark_values(row[i] for i in range(len(pk_columns)))
 
     return retry_read(probe, f'max primary key probe on {fq_table_name}')
 
@@ -291,7 +297,7 @@ def _scan_bucket(conn_info, stream, state, desired_columns, md_map, pk_columns,
                             stream, rec, stream_version, desired_columns,
                             time_extracted, md_map)
                         rows_saved += 1
-                        emit(message, bucket, [rec[i] for i in pk_indices],
+                        emit(message, bucket, _bookmark_values(rec[i] for i in pk_indices),
                              flush=rows_saved % UPDATE_BOOKMARK_PERIOD == 0)
                         counter.increment()
 

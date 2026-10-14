@@ -1,8 +1,18 @@
-0.97.0 (2026-10-13)
+0.97.0 (2026-10-14)
 -------------------
 
 **tap-yugabyte**
 
+- Keep `NUMERIC(p,s)` and `DECIMAL(p,s)` precision and scale on Snowflake
+  native and PostgreSQL targets, for every replication method and for
+  FullSync and PartialSync. Send decimal values and bookmarks as exact strings.
+  See [YugabyteDB decimals](docs/connectors/taps/yugabyte.rst#decimals)
+- Keep numeric primary keys fixed-point on Snowflake when their declaration
+  fits, because YugabyteDB rejects `NaN` in decimal columns
+- Refresh a LOG_BASED stream's schema when a column's numeric precision or
+  scale changes, using the type details wal2json now sends on decimal routes
+- Store FULL_TABLE resume positions for `NUMERIC` primary keys as exact text,
+  so a resumed sync cannot skip or repeat keys longer than about 15 digits
 - Reject malformed LOG_BASED WAL payloads before consuming a commit, so invalid
   JSON, UTF-8, missing row fields, or empty column/identity lists cannot advance
   a checkpoint past missing rows

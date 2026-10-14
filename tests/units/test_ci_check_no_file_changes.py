@@ -316,6 +316,7 @@ def test_snowflake_e2e_matrix_contract():
             'e2e_tests_10',
             (
                 'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[postgres-native]',
+                'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[yugabyte-native]',
                 'tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_transformations_are_private_through_publication',
             ),
         ),
@@ -351,6 +352,7 @@ def test_snowflake_e2e_matrix_contract():
             'e2e_tests_14',
             (
                 'tests/end_to_end/test_numeric_replication.py::test_postgres_bounded_numeric_key_snowflake',
+                'tests/end_to_end/test_numeric_replication.py::test_yugabyte_bounded_numeric_key_snowflake',
                 'tests/end_to_end/test_numeric_replication.py::test_mysql_bounded_decimal_key_snowflake',
                 'tests/end_to_end/test_numeric_replication.py::test_mysql_extended_types_snowflake',
             ),
@@ -459,7 +461,7 @@ def test_snowflake_e2e_matrix_contract():
 
     assert set(selected_tests) == expected_tests
     split_test_counts = {
-        'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake': 6,
+        'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake': 7,
         'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake': 6,
         'tests/end_to_end/test_numeric_replication.py::test_legacy_decimal_float_migration_requires_opt_in': 6,
     }

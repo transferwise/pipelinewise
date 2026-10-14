@@ -12,6 +12,7 @@ from ..logger import Logger
 from .commons import utils
 from .commons.tap_yugabyte import FastSyncTapYugabyte
 from .commons.target_postgres import FastSyncTargetPostgres
+from .commons.source_numeric import yugabyte_decimal_type
 
 LOGGER = Logger().get_logger(__name__)
 
@@ -30,8 +31,12 @@ REQUIRED_CONFIG_KEYS = {
 LOCK = multiprocessing.Lock()
 
 
-def tap_type_to_target_type(yb_type, *_):
+def tap_type_to_target_type(
+    yb_type, _character_length=None, numeric_precision=None, numeric_scale=None, *, is_key=False,
+):
     """Data type mapping from YugabyteDB (YSQL) to Postgres"""
+    if yb_type in ('numeric', 'decimal'):
+        return yugabyte_decimal_type(numeric_precision, numeric_scale, 'postgres', is_key=is_key)
     return {
         'char': 'CHARACTER VARYING',
         'character': 'CHARACTER VARYING',
@@ -48,7 +53,6 @@ def tap_type_to_target_type(yb_type, *_):
         'smallserial': 'DOUBLE PRECISION',
         'serial': 'DOUBLE PRECISION',
         'bigserial': 'DOUBLE PRECISION',
-        'numeric': 'DOUBLE PRECISION',
         'double precision': 'DOUBLE PRECISION',
         'real': 'DOUBLE PRECISION',
         'bool': 'BOOLEAN',

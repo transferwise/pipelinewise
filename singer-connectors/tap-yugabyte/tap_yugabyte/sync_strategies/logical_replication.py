@@ -13,12 +13,14 @@ import warnings
 from select import select
 from psycopg2 import sql
 from singer import metadata, utils, get_bookmark
+from singer.decimal_support import decimal_to_string, is_decimal_schema
 from dateutil.parser import parse, UnknownTimezoneWarning, ParserError
 from functools import reduce
 
 import tap_yugabyte.db as yb_db
 import tap_yugabyte.sync_strategies.common as sync_common
 from tap_yugabyte.stream_utils import refresh_streams_schema
+from tap_yugabyte.discovery_utils import Column, schema_for_column
 
 LOGGER = singer.get_logger('tap_yugabyte')
 
@@ -67,7 +69,7 @@ def _decode_wal_payload(msg, conn_info, slot=None):
     context = f"LSN {msg.data_start}, slot {slot or 'unknown'}, tap {conn_info.get('tap_id', 'unknown')}"
     try:
         payload = msg.payload.decode('utf-8') if isinstance(msg.payload, bytes) else msg.payload
-        message_payload = json.loads(payload)
+        message_payload = parse_wal_payload(payload, conn_info)
     except (TypeError, ValueError) as exc:
         # Preserve the decoding cause without retaining source record bytes in tracebacks.
         if isinstance(exc, UnicodeDecodeError):
@@ -389,7 +391,16 @@ def row_to_singer_message(stream, row, version, columns, time_extracted, md_map,
             LOGGER.info("No sql-datatype found for stream %s: %s", stream, columns[idx])
             raise Exception(f"Unable to find sql-datatype for stream {stream}")
 
-        cleaned_elem = selected_value_to_singer_value(elem, sql_datatype, conn_info)
+        column_schema = stream.get('schema', {}).get('properties', {}).get(columns[idx], {})
+        if is_decimal_schema(column_schema):
+            cleaned_elem = decimal_to_string(elem, column_schema)
+        else:
+            if (conn_info or {}).get('decimal_target') and elem is not None:
+                if sql_datatype in {'real', 'double precision'}:
+                    elem = float(elem)
+                elif sql_datatype in {'smallint', 'integer', 'bigint'}:
+                    elem = int(elem)
+            cleaned_elem = selected_value_to_singer_value(elem, sql_datatype, conn_info)
         row_to_persist += (cleaned_elem,)
 
     rec = dict(zip(columns, row_to_persist))
@@ -399,6 +410,77 @@ def row_to_singer_message(stream, row, version, columns, time_extracted, md_map,
         record=rec,
         version=version,
         time_extracted=time_extracted)
+
+
+def parse_wal_payload(payload, conn_info):
+    """Preserve decimal tokens before source-column conversion on enabled routes."""
+    # Unbounded NUMERIC may exceed Python's integer digit limit on older wal2json.
+    options = {'parse_float': decimal.Decimal, 'parse_int': str} if conn_info.get('decimal_target') else {}
+    return json.loads(payload, **options)
+
+
+def changed_decimal_columns(payload, stream):
+    """Detect numeric typmod changes carried by wal2json on enabled routes."""
+    changed = set()
+    properties = stream['schema']['properties']
+    for column in payload.get('columns', payload.get('identity', [])):
+        sql_type = column.get('type', '')
+        schema = properties.get(column['name'], {})
+        if sql_type == 'numeric':
+            dimensions = {'precision': None, 'scale': None}
+        else:
+            match = re.fullmatch(r'numeric\((\d+),\s*(-?\d+)\)', sql_type)
+            if not match:
+                if is_decimal_schema(schema) and sql_type:
+                    changed.add(column['name'])
+                continue
+            dimensions = {'precision': int(match[1]), 'scale': int(match[2])}
+        if not is_decimal_schema(schema) or schema['decimal'] != dimensions:
+            changed.add(column['name'])
+    return changed
+
+
+def reconcile_wal_decimal_schema(payload, stream, previous_metadata, decimal_target):
+    """Use event type metadata when live discovery cannot describe a WAL row."""
+    unresolved = changed_decimal_columns(payload, stream)
+    if not unresolved:
+        return
+    LOGGER.warning('Using WAL type metadata for stream %s, columns %s after schema discovery did not converge',
+                   stream['tap_stream_id'], ', '.join(sorted(unresolved)))
+    md_map = metadata.to_map(stream['metadata'])
+    key_properties = md_map.get((), {}).get('table-key-properties', [])
+    for column in payload.get('columns', payload.get('identity', [])):
+        name = column['name']
+        if name not in unresolved:
+            continue
+        sql_type = column['type']
+        numeric = re.fullmatch(r'numeric(?:\((\d+),\s*(-?\d+)\))?', sql_type)
+        type_modifier = re.search(r'\((\d+)\)', sql_type)
+        sql_type = re.sub(r'\([^)]*\)', '', sql_type)
+        precision = int(numeric[1]) if numeric and numeric[1] else {
+            'smallint': 16, 'integer': 32, 'bigint': 64,
+        }.get(sql_type)
+        scale = int(numeric[2]) if numeric and numeric[2] else None
+        description = Column(name, name in key_properties, sql_type,
+                             int(type_modifier[1]) if type_modifier else None,
+                             precision, scale, sql_type.endswith('[]'), False,
+                             key_properties.index(name) if name in key_properties else None)
+        column_schema = schema_for_column(description, decimal_target)
+        stream['schema']['properties'][name] = column_schema or {'type': ['null', 'string']}
+        field_metadata = md_map.setdefault(('properties', name), dict(previous_metadata.get(('properties', name), {})))
+        field_metadata.setdefault('inclusion', 'available')
+        field_metadata['sql-datatype'] = sql_type
+    stream['metadata'] = metadata.to_list(md_map)
+
+
+def refresh_message_schema(stream, payload, conn_info):
+    """Refresh a changed stream and reconcile decimal metadata before publication."""
+    previous_metadata = metadata.to_map(stream['metadata'])
+    refresh_streams_schema(conn_info, [stream])
+    if conn_info.get('decimal_target'):
+        reconcile_wal_decimal_schema(payload, stream, previous_metadata, conn_info['decimal_target'])
+    add_automatic_properties(stream, conn_info.get('debug_lsn', False))
+    sync_common.send_schema_message(stream, ['lsn'], record_update_mode=sync_common.PATCH_RECORD_UPDATE_MODE)
 
 
 def consume_message(streams, state, msg, time_extracted, conn_info, *, message_payload=None, slot=None):
@@ -461,22 +543,14 @@ def consume_message(streams, state, msg, time_extracted, conn_info, *, message_p
     if action in {'I', 'U'}:
         diff = {column['name'] for column in message_payload['columns']}.\
             difference(target_stream['schema']['properties'].keys())
+    if conn_info.get('decimal_target'):
+        # A DELETE can be the first row event after a numeric typmod change.
+        diff.update(changed_decimal_columns(message_payload, target_stream))
 
     # if there is new columns in the payload that are not in the schema properties then refresh the stream schema
     if diff:
-        LOGGER.info('Detected new columns "%s", refreshing schema of stream %s', diff, target_stream['stream'])
-        # encountered a column that is not in the schema
-        # refresh the stream schema and metadata by running discovery
-        refresh_streams_schema(conn_info, [target_stream])
-
-        # add the automatic properties back to the stream
-        add_automatic_properties(target_stream, conn_info.get('debug_lsn', False))
-
-        # publish new schema
-        sync_common.send_schema_message(
-            target_stream,
-            ['lsn'],
-            record_update_mode=sync_common.PATCH_RECORD_UPDATE_MODE)
+        LOGGER.info('Detected changed columns "%s", refreshing schema of stream %s', diff, target_stream['stream'])
+        refresh_message_schema(target_stream, message_payload, conn_info)
 
     stream_version = get_stream_version(target_stream['tap_stream_id'], state)
     stream_md_map = metadata.to_map(target_stream['metadata'])
@@ -622,6 +696,23 @@ def _write_lsn_state(state, logical_streams, lsn):
     return state
 
 
+def wal2json_options(logical_streams, conn_info):
+    """Build wal2json options; decimal routes need typmods and exact numeric text."""
+    decimal_target = conn_info.get('decimal_target')
+    options = {
+        'format-version': '2',
+        'include-transaction': 'true',
+        'include-timestamp': 'true',
+        'include-types': 'true' if decimal_target else 'false',
+        'actions': 'insert,update,delete',
+        'add-tables': streams_to_wal2json_tables(logical_streams)
+    }
+    if decimal_target:
+        # YugabyteDB bundles a wal2json that accepts both options, unlike self-managed PostgreSQL.
+        options.update({'include-typmod': 'true', 'numeric-data-types-as-string': 'true'})
+    return options
+
+
 def sync_tables(conn_info, logical_streams, state, end_lsn, state_file, *, wal_progress_content=None):  # noqa: C901
     target_acknowledged_lsn = _minimum_acknowledged_lsn(state, logical_streams)
     initial_stream_lsns = {
@@ -665,14 +756,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file, *, wal_p
                               decode=True,
                               start_lsn=start_lsn,
                               status_interval=poll_interval,
-                              options={
-                                  'format-version': '2',
-                                  'include-transaction': 'true',
-                                  'include-timestamp': 'true',
-                                  'include-types': 'false',
-                                  'actions': 'insert,update,delete',
-                                  'add-tables': streams_to_wal2json_tables(logical_streams)
-                              })
+                              options=wal2json_options(logical_streams, conn_info))
 
     except psycopg2.ProgrammingError as ex:
         raise Exception(f"Unable to start replication with logical replication (slot {ex})") from ex

@@ -37,7 +37,10 @@ def do_discovery(conn_config):
     """
     with post_db.open_connection(conn_config) as conn:
         LOGGER.info("Discovering db %s", conn_config['dbname'])
-        streams = discover_db(conn, conn_config.get('filter_schemas'))
+        discovery_options = (
+            {'decimal_target': conn_config['decimal_target']} if conn_config.get('decimal_target') else {}
+        )
+        streams = discover_db(conn, conn_config.get('filter_schemas'), **discovery_options)
 
     if len(streams) == 0:
         raise RuntimeError('0 tables were discovered across the entire cluster')
@@ -368,6 +371,8 @@ def main_impl():
         'logical_poll_total_seconds': float(args.config.get('logical_poll_total_seconds', 0)),
         'limit': int(limit) if limit else None
     }
+    if args.config.get('decimal_target'):
+        conn_config['decimal_target'] = args.config['decimal_target']
 
     if args.config.get('ssl') == 'true':
         conn_config['sslmode'] = 'require'
