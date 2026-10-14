@@ -186,6 +186,11 @@ Operational notes
   affected tables when upgrading a tap suspected of dropping rows.
 - MariaDB 11.4 zero ``End_log_pos`` values are supported. Do not enable
   ``binlog_legacy_event_pos`` for PipelineWise.
+- MariaDB 11.2 and later log extra status variables on some DDL. For example,
+  a statement that names a character set without a collation adds one.
+  Binlog replication skips status variables that the bundled decoder does not
+  recognize. It still reads the statement and continues. No server setting
+  change is needed.
 - PipelineWise retries a lost file/position connection twice from
   target-acknowledged state, waiting 30 seconds before the second attempt and
   60 seconds before the third. Recoverable disconnects log warnings; a
