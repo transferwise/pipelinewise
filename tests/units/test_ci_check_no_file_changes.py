@@ -355,6 +355,7 @@ def test_snowflake_e2e_matrix_contract():
                 'tests/end_to_end/test_numeric_replication.py::test_yugabyte_bounded_numeric_key_snowflake',
                 'tests/end_to_end/test_numeric_replication.py::test_mysql_bounded_decimal_key_snowflake',
                 'tests/end_to_end/test_numeric_replication.py::test_mysql_extended_types_snowflake',
+                'tests/end_to_end/test_numeric_replication.py::test_mysql_legacy_binary_width_partial_sync_snowflake',
             ),
         ),
         'connector-evolution': (

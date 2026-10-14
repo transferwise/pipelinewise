@@ -14,7 +14,7 @@ from pipelinewise.fastsync.commons.rdbms_source import RdbmsSnowflakeSource
 from pipelinewise.fastsync.commons.snowflake_iceberg_inspection import SnowflakeTableInspector
 from pipelinewise.fastsync.commons.snowflake_iceberg_model import SnowflakeObjectName
 from pipelinewise.fastsync.commons.snowflake_sql_client import SnowflakeSqlClient
-from pipelinewise.fastsync.commons.tap_mysql import FastSyncTapMySql, resolve_source_engine
+from pipelinewise.fastsync.commons.tap_mysql import FastSyncTapMySql, declared_binary_lengths, resolve_source_engine
 from pipelinewise.fastsync.commons.tap_postgres import FastSyncTapPostgres
 from pipelinewise.fastsync.mysql_to_snowflake import tap_type_to_target_type as mysql_type
 from pipelinewise.fastsync.postgres_to_snowflake import tap_type_to_target_type as postgres_type
@@ -27,11 +27,12 @@ class ReportInputError(ValueError):
 
 
 class MappedSourceColumns(list):
-    """Mapped definitions with transient source decimal provenance."""
+    """Mapped definitions with transient source decimal and binary-length provenance."""
 
-    def __init__(self, columns, decimal_columns):
+    def __init__(self, columns, decimal_columns, binary_lengths=None):
         super().__init__(columns)
         self.decimal_columns = frozenset(decimal_columns)
+        self.binary_lengths = dict(binary_lengths or {})
 
 
 class MetadataSnowflakeClient(SnowflakeSqlClient):
@@ -150,7 +151,8 @@ def mapped_source_columns(connection, source, table, primary_keys=()):
         for column in columns
         if (column[1] if postgres else column.get('data_type')) in ('numeric', 'decimal')
     ]
-    return MappedSourceColumns(source.map_table_columns(columns, primary_keys), decimal_columns)
+    binary_lengths = {} if postgres else declared_binary_lengths(columns)
+    return MappedSourceColumns(source.map_table_columns(columns, primary_keys), decimal_columns, binary_lengths)
 
 
 def _table_report(
@@ -181,6 +183,7 @@ def _table_report(
             primary_keys=primary_keys, boundary_column=boundary_column,
             decimal_columns=getattr(mapped, 'decimal_columns', ()),
             version_legacy_float_columns=version_legacy_float_columns,
+            binary_lengths=getattr(mapped, 'binary_lengths', {}),
         )
         status = 'incompatible' if any(row['status'] == 'incompatible' for row in column_report) else 'compatible'
         return {**result, 'status': status, 'columns': column_report}

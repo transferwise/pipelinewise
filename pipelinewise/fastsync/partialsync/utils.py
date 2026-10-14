@@ -87,7 +87,7 @@ def delete_s3_objects(
 
 def diff_source_target_columns(
     target_sf: dict, source_columns: list, primary_keys=(), boundary_column=None, decimal_columns=(),
-    version_legacy_float_columns=False,
+    version_legacy_float_columns=False, binary_lengths=None,
 ) -> dict:
     """Finding the diff between source and target columns"""
     target_column = target_sf['sf_object'].query(
@@ -107,7 +107,7 @@ def diff_source_target_columns(
     )
     versions = _validate_existing_column_types(
         target_sf, source_columns_dict, target_columns_info, primary_keys, boundary_column, decimal_columns,
-        version_legacy_float_columns,
+        version_legacy_float_columns, binary_lengths,
     )
     staging_columns = _staging_source_columns(
         source_columns_dict,
@@ -115,6 +115,7 @@ def diff_source_target_columns(
         primary_keys,
         decimal_columns,
         version_legacy_float_columns,
+        binary_lengths,
     )
 
     return {
@@ -130,7 +131,7 @@ def diff_source_target_columns(
 
 def report_source_target_columns(
     target_sf: dict, source_columns: list, target_columns: list, primary_keys=(), boundary_column=None,
-    decimal_columns=(), version_legacy_float_columns=False,
+    decimal_columns=(), version_legacy_float_columns=False, binary_lengths=None,
 ) -> list:
     """Report every mapped column using the same checks as native PartialSync."""
     rows_by_name = {}
@@ -163,7 +164,7 @@ def report_source_target_columns(
                 )
                 versions = _validate_existing_column_types(
                     target_sf, {name: source_type}, metadata, primary_keys, boundary_column, decimal_columns,
-                    version_legacy_float_columns,
+                    version_legacy_float_columns, binary_lengths,
                 )
                 result['status'] = 'would_version' if versions else 'would_widen' if widening else 'compatible'
             except (NativePartialSyncCompatibilityError, ValueError, TypeError, KeyError) as exc:
@@ -501,11 +502,12 @@ def _native_target_name(target_sf):
 
 def _validate_existing_column_types(
     target_sf, source_columns_dict, target_columns_info, primary_keys=(), boundary_column=None, decimal_columns=(),
-    version_legacy_float_columns=False,
+    version_legacy_float_columns=False, binary_lengths=None,
 ):
     versions = {}
     primary_keys = {str(key).strip('"').upper() for key in primary_keys or ()}
     decimal_columns = {str(name).strip('"').upper() for name in decimal_columns or ()}
+    binary_lengths = binary_lengths or {}
     for name, source_type in source_columns_dict.items():
         metadata = target_columns_info['type_metadata'].get(name)
         if metadata is None:
@@ -533,7 +535,9 @@ def _validate_existing_column_types(
             if actual.startswith('NUMBER(') or actual == 'FLOAT':
                 versions[name] = source_type
                 continue
-        if not _native_type_accepts(actual, expected):
+        if not _native_type_accepts(actual, expected) and not _holds_declared_binary(
+            actual, expected, binary_lengths.get(column_name),
+        ):
             raise NativePartialSyncCompatibilityError(
                 f'Native PartialSync cannot safely publish {name} as {expected}: '
                 f'existing target {_native_target_name(target_sf)} has type {actual}. '
@@ -544,22 +548,28 @@ def _validate_existing_column_types(
 
 def _staging_source_columns(
     source_columns_dict, target_columns_info, primary_keys=(), decimal_columns=(), version_legacy_float_columns=False,
+    binary_lengths=None,
 ):
-    """Match retained legacy decimal FLOAT columns in the PartialSync staging table."""
+    """Match retained legacy decimal FLOAT and BINARY widths in the PartialSync staging table."""
     primary_keys = {str(key).strip('"').upper() for key in primary_keys or ()}
     decimal_columns = {str(name).strip('"').upper() for name in decimal_columns or ()}
+    binary_lengths = binary_lengths or {}
     staging_columns = []
     for name, source_type in source_columns_dict.items():
         data_type = source_type
         metadata = target_columns_info['type_metadata'].get(name)
-        if metadata is not None and name[1:-1].replace('""', '"').upper() in decimal_columns:
+        column_name = name[1:-1].replace('""', '"').upper()
+        if metadata is not None and column_name in decimal_columns:
             expected = canonical_native_type(source_type)
             actual = canonical_native_metadata_type(metadata)
-            column_name = name[1:-1].replace('""', '"').upper()
             if (
                 (not version_legacy_float_columns or column_name in primary_keys)
                 and is_retained_legacy_decimal_float(actual, expected)
             ):
+                data_type = actual
+        elif metadata is not None and column_name in binary_lengths:
+            actual = canonical_native_metadata_type(metadata)
+            if _holds_declared_binary(actual, canonical_native_type(source_type), binary_lengths[column_name]):
                 data_type = actual
         staging_columns.append(f'{name} {data_type}')
     return staging_columns
@@ -580,6 +590,15 @@ def _native_type_accepts(actual, expected):
         expected_precision, expected_scale = expected_dimensions
         return actual_scale >= expected_scale and actual_precision - actual_scale >= expected_precision - expected_scale
     return bool(actual_dimensions and actual_dimensions[0] >= expected_dimensions[0])
+
+
+def _holds_declared_binary(actual, expected, declared_length):
+    """Return whether a native BINARY target holds every value of a length-bounded source binary column."""
+    return (
+        declared_length is not None
+        and expected.startswith('BINARY(')
+        and _native_type_accepts(actual, f'BINARY({declared_length})')
+    )
 
 
 def _get_varchar_columns_to_widen(

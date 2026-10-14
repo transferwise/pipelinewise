@@ -65,6 +65,10 @@ Native-table merge outcomes
    * - Compatible text column is narrower than ``VARCHAR(134217728)``
      - PipelineWise widens the target column before applying the merge.
      - Values are unchanged; the wider column definition applies to the table.
+   * - MariaDB/MySQL ``BINARY`` or ``VARBINARY`` target column is narrower than
+       ``BINARY(67108864)`` but holds the declared source length
+     - Existing rows update; new rows insert. The target column keeps its width.
+     - Unchanged.
    * - Non-key decimal changes type, precision, or scale; it is not the range column
      - The old column is versioned; the new numeric column receives source values.
      - Old values remain in the versioned column; the new column is ``NULL``.
@@ -84,7 +88,10 @@ PipelineWise therefore widens compatible native text columns and adds missing
 columns before starting DML. It checks all overlapping column types before
 export and again before the merge, even when no transformations are configured.
 Numeric precision and scale, binary width, and temporal precision must hold the
-mapped values; timestamp timezone types must match. Missing catalog dimensions
+mapped values; timestamp timezone types must match. A MariaDB/MySQL ``BINARY``
+or ``VARBINARY`` source column only needs a target width that holds its declared
+length. For example, a ``BINARY(16)`` key merges into an existing
+``BINARY(8388608)`` column. Missing catalog dimensions
 fail validation rather than being guessed. Compatible text widening and
 :ref:`decimal column versioning <exact_decimal_mapping>` are automatic. Versioning
 is unavailable for primary keys or the PartialSync range column.

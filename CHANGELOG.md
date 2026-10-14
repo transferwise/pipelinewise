@@ -71,6 +71,28 @@
   already has files at the shared install path from a prior `psycopg2-binary`
   install
 
+0.96.3 (2026-10-14)
+-------------------
+
+- Continue MariaDB binlog replication past DDL that names a character set
+  without a collation. Before this fix, MariaDB 11.2 and later stopped the
+  tap with `str.join() takes exactly one argument`. Skip other binlog status
+  variables that the bundled decoder does not recognize. No server setting
+  change is needed. Upgrade to resume affected taps from their saved
+  position. If the source no longer has that binary log, resync the affected
+  tables. See
+  [MySQL/MariaDB operational notes](docs/connectors/taps/mysql.rst#operational-notes)
+
+0.96.2 (2026-10-14)
+-------------------
+
+- Allow native Snowflake PartialSync into narrower `BINARY` target columns, such
+  as those created before 0.94.0. The column must hold the declared length of its
+  MariaDB/MySQL `BINARY` or `VARBINARY` source. Keep the existing target width.
+  Retry affected PartialSyncs without a FullSync. The compatibility report
+  applies the same check. See
+  [native-table merge outcomes](docs/user_guide/partial_sync.rst#native-table-merge-outcomes)
+
 0.96.1 (2026-10-12)
 -------------------
 

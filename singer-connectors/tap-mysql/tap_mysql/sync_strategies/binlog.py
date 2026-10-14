@@ -16,7 +16,7 @@ from typing import Dict, Set, Union, Optional, Any, Tuple
 from plpygis import Geometry
 from pymysqlreplication.bitmap import BitGet
 from pymysqlreplication import BinLogStreamReader
-from pymysqlreplication.constants import FIELD_TYPE
+from pymysqlreplication.constants import FIELD_TYPE, STATUS_VAR_KEY
 from pymysqlreplication.event import (
     RotateEvent, MariadbGtidEvent, GtidEvent, NotImplementedEvent, QueryEvent, XidEvent, XAPrepareEvent,
 )
@@ -91,6 +91,30 @@ def preserve_empty_binlog_sets():
 
 
 preserve_empty_binlog_sets()
+
+
+def skip_unknown_query_status_vars():
+    """Skip Query status variables unknown to mysql-replication 0.46, as MySQL and MariaDB replicas do."""
+    method_name = '_read_status_vars_value_for_key'
+    read_status_var = getattr(QueryEvent, method_name)
+    if getattr(read_status_var, '_pipelinewise_skips_unknown_status_vars', False):
+        return
+    known_keys = frozenset(value for name, value in vars(STATUS_VAR_KEY).items() if name.startswith('Q_'))
+
+    @wraps(read_status_var)
+    def tolerant_read_status_var(event, key):
+        if key in known_keys:
+            return read_status_var(event, key)
+        # MariaDB 11.2+ DDL can carry Q_CHARACTER_SET_COLLATIONS; the length-bounded block
+        # ends after the 13-byte post-header, so skipping its tail keeps schema and query aligned.
+        event.packet.advance(13 + event.status_vars_length - event.packet.read_bytes)
+        return None
+
+    tolerant_read_status_var._pipelinewise_skips_unknown_status_vars = True
+    setattr(QueryEvent, method_name, tolerant_read_status_var)
+
+
+skip_unknown_query_status_vars()
 
 
 def binlog_filename_key(filename: str) -> Tuple[str, int]:
