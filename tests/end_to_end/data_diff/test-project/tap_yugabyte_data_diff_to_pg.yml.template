@@ -1,0 +1,49 @@
+---
+
+id: "data_diff_yugabyte_to_pg"
+name: "Data-diff YugabyteDB source"
+type: "tap-yugabyte"
+owner: "test-runner"
+
+db_conn:
+  host: "${TAP_YUGABYTE_HOST}"
+  port: ${TAP_YUGABYTE_PORT}
+  user: "${TAP_YUGABYTE_USER}"
+  password: "${TAP_YUGABYTE_PASSWORD}"
+  dbname: "${TAP_YUGABYTE_DB}"
+  fastsync_parallelism: 1
+  # data-diff connects to host directly; only replication uses the YugabyteDB driver.
+  load_balance: "true"
+
+target: "data_diff_postgres_dwh"
+batch_size_rows: 20000
+stream_buffer_size: 0
+
+data_diff_defaults:
+  frequency: "0 * * * *"
+  window_start: "-1d"
+  window_end: "0s"
+  statement_timeout: "1min"
+
+schemas:
+  - source_schema: "public"
+    target_schema: "ppw_e2e_data_diff_yugabyte"
+
+    tables:
+      - table_name: "dd_yugabyte_transfers"
+        replication_method: "FULL_TABLE"
+        data_diff:
+          checks:
+            - schema_compatibility
+            - row_count
+            - distinct_key_count
+            - null_key_count
+            - duplicate_key_count
+            - min_key
+            - max_key
+            - row_checksum
+          key_column: "id"
+          timestamp_column: "updated_at"
+          compare_columns:
+            - "amount"
+            - "note"

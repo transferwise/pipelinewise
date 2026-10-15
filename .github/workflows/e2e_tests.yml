@@ -90,6 +90,7 @@ jobs:
           tests/end_to_end/test_postgres_stream_buffer_recovery.py \
           tests/end_to_end/data_diff/test_postgres_to_postgres.py \
           tests/end_to_end/data_diff/test_mysql_to_postgres.py \
+          tests/end_to_end/data_diff/test_yugabyte_to_postgres.py \
           -vx --timer-top-n 10
 
       - name: Run SQL source and PostgreSQL target decimal integrations

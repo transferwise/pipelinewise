@@ -145,6 +145,7 @@ column actually is. The index name follows the column: `<table>_<column>_pw_keys
 Enables:
 - `INCREMENTAL` on that column — **new rows only**
 - **PartialSync** — a bounded export, `WHERE created_at BETWEEN ... AND ...`
+- **data-diff** with that column as `timestamp_column`
 
 Does **not** see updates. A creation timestamp never moves after insert, so every
 change to an existing row is invisible. That is not a defect in the index; it is
@@ -163,6 +164,7 @@ Identical DDL to shape 3. The difference is what the column records.
 Enables:
 - `INCREMENTAL` on that column — **inserts and updates**
 - **PartialSync**
+- **data-diff** with that column as `timestamp_column`
 
 **A column named for modification time is a claim, not a mechanism.** An
 `updated_at` carrying only `DEFAULT now()` is set on insert and never moves
@@ -201,6 +203,7 @@ Neither shape 3 nor shape 4 sees **deletes**. Only `LOG_BASED` does.
 | ⮑ sees deletes | — | ❌ | ❌ | ❌ |
 | ⮑ resumes inside a tie | — | ✅ *(key is unique)* | ❌ *see below* | ❌ *see below* |
 | PartialSync bounded export | ❌ | ✅ on the PK | ✅ | ✅ |
+| data-diff `timestamp_column` | — | — | ✅ | ✅ |
 
 ### Resuming inside a tie group
 

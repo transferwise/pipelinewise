@@ -48,7 +48,8 @@ run_e2e \
   tests/end_to_end/test_numeric_replication.py::test_postgres_decimal_float_underflow \
   tests/end_to_end/test_postgres_stream_buffer_recovery.py \
   tests/end_to_end/data_diff/test_postgres_to_postgres.py \
-  tests/end_to_end/data_diff/test_mysql_to_postgres.py
+  tests/end_to_end/data_diff/test_mysql_to_postgres.py \
+  tests/end_to_end/data_diff/test_yugabyte_to_postgres.py
 
 run_e2e \
   tests/end_to_end/target_snowflake/test_native_to_iceberg_converter.py \

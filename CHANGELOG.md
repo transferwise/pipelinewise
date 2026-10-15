@@ -1,4 +1,4 @@
-0.97.0 (2026-10-14)
+0.97.0 (2026-10-15)
 -------------------
 
 **tap-yugabyte**
@@ -70,6 +70,14 @@
   the driver swap is not silently skipped when a Docker anonymous volume
   already has files at the shared install path from a prior `psycopg2-binary`
   install
+- Add data-diff checks for YugabyteDB sources with PostgreSQL and Snowflake
+  targets. See [Data-diff checks](docs/user_guide/data_diff.rst)
+- Accept two YugabyteDB index shapes in data-diff preflight: a timestamp index
+  declared `ASC` or `DESC`, and the tap-yugabyte keyset index on the timestamp
+  column. A default `HASH` index does not qualify. See
+  [Preflight](docs/user_guide/data_diff.rst#preflight)
+- Connect data-diff directly to `db_conn.host`. It ignores `load_balance` and
+  `topology_keys`
 
 0.96.3 (2026-10-14)
 -------------------

@@ -139,11 +139,14 @@ opened for this tap, including FastSync FullSync/PartialSync bulk exports and
 LOG_BASED streaming, since both connect through YugabyteDB's
 native-load-balancing psycopg2 driver.
 
-The one exception is the replication-slot cleanup that runs when a tap's
-configuration is removed and ``pipelinewise import_config`` drops its slot. That
-cleanup runs inside PipelineWise itself, which uses the stock psycopg2 driver, so
-it ignores both options and connects directly to the configured ``host``. Keep
-that host reachable, or drop the slot manually if it is not.
+Two features run inside PipelineWise itself, which uses the stock psycopg2
+driver. They ignore both options and connect directly to the configured
+``host``:
+
+- The replication-slot cleanup that runs when a tap's configuration is removed
+  and ``pipelinewise import_config`` drops its slot. Keep that host reachable,
+  or drop the slot manually if it is not.
+- :ref:`data_diff` checks.
 
 Common tap settings are documented in :ref:`yaml_configuration`. Generate the
 full template with ``pipelinewise init``.
@@ -196,10 +199,10 @@ buckets ``ASC``, then the ordering column, then the **primary key** again,
      - the above, plus ``INCREMENTAL`` where the replication key is the primary key
    * - ``bucket, created_at, PK``
      - ``<table>_<column>_pw_keyset``
-     - ``INCREMENTAL`` (new rows only), PartialSync
+     - ``INCREMENTAL`` (new rows only), PartialSync, data-diff on that column
    * - ``bucket, updated_at, PK``
      - ``<table>_<column>_pw_keyset``
-     - ``INCREMENTAL`` (inserts and updates), PartialSync
+     - ``INCREMENTAL`` (inserts and updates), PartialSync, data-diff on that column
 
 The full contract -- exact DDL, the rules that must not be varied, what each
 mistake costs, and the feature matrix -- is in
