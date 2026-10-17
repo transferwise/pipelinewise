@@ -6,8 +6,8 @@ PostgreSQL target
 ``target-postgres`` loads Singer streams into PostgreSQL and manages compatible
 target schema changes.
 
-MariaDB/MySQL and PostgreSQL source decimals use ``NUMERIC(p,s)`` with their
-supported dimensions. Unconstrained PostgreSQL ``NUMERIC`` remains unconstrained.
+MariaDB/MySQL, PostgreSQL, and YugabyteDB source decimals use ``NUMERIC(p,s)``
+with their supported dimensions. Unconstrained ``NUMERIC`` remains unconstrained.
 Older targets use unconstrained ``NUMERIC`` for unsupported scale declarations.
 Existing ``REAL`` or ``DOUBLE PRECISION`` columns created by the legacy decimal
 mapping remain in place, including primary keys. Singer stages those values with

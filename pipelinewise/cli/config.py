@@ -355,7 +355,7 @@ class Config:
         """
         tap_config = {**tap.get('db_conn'), **extra_config_keys}
         tap_config.pop('decimal_target', None)
-        if tap.get('type') in ('tap-mysql', 'tap-postgres') and target_type in (
+        if tap.get('type') in ('tap-mysql', 'tap-postgres', 'tap-yugabyte') and target_type in (
             'target-snowflake', 'target-postgres',
         ):
             tap_config['decimal_target'] = target_type.removeprefix('target-')

@@ -25,6 +25,10 @@ Supported routes
       - PostgreSQL
     * - MySQL / MariaDB
       - Snowflake
+    * - YugabyteDB
+      - PostgreSQL
+    * - YugabyteDB
+      - Snowflake
 
 Snowflake supports native and PipelineWise-managed Iceberg v3 tables for all
 checks, including the initial historical scan.
@@ -159,6 +163,9 @@ For example, ``"-1d6h"`` means 30 hours before the scheduled time.
 For MySQL/MariaDB sources, ``db_conn.engine`` overrides server detection. Set it
 explicitly if a proxy hides the server identity. See :ref:`tap-mysql` for
 connection settings.
+
+For YugabyteDB sources, data-diff connects directly to ``db_conn.host``. It
+ignores ``load_balance`` and ``topology_keys``, which only replication uses.
 
 Choosing a frequency and window
 '''''''''''''''''''''''''''''''
@@ -521,6 +528,17 @@ Accepted indexes are:
   BRIN, and still-building indexes do not satisfy this preflight policy.
 - MySQL/MariaDB: a BTREE index with no prefix length on the timestamp column.
   ``INVISIBLE`` and ``IGNORED`` indexes do not satisfy the policy.
+- YugabyteDB: a valid, ready, non-partial LSM index whose first column is the
+  timestamp column, declared ``ASC`` or ``DESC``. A YugabyteDB index column is
+  ``HASH`` by default, and a ``HASH`` column does not qualify.
+- YugabyteDB: the tap-yugabyte keyset index
+  ``((yb_hash_code(<primary key>) % N)) ASC, <timestamp_column> ASC, <primary key> ASC``.
+  The bucket must hash exactly the primary key. See :ref:`tap-yugabyte`.
+
+With the YugabyteDB keyset index, data-diff adds a bucket condition to source
+queries. The condition matches every row. It lets YugabyteDB scan the index for
+wide windows instead of the whole table. The initial full scan still reads every
+source row before the cutoff to find the earliest timestamp.
 
 .. note::
 

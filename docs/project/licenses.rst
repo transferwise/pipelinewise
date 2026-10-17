@@ -51,6 +51,8 @@ Packaged components
      - Apache License 2.0
    * - ``tap-twilio``
      - AGPL 3.0
+   * - ``tap-yugabyte``
+     - AGPL 3.0
    * - ``tap-zendesk``
      - AGPL 3.0
    * - ``target-postgres``

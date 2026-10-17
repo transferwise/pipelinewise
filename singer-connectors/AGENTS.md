@@ -5,21 +5,23 @@ Read root `AGENTS.md` and relevant implementation, test, E2E, and docs guides.
 ## Environments and CI
 
 These are vendored sources, not submodules. The root Ruff gate checks connector
-source packages plus the tap-mysql, tap-postgres, target-postgres, and target-snowflake unit
-suites run by connector CI. Connector tests outside GitHub connector CI,
-including integration suites, legacy tests, and spikes, remain excluded; root
-unit tests exclude connectors. Prefer the ready `pipelinewise` container; report
-host fallbacks.
+source packages plus the tap-mysql, tap-postgres, tap-yugabyte, target-postgres,
+and target-snowflake unit suites run by connector CI. Connector tests outside
+GitHub connector CI, including integration suites, legacy tests, and spikes,
+remain excluded; root unit tests exclude connectors. Prefer the ready
+`pipelinewise` container; report host fallbacks.
 
 Connector CI installs all connectors and runs Python 3.12 units for tap-mysql
 (`make unit_test_cov`, 47%), tap-postgres (`make unit_test_cov`, 58%),
-target-postgres (`make unit_test`, 44%), and target-snowflake (`make unit_test`, 90%).
+tap-yugabyte (`make unit_test_cov`, 65%), target-postgres (`make unit_test`,
+44%), and target-snowflake (`make unit_test`, 90%).
 The shared Singer job also runs tap-mongodb's source logging regression tests in
 a separate environment without a database. Other MongoDB units remain local.
 E2E job 01 runs SQL-source and PostgreSQL-target decimal integrations; jobs 15,
 16, and 20 run Snowflake decimal and runtime integrations through
 `scripts/test_decimal_connectors.sh`.
-Other connector integration suites still require local validation.
+Other connector integration suites still require local validation; behavior
+changes need local connector tests and an available E2E route.
 
 Root `make connectors -e pw_connector=<name>` creates runtime
 `.virtualenvs/<name>/`; connector Makefiles often test in `./venv/`. Never mix
@@ -30,8 +32,9 @@ PipelineWise, runtime-connector, connector-test, host, or container interpreters
 Ruff is the only supported connector linter. Where present, the owning
 Makefile's `lint` target runs the connector environment's Ruff binary from the
 repository root so the root `pyproject.toml` applies. The tap-mysql,
-tap-postgres, target-postgres, and target-snowflake targets lint source, their GitHub-tested unit
-suites, and shared unit helpers; other connector targets lint source only. Unit
+tap-postgres, tap-yugabyte, target-postgres, and target-snowflake targets lint
+source, their GitHub-tested unit suites, and shared unit helpers; other connector
+targets lint source only. Unit
 and integration targets remain the behavioral validation. Do not add
 connector-local lint configuration, another Python linter, or an automatic
 formatter. Line length, docstring quoting, lambda assignment, and complexity
