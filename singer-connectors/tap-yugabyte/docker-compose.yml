@@ -1,6 +1,6 @@
 services:
   yugabyte:
-    image: yugabytedb/yugabyte:2026.1.1.1-b2
+    image: yugabytedb/yugabyte:2026.1.2.0-b137
     container_name: "yugabyte"
     command: >
       bin/yugabyted start --background=false
