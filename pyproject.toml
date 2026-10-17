@@ -22,7 +22,6 @@ extend-exclude = [
     "singer-connectors/tap-slack/tests",
     "singer-connectors/tap-snowflake/tests",
     "singer-connectors/tap-twilio/tests",
-    "singer-connectors/tap-yugabyte/tests/integration/test_discovery.py",
     "singer-connectors/tap-yugabyte/tests/integration/test_full_table.py",
     "singer-connectors/tap-yugabyte/tests/integration/test_incremental.py",
     "singer-connectors/tap-yugabyte/tests/integration/test_logical_replication.py",
