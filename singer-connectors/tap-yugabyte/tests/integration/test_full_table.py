@@ -6,6 +6,7 @@ from unittest.mock import patch
 from singer import metadata
 
 import tap_yugabyte
+from tap_yugabyte import keyset
 from tap_yugabyte.sync_strategies import common as sync_common
 
 from tests.utils import ensure_test_table, get_test_connection, get_test_connection_config
@@ -60,6 +61,13 @@ def _desired_columns(stream, md_map):
     return sorted(c for c in stream['schema']['properties'].keys() if sync_common.should_sync_column(md_map, c))
 
 
+def _create_keyset_index(table_name, pk_columns):
+    """Create the bucket index the resumable scan requires; without it the tap falls back to a plain scan."""
+    with get_test_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(keyset.index_ddl(f'"public"."{table_name}"', table_name, pk_columns, keyset.BUCKETS_DEFAULT))
+
+
 class TestFullTableSyncTable(unittest.TestCase):
     maxDiff = None
     table_name = 'ft_basic'
@@ -76,6 +84,7 @@ class TestFullTableSyncTable(unittest.TestCase):
             with conn.cursor() as cur:
                 cur.execute(f'INSERT INTO {self.table_name} (id, name) VALUES (1, %s), (2, %s), (3, %s)',
                             ('alice', 'bob', 'carol'))
+        _create_keyset_index(self.table_name, ['id'])
 
     def test_full_table_sync_table_emits_expected_messages(self):
         """A fresh FULL_TABLE sync emits SCHEMA, one RECORD per row, then ACTIVATE_VERSION,
@@ -116,10 +125,11 @@ class TestFullTableSyncTableResume(unittest.TestCase):
             with conn.cursor() as cur:
                 cur.execute(f'INSERT INTO {self.table_name} (id, value) VALUES (1, %s), (2, %s), (3, %s)',
                             ('a', 'b', 'c'))
+        _create_keyset_index(self.table_name, ['id'])
 
     def test_full_table_sync_table_resumes_from_last_pk_fetched(self):
-        """A resumed sync only re-fetches rows beyond last_pk_fetched, bounded by the
-        original max_pk_values snapshot, and reuses the interrupted run's stream version."""
+        """A resumed sync only re-fetches rows beyond each bucket's last_pk_fetched, bounded by
+        the original max_pk_values snapshot, and reuses the interrupted run's stream version."""
         conn_config = get_test_connection_config()
         stream = _discover_stream(conn_config, self.table_name)
         md_map = metadata.to_map(stream['metadata'])
@@ -128,8 +138,9 @@ class TestFullTableSyncTableResume(unittest.TestCase):
         crafted_version = 1700000000000
         state = {'bookmarks': {stream['tap_stream_id']: {
             'version': crafted_version,
+            'keyset_buckets': keyset.BUCKETS_DEFAULT,
             'max_pk_values': [3],
-            'last_pk_fetched': [1],
+            'last_pk_fetched': {str(bucket): [1] for bucket in range(keyset.BUCKETS_DEFAULT)},
         }}}
 
         # rows inserted after the original max_pk_values snapshot must not be re-emitted
@@ -165,10 +176,11 @@ class TestFullTableSyncTableNonIntegerPk(unittest.TestCase):
             with conn.cursor() as cur:
                 cur.execute(f'INSERT INTO {self.table_name} (code, name) VALUES (%s, %s), (%s, %s), (%s, %s)',
                             ('USA', 'United States', 'FRA', 'France', 'GBR', 'United Kingdom'))
+        _create_keyset_index(self.table_name, ['code'])
 
     def test_full_table_sync_table_non_integer_primary_key(self):
-        """A character primary key is bound as a query parameter (never interpolated)
-        and rows are emitted in ascending primary-key order."""
+        """A character primary key is bound as a query parameter (never interpolated). Buckets are
+        scanned concurrently, so rows are ordered only within a bucket and are compared as a set."""
         conn_config = get_test_connection_config()
         stream = _discover_stream(conn_config, self.table_name)
         md_map = metadata.to_map(stream['metadata'])
@@ -178,7 +190,7 @@ class TestFullTableSyncTableNonIntegerPk(unittest.TestCase):
             tap_yugabyte.do_sync_full_table, conn_config, stream, {}, desired_columns, md_map)
 
         record_messages = [m for m in messages if m['type'] == 'RECORD']
-        self.assertEqual(['FRA', 'GBR', 'USA'], [m['record']['code'] for m in record_messages])
+        self.assertEqual(['FRA', 'GBR', 'USA'], sorted(m['record']['code'] for m in record_messages))
 
 
 class TestFullTableSyncView(unittest.TestCase):

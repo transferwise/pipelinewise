@@ -4,7 +4,8 @@ from singer import metadata
 
 import tap_yugabyte
 
-from tests.integration.test_full_table import _capture_singer_messages, _discover_stream, _desired_columns
+from tests.integration.test_full_table import (
+    _capture_singer_messages, _create_keyset_index, _desired_columns, _discover_stream)
 from tests.utils import ensure_test_table, get_test_connection, get_test_connection_config
 
 
@@ -169,6 +170,7 @@ class TestDoSyncDispatchesReplicationMethods(unittest.TestCase):
                 cur.execute(f'INSERT INTO {self.full_table_name} (id, name) VALUES (1, %s)', ('a',))
                 cur.execute(f'INSERT INTO {self.incremental_table_name} (id, value) VALUES (1, %s), (2, %s)',
                             ('x', 'y'))
+        _create_keyset_index(self.full_table_name, ['id'])
 
     def test_do_sync_dispatches_full_table_and_incremental_streams_in_one_run(self):
         """do_sync routes each selected stream to its own replication method via the
