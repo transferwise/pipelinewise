@@ -230,3 +230,31 @@ class TestLogicalReplicationPort(unittest.TestCase):
             tap_yugabyte.do_sync({'port': 15436}, catalog, 'FULL_TABLE', {'bookmarks': {}})
 
         ensure_replication_port.assert_not_called()
+
+
+class TestSyncLogicalStreamsBookmarks(unittest.TestCase):
+    """sync_logical_streams prunes only deselected LOG_BASED bookmarks before streaming"""
+
+    def test_keeps_deselected_fastsync_bookmark_and_drops_deselected_log_based_one(self):
+        selected = {'tap_stream_id': 'public-selected', 'schema': {'properties': {}}}
+        state = {
+            'currently_syncing': None,
+            'bookmarks': {
+                'public-selected': {'lsn': 5, 'version': 1, 'last_replication_method': 'LOG_BASED'},
+                # FastSync writes bookmarks without last_replication_method
+                'public-fastsync_only': {'lsn': 1, 'version': 1},
+                'public-deselected': {'lsn': 2, 'version': 1, 'last_replication_method': 'LOG_BASED'},
+            },
+        }
+        with patch('tap_yugabyte.logical_replication.sync_tables',
+                   side_effect=lambda _conn, _streams, state, *_args: state) as sync_tables:
+            result = tap_yugabyte.sync_logical_streams({}, [selected], state, 10, 'state.json')
+
+        self.assertEqual(
+            {
+                'public-selected': {'lsn': 5, 'version': 1, 'last_replication_method': 'LOG_BASED'},
+                'public-fastsync_only': {'lsn': 1, 'version': 1},
+            },
+            result['bookmarks'],
+        )
+        sync_tables.assert_called_once()

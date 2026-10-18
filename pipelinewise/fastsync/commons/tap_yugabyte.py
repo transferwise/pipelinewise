@@ -299,6 +299,9 @@ class FastSyncTapYugabyte:
 
         # Set connection to autocommit
         conn.autocommit = True
+        # Both targets drop the offset of exported timestamptz text, so it must be rendered in UTC.
+        with conn.cursor() as cur:
+            cur.execute("SET TIME ZONE 'UTC'")
 
         LOGGER.info('Connection to YSQL server established')
 
@@ -394,6 +397,11 @@ class FastSyncTapYugabyte:
             )
 
         current_lsn = result[0].get('yb_restart_commit_ht')
+        if current_lsn is None:
+            raise RuntimeError(
+                f'Replication slot {slot_name} has no restart HybridTime. '
+                'Stop replication, drop the slot, and rerun the unfiltered fast_sync to recreate it.'
+            )
         # Pin the upcoming copy_table() bulk export to this exact boundary so the initial
         # snapshot and the CDC stream's start point are provably consistent.
         self._snapshot_ht = current_lsn

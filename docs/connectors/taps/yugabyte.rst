@@ -305,6 +305,14 @@ reads current data instead. An interrupted bootstrap resumes from a ``bootstrap_
 rather than an ``xmin`` sentinel. Views and materialized views are rejected
 for ``LOG_BASED``.
 
+``LOG_BASED`` does not replicate ``TRUNCATE``. An update that changes a primary
+key adds a row under the new key, and the row under the old key stays in the
+target. After either change, resync the table:
+
+.. code-block:: bash
+
+   pipelinewise fast_sync --tap <tap_id> --target <target_id> --tables <schema.table>
+
 
 .. _yugabyte_resync_size_limit:
 

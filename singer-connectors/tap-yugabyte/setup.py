@@ -22,6 +22,8 @@ setup(name='pipelinewise-tap-yugabyte',
           # YugabyteDB's native-load-balancing psycopg2 fork; drop-in compatible with psycopg2-binary
           "psycopg2-yugabytedb-binary==2.9.3.5.post1; sys_platform == 'darwin'",
           "psycopg2-yugabytedb-binary==2.9.3.5; sys_platform == 'linux'",
+          'python-dateutil==2.9.0.post0',
+          'pytz==2026.5',
           'strict-rfc3339==0.7',
           'simplejson==4.1.1'
       ],

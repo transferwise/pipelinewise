@@ -252,7 +252,7 @@ def sync_logical_streams(conn_config, logical_streams, state, end_lsn, state_fil
         new_state = dict(currently_syncing=state['currently_syncing'], bookmarks={})
 
         for stream, bookmark in state['bookmarks'].items():
-            if bookmark == {} or bookmark['last_replication_method'] != 'LOG_BASED' or stream in selected_streams:
+            if bookmark == {} or bookmark.get('last_replication_method') != 'LOG_BASED' or stream in selected_streams:
                 new_state['bookmarks'][stream] = bookmark
         state = new_state
 

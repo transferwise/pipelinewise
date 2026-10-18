@@ -111,6 +111,15 @@
   [Preflight](docs/user_guide/data_diff.rst#preflight)
 - Connect data-diff directly to `db_conn.host`. It ignores `load_balance` and
   `topology_keys`
+- Export `timestamptz` values in UTC from FastSync and PartialSync, whatever
+  the source session time zone
+- Stop with an error when the replication slot has no restart HybridTime,
+  instead of saving an empty position
+- Keep FastSync-written bookmarks of deselected streams instead of failing the
+  run
+- Document that `LOG_BASED` does not replicate `TRUNCATE` or primary-key
+  changes. Resync the table after either. See
+  [Replication behaviour](docs/connectors/taps/yugabyte.rst#replication-behaviour)
 
 0.96.3 (2026-10-14)
 -------------------

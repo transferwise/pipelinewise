@@ -155,6 +155,19 @@ class TestFastSyncTapYugabyte(TestCase):
                 self.assertIn(f'plugin {plugin} and LSN type {lsn_type}', str(context.exception))
                 self.assertIsNone(self.yugabyte._snapshot_ht)
 
+    def test_fetch_current_log_pos_rejects_null_hybrid_time(self):
+        """A slot without a restart HybridTime must fail before an unpinned copy saves an empty bookmark"""
+        with patch.object(self.yugabyte, 'create_replication_slot'), patch.object(
+            self.yugabyte,
+            'query',
+            return_value=[{'yb_restart_commit_ht': None, 'plugin': 'wal2json', 'yb_lsn_type': 'HYBRID_TIME'}],
+        ):
+            with self.assertRaises(RuntimeError) as context:
+                self.yugabyte.fetch_current_log_pos()
+
+        self.assertIn('has no restart HybridTime', str(context.exception))
+        self.assertIsNone(self.yugabyte._snapshot_ht)
+
     def test_fetch_current_log_pos_raises_if_slot_missing_after_creation(self):
         """An empty result after slot creation is unexpected and must raise"""
         with patch.object(self.yugabyte, 'create_replication_slot'), patch.object(
@@ -273,6 +286,16 @@ class TestFastSyncTapYugabyte(TestCase):
             dbname='my_db',
         )
         self.assertTrue(connection.autocommit)
+
+    def test_get_connection_renders_timestamps_in_utc(self):
+        """Exported timestamptz text must not depend on the database, role, or PGTZ time zone"""
+        creds = {'host': 'h', 'user': 'u', 'password': 'p', 'dbname': 'd', 'port': 5433}
+
+        with patch.object(tap_yugabyte.psycopg2, 'connect') as connect_mock:
+            FastSyncTapYugabyte.get_connection(creds)
+
+        cursor = connect_mock.return_value.cursor.return_value.__enter__.return_value
+        cursor.execute.assert_called_once_with("SET TIME ZONE 'UTC'")
 
     def test_get_connection_passes_password_verbatim(self):
         """get_connection must not quote or escape a password containing spaces and quotes"""
