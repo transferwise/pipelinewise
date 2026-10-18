@@ -98,6 +98,13 @@ connectors needed by the pipeline:
     make pipelinewise
     make connectors -e pw_connector=tap-postgres,target-snowflake
 
+``tap-yugabyte`` FastSync and PartialSync run from their own virtual
+environment. Build it when the pipeline uses ``tap-yugabyte``:
+
+.. code-block:: bash
+
+    make fastsync-yugabyte
+
 PipelineWise creates an isolated virtual environment per component below
 ``${PIPELINEWISE_HOME}/.virtualenvs``. Activate the CLI environment before use:
 
