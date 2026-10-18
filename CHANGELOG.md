@@ -26,6 +26,9 @@
   key
 - Add INCREMENTAL replication, resuming from a persisted replication-key
   bookmark;
+- Read `uuid[]`, `money[]`, `bit[]`, `citext[]` and enum array columns as
+  lists of values on FULL_TABLE, INCREMENTAL and LOG_BASED initial syncs,
+  matching tap-postgres
 - Add LOG_BASED (CDC) replication using YugabyteDB's native `HYBRID_TIME`
   logical-replication slots and the pre-packaged `wal2json` output plugin
 - Capture replication-slot boundaries as HybridTime values via

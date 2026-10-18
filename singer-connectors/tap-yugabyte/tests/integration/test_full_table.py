@@ -271,3 +271,58 @@ class TestFullTableSyncTableNoPrimaryKey(unittest.TestCase):
         bookmarks = state['bookmarks'][stream['tap_stream_id']]
         self.assertNotIn('max_pk_values', bookmarks)
         self.assertNotIn('last_pk_fetched', bookmarks)
+
+
+class TestFullTableSyncArrayTypes(unittest.TestCase):
+    maxDiff = None
+    table_name = 'ft_array_types'
+    enum_name = 'ft_array_mood'
+
+    def setUp(self):
+        with get_test_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute('CREATE EXTENSION IF NOT EXISTS citext')
+                cur.execute(f'DROP TYPE IF EXISTS {self.enum_name} CASCADE')
+                cur.execute(f"CREATE TYPE {self.enum_name} AS ENUM ('ok', 'sad')")
+        ensure_test_table({
+            'name': self.table_name,
+            'columns': [
+                {'name': 'id', 'type': 'integer', 'primary_key': True},
+                {'name': 'our_uuid_array', 'type': 'uuid[]'},
+                {'name': 'our_money_array', 'type': 'money[]'},
+                {'name': 'our_bit_array', 'type': 'bit(1)[]'},
+                {'name': 'our_citext_array', 'type': 'citext[]'},
+                {'name': 'our_enum_array', 'type': f'{self.enum_name}[]'},
+            ],
+        })
+        with get_test_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(f"""INSERT INTO {self.table_name} VALUES (1,
+                                '{{a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11,b1eebc99-9c0b-4ef8-bb6d-6bb9bd380a12}}',
+                                '{{1.50,2}}', '{{1,0}}', '{{Ab,Cd}}', '{{ok,sad}}')""")
+        _create_keyset_index(self.table_name, ['id'])
+
+    def tearDown(self):
+        with get_test_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(f'DROP TYPE IF EXISTS {self.enum_name} CASCADE')
+
+    def test_select_based_syncs_emit_array_elements(self):
+        """Arrays psycopg2 cannot cast natively must arrive as element lists, not split characters."""
+        conn_config = get_test_connection_config()
+        stream = _discover_stream(conn_config, self.table_name)
+
+        for sync_method in ('full', 'logical_initial'):
+            with self.subTest(sync_method=sync_method):
+                _, messages = _capture_singer_messages(
+                    tap_yugabyte.sync_traditional_stream, conn_config, stream, {}, sync_method, 1)
+
+                records = [m['record'] for m in messages if m['type'] == 'RECORD']
+                self.assertEqual([{
+                    'id': 1,
+                    'our_uuid_array': ['a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'b1eebc99-9c0b-4ef8-bb6d-6bb9bd380a12'],
+                    'our_money_array': ['$1.50', '$2.00'],
+                    'our_bit_array': [True, False],
+                    'our_citext_array': ['Ab', 'Cd'],
+                    'our_enum_array': ['ok', 'sad'],
+                }], records)

@@ -1,6 +1,8 @@
 import argparse
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, Mock, call, patch
+
+import psycopg2
 
 import tap_yugabyte
 
@@ -95,3 +97,91 @@ class TestMainImplKeysetBuckets(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, 'keyset_buckets'):
                         tap_yugabyte.main_impl()
                 do_discovery_mock.assert_not_called()
+
+
+class TestRegisterTypeAdapters(unittest.TestCase):
+    """register_type_adapters must give psycopg2 array casters for types it returns as raw text"""
+
+    @staticmethod
+    def _cursor(type_oids, enum_oids):
+        cur = MagicMock()
+        executed = []
+
+        def execute(sql, params=None):
+            executed.append(params[0] if params else sql)
+
+        def fetchone():
+            return (type_oids[executed[-1]],) if type_oids.get(executed[-1]) else None
+
+        cur.execute.side_effect = execute
+        cur.fetchone.side_effect = fetchone
+        cur.fetchall.return_value = [(oid,) for oid in enum_oids]
+        return cur
+
+    def _register(self, cur):
+        conn = MagicMock()
+        conn.__enter__.return_value.cursor.return_value.__enter__.return_value = cur
+        with patch('tap_yugabyte.post_db.open_connection', return_value=conn), \
+                patch('psycopg2.extensions.register_type') as register_type, \
+                patch('psycopg2.extensions.new_array_type', side_effect=lambda *args: args) as new_array_type, \
+                patch('psycopg2.extras.register_default_json') as register_json, \
+                patch('psycopg2.extras.register_default_jsonb') as register_jsonb:
+            tap_yugabyte.register_type_adapters({'dbname': 'db'})
+        register_json.assert_not_called()
+        register_jsonb.assert_not_called()
+        self.assertEqual(new_array_type.call_count, register_type.call_count)
+        return [c.args[0] for c in register_type.call_args_list]
+
+    def test_registers_string_array_casters_for_raw_text_types(self):
+        cur = self._cursor({'citext': 1001, 'bit': 1561, 'uuid': 2951, 'money': 791}, [5001, 5002])
+
+        self.assertEqual([
+            ((1001,), 'CITEXT[]', psycopg2.STRING),
+            ((1561,), 'BIT[]', psycopg2.STRING),
+            ((2951,), 'UUID[]', psycopg2.STRING),
+            ((791,), 'MONEY[]', psycopg2.STRING),
+            ((5001,), 'ENUM_5001[]', psycopg2.STRING),
+            ((5002,), 'ENUM_5002[]', psycopg2.STRING),
+        ], self._register(cur))
+
+    def test_skips_citext_when_extension_is_not_installed(self):
+        cur = self._cursor({'bit': 1561, 'uuid': 2951, 'money': 791}, [])
+
+        self.assertEqual(['BIT[]', 'UUID[]', 'MONEY[]'], [name for _, name, _ in self._register(cur)])
+
+
+class TestSyncTraditionalStreamRegistersTypeAdapters(unittest.TestCase):
+    """Every SELECT-based sync method must register the array casters before reading rows"""
+
+    stream = {
+        'tap_stream_id': 'public-t',
+        'schema': {'properties': {'id': {}}},
+        'metadata': [{'breadcrumb': ['properties', 'id'], 'metadata': {'selected': True}}],
+    }
+
+    def test_registers_before_each_sync_method(self):
+        for sync_method, target in (('full', 'tap_yugabyte.do_sync_full_table'),
+                                    ('incremental', 'tap_yugabyte.do_sync_incremental'),
+                                    ('logical_initial', 'tap_yugabyte.full_table.sync_table'),
+                                    ('logical_initial_interrupted', 'tap_yugabyte.full_table.sync_table')):
+            with self.subTest(sync_method=sync_method):
+                calls = Mock()
+
+                def sync(*args):
+                    calls.sync()
+                    return args[2]
+
+                with patch('tap_yugabyte.register_type_adapters', calls.register), \
+                        patch(target, side_effect=sync), \
+                        patch('tap_yugabyte.sync_common.send_schema_message'), \
+                        patch('tap_yugabyte.singer.write_message'):
+                    tap_yugabyte.sync_traditional_stream({'dbname': 'db'}, self.stream, {}, sync_method, 1)
+
+                self.assertEqual([call.register({'dbname': 'db'}), call.sync()], calls.mock_calls)
+
+    def test_skips_registration_when_no_columns_are_selected(self):
+        stream = {**self.stream, 'metadata': [{'breadcrumb': ['properties', 'id'], 'metadata': {'selected': False}}]}
+        with patch('tap_yugabyte.register_type_adapters') as register:
+            tap_yugabyte.sync_traditional_stream({'dbname': 'db'}, stream, {}, 'full', None)
+
+        register.assert_not_called()

@@ -1,5 +1,7 @@
 import argparse
 import copy
+import psycopg2
+import psycopg2.extensions
 import singer
 
 from singer import utils, metadata, get_bookmark
@@ -163,6 +165,29 @@ def sync_method_for_streams(streams, state, default_replication_method):
     return lookup, traditional_streams, logical_streams
 
 
+def register_type_adapters(conn_config):
+    """Register psycopg2 array typecasters for types it would otherwise return as raw '{...}' text.
+
+    Args:
+        conn_config: Connection config used to look up the array type OIDs.
+    """
+    array_oids = []
+    with post_db.open_connection(conn_config) as conn:
+        with conn.cursor() as cur:
+            for type_name in ('citext', 'bit', 'uuid', 'money'):
+                cur.execute('SELECT typarray FROM pg_type WHERE typname = %s', (type_name,))
+                row = cur.fetchone()
+                # citext is an extension type, so it is absent unless the extension is installed.
+                if row:
+                    array_oids.append((row[0], f'{type_name.upper()}[]'))
+
+            cur.execute('SELECT DISTINCT t.typarray FROM pg_type t JOIN pg_enum e ON t.oid = e.enumtypid')
+            array_oids.extend((row[0], f'ENUM_{row[0]}[]') for row in cur.fetchall())
+
+    for oid, name in array_oids:
+        psycopg2.extensions.register_type(psycopg2.extensions.new_array_type((oid,), name, psycopg2.STRING))
+
+
 def sync_traditional_stream(conn_config, stream, state, sync_method, end_lsn):
     """
     Sync INCREMENTAL and FULL_TABLE streams, and the full-table bootstrap stage of LOG_BASED streams
@@ -175,6 +200,8 @@ def sync_traditional_stream(conn_config, stream, state, sync_method, end_lsn):
     if len(desired_columns) == 0:
         LOGGER.warning('There are no columns selected for stream %s, skipping it', stream['tap_stream_id'])
         return state
+
+    register_type_adapters(conn_config)
 
     if sync_method == 'full':
         state = singer.set_currently_syncing(state, stream['tap_stream_id'])
