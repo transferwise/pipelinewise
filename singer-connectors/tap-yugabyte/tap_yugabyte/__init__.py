@@ -276,6 +276,7 @@ def do_sync(conn_config, catalog, default_replication_method, state, state_file=
     streams.sort(key=lambda s: s['tap_stream_id'])
     LOGGER.info("Selected streams: %s ", [s['tap_stream_id'] for s in streams])
     if any_logical_streams(streams, default_replication_method):
+        logical_replication.ensure_replication_port(conn_config)
         # Use of logical replication requires fetching an lsn
         end_lsn = logical_replication.fetch_current_lsn(conn_config)
         LOGGER.debug("end_lsn = %s ", end_lsn)

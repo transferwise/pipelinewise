@@ -35,6 +35,7 @@ read is silently absent from the catalog rather than reported as an error.
 
 LOG_BASED replication also requires:
 
+- port ``5433``, the YSQL default (see the warning below);
 - the `wal2json <https://github.com/eulerto/wal2json>`_ output plugin, which
   ships pre-packaged with YugabyteDB;
 - the ``REPLICATION`` role attribute, to create, consume, and drop the
@@ -42,6 +43,16 @@ LOG_BASED replication also requires:
 - ``SET`` on the ``yb_read_time`` parameter. The initial snapshot pins this
   setting to the slot's start point. Without it, the first sync fails with
   ``permission denied to set parameter "yb_read_time"``.
+
+.. warning::
+
+   LOG_BASED replication works only on port 5433. The current YugabyteDB
+   psycopg2 drivers, ``psycopg2-yugabytedb-binary`` 2.9.3.5 and
+   2.9.3.5.post1, ignore the configured ``port`` on replication connections
+   and always connect to 5433. PipelineWise rejects LOG_BASED tables on any
+   other port when it loads the configuration, and the tap stops before it
+   reads any data. If the cluster is reachable only on another port, use
+   FULL_TABLE or INCREMENTAL.
 
 The following grants are enough for every replication method, FastSync, and
 data-diff. Run the first block as a superuser and the second as the owner of

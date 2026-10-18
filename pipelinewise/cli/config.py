@@ -26,6 +26,8 @@ class Config:
     TABLE_FORMAT_ICEBERG = fastsync_capabilities.TABLE_FORMAT_ICEBERG
     ICEBERG_VERSION = 3
     VERSION_LEGACY_FLOAT_COLUMNS_SETTING = 'version_legacy_float_columns'
+    # psycopg2-yugabytedb 2.9.3.5 and 2.9.3.5.post1 replace the configured port with 5433 on replication connections.
+    YUGABYTE_REPLICATION_PORT = 5433
     TARGET_FORMAT_KEYS = {
         'iceberg_create',
         'iceberg_version',
@@ -128,6 +130,7 @@ class Config:
             cls.validate_target_table_format(tap_data, targets[target_id])
             cls.validate_snowflake_decimal_versioning(tap_data, targets[target_id])
             cls.validate_source_transformations(tap_data, targets[target_id])
+            cls.validate_yugabyte_log_based_port(tap_data)
 
             # Add generated extra keys that not available in the YAML
             tap_data['files'] = config.get_connector_files(
@@ -405,6 +408,28 @@ class Config:
                 )
 
         return selection
+
+    @classmethod
+    def validate_yugabyte_log_based_port(cls, tap: Dict) -> None:
+        """Reject LOG_BASED tap-yugabyte tables on a port the current YugabyteDB drivers cannot replicate from."""
+        port = tap.get('db_conn', {}).get('port')
+        if tap.get('type') != 'tap-yugabyte' or str(port) == str(cls.YUGABYTE_REPLICATION_PORT):
+            return
+        default_replication_method = utils.get_tap_default_replication_method(tap)
+        log_based_tables = [
+            f'{schema.get("source_schema")}.{table.get("table_name")}'
+            for schema in tap.get('schemas', [])
+            for table in schema.get('tables', [])
+            if table.get('replication_method', default_replication_method) == 'LOG_BASED'
+        ]
+        if log_based_tables:
+            raise InvalidConfigException(
+                f'Tap "{tap.get("id")}" uses LOG_BASED replication for {", ".join(log_based_tables)} on port '
+                f'{port}. LOG_BASED requires port {cls.YUGABYTE_REPLICATION_PORT}: the current YugabyteDB '
+                'psycopg2 drivers (psycopg2-yugabytedb-binary 2.9.3.5 and 2.9.3.5.post1) always open replication '
+                f'connections on port {cls.YUGABYTE_REPLICATION_PORT}. Connect on port '
+                f'{cls.YUGABYTE_REPLICATION_PORT}, or use FULL_TABLE or INCREMENTAL for these tables.'
+            )
 
     @classmethod
     def validate_source_transformations(cls, tap: Dict, target: Dict) -> None:

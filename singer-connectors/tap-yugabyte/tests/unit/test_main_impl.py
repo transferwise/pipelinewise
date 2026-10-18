@@ -185,3 +185,48 @@ class TestSyncTraditionalStreamRegistersTypeAdapters(unittest.TestCase):
             tap_yugabyte.sync_traditional_stream({'dbname': 'db'}, stream, {}, 'full', None)
 
         register.assert_not_called()
+
+
+class TestLogicalReplicationPort(unittest.TestCase):
+    """LOG_BASED must fail before any work when the YugabyteDB driver would connect to the wrong port"""
+
+    @staticmethod
+    def _stream(replication_method):
+        return {
+            'tap_stream_id': 'public-t',
+            'schema': {'properties': {'id': {}}},
+            'metadata': [{'breadcrumb': [], 'metadata': {'selected': True, 'replication-method': replication_method}}],
+        }
+
+    def test_ensure_replication_port_accepts_5433(self):
+        for port in (5433, '5433'):
+            with self.subTest(port=port):
+                tap_yugabyte.logical_replication.ensure_replication_port({'port': port})
+
+    def test_ensure_replication_port_rejects_other_ports(self):
+        for port in (15436, '5432'):
+            with self.subTest(port=port):
+                with self.assertRaises(tap_yugabyte.logical_replication.UnsupportedReplicationPortError) as context:
+                    tap_yugabyte.logical_replication.ensure_replication_port({'port': port})
+
+                self.assertIn(f'port {port} is configured', str(context.exception))
+                self.assertIn('psycopg2-yugabytedb-binary 2.9.3.5 and 2.9.3.5.post1', str(context.exception))
+
+    def test_do_sync_rejects_log_based_on_other_port_before_fetching_lsn(self):
+        catalog = {'streams': [self._stream('LOG_BASED')]}
+        with patch('tap_yugabyte.logical_replication.fetch_current_lsn') as fetch_current_lsn, \
+                patch('tap_yugabyte.refresh_streams_schema') as refresh_streams_schema:
+            with self.assertRaises(tap_yugabyte.logical_replication.UnsupportedReplicationPortError):
+                tap_yugabyte.do_sync({'port': 15436}, catalog, 'FULL_TABLE', {'bookmarks': {}})
+
+        fetch_current_lsn.assert_not_called()
+        refresh_streams_schema.assert_not_called()
+
+    def test_do_sync_allows_other_port_without_log_based_streams(self):
+        catalog = {'streams': [self._stream('FULL_TABLE')]}
+        with patch('tap_yugabyte.logical_replication.ensure_replication_port') as ensure_replication_port, \
+                patch('tap_yugabyte.refresh_streams_schema'), \
+                patch('tap_yugabyte.sync_traditional_stream', side_effect=lambda *args: args[2]):
+            tap_yugabyte.do_sync({'port': 15436}, catalog, 'FULL_TABLE', {'bookmarks': {}})
+
+        ensure_replication_port.assert_not_called()

@@ -146,6 +146,10 @@ to the tap for the next sync.
   parameter (`GRANT SET ON PARAMETER yb_read_time TO <user>`). Without the latter, the initial snapshot fails
   with `permission denied to set parameter "yb_read_time"`. The slot streams changes from every table in the
   database, regardless of table privileges.
+* **Port**: Log based replication works only on port 5433. The current YugabyteDB psycopg2 drivers
+  (`psycopg2-yugabytedb-binary` 2.9.3.5 and 2.9.3.5.post1) ignore the configured `port` on replication
+  connections and always connect to 5433. The tap stops before reading any data if LOG_BASED streams are
+  selected on another port. Use FULL_TABLE or INCREMENTAL if the cluster is reachable only on another port.
 * **Existing replication slot**: Log based replication requires a dedicated logical replication slot with LSN
   type `HYBRID_TIME`. When run from PipelineWise, FastSync owns the slot's full lifecycle: it creates the slot
   on first sync and drops it when the tap is removed, retrying a transient "slot is active" error for up to

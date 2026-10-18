@@ -31,6 +31,11 @@
   matching tap-postgres
 - Add LOG_BASED (CDC) replication using YugabyteDB's native `HYBRID_TIME`
   logical-replication slots and the pre-packaged `wal2json` output plugin
+- Reject LOG_BASED tables on any port other than 5433, when PipelineWise loads
+  the configuration and again when the tap starts. The current YugabyteDB
+  psycopg2 drivers (2.9.3.5 and 2.9.3.5.post1) always open replication
+  connections on port 5433. Use FULL_TABLE or INCREMENTAL on other ports. See
+  [YugabyteDB prerequisites](docs/connectors/taps/yugabyte.rst#prerequisites)
 - Capture replication-slot boundaries as HybridTime values via
   `yb_get_current_hybrid_time_lsn()`/`pg_replication_slots.yb_restart_commit_ht`,
   since YugabyteDB disables `pg_current_wal_lsn` and its LSNs are not

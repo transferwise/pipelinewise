@@ -27,6 +27,8 @@ UPDATE_BOOKMARK_PERIOD = 10000
 FEEDBACK_POLL_INTERVAL = 10
 FALLBACK_DATETIME = '9999-12-31T23:59:59.999+00:00'
 FALLBACK_DATE = '9999-12-31T00:00:00+00:00'
+# psycopg2-yugabytedb 2.9.3.5 and 2.9.3.5.post1 replace the configured port with 5433 on replication connections.
+REPLICATION_PORT = 5433
 
 
 class ReplicationSlotNotFoundError(Exception):
@@ -35,6 +37,10 @@ class ReplicationSlotNotFoundError(Exception):
 
 class IncompatibleReplicationSlotError(Exception):
     """Custom exception when replication slot is not a wal2json HYBRID_TIME slot"""
+
+
+class UnsupportedReplicationPortError(Exception):
+    """Custom exception when LOG_BASED replication is configured on a port the driver cannot use"""
 
 
 class UnsupportedPayloadKindError(Exception):
@@ -79,6 +85,16 @@ def _decode_wal_payload(msg, conn_info, slot=None):
             exc.doc = ''
         raise MalformedWALPayloadError(f'Invalid wal2json payload at {context}: invalid JSON or UTF-8') from exc
     return _validate_wal_payload(message_payload, msg, conn_info, slot)
+
+
+def ensure_replication_port(conn_config):
+    """Reject LOG_BASED replication on any port other than 5433, which the YugabyteDB driver would ignore."""
+    if str(conn_config['port']) != str(REPLICATION_PORT):
+        raise UnsupportedReplicationPortError(
+            f"LOG_BASED replication requires port {REPLICATION_PORT}, but port {conn_config['port']} is configured. "
+            'The current YugabyteDB psycopg2 drivers (psycopg2-yugabytedb-binary 2.9.3.5 and 2.9.3.5.post1) '
+            f'always open replication connections on port {REPLICATION_PORT}. Connect on port '
+            f'{REPLICATION_PORT}, or use FULL_TABLE or INCREMENTAL for this tap.')
 
 
 def fetch_current_lsn(conn_config):

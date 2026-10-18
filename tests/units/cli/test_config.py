@@ -190,6 +190,52 @@ class TestConfig:
     def _table_format_target(**connection_settings):
         return _table_format_target(**connection_settings)
 
+    @staticmethod
+    def _yugabyte_tap(port, replication_method=None, tap_type='tap-yugabyte'):
+        table = {'table_name': 'orders'}
+        if replication_method:
+            table['replication_method'] = replication_method
+        return TestConfig._table_format_tap(
+            type=tap_type,
+            db_conn={'port': port},
+            schemas=[{'source_schema': 'public', 'target_schema': 'public', 'tables': [table]}],
+        )
+
+    @pytest.mark.parametrize('port', [15436, '15436', 5432])
+    def test_yugabyte_log_based_rejects_ports_the_driver_ignores(self, port):
+        """LOG_BASED would otherwise fail after FastSync, when the driver connects to 5433 instead."""
+        with pytest.raises(InvalidConfigException) as error:
+            Config.validate_yugabyte_log_based_port(self._yugabyte_tap(port, 'LOG_BASED'))
+
+        message = str(error.value)
+        assert f'public.orders on port {port}' in message
+        assert 'psycopg2-yugabytedb-binary 2.9.3.5 and 2.9.3.5.post1' in message
+
+    @pytest.mark.parametrize(
+        'port, replication_method, tap_type',
+        [
+            (5433, 'LOG_BASED', 'tap-yugabyte'),
+            ('5433', 'LOG_BASED', 'tap-yugabyte'),
+            (15436, 'FULL_TABLE', 'tap-yugabyte'),
+            (15436, 'INCREMENTAL', 'tap-yugabyte'),
+            (15436, None, 'tap-yugabyte'),
+            (15436, 'LOG_BASED', 'tap-postgres'),
+        ],
+    )
+    def test_yugabyte_log_based_port_check_allows_unaffected_configs(self, port, replication_method, tap_type):
+        """Port 5433, non-LOG_BASED tables, the FULL_TABLE default, and other taps are unaffected."""
+        Config.validate_yugabyte_log_based_port(self._yugabyte_tap(port, replication_method, tap_type))
+
+    def test_from_yamls_rejects_yugabyte_log_based_on_unsupported_port(self, tmp_path):
+        """validate and import_config both load YAML through from_yamls, so the check runs before FastSync."""
+        yaml_dir = tmp_path / 'yaml'
+        yaml_dir.mkdir()
+        (yaml_dir / 'tap_test.yml').write_text(json.dumps(self._yugabyte_tap(15436, 'LOG_BASED')), encoding='utf-8')
+        (yaml_dir / 'target_test.yml').write_text(json.dumps(self._table_format_target()), encoding='utf-8')
+
+        with pytest.raises(InvalidConfigException, match='LOG_BASED requires port 5433'):
+            Config.from_yamls(str(tmp_path / 'runtime'), str(yaml_dir))
+
     @pytest.mark.parametrize(
         'settings',
         [
