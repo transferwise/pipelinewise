@@ -38,6 +38,9 @@
 - Bootstrap a LOG_BASED stream's initial scan on a `yb_read_time` - pinned
   snapshot bound to its replication slot's own restart boundary, so the
   snapshot and the streaming start position are provably consistent
+- Grant the LOG_BASED tap user the `REPLICATION` attribute and `SET` on
+  `yb_read_time`; superuser is not required. See
+  [YugabyteDB prerequisites](docs/connectors/taps/yugabyte.rst#prerequisites)
 - Emit periodic WAL-progress heartbeat messages via
   `pg_logical_emit_message` to advance an otherwise-idle slot's restart
   position

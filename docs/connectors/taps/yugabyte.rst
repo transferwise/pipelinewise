@@ -28,15 +28,46 @@ tap at 5432 usually reaches a co-located PostgreSQL instance instead of the
 cluster.
 
 The runtime user needs ``CONNECT`` on the database, ``USAGE`` on each source
-schema, and ``SELECT`` on replicated tables. Discovery reads
+schema, and ``SELECT`` on replicated tables. Grant default privileges if future
+tables must be discovered automatically. Discovery reads
 ``information_schema``, which is privilege-filtered: a table the user cannot
 read is silently absent from the catalog rather than reported as an error.
 
 LOG_BASED replication also requires:
 
 - the `wal2json <https://github.com/eulerto/wal2json>`_ output plugin, which
-  ships pre-packaged with YugabyteDB; and
-- permission to create and consume a logical replication slot.
+  ships pre-packaged with YugabyteDB;
+- the ``REPLICATION`` role attribute, to create, consume, and drop the
+  replication slot; and
+- ``SET`` on the ``yb_read_time`` parameter. The initial snapshot pins this
+  setting to the slot's start point. Without it, the first sync fails with
+  ``permission denied to set parameter "yb_read_time"``.
+
+The following grants are enough for every replication method, FastSync, and
+data-diff. Run the first block as a superuser and the second as the owner of
+each source schema:
+
+.. code-block:: sql
+
+   CREATE ROLE pipelinewise LOGIN REPLICATION PASSWORD '<password>';
+   GRANT CONNECT ON DATABASE <database> TO pipelinewise;
+   GRANT SET ON PARAMETER yb_read_time TO pipelinewise;
+
+   GRANT USAGE ON SCHEMA <schema> TO pipelinewise;
+   GRANT SELECT ON ALL TABLES IN SCHEMA <schema> TO pipelinewise;
+   ALTER DEFAULT PRIVILEGES FOR ROLE <owner> IN SCHEMA <schema>
+   GRANT SELECT ON TABLES TO pipelinewise;
+
+Omit ``REPLICATION`` and the ``yb_read_time`` grant when no table uses
+LOG_BASED. The user does not need superuser, object ownership, or write
+privileges. Revoke the ``yb_read_time`` grant before dropping the role.
+
+.. warning::
+
+   Table privileges do not limit logical replication. The slot streams
+   changes from every table in the database, including tables the user cannot
+   ``SELECT``. The tap discards unselected tables only after receiving them.
+   Replicate from a database that holds only data the pipeline may read.
 
 FastSync owns the replication slot's full lifecycle: it creates a
 ``wal2json`` slot with LSN type ``HYBRID_TIME`` on first sync and drops it

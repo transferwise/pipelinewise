@@ -80,7 +80,8 @@ tap-yugabyte --config config.json --discover > catalog.json # Capture the Catalo
 ```
 
 Discovery reads `information_schema`, which is privilege-filtered: a table the configured user cannot read is
-silently absent from the catalog rather than reported as an error.
+silently absent from the catalog rather than reported as an error. For the full list of grants, see
+[Prerequisites](../../docs/connectors/taps/yugabyte.rst#prerequisites).
 
 ### Add Metadata to the Catalog
 
@@ -141,6 +142,10 @@ to the tap for the next sync.
 
 * **wal2json plugin**: `wal2json` ships pre-packaged with YugabyteDB, so no separate installation step is
   required (unlike PostgreSQL).
+* **Privileges**: the tap user needs the `REPLICATION` role attribute and `SET` on the `yb_read_time`
+  parameter (`GRANT SET ON PARAMETER yb_read_time TO <user>`). Without the latter, the initial snapshot fails
+  with `permission denied to set parameter "yb_read_time"`. The slot streams changes from every table in the
+  database, regardless of table privileges.
 * **Existing replication slot**: Log based replication requires a dedicated logical replication slot with LSN
   type `HYBRID_TIME`. When run from PipelineWise, FastSync owns the slot's full lifecycle: it creates the slot
   on first sync and drops it when the tap is removed, retrying a transient "slot is active" error for up to
