@@ -73,9 +73,16 @@ FastSync owns the replication slot's full lifecycle: it creates a
 ``wal2json`` slot with LSN type ``HYBRID_TIME`` on first sync and drops it
 when the tap is removed, retrying a transient "slot is active" error for up
 to five minutes to tolerate YugabyteDB's post-disconnect active-slot window.
-Slot names follow ``pipelinewise_<dbname>_<tap_id>``. YugabyteDB LSNs are
-HybridTime values, not comparable byte offsets, so they are only meaningful
-relative to their own slot.
+Slot names follow ``pipelinewise_<dbname>_<tap_id>``.
+
+FastSync and the tap fail if the slot's plugin is not ``wal2json`` or its
+``yb_lsn_type`` is not ``HYBRID_TIME``. A slot created without the
+``'HYBRID_TIME'`` argument gets YugabyteDB's default ``SEQUENCE`` type, which
+would stream no changes. Drop the slot and rerun the unfiltered ``fast_sync``
+to recreate it.
+
+YugabyteDB LSNs are HybridTime values, not comparable byte offsets, so they
+are only meaningful relative to their own slot.
 
 An unfiltered ``fast_sync`` of a tap with LOG_BASED tables resets the slot.
 It backs up and clears every bookmark, then drops and recreates the slot once

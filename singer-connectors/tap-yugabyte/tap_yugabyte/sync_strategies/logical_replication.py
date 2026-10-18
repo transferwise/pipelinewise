@@ -33,6 +33,10 @@ class ReplicationSlotNotFoundError(Exception):
     """Custom exception when replication slot not found"""
 
 
+class IncompatibleReplicationSlotError(Exception):
+    """Custom exception when replication slot is not a wal2json HYBRID_TIME slot"""
+
+
 class UnsupportedPayloadKindError(Exception):
     """Custom exception when waljson payload is not insert, update nor delete"""
 
@@ -574,12 +578,20 @@ def generate_replication_slot_name(dbname, tap_id=None, prefix='pipelinewise'):
 def locate_replication_slot_by_cur(cursor, dbname, tap_id=None):
     slot_name = generate_replication_slot_name(dbname, tap_id)
 
-    cursor.execute(f"SELECT * FROM pg_replication_slots WHERE slot_name = '{slot_name}'")
-    if len(cursor.fetchall()) == 1:
-        LOGGER.info('Using pg_replication_slot %s', slot_name)
-        return slot_name
+    cursor.execute('SELECT plugin, yb_lsn_type FROM pg_replication_slots WHERE slot_name = %s', (slot_name,))
+    rows = cursor.fetchall()
+    if len(rows) != 1:
+        raise ReplicationSlotNotFoundError(f'Unable to find replication slot {slot_name}')
 
-    raise ReplicationSlotNotFoundError(f'Unable to find replication slot {slot_name}')
+    plugin, lsn_type = rows[0]
+    if (plugin, lsn_type) != ('wal2json', 'HYBRID_TIME'):
+        raise IncompatibleReplicationSlotError(
+            f'Replication slot {slot_name} uses plugin {plugin} and LSN type {lsn_type}; '
+            'tap-yugabyte requires plugin wal2json and LSN type HYBRID_TIME. '
+            'Stop replication, drop the slot, and rerun the unfiltered fast_sync to recreate it.')
+
+    LOGGER.info('Using pg_replication_slot %s', slot_name)
+    return slot_name
 
 
 def locate_replication_slot(conn_info):

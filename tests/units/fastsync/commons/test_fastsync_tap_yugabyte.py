@@ -94,17 +94,35 @@ class TestFastSyncTapYugabyte(TestCase):
         with patch.object(
             self.yugabyte, 'create_replication_slot'
         ) as create_replication_slot, patch.object(
-            self.yugabyte, 'query', return_value=[{'yb_restart_commit_ht': 123456789}]
+            self.yugabyte,
+            'query',
+            return_value=[{'yb_restart_commit_ht': 123456789, 'plugin': 'wal2json', 'yb_lsn_type': 'HYBRID_TIME'}],
         ) as query_mock:
             bookmark = self.yugabyte.fetch_current_log_pos()
 
         self.assertEqual({'lsn': 123456789, 'version': 1}, bookmark)
         create_replication_slot.assert_called_once_with()
         query_mock.assert_called_once_with(
-            "SELECT yb_restart_commit_ht FROM pg_replication_slots WHERE "
-            "slot_name = 'pipelinewise_test_database_test_tap'"
+            "SELECT yb_restart_commit_ht, plugin, yb_lsn_type FROM pg_replication_slots "
+            "WHERE slot_name = 'pipelinewise_test_database_test_tap'"
         )
         self.assertEqual(123456789, self.yugabyte._snapshot_ht)
+
+    def test_fetch_current_log_pos_rejects_incompatible_existing_slot(self):
+        """A tolerated pre-existing slot must be wal2json HYBRID_TIME before any copy is pinned to it"""
+        for plugin, lsn_type in (('wal2json', 'SEQUENCE'), ('pgoutput', 'HYBRID_TIME')):
+            with self.subTest(plugin=plugin, lsn_type=lsn_type), patch.object(
+                self.yugabyte, 'create_replication_slot'
+            ), patch.object(
+                self.yugabyte,
+                'query',
+                return_value=[{'yb_restart_commit_ht': 123456789, 'plugin': plugin, 'yb_lsn_type': lsn_type}],
+            ):
+                with self.assertRaises(RuntimeError) as context:
+                    self.yugabyte.fetch_current_log_pos()
+
+                self.assertIn(f'plugin {plugin} and LSN type {lsn_type}', str(context.exception))
+                self.assertIsNone(self.yugabyte._snapshot_ht)
 
     def test_fetch_current_log_pos_raises_if_slot_missing_after_creation(self):
         """An empty result after slot creation is unexpected and must raise"""

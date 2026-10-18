@@ -151,7 +151,9 @@ to the tap for the next sync.
   on first sync and drops it when the tap is removed, retrying a transient "slot is active" error for up to
   five minutes to tolerate YugabyteDB's post-disconnect active-slot window
   (`ysql_cdc_active_replication_slot_window_ms`, five minutes by default). Slot names follow
-  `pipelinewise_<dbname>_<tap_id>`.
+  `pipelinewise_<dbname>_<tap_id>`. FastSync and the tap fail if the slot's plugin is not `wal2json` or its
+  `yb_lsn_type` is not `HYBRID_TIME`. A slot created without the `'HYBRID_TIME'` argument gets YugabyteDB's
+  default `SEQUENCE` type, which would stream no changes.
 
   To create one manually when running the tap standalone, connect as a user with replication privileges and
   run:

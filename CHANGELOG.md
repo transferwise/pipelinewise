@@ -50,6 +50,10 @@
   `yugabyte-to-snowflake`) for bulk full-table copies
 - Create a tap's replication slot from FastSync when a LOG_BASED stream needs
   a HybridTime boundary
+- Fail FastSync and the tap when the tap's replication slot is not a `wal2json`
+  `HYBRID_TIME` slot. A slot created without `'HYBRID_TIME'` defaults to
+  `SEQUENCE` and would otherwise stream no changes. Drop the slot and rerun the
+  unfiltered `fast_sync` to recreate it
 - Drop a tap's replication slot when its configuration is removed, matching
   existing tap-postgres cleanup behavior, and retry a "slot is active" error
   for up to 5 minutes to tolerate YugabyteDB's post-disconnect active-slot

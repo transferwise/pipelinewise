@@ -18,21 +18,23 @@ class YugabyteCurReplicationSlotMock:
     Yugabyte Cursor Mock with replication slot selection
     """
 
-    def __init__(self, existing_slot_name):
+    def __init__(self, existing_slot_name, plugin='wal2json', lsn_type='HYBRID_TIME'):
         """Initialise by defining an existing replication slot"""
         self.existing_slot_name = existing_slot_name
+        self.slot_row = (plugin, lsn_type)
         self.replication_slot_found = False
 
-    def execute(self, sql):
+    def execute(self, sql, params=None):
         """Simulating to run an SQL query
         If the query is selecting the existing_slot_name then the replication slot found"""
-        if sql == f"SELECT * FROM pg_replication_slots WHERE slot_name = '{self.existing_slot_name}'":
+        if sql == 'SELECT plugin, yb_lsn_type FROM pg_replication_slots WHERE slot_name = %s' \
+                and params == (self.existing_slot_name,):
             self.replication_slot_found = True
 
     def fetchall(self):
-        """Return the replication slot name as a List if the slot exists."""
+        """Return the replication slot plugin and LSN type as a List if the slot exists."""
         if self.replication_slot_found:
-            return [self.existing_slot_name]
+            return [self.slot_row]
 
         return []
 
@@ -144,6 +146,18 @@ class TestLogicalReplication(unittest.TestCase):
             logical_replication.locate_replication_slot_by_cur(cursor,
                                                                 'some_db',
                                                                 'some_tap')
+
+    def test_locate_replication_slot_by_cur_rejects_incompatible_slot(self):
+        """A SEQUENCE or non-wal2json slot must fail loudly instead of streaming nothing"""
+        for plugin, lsn_type in (('wal2json', 'SEQUENCE'), ('pgoutput', 'HYBRID_TIME')):
+            with self.subTest(plugin=plugin, lsn_type=lsn_type):
+                cursor = YugabyteCurReplicationSlotMock(existing_slot_name='pipelinewise_some_db_some_tap',
+                                                        plugin=plugin,
+                                                        lsn_type=lsn_type)
+                with self.assertRaises(logical_replication.IncompatibleReplicationSlotError) as context:
+                    logical_replication.locate_replication_slot_by_cur(cursor, 'some_db', 'some_tap')
+
+                self.assertIn(f'plugin {plugin} and LSN type {lsn_type}', str(context.exception))
 
     def test_consume_with_message_payload_is_not_json_raises(self):
         state = {}
@@ -787,7 +801,7 @@ class TestLogicalReplication(unittest.TestCase):
         """Test locate_replication_slot returns excpected value"""
         mocked_cursor = mocked_connect.return_value.__enter__.return_value.cursor
         mocked_fetchall = mocked_cursor.return_value.__enter__.return_value.fetchall
-        mocked_fetchall.return_value = ['foo']
+        mocked_fetchall.return_value = [('wal2json', 'HYBRID_TIME')]
         expected_output = f'pipelinewise_{self.conn_info["dbname"]}_{self.conn_info["tap_id"]}'
         actual_output = logical_replication.locate_replication_slot(self.conn_info)
         self.assertEqual(expected_output, actual_output)

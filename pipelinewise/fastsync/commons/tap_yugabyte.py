@@ -363,10 +363,20 @@ class FastSyncTapYugabyte:
             self.connection_config['dbname'], self.connection_config['tap_id']
         )
         result = self.query(
-            f"SELECT yb_restart_commit_ht FROM pg_replication_slots WHERE slot_name = '{slot_name}'"
+            f"SELECT yb_restart_commit_ht, plugin, yb_lsn_type FROM pg_replication_slots "
+            f"WHERE slot_name = '{slot_name}'"
         )
         if not result:
             raise Exception(f'Replication slot {slot_name} not found after creation')
+
+        plugin = result[0].get('plugin')
+        lsn_type = result[0].get('yb_lsn_type')
+        if (plugin, lsn_type) != ('wal2json', 'HYBRID_TIME'):
+            raise RuntimeError(
+                f'Replication slot {slot_name} uses plugin {plugin} and LSN type {lsn_type}; '
+                'tap-yugabyte requires plugin wal2json and LSN type HYBRID_TIME. '
+                'Stop replication, drop the slot, and rerun the unfiltered fast_sync to recreate it.'
+            )
 
         current_lsn = result[0].get('yb_restart_commit_ht')
         # Pin the upcoming copy_table() bulk export to this exact boundary so the initial
