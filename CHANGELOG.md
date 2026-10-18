@@ -1,4 +1,4 @@
-0.97.0 (2026-10-15)
+0.97.0 (2026-10-18)
 -------------------
 
 **tap-yugabyte**
@@ -52,6 +52,12 @@
   existing tap-postgres cleanup behavior, and retry a "slot is active" error
   for up to 5 minutes to tolerate YugabyteDB's post-disconnect active-slot
   window
+- Reset a tap's replication slot on an unfiltered `fast_sync` with LOG_BASED
+  tables, as tap-postgres does. PipelineWise backs up and clears every bookmark,
+  then drops and recreates the slot once before workers start. `--tables` and a
+  non-default `--replication_method_only` keep the slot. The reset waits up to
+  5 minutes for an active slot to free. `allowed_resync_max_size` does not apply.
+  See [source-slot reset](docs/user_guide/resync.rst#postgresql-and-yugabytedb-source-slot-reset)
 - Add native PartialSync support (`partial-yugabyte-to-snowflake`) for
   bounded-range resyncs to Snowflake, reusing PostgreSQL's dialect-safe
   boundary predicate since YSQL follows PostgreSQL identifier-quoting rules

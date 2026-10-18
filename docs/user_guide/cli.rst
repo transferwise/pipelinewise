@@ -250,9 +250,10 @@ The command fails when FullSync is unavailable for the route. It never falls
 back to Singer. A table with ``sync_start_from`` uses PartialSync. ``sync_tables``
 remains a deprecated alias. Supplying ``--tables`` or setting
 ``--replication_method_only`` to anything other than ``*`` makes the resync
-filtered and retains the PostgreSQL replication slot, even if ``--tables`` lists
-every table. An unfiltered whole-tap PostgreSQL run with LOG_BASED tables resets
-its tap-specific slot once before workers start, with or without ``--force``.
+filtered and retains the PostgreSQL or YugabyteDB replication slot, even if
+``--tables`` lists every table. An unfiltered whole-tap PostgreSQL or YugabyteDB
+run with LOG_BASED tables resets its tap-specific slot once before workers start,
+with or without ``--force``.
 See :ref:`resync_postgres_slot_reset` for safety checks, backups, pending-Iceberg
 guards, and non-atomic reset recovery.
 

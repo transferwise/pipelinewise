@@ -54,6 +54,15 @@ FASTSYNC_PAIRS = fastsync_capability_policy.FASTSYNC_PAIRS
 ICEBERG_FASTSYNC_PAIRS = fastsync_capability_policy.ICEBERG_FASTSYNC_PAIRS
 PARTIAL_SYNC_PAIRS = fastsync_capability_policy.PARTIAL_SYNC_PAIRS
 
+_SLOT_RESET_SOURCES = {
+    ConnectorType.TAP_POSTGRES.value: FastSyncTapPostgres,
+    ConnectorType.TAP_YUGABYTE.value: FastSyncTapYugabyte,
+}
+_SLOT_RESET_SOURCE_NAMES = {
+    ConnectorType.TAP_POSTGRES.value: 'PostgreSQL',
+    ConnectorType.TAP_YUGABYTE.value: 'YugabyteDB',
+}
+
 MYSQL_BINLOG_DISCONNECT_MARKER = {
     'type': 'PIPELINEWISE_CONTROL',
     'component': 'tap-mysql',
@@ -1478,7 +1487,7 @@ class PipelineWise:
         try:
             with pidfile.PIDFile(self.tap['files']['pidfile']):
                 self.do_sync_tables(
-                    reset_postgres_slot=self._should_reset_postgres_slot_for_fast_sync()
+                    reset_source_slot=self._should_reset_source_slot_for_fast_sync()
                 )
         except pidfile.AlreadyRunningError as exc:
             self.logger.error('Another instance of the tap is already running.')
@@ -1490,10 +1499,10 @@ class PipelineWise:
             return self.config.get('allowed_resync_max_size', {}).get('table_mb')
         return None
 
-    def _should_reset_postgres_slot_for_fast_sync(self) -> bool:
-        """Return whether this command is an unfiltered PostgreSQL resync."""
+    def _should_reset_source_slot_for_fast_sync(self) -> bool:
+        """Return whether this command is an unfiltered PostgreSQL or YugabyteDB resync."""
         if (
-            self.tap['type'] != ConnectorType.TAP_POSTGRES.value
+            self.tap['type'] not in _SLOT_RESET_SOURCES
             or self.args.tables is not None
             or self.args.replication_method_only != '*'
         ):
@@ -1502,7 +1511,7 @@ class PipelineWise:
         selected_tables = self._get_sync_tables_setting_from_selection_file(None, self.LOG_BASED)
         return bool(selected_tables['full_sync'] or selected_tables['partial_sync'])
 
-    def do_sync_tables(self, fastsync_stream_ids=None, reset_postgres_slot: bool = False):
+    def do_sync_tables(self, fastsync_stream_ids=None, reset_source_slot: bool = False):
         """
         syncing tables by using fast sync
         """
@@ -1521,12 +1530,12 @@ class PipelineWise:
         if selected_tables['full_sync']:
             self._check_target_table_format_supports_fastsync('full_sync')
 
-        if reset_postgres_slot:
-            tap_config, target_config = self._preflight_postgres_slot_reset(selected_tables)
-            with self._guard_postgres_slot_reset_from_iceberg_recovery(selected_tables, target_config):
-                FastSyncTapPostgres.reset_slot(
+        if reset_source_slot:
+            tap_config, target_config = self._preflight_source_slot_reset(selected_tables)
+            with self._guard_source_slot_reset_from_iceberg_recovery(selected_tables, target_config):
+                _SLOT_RESET_SOURCES[self.tap['type']].reset_slot(
                     tap_config,
-                    before_reset=self._clear_tap_bookmarks_before_postgres_slot_reset,
+                    before_reset=self._clear_tap_bookmarks_before_source_slot_reset,
                 )
 
         processes_list = []
@@ -1551,7 +1560,7 @@ class PipelineWise:
             if process.exitcode != 0:
                 raise SystemExit(process.exitcode)
 
-    def _preflight_postgres_slot_reset(self, selected_tables):
+    def _preflight_source_slot_reset(self, selected_tables):
         """Validate every local reset dependency before changing source or state."""
 
         self._check_if_tap_is_enabled()
@@ -1582,23 +1591,27 @@ class PipelineWise:
             if table not in catalog_tables:
                 raise fastsync_utils.NotSelectedTableException(table, catalog_tables)
 
+        is_postgres = tap_type == ConnectorType.TAP_POSTGRES.value
         if target_type == ConnectorType.TARGET_SNOWFLAKE.value:
             # Local imports keep route entry points out of CLI module initialization.
-            from pipelinewise.fastsync import postgres_to_snowflake
+            from pipelinewise.fastsync import postgres_to_snowflake, yugabyte_to_snowflake
             from pipelinewise.fastsync.commons import snowflake_iceberg_routes
 
-            required_config = postgres_to_snowflake.REQUIRED_CONFIG_KEYS
+            route = postgres_to_snowflake if is_postgres else yugabyte_to_snowflake
             snowflake_iceberg_routes.validate_route_config(target_config)
         elif target_type == ConnectorType.TARGET_POSTGRES.value:
-            from pipelinewise.fastsync import postgres_to_postgres
+            from pipelinewise.fastsync import postgres_to_postgres, yugabyte_to_postgres
 
-            required_config = postgres_to_postgres.REQUIRED_CONFIG_KEYS
+            route = postgres_to_postgres if is_postgres else yugabyte_to_postgres
         else:
-            raise PreRunChecksException(f'Unsupported target for PostgreSQL slot reset: {target_type}')
+            raise PreRunChecksException(
+                f'Unsupported target for {_SLOT_RESET_SOURCE_NAMES[tap_type]} slot reset: {target_type}'
+            )
 
-        fastsync_utils.check_config(tap_config, required_config['tap'])
-        fastsync_utils.check_config(target_config, required_config['target'])
-        if target_type == ConnectorType.TARGET_SNOWFLAKE.value:
+        fastsync_utils.check_config(tap_config, route.REQUIRED_CONFIG_KEYS['tap'])
+        fastsync_utils.check_config(target_config, route.REQUIRED_CONFIG_KEYS['target'])
+        # allowed_resync_max_size applies only to MySQL and PostgreSQL sources.
+        if is_postgres and target_type == ConnectorType.TARGET_SNOWFLAKE.value:
             size_errors = postgres_to_snowflake.get_resync_size_errors(
                 tap_config, selected_tables['full_sync'], self._get_fastsync_size_limit(tap_type, target_type),
             )
@@ -1617,7 +1630,7 @@ class PipelineWise:
         return value
 
     @contextmanager
-    def _guard_postgres_slot_reset_from_iceberg_recovery(
+    def _guard_source_slot_reset_from_iceberg_recovery(
         self, selected_tables, target_config,
     ):
         """Hold selected Iceberg target locks and reject persisted recovery state."""
@@ -1646,8 +1659,9 @@ class PipelineWise:
             for target in targets:
                 store = coordinator.recovery_store(target)
                 if store.load_locked() is not None or store.load_fastsync_target_pointer() is not None:
+                    source_name = _SLOT_RESET_SOURCE_NAMES[self.tap['type']]
                     raise PreRunChecksException(
-                        'Cannot reset the PostgreSQL replication slot while an '
+                        f'Cannot reset the {source_name} replication slot while an '
                         'Iceberg publication or conversion attempt is pending. '
                         'Complete it with the corresponding filtered FastSync or '
                         'conversion command, then rerun the unfiltered fast_sync. '
@@ -1655,7 +1669,7 @@ class PipelineWise:
                     )
             yield
 
-    def _clear_tap_bookmarks_before_postgres_slot_reset(self):
+    def _clear_tap_bookmarks_before_source_slot_reset(self):
         """Durably back up and invalidate state before replacing the tap-wide slot."""
         state_path = self.tap['files']['state']
         if not os.path.exists(state_path):

@@ -77,6 +77,12 @@ Slot names follow ``pipelinewise_<dbname>_<tap_id>``. YugabyteDB LSNs are
 HybridTime values, not comparable byte offsets, so they are only meaningful
 relative to their own slot.
 
+An unfiltered ``fast_sync`` of a tap with LOG_BASED tables resets the slot.
+It backs up and clears every bookmark, then drops and recreates the slot once
+before workers start. ``--tables``, a non-default ``--replication_method_only``,
+automatic initial loads, and standalone PartialSync keep the slot. See
+:ref:`resync_postgres_slot_reset`.
+
 
 Configuration
 -------------
@@ -176,13 +182,14 @@ opened for this tap, including FastSync FullSync/PartialSync bulk exports and
 LOG_BASED streaming, since both connect through YugabyteDB's
 native-load-balancing psycopg2 driver.
 
-Two features run inside PipelineWise itself, which uses the stock psycopg2
+Three features run inside PipelineWise itself, which uses the stock psycopg2
 driver. They ignore both options and connect directly to the configured
 ``host``:
 
 - The replication-slot cleanup that runs when a tap's configuration is removed
   and ``pipelinewise import_config`` drops its slot. Keep that host reachable,
   or drop the slot manually if it is not.
+- The slot reset that runs before an unfiltered ``fast_sync``.
 - :ref:`data_diff` checks.
 
 Common tap settings are documented in :ref:`yaml_configuration`. Generate the
@@ -315,7 +322,8 @@ and a value, which may be null. Investigate the source or output plugin, then
 restart with the same state and slot after correcting the cause; do not manually
 advance the bookmark past the failed transaction.
 
-Resync only when the slot is unavailable, and monitor
+Resync only when the slot is unavailable. Run the unfiltered ``fast_sync``
+so every LOG_BASED table gets a bookmark from the new slot. Monitor
 ``ysql_cdc_active_replication_slot_window_ms`` (default five minutes) when
 tearing down a tap: dropping a slot immediately after the last consumer
 disconnects can transiently fail with "slot is active." See

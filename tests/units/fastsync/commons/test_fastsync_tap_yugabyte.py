@@ -5,7 +5,7 @@ import psycopg2
 
 from decimal import Decimal
 from unittest import TestCase
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, Mock, call, patch
 
 from pipelinewise.fastsync.commons.tap_yugabyte import FastSyncTapYugabyte
 from pipelinewise.fastsync.commons import tap_yugabyte, yb_retry
@@ -373,6 +373,155 @@ class TestFastSyncTapYugabyte(TestCase):
 
         sleep_mock.assert_not_called()
         connection.close.assert_called_once_with()
+
+    def test_reset_slot_drops_only_current_slot_after_state_invalidation(self):
+        """Only the preflighted tap-specific slot is dropped, after state is durable."""
+        connection = MagicMock()
+        cursor = connection.cursor.return_value.__enter__.return_value
+        cursor.fetchall.return_value = [('pipelinewise_my_db_my_tap', 'my_db', 'wal2json', False)]
+        creds = {'dbname': 'my_db', 'tap_id': 'my_tap', 'load_balance': 'true', 'topology_keys': 'aws.*'}
+        before_reset = MagicMock(return_value='state.backup')
+        calls = MagicMock()
+        calls.attach_mock(cursor.execute, 'execute')
+        calls.attach_mock(before_reset, 'before_reset')
+
+        with patch.object(FastSyncTapYugabyte, 'get_connection', return_value=connection) as get_connection:
+            FastSyncTapYugabyte.reset_slot(creds, before_reset=before_reset)
+
+        get_connection.assert_called_once_with({'dbname': 'my_db', 'tap_id': 'my_tap'})
+        self.assertEqual(calls.mock_calls, [
+            call.execute(
+                'SELECT slot_name, database, plugin, active FROM pg_replication_slots '
+                'WHERE slot_name IN (%s, %s)',
+                ('pipelinewise_my_db', 'pipelinewise_my_db_my_tap'),
+            ),
+            call.before_reset(),
+            call.execute('SELECT pg_drop_replication_slot(%s)', ('pipelinewise_my_db_my_tap',)),
+            call.execute(
+                'SELECT * FROM pg_create_logical_replication_slot(%s, %s, %s, %s, %s)',
+                ('pipelinewise_my_db_my_tap', 'wal2json', False, False, 'HYBRID_TIME'),
+            ),
+        ])
+        connection.close.assert_called_once_with()
+
+    def test_reset_slot_creates_missing_slot_without_dropping_any_slot(self):
+        """A missing slot still requires state invalidation before creation."""
+        connection = MagicMock()
+        cursor = connection.cursor.return_value.__enter__.return_value
+        cursor.fetchall.return_value = []
+        before_reset = MagicMock(return_value=None)
+
+        with patch.object(FastSyncTapYugabyte, 'get_connection', return_value=connection):
+            FastSyncTapYugabyte.reset_slot({'dbname': 'my_db', 'tap_id': 'my_tap'}, before_reset=before_reset)
+
+        before_reset.assert_called_once_with()
+        self.assertEqual(cursor.execute.call_count, 2)
+        cursor.execute.assert_called_with(
+            'SELECT * FROM pg_create_logical_replication_slot(%s, %s, %s, %s, %s)',
+            ('pipelinewise_my_db_my_tap', 'wal2json', False, False, 'HYBRID_TIME'),
+        )
+        connection.close.assert_called_once_with()
+
+    def test_reset_slot_rejects_legacy_and_incompatible_slots_before_state_changes(self):
+        """Legacy lookup takes precedence even when an inactive tap-specific slot also exists."""
+        current = ('pipelinewise_my_db_my_tap', 'my_db', 'wal2json', False)
+        cases = [
+            ([('pipelinewise_my_db', 'my_db', 'wal2json', active)] + modern, 'legacy')
+            for active in (False, True) for modern in ([], [current])
+        ] + [
+            ([(current[0], database, plugin, False)], 'must use wal2json')
+            for database, plugin in (('other_db', 'wal2json'), ('my_db', 'yboutput'))
+        ]
+        for rows, message in cases:
+            with self.subTest(rows=rows):
+                connection = MagicMock()
+                cursor = connection.cursor.return_value.__enter__.return_value
+                cursor.fetchall.return_value = rows
+                before_reset = MagicMock()
+                with patch.object(FastSyncTapYugabyte, 'get_connection', return_value=connection):
+                    with self.assertRaisesRegex(RuntimeError, message):
+                        FastSyncTapYugabyte.reset_slot(
+                            {'dbname': 'my_db', 'tap_id': 'my_tap'}, before_reset=before_reset,
+                        )
+                before_reset.assert_not_called()
+                self.assertEqual(cursor.execute.call_count, 1)
+                connection.close.assert_called_once_with()
+
+    def test_reset_slot_waits_out_the_active_slot_window(self):
+        """A lingering active flag delays the reset; one that outlasts the window rejects it."""
+        active = ('pipelinewise_my_db_my_tap', 'my_db', 'wal2json', True)
+        inactive = active[:3] + (False,)
+        attempts = tap_yugabyte._DROP_SLOT_RETRY_ATTEMPTS
+        for rows, succeeds in (([[active], [inactive]], True), ([[active]] * attempts, False)):
+            with self.subTest(succeeds=succeeds):
+                connection = MagicMock()
+                cursor = connection.cursor.return_value.__enter__.return_value
+                cursor.fetchall.side_effect = rows
+                before_reset = MagicMock(return_value=None)
+                with patch.object(FastSyncTapYugabyte, 'get_connection', return_value=connection), patch.object(
+                    tap_yugabyte.time, 'sleep',
+                ) as sleep_mock:
+                    if succeeds:
+                        FastSyncTapYugabyte.reset_slot(
+                            {'dbname': 'my_db', 'tap_id': 'my_tap'}, before_reset=before_reset,
+                        )
+                        before_reset.assert_called_once_with()
+                    else:
+                        with self.assertRaisesRegex(RuntimeError, 'still active'):
+                            FastSyncTapYugabyte.reset_slot(
+                                {'dbname': 'my_db', 'tap_id': 'my_tap'}, before_reset=before_reset,
+                            )
+                        before_reset.assert_not_called()
+                self.assertEqual(sleep_mock.call_count, len(rows) - 1)
+                connection.close.assert_called_once_with()
+
+    def test_reset_slot_name_length_boundary(self):
+        """Accept exactly 63 characters; reject a longer name before SQL or state changes."""
+        slot_prefix = FastSyncTapYugabyte.generate_replication_slot_name('my_db') + '_'
+        for length in (63, 64):
+            with self.subTest(length=length):
+                config = {'dbname': 'my_db', 'tap_id': 't' * (length - len(slot_prefix))}
+                connection = MagicMock()
+                cursor = connection.cursor.return_value.__enter__.return_value
+                cursor.fetchall.return_value = []
+                before_reset = MagicMock(return_value=None)
+                with patch.object(FastSyncTapYugabyte, 'get_connection', return_value=connection):
+                    if length == 64:
+                        with self.assertRaisesRegex(RuntimeError, 'at most 63 characters'):
+                            FastSyncTapYugabyte.reset_slot(config, before_reset=before_reset)
+                        cursor.execute.assert_not_called()
+                        before_reset.assert_not_called()
+                    else:
+                        FastSyncTapYugabyte.reset_slot(config, before_reset=before_reset)
+                        before_reset.assert_called_once_with()
+                connection.close.assert_called_once_with()
+
+    def test_reset_slot_reports_failed_phase_and_backup_without_restoring_state(self):
+        """A source error after invalidation names its phase and the pre-reset backup."""
+        for phase, sql in (('drop', 'pg_drop_'), ('create', 'pg_create_')):
+            with self.subTest(phase=phase):
+                connection = MagicMock()
+                cursor = connection.cursor.return_value.__enter__.return_value
+                cursor.fetchall.return_value = [('pipelinewise_my_db_my_tap', 'my_db', 'wal2json', False)]
+
+                def execute(statement, _params, failing_sql=sql):
+                    if failing_sql in statement:
+                        raise _psycopg2_error('permission denied')
+
+                cursor.execute.side_effect = execute
+                before_reset = MagicMock(return_value='state.backup')
+                with patch.object(FastSyncTapYugabyte, 'get_connection', return_value=connection), patch.object(
+                    tap_yugabyte.time, 'sleep',
+                ) as sleep_mock:
+                    with self.assertRaisesRegex(RuntimeError, f'failed during {phase}') as error:
+                        FastSyncTapYugabyte.reset_slot(
+                            {'dbname': 'my_db', 'tap_id': 'my_tap'}, before_reset=before_reset,
+                        )
+                self.assertIn('state.backup', str(error.exception))
+                self.assertIn('Do not restore old LOG_BASED bookmarks', str(error.exception))
+                before_reset.assert_called_once_with()
+                sleep_mock.assert_not_called()
+                connection.close.assert_called_once_with()
 
     def test_copy_table_pins_snapshot_when_hybrid_time_is_known(self):
         """copy_table must pin yb_read_time to the captured snapshot boundary before exporting"""
