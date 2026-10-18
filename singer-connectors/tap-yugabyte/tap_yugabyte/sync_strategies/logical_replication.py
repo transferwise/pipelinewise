@@ -7,7 +7,6 @@ import json
 import re
 import singer
 import sys
-import uuid
 import warnings
 
 from select import select
@@ -28,8 +27,6 @@ UPDATE_BOOKMARK_PERIOD = 10000
 FEEDBACK_POLL_INTERVAL = 10
 FALLBACK_DATETIME = '9999-12-31T23:59:59.999+00:00'
 FALLBACK_DATE = '9999-12-31T00:00:00+00:00'
-WAL_PROGRESS_MESSAGE_PREFIX = 'pipelinewise'
-WAL_PROGRESS_MESSAGE_CONTENT_PREFIX = 'wal_progress:'
 
 
 class ReplicationSlotNotFoundError(Exception):
@@ -86,51 +83,6 @@ def fetch_current_lsn(conn_config):
         with conn.cursor() as cur:
             cur.execute("SELECT yb_get_current_hybrid_time_lsn()")
             return cur.fetchone()[0]
-
-
-def wal_progress_message_content(conn_info, marker_id):
-    """Return content unique to one tap invocation."""
-    return f"{WAL_PROGRESS_MESSAGE_CONTENT_PREFIX}{conn_info['tap_id']}:{marker_id}"
-
-
-def emit_wal_progress_message(conn_info):
-    """Emit a source-database marker when logical messages are available."""
-    availability_query = """
-        WITH function_check AS (
-            SELECT to_regprocedure(
-                'pg_catalog.pg_logical_emit_message(boolean,text,text)'
-            ) AS function_oid
-        )
-        SELECT CASE
-                   WHEN function_oid IS NULL THEN FALSE
-                   ELSE has_function_privilege(current_user, function_oid, 'EXECUTE')
-               END
-          FROM function_check
-    """
-
-    message_content = wal_progress_message_content(conn_info, uuid.uuid4().hex)
-    conn = None
-    try:
-        conn = yb_db.open_connection(conn_info)
-        with conn:
-            with conn.cursor() as cur:
-                cur.execute(availability_query)
-                available = cur.fetchone()
-                if not available or available[0] is not True:
-                    LOGGER.debug('Logical WAL progress messages are unavailable')
-                    return None
-
-                cur.execute(
-                    'SELECT pg_catalog.pg_logical_emit_message(TRUE, %s, %s)',
-                    (WAL_PROGRESS_MESSAGE_PREFIX, message_content)
-                )
-        return message_content
-    except psycopg2.Error as ex:
-        LOGGER.warning('Unable to emit a logical WAL progress message; continuing without it: %s', ex)
-        return None
-    finally:
-        if conn is not None:
-            conn.close()
 
 
 def add_automatic_properties(stream, debug_lsn: bool = False):
@@ -713,7 +665,7 @@ def wal2json_options(logical_streams, conn_info):
     return options
 
 
-def sync_tables(conn_info, logical_streams, state, end_lsn, state_file, *, wal_progress_content=None):  # noqa: C901
+def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):  # noqa: C901
     target_acknowledged_lsn = _minimum_acknowledged_lsn(state, logical_streams)
     initial_stream_lsns = {
         stream['tap_stream_id']: get_bookmark(state, stream['tap_stream_id'], 'lsn')
@@ -730,7 +682,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file, *, wal_p
     start_run_timestamp = datetime.datetime.now(datetime.UTC)
     max_run_seconds = conn_info['max_run_seconds']
     break_at_end_lsn = conn_info['break_at_end_lsn']
-    logical_poll_total_seconds = conn_info['logical_poll_total_seconds'] or 10800  # 3 hours
+    logical_poll_total_seconds = conn_info['logical_poll_total_seconds']
     poll_interval = FEEDBACK_POLL_INTERVAL
 
     for s in logical_streams:
@@ -764,13 +716,11 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file, *, wal_p
     lsn_received_timestamp = datetime.datetime.now(datetime.UTC)
     poll_timestamp = datetime.datetime.now(datetime.UTC)
 
-    wal_progress_message_seen = False
     try:
         while True:
-            # Disconnect when no data received for logical_poll_total_seconds
-            # needs to be long enough to wait for the largest single wal payload to avoid unplanned timeouts
+            # YugabyteDB never streams pg_logical_emit_message, so an idle source only ends a run here.
             poll_duration = (datetime.datetime.now(datetime.UTC) - lsn_received_timestamp).total_seconds()
-            if poll_duration > logical_poll_total_seconds:
+            if logical_poll_total_seconds and poll_duration > logical_poll_total_seconds:
                 LOGGER.info('Breaking - %i seconds of polling with no data', poll_duration)
                 break
 
@@ -786,6 +736,8 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file, *, wal_p
                 raise
 
             if msg:
+                # Rows share their transaction's LSN, so any message, not only a new LSN, proves activity.
+                lsn_received_timestamp = datetime.datetime.now(datetime.UTC)
                 if (break_at_end_lsn) and (msg.data_start > end_lsn):
                     LOGGER.info('Breaking - latest wal message %s is past end_lsn %s',
                                 msg.data_start,
@@ -793,13 +745,6 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file, *, wal_p
                     break
 
                 message_payload = _decode_wal_payload(msg, conn_info, slot)
-
-                if (wal_progress_content is not None
-                        and message_payload.get('action') == 'M'
-                        and message_payload.get('transactional') is True
-                        and message_payload.get('prefix') == WAL_PROGRESS_MESSAGE_PREFIX
-                        and message_payload.get('content') == wal_progress_content):
-                    wal_progress_message_seen = True
 
                 state = consume_message(
                     logical_streams,
@@ -825,7 +770,6 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file, *, wal_p
 
                 elif int(msg.data_start) > lsn_currently_processing:
                     lsn_currently_processing = msg.data_start
-                    lsn_received_timestamp = datetime.datetime.now(datetime.UTC)
 
                 if message_payload.get('action') == 'C':
                     last_committed_lsn = msg.data_start
@@ -835,15 +779,6 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file, *, wal_p
                         state = _write_lsn_state(state, logical_streams,
                                                  max(last_committed_lsn, target_acknowledged_lsn))
                         lsn_processed_count = 0
-
-                if wal_progress_message_seen and message_payload.get('action') == 'C':
-                    wal_progress_message_seen = False
-                    if break_at_end_lsn:
-                        LOGGER.info('Breaking - reached PipelineWise WAL progress message at %s', last_committed_lsn)
-                        break
-                    LOGGER.info('Updating bookmarks at PipelineWise WAL progress message %s', last_committed_lsn)
-                    state = _write_lsn_state(state, logical_streams,
-                                             max(last_committed_lsn, target_acknowledged_lsn))
             else:
                 try:
                     # Wait for a second unless a message arrives

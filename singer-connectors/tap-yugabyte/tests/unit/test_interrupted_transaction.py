@@ -15,7 +15,7 @@ class TestInterruptedTransaction(unittest.TestCase):
     """Exercise real row consumption with a mocked replication connection."""
 
     def _run_interrupted_sync(self, stop, completed_transaction=False, *, finish_first=False,
-                              progress_message=False, acknowledged_lsn=None, missing_commit=False,
+                              acknowledged_lsn=None, missing_commit=False,
                               expected_flush_lsn=None, commit_lsn_offset=0, check_feedback_boundary=False):
         stream = {
             'tap_stream_id': 'public-items',
@@ -48,15 +48,8 @@ class TestInterruptedTransaction(unittest.TestCase):
 
         messages = transaction(200, 1, not missing_commit) if completed_transaction else []
         messages.extend(transaction(300 if completed_transaction else 200, 2, finish_first))
-        if progress_message:
-            messages.extend([
-                message(json.dumps({'action': 'B'}), 300),
-                message(json.dumps({'action': 'M', 'transactional': True,
-                                    'prefix': logical_replication.WAL_PROGRESS_MESSAGE_PREFIX,
-                                    'content': 'test-progress'}), 300),
-                message(json.dumps({'action': 'C'}), 300),
-            ])
         pending = iter(messages)
+        idle = []
         emitted = []
         now = datetime(2026, 9, 28, tzinfo=timezone.utc)
         disconnect = ConnectionError('replication connection lost before COMMIT')
@@ -66,6 +59,7 @@ class TestInterruptedTransaction(unittest.TestCase):
                 patch.object(logical_replication, 'locate_replication_slot', return_value='test_slot'), \
                 patch.object(logical_replication.utils, 'now', return_value=now), \
                 patch.object(logical_replication.datetime, 'datetime') as clock, \
+                patch.object(logical_replication, 'select'), \
                 patch.object(logical_replication.singer, 'write_message',
                              side_effect=lambda msg: emitted.append(copy.deepcopy(msg.asdict()))):
             state_file = None
@@ -78,6 +72,9 @@ class TestInterruptedTransaction(unittest.TestCase):
             cursor = connect.return_value.cursor.return_value
 
             def read_message():
+                if idle:
+                    clock.now.return_value += timedelta(seconds=2)
+                    return None
                 if check_feedback_boundary:
                     for call in cursor.send_feedback.call_args_list:
                         self.assertLessEqual(call.kwargs['flush_lsn'], 100)
@@ -86,7 +83,7 @@ class TestInterruptedTransaction(unittest.TestCase):
                 payload = json.loads(msg.payload)
                 stop_here = (
                     payload.get('action') == 'C'
-                    and msg.data_start == (300 if progress_message else 200 + commit_lsn_offset)
+                    and msg.data_start == 200 + commit_lsn_offset
                     if finish_first else
                     payload.get('action') == 'I' and payload['columns'][0]['value'] == 2
                 )
@@ -94,7 +91,7 @@ class TestInterruptedTransaction(unittest.TestCase):
                     if stop == 'max_run_seconds':
                         clock.now.return_value = now + timedelta(seconds=61)
                     elif stop == 'idle_timeout':
-                        clock.now.return_value = now + timedelta(seconds=2)
+                        idle.append(True)
                     else:
                         cursor.read_message.side_effect = disconnect
                 return msg
@@ -102,21 +99,17 @@ class TestInterruptedTransaction(unittest.TestCase):
             cursor.read_message.side_effect = read_message
             if stop == 'disconnect':
                 with self.assertRaises(ConnectionError) as caught:
-                    logical_replication.sync_tables(
-                        config, [stream], state, 1000, state_file,
-                        wal_progress_content='test-progress' if progress_message else None)
+                    logical_replication.sync_tables(config, [stream], state, 1000, state_file)
                 self.assertIs(caught.exception, disconnect)
             else:
-                returned_state = logical_replication.sync_tables(
-                    config, [stream], state, 1000, state_file,
-                    wal_progress_content='test-progress' if progress_message else None)
+                returned_state = logical_replication.sync_tables(config, [stream], state, 1000, state_file)
                 self.assertIs(returned_state, state)
 
         records = [msg for msg in emitted if msg['type'] == 'RECORD']
         self.assertEqual([1, 2] if completed_transaction else [2], [msg['record']['id'] for msg in records])
         checkpoints = [msg['value'] for msg in emitted if msg['type'] == 'STATE']
         self.assertTrue(checkpoints)
-        expected_lsn = 300 if progress_message else 200 + commit_lsn_offset if (
+        expected_lsn = 200 + commit_lsn_offset if (
             completed_transaction and not missing_commit) or finish_first else 100
         expected_lsn = max(expected_lsn, acknowledged_lsn or 100)
         feedback = cursor.send_feedback.call_args_list
@@ -158,9 +151,6 @@ class TestInterruptedTransaction(unittest.TestCase):
     def test_commit_flushes_acknowledged_lsn_without_a_later_message(self):
         self._run_interrupted_sync('max_run_seconds', finish_first=True, acknowledged_lsn=201,
                                    expected_flush_lsn=201, commit_lsn_offset=1, check_feedback_boundary=True)
-
-    def test_wal_progress_commit_retains_completed_checkpoint(self):
-        self._run_interrupted_sync('max_run_seconds', finish_first=True, progress_message=True)
 
     def test_first_transaction_preserves_newer_target_acknowledgement(self):
         self._run_interrupted_sync('max_run_seconds', acknowledged_lsn=150)

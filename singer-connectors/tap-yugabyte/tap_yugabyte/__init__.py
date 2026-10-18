@@ -205,7 +205,7 @@ def sync_traditional_stream(conn_config, stream, state, sync_method, end_lsn):
     return state
 
 
-def sync_logical_streams(conn_config, logical_streams, state, end_lsn, state_file, *, wal_progress_content=None):
+def sync_logical_streams(conn_config, logical_streams, state, end_lsn, state_file):
     """
     Sync streams that use LOG_BASED method
     """
@@ -235,7 +235,6 @@ def sync_logical_streams(conn_config, logical_streams, state, end_lsn, state_fil
             state,
             end_lsn,
             state_file,
-            wal_progress_content=wal_progress_content,
         )
 
     return state
@@ -285,17 +284,14 @@ def do_sync(conn_config, catalog, default_replication_method, state, state_file=
                                         end_lsn)
 
     if logical_streams:
-        # Logical messages are decoded only by slots in the same database.
-        wal_progress_content = logical_replication.emit_wal_progress_message(conn_config)
-        logical_end_lsn = (logical_replication.fetch_current_lsn(conn_config)
-                           if wal_progress_content is not None else end_lsn)
+        # Bootstrap scans can take hours; a fresh boundary lets this run drain the changes made meanwhile.
+        logical_end_lsn = logical_replication.fetch_current_lsn(conn_config)
         state = sync_logical_streams(
             conn_config,
             logical_streams,
             state,
             logical_end_lsn,
             state_file,
-            wal_progress_content=wal_progress_content,
         )
     return state
 
@@ -386,7 +382,7 @@ def main_impl():
         'debug_lsn': args.config.get('debug_lsn') == 'true',
         'max_run_seconds': args.config.get('max_run_seconds', 43200),
         'break_at_end_lsn': args.config.get('break_at_end_lsn', True),
-        'logical_poll_total_seconds': float(args.config.get('logical_poll_total_seconds', 0)),
+        'logical_poll_total_seconds': float(args.config.get('logical_poll_total_seconds', 300)),
         'limit': int(limit) if limit else None
     }
     if args.config.get('keyset_buckets') is not None:

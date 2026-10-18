@@ -6,7 +6,7 @@ import singer
 import psycopg2
 
 from collections import namedtuple
-from datetime import datetime, date, timezone
+from datetime import datetime, date, timedelta, timezone
 from unittest.mock import Mock, call, mock_open, patch
 from dateutil.tz import tzoffset
 
@@ -616,55 +616,6 @@ class TestLogicalReplication(unittest.TestCase):
         self.assertEqual(123456789, actual_value)
         mocked_open_connection.assert_called_once_with(self.conn_info)
         cursor.execute.assert_called_once_with("SELECT yb_get_current_hybrid_time_lsn()")
-
-    @patch('tap_yugabyte.sync_strategies.logical_replication.uuid.uuid4')
-    @patch('tap_yugabyte.sync_strategies.logical_replication.yb_db.open_connection')
-    def test_emit_wal_progress_message(self, mocked_open_connection, mocked_uuid):
-        """Emit a transactional marker through a plain connection when permitted."""
-        connection = mocked_open_connection.return_value
-        cursor = connection.cursor.return_value.__enter__.return_value
-        cursor.fetchone.return_value = (True,)
-        mocked_uuid.return_value.hex = 'unique_marker'
-
-        self.assertEqual(
-            'wal_progress:tap_id_value:unique_marker',
-            logical_replication.emit_wal_progress_message(self.conn_info),
-        )
-
-        mocked_open_connection.assert_called_once_with(self.conn_info)
-        self.assertEqual(cursor.execute.call_count, 2)
-        self.assertEqual(
-            cursor.execute.call_args_list[-1],
-            call(
-                'SELECT pg_catalog.pg_logical_emit_message(TRUE, %s, %s)',
-                ('pipelinewise', 'wal_progress:tap_id_value:unique_marker')
-            )
-        )
-        connection.close.assert_called_once_with()
-
-    @patch('tap_yugabyte.sync_strategies.logical_replication.yb_db.open_connection')
-    def test_emit_wal_progress_message_skips_unavailable_function(self, mocked_open_connection):
-        """Old or restricted YugabyteDB sources retain the existing behavior."""
-        connection = mocked_open_connection.return_value
-        cursor = connection.cursor.return_value.__enter__.return_value
-        cursor.fetchone.return_value = (False,)
-
-        self.assertIsNone(logical_replication.emit_wal_progress_message(self.conn_info))
-        self.assertEqual(cursor.execute.call_count, 1)
-        connection.close.assert_called_once_with()
-
-    @patch('tap_yugabyte.sync_strategies.logical_replication.yb_db.open_connection')
-    def test_emit_wal_progress_message_ignores_database_errors(self, mocked_open_connection):
-        """Failure to emit the optional marker does not prevent replication."""
-        connection = mocked_open_connection.return_value
-        cursor = connection.cursor.return_value.__enter__.return_value
-        cursor.execute.side_effect = psycopg2.ProgrammingError('permission denied')
-
-        with self.assertLogs('tap_yugabyte', level='WARNING') as logs:
-            self.assertIsNone(logical_replication.emit_wal_progress_message(self.conn_info))
-
-        self.assertIn('continuing without it', logs.output[0])
-        connection.close.assert_called_once_with()
 
     def test_add_automatic_properties_if_debug_lsn_is_off(self):
         """Test if add_automatic_property returns expected value if debug_lsn is off"""
@@ -1377,8 +1328,7 @@ class TestLogicalReplicationFeedback(unittest.TestCase):
 
         self.assertEqual(150, acknowledged_lsn)
 
-    def _run_sync(self, state, messages, state_reader, logical_streams=None,
-                  wal_progress_content='wal_progress:tap_id_value:current'):
+    def _run_sync(self, state, messages, state_reader, logical_streams=None):
         termination = RuntimeError('unexpected replication termination')
         streams = self.logical_streams if logical_streams is None else logical_streams
 
@@ -1402,7 +1352,6 @@ class TestLogicalReplicationFeedback(unittest.TestCase):
                     state,
                     1000,
                     'state.json',
-                    wal_progress_content=wal_progress_content,
                 )
             except Exception as exc:  # The harness captures the intentional termination or regression failure.
                 error = exc
@@ -1428,140 +1377,6 @@ class TestLogicalReplicationFeedback(unittest.TestCase):
 
         self.assertIsInstance(error, logical_replication.MalformedWALPayloadError)
         self.assertEqual([], feedback)
-
-    def test_progress_message_advances_state_without_advancing_feedback(self):
-        """The tap stops at its committed marker while feedback remains target-bounded."""
-        state = self._state({'foo-bar': 100})
-        self.conn_info['break_at_end_lsn'] = True
-        state_reader = mock_open(read_data=json.dumps(state))
-        messages = [
-            self._message('B', 200),
-            self._message(
-                'M',
-                210,
-                transactional=True,
-                prefix='pipelinewise',
-                content='wal_progress:tap_id_value:current'
-            ),
-            self._message('C', 220),
-        ]
-
-        feedback, error, _, _ = self._run_sync(state, messages, state_reader)
-
-        self.assertIsNone(error)
-        self.assertEqual(220, state['bookmarks']['foo-bar']['lsn'])
-        self.assertEqual(self._expected_feedback(100), feedback)
-
-    def test_stale_progress_message_does_not_end_current_sync(self):
-        """A marker from an earlier invocation cannot satisfy the current boundary."""
-        state = self._state({'foo-bar': 100})
-        self.conn_info['break_at_end_lsn'] = True
-        state_reader = mock_open(read_data=json.dumps(state))
-        messages = [
-            self._message('B', 200),
-            self._message(
-                'M',
-                210,
-                transactional=True,
-                prefix='pipelinewise',
-                content='wal_progress:tap_id_value:stale',
-            ),
-            self._message('C', 220),
-            self._message('B', 300),
-            self._message(
-                'M',
-                310,
-                transactional=True,
-                prefix='pipelinewise',
-                content='wal_progress:tap_id_value:current',
-            ),
-            self._message('C', 320),
-        ]
-
-        feedback, error, _, _ = self._run_sync(state, messages, state_reader)
-
-        self.assertIsNone(error)
-        self.assertEqual(320, state['bookmarks']['foo-bar']['lsn'])
-        self.assertEqual(self._expected_feedback(100), feedback)
-
-    def test_progress_message_does_not_end_continuous_sync(self):
-        """A continuous tap publishes and flushes a target-acknowledged marker."""
-        state = self._state({'foo-bar': 100})
-        old_state = mock_open(read_data=json.dumps(state))
-        acknowledged_marker = mock_open(read_data=json.dumps(self._state({'foo-bar': 220})))
-        state_reader = Mock(side_effect=[
-            old_state.return_value,
-            old_state.return_value,
-            acknowledged_marker.return_value,
-        ])
-        messages = [
-            self._message('B', 200),
-            self._message(
-                'M',
-                210,
-                transactional=True,
-                prefix='pipelinewise',
-                content='wal_progress:tap_id_value:current'
-            ),
-            self._message('C', 220),
-        ]
-
-        feedback, error, termination, written_messages = self._run_sync(state, messages, state_reader)
-
-        self.assertIs(error, termination)
-        self.assertEqual(220, state['bookmarks']['foo-bar']['lsn'])
-        self.assertEqual(self._expected_feedback(100, 220), feedback)
-        self.assertEqual(2, len(written_messages))
-        self.assertEqual(220, written_messages[0].args[0].value['bookmarks']['foo-bar']['lsn'])
-
-    def test_only_own_committed_progress_message_creates_boundary(self):
-        """Incomplete, foreign, and non-transactional messages are not safe boundaries."""
-        cases = {
-            'interrupted_before_commit': ([
-                self._message('B', 200),
-                self._message(
-                    'M',
-                    210,
-                    transactional=True,
-                    prefix='pipelinewise',
-                    content='wal_progress:tap_id_value:current',
-                ),
-            ], 100),
-            'foreign_tap': ([
-                self._message('B', 200),
-                self._message(
-                    'M',
-                    210,
-                    transactional=True,
-                    prefix='pipelinewise',
-                    content='wal_progress:another_tap:current',
-                ),
-                self._message('C', 220),
-            ], 220),
-            'non_transactional': ([
-                self._message('B', 200),
-                self._message(
-                    'M',
-                    210,
-                    transactional=False,
-                    prefix='pipelinewise',
-                    content='wal_progress:tap_id_value:current',
-                ),
-                self._message('C', 220),
-            ], 220),
-        }
-
-        self.conn_info['break_at_end_lsn'] = True
-        for name, (messages, expected_lsn) in cases.items():
-            with self.subTest(name=name):
-                state = self._state({'foo-bar': 100})
-                state_reader = mock_open(read_data=json.dumps(state))
-
-                feedback, error, termination, _ = self._run_sync(state, messages, state_reader)
-
-                self.assertIs(error, termination)
-                self.assertEqual(expected_lsn, state['bookmarks']['foo-bar']['lsn'])
-                self.assertEqual(self._expected_feedback(100), feedback)
 
     def test_periodic_bookmark_does_not_acknowledge_processed_lsn(self):
         state = self._state({'foo-bar': 100})
@@ -1692,3 +1507,76 @@ class TestLogicalReplicationFeedback(unittest.TestCase):
 
         self.assertIs(error, termination)
         self.assertEqual(self._expected_feedback(100, 150), feedback)
+
+
+class TestLogicalReplicationIdleStop(unittest.TestCase):
+    """A quiet source ends a run through the idle timeout, never through a progress marker."""
+
+    START = datetime(2026, 10, 18, tzinfo=timezone.utc)
+    _state = staticmethod(TestLogicalReplicationFeedback._state)
+    _consume_message = staticmethod(TestLogicalReplicationFeedback._consume_message)
+    _message = TestLogicalReplicationFeedback._message
+
+    def setUp(self):
+        self.WalMessage = namedtuple('WalMessage', ['payload', 'data_start'])
+        self.conn_info = {'host': 'foo', 'dbname': 'foo_db', 'user': 'foo_user', 'password': 'foo_pass',
+                          'port': 12345, 'tap_id': 'tap_id_value', 'break_at_end_lsn': False}
+        self.logical_streams = [TestLogicalReplicationFeedback._stream('foo-bar', 'foo_table')]
+
+    def _run_with_clock(self, messages, seconds_per_read):
+        """Advance the clock on every read; reads past the end of messages find an idle source."""
+        state = self._state({'foo-bar': 100})
+        pending = iter(messages)
+
+        with patch('tap_yugabyte.sync_strategies.logical_replication.datetime.datetime') as clock, \
+                patch('tap_yugabyte.sync_strategies.logical_replication.select'), \
+                patch('tap_yugabyte.sync_strategies.logical_replication.sync_common.send_schema_message'), \
+                patch('tap_yugabyte.sync_strategies.logical_replication.singer.write_message'), \
+                patch('tap_yugabyte.sync_strategies.logical_replication.consume_message',
+                      side_effect=self._consume_message), \
+                patch('tap_yugabyte.sync_strategies.logical_replication.locate_replication_slot',
+                      return_value='replication_slot'), \
+                patch('builtins.open', mock_open(read_data=json.dumps(state))), \
+                patch('psycopg2.connect') as mocked_connect:
+            clock.now.return_value = self.START
+
+            def read_message():
+                clock.now.return_value += timedelta(seconds=seconds_per_read)
+                return next(pending, None)
+
+            mocked_connect.return_value.cursor.return_value.read_message.side_effect = read_message
+            with self.assertLogs('tap_yugabyte', level='INFO') as logs:
+                logical_replication.sync_tables(self.conn_info, self.logical_streams, state, 1000, 'state.json')
+
+        breaks = [line for line in logs.output if 'Breaking' in line]
+        return state, breaks, clock.now.return_value - self.START
+
+    def test_quiet_source_stops_after_idle_timeout(self):
+        self.conn_info.update(logical_poll_total_seconds=300, max_run_seconds=43200)
+
+        state, breaks, elapsed = self._run_with_clock([], seconds_per_read=60)
+
+        self.assertEqual(1, len(breaks))
+        self.assertIn('seconds of polling with no data', breaks[0])
+        self.assertLessEqual(elapsed, timedelta(seconds=360))
+        self.assertEqual(100, state['bookmarks']['foo-bar']['lsn'])
+
+    def test_rows_sharing_a_transaction_lsn_reset_the_idle_timer(self):
+        """YugabyteDB gives BEGIN and every row the same LSN; a long transaction is not idle."""
+        self.conn_info.update(logical_poll_total_seconds=5, max_run_seconds=43200)
+        messages = [self._message('B', 200), *[self._message('I', 200) for _ in range(5)], self._message('C', 201)]
+
+        state, breaks, _ = self._run_with_clock(messages, seconds_per_read=3)
+
+        self.assertEqual(1, len(breaks))
+        self.assertIn('seconds of polling with no data', breaks[0])
+        self.assertEqual(201, state['bookmarks']['foo-bar']['lsn'])
+
+    def test_zero_logical_poll_total_seconds_disables_idle_stop(self):
+        self.conn_info.update(logical_poll_total_seconds=0, max_run_seconds=3600)
+
+        _, breaks, elapsed = self._run_with_clock([], seconds_per_read=600)
+
+        self.assertEqual(1, len(breaks))
+        self.assertIn('reached max_run_seconds', breaks[0])
+        self.assertGreaterEqual(elapsed, timedelta(seconds=3600))

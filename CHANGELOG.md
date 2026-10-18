@@ -41,9 +41,11 @@
 - Grant the LOG_BASED tap user the `REPLICATION` attribute and `SET` on
   `yb_read_time`; superuser is not required. See
   [YugabyteDB prerequisites](docs/connectors/taps/yugabyte.rst#prerequisites)
-- Emit periodic WAL-progress heartbeat messages via
-  `pg_logical_emit_message` to advance an otherwise-idle slot's restart
-  position
+- Stop a LOG_BASED run after 300 seconds without WAL messages by default.
+  Set `logical_poll_total_seconds` to change the limit, or `0` to disable it.
+  YugabyteDB does not stream `pg_logical_emit_message`, so this is how an idle
+  run ends. See
+  [acknowledgement and recovery](docs/connectors/taps/yugabyte.rst#acknowledgement-and-recovery)
 - Add FastSync FullSync support (`yugabyte-to-postgres`,
   `yugabyte-to-snowflake`) for bulk full-table copies
 - Create a tap's replication slot from FastSync when a LOG_BASED stream needs

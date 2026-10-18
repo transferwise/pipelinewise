@@ -128,12 +128,14 @@ Configuration
      - Stops a logical replication run after this duration.
    * - ``logical_poll_total_seconds``
      - No
-     - ``0`` (disabled)
-     - Stops after this total idle polling period.
+     - ``300``
+     - Stops a logical replication run after this many seconds without a
+       WAL message. ``0`` disables the idle stop.
    * - ``break_at_end_lsn``
      - No
      - ``true``
-     - Stops after reaching the HybridTime boundary captured at startup.
+     - Stops at the first WAL message past the HybridTime boundary captured
+       before streaming.
    * - ``ssl``
      - No
      - Connector default
@@ -293,22 +295,19 @@ PipelineWise sends feedback only up to the minimum target-acknowledged LSN
 stored in ``state.json``. Missing, unreadable, invalid, or regressing state
 retains the previous safe LSN.
 
-Before consuming ongoing LOG_BASED changes, PipelineWise attempts to emit a
-transactional ``pg_logical_emit_message`` in each tap database when the tap
-user can execute the function. The transaction's commit provides a
-decodable bookmark boundary even when the selected tables are idle. Slot
-feedback advances through that boundary only after the target acknowledges
-the state.
+YugabyteDB does not stream ``pg_logical_emit_message`` records, so an idle
+source sends nothing that can end a run. A run stops after
+``logical_poll_total_seconds`` (default 300) without a WAL message and keeps
+its bookmarks. Commits on unselected tables in the same database count as
+WAL messages. With ``0``, an idle run lasts until ``max_run_seconds``.
 
-If the function is unavailable or inaccessible, replication continues using
-the captured current boundary. Fully filtered idle streams may then require
-a later decodable message before the bookmark and acknowledgement can
-advance.
+On an idle source the slot does not move. The next run that receives a WAL
+message first acknowledges the committed bookmark from its input state.
 
 After an unexpected termination, restart the same tap without advancing
 state. Unacknowledged changes remain replayable while the slot exists.
-Checkpoints advance only after the tap consumes a transaction's commit record,
-including a committed PipelineWise WAL progress message. A completed transaction
+Checkpoints advance only after the tap consumes a transaction's commit record.
+A completed transaction
 can checkpoint even if no later message arrives. If a transaction is interrupted,
 the tap retains the last consumed commit, or each stream's starting checkpoint
 when no commit was consumed, without regressing below a newer target acknowledgement.

@@ -1,6 +1,5 @@
 import time
 import unittest
-from unittest.mock import patch
 
 import tap_yugabyte
 from tap_yugabyte.sync_strategies import common as sync_common
@@ -197,22 +196,14 @@ class TestUnselectedTableSlotAdvancement(unittest.TestCase):
         self.assertGreater(state['bookmarks'][tap_stream_id]['lsn'], initial_lsn)
 
 
-class TestWalProgressMessageSlotAdvancement(unittest.TestCase):
-    """pg_logical_emit_message is callable on YugabyteDB (emit_wal_progress_message returns
-    real content), but its 'M' record is never surfaced by YB's wal2json-emulated CDC stream
-    (confirmed by direct start_replication probing outside this suite) - so a run over an
-    idle table degrades to the ordinary idle-timeout path instead of an early, heartbeat-driven
-    break, and the lsn bookmark is left unchanged rather than incorrectly advanced. A later run
-    with real DML still advances the tap's own in-memory bookmark and calls
-    cur.send_feedback(write_lsn=..., flush_lsn=..., reply=True, force=True), but YugabyteDB
-    never reflects that feedback back into pg_replication_slots.confirmed_flush_lsn for
-    HYBRID_TIME wal2json slots (confirmed by direct probing outside this suite: the reported
-    position stayed at its creation-time placeholder for several seconds of polling after
-    send_feedback) - a second, independent platform limitation."""
+class TestIdleRunAndSlotAcknowledgement(unittest.TestCase):
+    """YugabyteDB never streams pg_logical_emit_message, so an idle run ends at the idle timeout and keeps
+    its bookmark. The slot moves once a run acknowledges a streamed commit from its input state; the
+    bootstrap boundary is not a streamed commit, so acknowledging it leaves the slot in place."""
 
     maxDiff = None
-    table_name = 'lr_wal_progress_message_table'
-    tap_id = 'tap_wal_progress_message_test'
+    table_name = 'lr_idle_ack_table'
+    tap_id = 'tap_idle_ack_test'
 
     @classmethod
     def setUpClass(cls):
@@ -230,70 +221,48 @@ class TestWalProgressMessageSlotAdvancement(unittest.TestCase):
         drop_replication_slot(tap_id=cls.tap_id)
         drop_table(cls.table_name)
 
-    def test_wal_progress_message_is_emitted_but_not_seen_then_dml_still_advances(self):
+    @staticmethod
+    def _confirmed_flush_lsn(slot_name):
+        with get_test_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute('SELECT confirmed_flush_lsn FROM pg_replication_slots WHERE slot_name = %s', (slot_name,))
+                return lsn_to_int(cur.fetchone()[0])
+
+    def test_idle_run_stops_then_acknowledged_commit_advances_slot(self):
         conn_config = get_test_connection_config()
         conn_config['tap_id'] = self.tap_id
+        slot_name = logical_replication.generate_replication_slot_name(conn_config['dbname'], self.tap_id)
 
         stream = _discover_stream(conn_config, self.table_name)
         set_replication_method_for_stream(stream, 'LOG_BASED')
         tap_stream_id = stream['tap_stream_id']
         catalog = {'streams': [stream]}
 
-        state, _ = _capture_singer_messages(
-            tap_yugabyte.do_sync, conn_config, catalog, 'LOG_BASED', {})
+        state, _ = _capture_singer_messages(tap_yugabyte.do_sync, conn_config, catalog, 'LOG_BASED', {})
         initial_lsn = state['bookmarks'][tap_stream_id]['lsn']
+        baseline_confirmed_flush_lsn = self._confirmed_flush_lsn(slot_name)
 
-        slot_name = logical_replication.generate_replication_slot_name(
-            conn_config['dbname'], conn_config['tap_id'])
-        with get_test_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    'SELECT confirmed_flush_lsn FROM pg_replication_slots WHERE slot_name = %s',
-                    (slot_name,))
-                baseline_confirmed_flush_lsn = lsn_to_int(cur.fetchone()[0])
-
-        captured_content = {}
-        original_emit = logical_replication.emit_wal_progress_message
-
-        def _capturing_emit(conn_info):
-            content = original_emit(conn_info)
-            captured_content['value'] = content
-            return content
-
-        # Second run: an idle table. emit_wal_progress_message succeeds (the function is
-        # available and callable), but YugabyteDB's CDC stream never surfaces the resulting
-        # 'M' record, so sync_tables falls through to the ordinary idle-timeout break and
-        # the lsn bookmark is left exactly where it was (never regressed, never advanced).
-        with patch.object(logical_replication, 'emit_wal_progress_message', side_effect=_capturing_emit), \
-                patch.object(tap_yugabyte.logical_replication, 'emit_wal_progress_message', side_effect=_capturing_emit):
-            state, _ = _capture_singer_messages(
-                tap_yugabyte.do_sync, conn_config, catalog, 'LOG_BASED', state)
-
-        self.assertIsNotNone(captured_content.get('value'))
+        started = time.monotonic()
+        state, messages = _capture_singer_messages(tap_yugabyte.do_sync, conn_config, catalog, 'LOG_BASED', state)
+        self.assertLess(time.monotonic() - started, conn_config['logical_poll_total_seconds'] + 30)
+        self.assertEqual([], [m for m in messages if m['type'] == 'RECORD'])
         self.assertEqual(initial_lsn, state['bookmarks'][tap_stream_id]['lsn'])
 
-        # Third run: real DML on the selected table advances the bookmark normally,
-        # proving the tap still functions correctly even though the heartbeat is a no-op.
         with get_test_connection() as conn:
             with conn.cursor() as cur:
-                insert_record(cur, self.table_name, {'id': 1, 'val': 'third-run-row'})
+                insert_record(cur, self.table_name, {'id': 1, 'val': 'first-commit'})
 
-        state, messages = _capture_singer_messages(
-            tap_yugabyte.do_sync, conn_config, catalog, 'LOG_BASED', state)
-        final_lsn = state['bookmarks'][tap_stream_id]['lsn']
-        self.assertGreater(final_lsn, initial_lsn)
-        record_messages = [m for m in messages if m['type'] == 'RECORD']
-        self.assertEqual([1], [m['record']['id'] for m in record_messages])
+        state, messages = _capture_singer_messages(tap_yugabyte.do_sync, conn_config, catalog, 'LOG_BASED', state)
+        committed_lsn = state['bookmarks'][tap_stream_id]['lsn']
+        self.assertGreater(committed_lsn, initial_lsn)
+        self.assertEqual([1], [m['record']['id'] for m in messages if m['type'] == 'RECORD'])
 
-        # Platform limitation: despite the tap's send_feedback call above (confirmed via the
-        # "Confirming write up to ..." log line and the bookmark advancement just asserted),
-        # YugabyteDB's HYBRID_TIME wal2json slots never move confirmed_flush_lsn off its
-        # creation-time placeholder.
         with get_test_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute(
-                    'SELECT confirmed_flush_lsn FROM pg_replication_slots WHERE slot_name = %s',
-                    (slot_name,))
-                confirmed_flush_lsn = lsn_to_int(cur.fetchone()[0])
+                insert_record(cur, self.table_name, {'id': 2, 'val': 'second-commit'})
 
-        self.assertEqual(baseline_confirmed_flush_lsn, confirmed_flush_lsn)
+        state, messages = _capture_singer_messages(tap_yugabyte.do_sync, conn_config, catalog, 'LOG_BASED', state)
+        self.assertEqual([2], [m['record']['id'] for m in messages if m['type'] == 'RECORD'])
+        self.assertGreater(state['bookmarks'][tap_stream_id]['lsn'], committed_lsn)
+        self.assertGreater(committed_lsn, baseline_confirmed_flush_lsn)
+        self.assertEqual(committed_lsn, self._confirmed_flush_lsn(slot_name))
