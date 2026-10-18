@@ -56,6 +56,10 @@
   [acknowledgement and recovery](docs/connectors/taps/yugabyte.rst#acknowledgement-and-recovery)
 - Add FastSync FullSync support (`yugabyte-to-postgres`,
   `yugabyte-to-snowflake`) for bulk full-table copies
+- Check source transformations for YugabyteDB to Snowflake during
+  `pipelinewise validate` and `import_config`, as for PostgreSQL and MySQL.
+  Invalid rules now fail before a run starts, not when FastSync reaches the
+  table. See [load-time transformations](docs/user_guide/transformations.rst#validation-and-rollout)
 - Create a tap's replication slot from FastSync when a LOG_BASED stream needs
   a HybridTime boundary
 - Fail FastSync and the tap when the tap's replication slot is not a `wal2json`

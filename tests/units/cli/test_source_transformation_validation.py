@@ -42,8 +42,10 @@ def _validate_project(tmp_path, command):
 
 
 @pytest.mark.parametrize('command', ['validate', 'import_config'])
-@pytest.mark.parametrize('tap_type', ['tap-postgres', 'tap-mysql'])
-@pytest.mark.parametrize('iceberg', [False, True])
+@pytest.mark.parametrize('tap_type,iceberg', [
+    ('tap-postgres', False), ('tap-postgres', True), ('tap-mysql', False), ('tap-mysql', True),
+    ('tap-yugabyte', False),
+])
 @pytest.mark.parametrize('condition,error', [
     ({'regex_match': r'\d+'}, 'Backslash regex'),
     ({'regex_match': 'a^b'}, 'anchors'),
@@ -70,7 +72,7 @@ def test_duplicate_unconditional_rules_fail_offline(tmp_path, command):
 
 
 @pytest.mark.parametrize('command', ['validate', 'import_config'])
-@pytest.mark.parametrize('tap_type', ['tap-postgres', 'tap-mysql'])
+@pytest.mark.parametrize('tap_type', ['tap-postgres', 'tap-mysql', 'tap-yugabyte'])
 def test_transformed_incremental_key_fails_offline(tmp_path, command, tap_type):
     _write_project(
         tmp_path, tap_type=tap_type, replication_method='INCREMENTAL', replication_key='id',
@@ -92,10 +94,18 @@ def test_valid_configuration_leaves_metadata_dependent_checks_for_preflight(tmp_
 @pytest.mark.parametrize('command', ['validate', 'import_config'])
 @pytest.mark.parametrize('tap_type,target_type', [
     ('tap-mongodb', 'target-snowflake'), ('tap-postgres', 'target-postgres'),
-    ('tap-mysql', 'target-postgres'),
+    ('tap-mysql', 'target-postgres'), ('tap-yugabyte', 'target-postgres'),
 ])
 def test_other_routes_keep_their_existing_condition_syntax(tmp_path, command, tap_type, target_type):
     _write_project(tmp_path, tap_type=tap_type, target_type=target_type, transformations=[{
+        'column': 'secret', 'type': 'HASH', 'when': [{'column': 'secret', 'regex_match': r'\d+'}],
+    }])
+    _validate_project(tmp_path, command)
+
+
+@pytest.mark.parametrize('command', ['validate', 'import_config'])
+def test_yugabyte_iceberg_has_no_source_side_route_to_check(tmp_path, command):
+    _write_project(tmp_path, tap_type='tap-yugabyte', iceberg=True, transformations=[{
         'column': 'secret', 'type': 'HASH', 'when': [{'column': 'secret', 'regex_match': r'\d+'}],
     }])
     _validate_project(tmp_path, command)

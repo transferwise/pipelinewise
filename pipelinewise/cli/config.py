@@ -434,7 +434,7 @@ class Config:
     @classmethod
     def validate_source_transformations(cls, tap: Dict, target: Dict) -> None:
         """Validate source-select rules before either validate or import discovers columns."""
-        if target['type'] != 'target-snowflake' or tap['type'] not in {'tap-mysql', 'tap-postgres'}:
+        if target['type'] != 'target-snowflake' or tap['type'] not in {'tap-mysql', 'tap-postgres', 'tap-yugabyte'}:
             return
         capabilities = fastsync_capabilities.resolve_fastsync_capabilities(
             tap['type'], target['type'], tap.get('target_table_format'),
