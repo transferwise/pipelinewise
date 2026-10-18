@@ -305,6 +305,32 @@ rather than an ``xmin`` sentinel. Views and materialized views are rejected
 for ``LOG_BASED``.
 
 
+.. _yugabyte_resync_size_limit:
+
+Resync size limit
+-----------------
+
+``allowed_resync_max_size.table_mb`` blocks a FullSync to Snowflake when a
+selected table is larger than the limit. ``--force`` bypasses it. The limit
+does not apply to PostgreSQL targets, the same as for PostgreSQL sources.
+
+YugabyteDB measures size differently from PostgreSQL. PipelineWise compares
+``pg_table_size`` plus ``pg_indexes_size``, summed over a partitioned table's
+partitions. On YugabyteDB this is:
+
+- the on-disk size of one copy of the data, read from the leader replicas;
+  the replication factor does not change it;
+- compressed data files plus the write-ahead log (WAL). The WAL stays until
+  data is flushed and log segments roll over, so the size depends on recent
+  writes. A freshly loaded table can report more than its data. A settled table
+  can report several times less than the CSV that FastSync exports;
+- refreshed by heartbeat, so a table loaded in the last minute can report 0.
+
+YugabyteDB reports no size for colocated tables, and views have none. The
+check blocks these tables; use ``--force`` to resync them. Set ``table_mb`` with
+headroom rather than as an exact export size.
+
+
 Acknowledgement and recovery
 -----------------------------
 

@@ -114,7 +114,9 @@ command does not migrate or delete a legacy slot.
 
 For YugabyteDB, the reset differs in two ways:
 
-- ``allowed_resync_max_size`` does not apply, so ``--force`` has no effect on it.
+- ``allowed_resync_max_size`` uses YugabyteDB's on-disk size, which differs
+  from PostgreSQL's. It also blocks colocated tables and views, which have no
+  size. See :ref:`yugabyte_resync_size_limit`.
 - YugabyteDB reports a slot as active for
   ``ysql_cdc_active_replication_slot_window_ms`` (default five minutes) after its
   last consumer disconnects. The reset waits up to five minutes for the flag to

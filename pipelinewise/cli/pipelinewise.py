@@ -1495,7 +1495,11 @@ class PipelineWise:
 
     def _get_fastsync_size_limit(self, tap_type, target_type):
         """Use the same size-limit policy for preflight and the FullSync worker."""
-        if tap_type in ('tap-mysql', 'tap-postgres') and target_type == 'target-snowflake' and not self.force_fast_sync:
+        if (
+            tap_type in ('tap-mysql', 'tap-postgres', 'tap-yugabyte')
+            and target_type == 'target-snowflake'
+            and not self.force_fast_sync
+        ):
             return self.config.get('allowed_resync_max_size', {}).get('table_mb')
         return None
 
@@ -1610,9 +1614,9 @@ class PipelineWise:
 
         fastsync_utils.check_config(tap_config, route.REQUIRED_CONFIG_KEYS['tap'])
         fastsync_utils.check_config(target_config, route.REQUIRED_CONFIG_KEYS['target'])
-        # allowed_resync_max_size applies only to MySQL and PostgreSQL sources.
-        if is_postgres and target_type == ConnectorType.TARGET_SNOWFLAKE.value:
-            size_errors = postgres_to_snowflake.get_resync_size_errors(
+        # allowed_resync_max_size applies only to Snowflake routes.
+        if target_type == ConnectorType.TARGET_SNOWFLAKE.value:
+            size_errors = route.get_resync_size_errors(
                 tap_config, selected_tables['full_sync'], self._get_fastsync_size_limit(tap_type, target_type),
             )
             if size_errors:

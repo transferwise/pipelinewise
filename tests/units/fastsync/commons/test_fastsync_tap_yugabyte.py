@@ -89,6 +89,37 @@ class TestFastSyncTapYugabyte(TestCase):
 
         self.assertEqual('permission denied', str(context.exception))
 
+    def test_fetch_table_sizes_mb_reads_each_schema_once_and_marks_unsized_tables(self):
+        """Sizes are MB per selected table; NULL (colocated) and absent tables (views) are None"""
+        cursor = MagicMock()
+        cursor.fetchall.side_effect = [
+            [('orders', 2 * 1024 * 1024), ('unselected', 99 * 1024 * 1024)],
+            [('coloc', None)],
+        ]
+        connection = MagicMock()
+        connection.cursor.return_value.__enter__.return_value = cursor
+        with patch.object(FastSyncTapYugabyte, 'admin_connection', return_value=connection) as admin_connection:
+            sizes = FastSyncTapYugabyte.fetch_table_sizes_mb(
+                {'host': 'h', 'load_balance': 'true'}, ['public.orders', 'public.a_view', 'sales.coloc'],
+            )
+
+        self.assertEqual({'public.orders': 2.0, 'public.a_view': None, 'sales.coloc': None}, sizes)
+        admin_connection.assert_called_once_with({'host': 'h', 'load_balance': 'true'})
+        self.assertEqual(
+            [call(tap_yugabyte._TABLE_SIZE_SQL, ('public',)), call(tap_yugabyte._TABLE_SIZE_SQL, ('sales',))],
+            cursor.execute.call_args_list,
+        )
+        connection.close.assert_called_once_with()
+
+    def test_fetch_table_sizes_mb_closes_connection_after_query_failure(self):
+        connection = MagicMock()
+        connection.cursor.return_value.__enter__.return_value.execute.side_effect = psycopg2.OperationalError('down')
+        with patch.object(FastSyncTapYugabyte, 'admin_connection', return_value=connection):
+            with self.assertRaises(psycopg2.OperationalError):
+                FastSyncTapYugabyte.fetch_table_sizes_mb({}, ['public.orders'])
+
+        connection.close.assert_called_once_with()
+
     def test_fetch_current_log_pos_returns_hybrid_time_boundary(self):
         """fetch_current_log_pos must read yb_restart_commit_ht, not the placeholder lsn"""
         with patch.object(

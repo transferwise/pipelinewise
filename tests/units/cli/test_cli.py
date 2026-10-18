@@ -1127,11 +1127,12 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         (ConnectorType.TARGET_SNOWFLAKE.value, yugabyte_to_snowflake),
         (ConnectorType.TARGET_POSTGRES.value, yugabyte_to_postgres),
     ])
-    def test_yugabyte_slot_reset_preflight_uses_yugabyte_route_without_size_limit(self, target_type, route):
-        """YugabyteDB checks its own route keys and is exempt from allowed_resync_max_size."""
+    def test_yugabyte_slot_reset_preflight_uses_yugabyte_route_and_snowflake_size_limit(self, target_type, route):
+        """YugabyteDB checks its own route keys; allowed_resync_max_size applies only to Snowflake."""
         pipelinewise = self._init_for_sync_tables_states_cleanup()
         pipelinewise.tap['type'] = ConnectorType.TAP_YUGABYTE.value
         pipelinewise.target['type'] = target_type
+        pipelinewise.force_fast_sync = False
         pipelinewise.config['allowed_resync_max_size'] = {'table_mb': 10}
         tap_config, target_config = {'tap': 'config'}, {'target': 'config'}
         with patch.object(pipelinewise, '_check_if_complete_tap_configuration') as check_executable, patch.object(
@@ -1142,7 +1143,9 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
             route, 'REQUIRED_CONFIG_KEYS', {'tap': ['yb_tap_key'], 'target': ['yb_target_key']},
         ), patch(
             'pipelinewise.fastsync.commons.snowflake_iceberg_routes.validate_route_config',
-        ), patch('pipelinewise.fastsync.postgres_to_snowflake.get_resync_size_errors') as size_errors:
+        ), patch(
+            'pipelinewise.fastsync.yugabyte_to_snowflake.get_resync_size_errors', return_value=[],
+        ) as size_errors, patch('pipelinewise.fastsync.postgres_to_snowflake.get_resync_size_errors') as pg_size_errors:
             assert pipelinewise._preflight_source_slot_reset(
                 {'full_sync': ['public.full'], 'partial_sync': {}},
             ) == (tap_config, target_config)
@@ -1150,11 +1153,61 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         assert check_config.call_args_list == [
             call(tap_config, ['yb_tap_key']), call(target_config, ['yb_target_key']),
         ]
-        size_errors.assert_not_called()
+        pg_size_errors.assert_not_called()
+        if target_type == ConnectorType.TARGET_SNOWFLAKE.value:
+            size_errors.assert_called_once_with(tap_config, ['public.full'], 10)
+        else:
+            size_errors.assert_not_called()
         target = target_type.replace('target-', '')
         check_executable.assert_called_once_with(
             f'{pipelinewise.venv_dir}fastsync-yugabyte/bin/yugabyte-to-{target}', 'tap-yugabyte', target_type,
         )
+
+    @pytest.mark.parametrize('force, expected_limit', [(False, 10), (True, None)])
+    def test_yugabyte_slot_reset_preflight_blocks_oversized_snowflake_resync(self, force, expected_limit):
+        """An oversized or unsized YugabyteDB table blocks the reset unless --force lifts the limit."""
+        pipelinewise = self._init_for_sync_tables_states_cleanup()
+        pipelinewise.tap['type'] = ConnectorType.TAP_YUGABYTE.value
+        pipelinewise.target['type'] = ConnectorType.TARGET_SNOWFLAKE.value
+        pipelinewise.force_fast_sync = force
+        pipelinewise.config['allowed_resync_max_size'] = {'table_mb': 10}
+        tap_config = dict.fromkeys(yugabyte_to_snowflake.REQUIRED_CONFIG_KEYS['tap'], 'test')
+        target_config = dict.fromkeys(yugabyte_to_snowflake.REQUIRED_CONFIG_KEYS['target'], 'test')
+        size_errors = [] if force else ['re-sync can not be done because size of table `public.full` is greater']
+        with patch.object(pipelinewise, '_check_if_complete_tap_configuration'), patch.object(
+            pipelinewise, '_load_required_json_object', side_effect=[tap_config, target_config, {}, {'streams': []}],
+        ), patch.object(
+            fastsync_utils, 'get_tables_from_properties', return_value=['public.full'],
+        ), patch(
+            'pipelinewise.fastsync.commons.snowflake_iceberg_routes.validate_route_config',
+        ), patch(
+            'pipelinewise.fastsync.yugabyte_to_snowflake.get_resync_size_errors', return_value=size_errors,
+        ) as get_size_errors:
+            if force:
+                assert pipelinewise._preflight_source_slot_reset(
+                    {'full_sync': ['public.full'], 'partial_sync': {}},
+                ) == (tap_config, target_config)
+            else:
+                with pytest.raises(PreRunChecksException, match='public.full.*No source or state changes were made'):
+                    pipelinewise._preflight_source_slot_reset({'full_sync': ['public.full'], 'partial_sync': {}})
+
+        get_size_errors.assert_called_once_with(tap_config, ['public.full'], expected_limit)
+
+    @pytest.mark.parametrize('tap_type, target_type, expected', [
+        ('tap-mysql', 'target-snowflake', 10),
+        ('tap-postgres', 'target-snowflake', 10),
+        ('tap-yugabyte', 'target-snowflake', 10),
+        ('tap-yugabyte', 'target-postgres', None),
+        ('tap-postgres', 'target-postgres', None),
+        ('tap-mongodb', 'target-snowflake', None),
+    ])
+    def test_fastsync_size_limit_covers_rdbms_to_snowflake_routes(self, tap_type, target_type, expected):
+        pipelinewise = self._init_for_sync_tables_states_cleanup()
+        pipelinewise.config['allowed_resync_max_size'] = {'table_mb': 10}
+        pipelinewise.force_fast_sync = False
+        assert pipelinewise._get_fastsync_size_limit(tap_type, target_type) == expected
+        pipelinewise.force_fast_sync = True
+        assert pipelinewise._get_fastsync_size_limit(tap_type, target_type) is None
 
     def test_yugabyte_slot_reset_preflight_names_source_for_unsupported_target(self):
         pipelinewise = self._init_for_sync_tables_states_cleanup()

@@ -7,6 +7,7 @@ from pipelinewise.fastsync.yugabyte_to_snowflake import (
     tap_type_to_target_type,
     sync_table,
     main_impl,
+    get_resync_size_errors,
 )
 
 PACKAGE_IN_SCOPE = 'pipelinewise.fastsync.yugabyte_to_snowflake'
@@ -53,6 +54,38 @@ class YugabyteToSnowflake(unittest.TestCase):
                 TARGET,
                 expected_cleanup=call.close_connection(silent=True),
             )
+
+    def test_resync_size_check_reports_every_oversized_or_unsized_table(self):
+        with patch(f'{PACKAGE_IN_SCOPE}.{TAP}.fetch_table_sizes_mb', return_value={
+            'public.small': 10.0, 'public.big': 10.5, 'public.coloc': None,
+        }) as sizes:
+            errors = get_resync_size_errors({'host': 'h'}, ['public.small', 'public.big', 'public.coloc'], 10)
+
+        sizes.assert_called_once_with({'host': 'h'}, ['public.small', 'public.big', 'public.coloc'])
+        self.assertEqual(2, len(errors))
+        self.assertIn('size of table `public.big` is greater than `10`', errors[0])
+        self.assertIn('reports no size for table `public.coloc`', errors[1])
+        self.assertTrue(all('Use --force' in error for error in errors))
+
+    def test_resync_size_check_skips_unlimited_or_partial_only_runs(self):
+        with patch(f'{PACKAGE_IN_SCOPE}.{TAP}.fetch_table_sizes_mb') as sizes:
+            self.assertEqual(get_resync_size_errors({}, ['public.full'], None), [])
+            self.assertEqual(get_resync_size_errors({}, [], 10), [])
+        sizes.assert_not_called()
+
+    def test_main_impl_does_not_start_workers_when_size_check_fails(self):
+        with patch(f'{PACKAGE_IN_SCOPE}.utils') as utils_mock, patch(
+            f'{PACKAGE_IN_SCOPE}.iceberg_routes.validate_route_config',
+        ), patch(
+            f'{PACKAGE_IN_SCOPE}.get_resync_size_errors', return_value=['too big'],
+        ), patch(f'{PACKAGE_IN_SCOPE}.multiprocessing') as multiprocessing_mock:
+            utils_mock.parse_args.return_value.tables = ['public.full']
+            utils_mock.parse_args.return_value.autoresync_size = 10
+            utils_mock.get_pool_size.return_value = 1
+            with self.assertRaises(SystemExit):
+                main_impl()
+
+        multiprocessing_mock.Pool.assert_not_called()
 
     @staticmethod
     def test_main_impl_with_all_tables_synced_successfully_should_exit_normally():

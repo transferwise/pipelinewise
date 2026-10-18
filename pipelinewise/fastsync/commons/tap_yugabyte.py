@@ -37,6 +37,21 @@ _RETRYABLE_DROP_SLOT_ERRORS = (
 # psycopg2-binary rejects the YugabyteDB driver's load balancing connection options.
 _DRIVER_SPECIFIC_CONNECTION_OPTIONS = ('load_balance', 'topology_keys')
 
+# YugabyteDB reports a relation's leader-replica compressed SST plus WAL, and NULL for colocated tables.
+# A partitioned parent holds no data, so its partitions are summed.
+_TABLE_SIZE_SQL = """
+SELECT c.relname,
+       CASE WHEN bool_or(p.data_bytes IS NULL) THEN NULL ELSE SUM(p.data_bytes + p.index_bytes) END
+FROM pg_class c
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+  CROSS JOIN LATERAL (
+      SELECT pg_table_size(r.oid) AS data_bytes, pg_indexes_size(r.oid) AS index_bytes
+      FROM (SELECT c.oid UNION ALL SELECT inhrelid FROM pg_inherits WHERE inhparent = c.oid) AS r(oid)
+  ) AS p
+WHERE n.nspname = %s AND c.relkind IN ('r', 'p', 'm') AND NOT c.relispartition
+GROUP BY c.relname
+"""
+
 # MISMATCHED_SCHEMA, one of the errors the general read-retry policy in yb_retry
 # covers: a `yb_read_time`-pinned read validates its session's cached catalog
 # snapshot against the cluster's current catalog version, and a concurrent DDL
@@ -384,6 +399,30 @@ class FastSyncTapYugabyte:
         self._snapshot_ht = current_lsn
 
         return {'lsn': current_lsn, 'version': 1}
+
+    @classmethod
+    def fetch_table_sizes_mb(cls, connection_config: Dict, tables) -> Dict[str, Optional[float]]:
+        """
+        Return each table's on-disk size in MB, or None where YugabyteDB reports no size.
+
+        Args:
+            connection_config: Dictionary with db credentials
+            tables: Fully qualified `schema.table` names
+        Returns:
+            Dictionary of table name to size in MB; None for colocated tables, views, or missing tables
+        """
+        sizes = {}
+        connection = cls.admin_connection(connection_config)
+        try:
+            with connection.cursor() as cur:
+                for schema in sorted({table.split('.')[0] for table in tables}):
+                    cur.execute(_TABLE_SIZE_SQL, (schema,))
+                    for table_name, size_bytes in cur.fetchall():
+                        size_mb = None if size_bytes is None else float(size_bytes) / 1024 / 1024
+                        sizes[f'{schema}.{table_name}'] = size_mb
+        finally:
+            connection.close()
+        return {table: sizes.get(table) for table in tables}
 
     def fetch_current_incremental_key_pos(self, table, replication_key):
         """

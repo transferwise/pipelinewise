@@ -74,8 +74,14 @@
   tables, as tap-postgres does. PipelineWise backs up and clears every bookmark,
   then drops and recreates the slot once before workers start. `--tables` and a
   non-default `--replication_method_only` keep the slot. The reset waits up to
-  5 minutes for an active slot to free. `allowed_resync_max_size` does not apply.
+  5 minutes for an active slot to free.
   See [source-slot reset](docs/user_guide/resync.rst#postgresql-and-yugabytedb-source-slot-reset)
+- Apply `allowed_resync_max_size` to YugabyteDB-to-Snowflake FullSync, before a
+  slot reset and before workers start. `--force` bypasses it. The size is
+  YugabyteDB's on-disk size: compressed data plus write-ahead log on the leader
+  replicas, including indexes. It changes with write activity, so set the limit
+  with headroom. Colocated tables and views have no size and are blocked. See
+  [resync size limit](docs/connectors/taps/yugabyte.rst#resync-size-limit)
 - Add native PartialSync support (`partial-yugabyte-to-snowflake`) for
   bounded-range resyncs to Snowflake, reusing PostgreSQL's dialect-safe
   boundary predicate since YSQL follows PostgreSQL identifier-quoting rules

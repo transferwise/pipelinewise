@@ -16,9 +16,6 @@ from .commons.rdbms_source import RdbmsSnowflakeSource
 from .commons.source_numeric import yugabyte_decimal_type
 from .commons.tap_yugabyte import FastSyncTapYugabyte
 from .commons.target_snowflake import FastSyncTargetSnowflake
-from pipelinewise.utils import (get_tables_size,
-                                filter_out_selected_tables,
-                                get_maximum_value_from_list_of_dicts, get_schemas_of_tables_set)
 
 
 LOGGER = Logger().get_logger(__name__)
@@ -103,13 +100,29 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
     )
 
 
+def get_resync_size_errors(tap_config, tables, maximum_table_size):
+    """Check selected FullSync tables before either slot reset or worker loading."""
+    if not maximum_table_size or not tables:
+        return []
+    errors = []
+    for table, size_mb in sorted(FastSyncTapYugabyte.fetch_table_sizes_mb(tap_config, tables).items()):
+        if size_mb is None:
+            errors.append(
+                f're-sync can not be done because YugabyteDB reports no size for table `{table}`'
+                ' (colocated tables and views have none)! Use --force argument to force fast_sync!')
+        elif size_mb > float(maximum_table_size):
+            errors.append(
+                f're-sync can not be done because size of table `{table}` is greater than `{maximum_table_size}`!'
+                ' Use --force argument to force fast_sync!')
+    return errors
+
+
 def main_impl():
     """Main sync logic"""
     args = utils.parse_args(REQUIRED_CONFIG_KEYS)
     iceberg_routes.validate_route_config(args.target)
     pool_size = utils.get_pool_size(args.tap)
     start_time = datetime.now()
-    table_sync_excs = []
 
     # Log start info
     LOGGER.info(
@@ -127,23 +140,10 @@ def main_impl():
         pool_size,
     )
 
-    can_run_sync = True
-    if args.autoresync_size:
-        schemas = get_schemas_of_tables_set(args.tables)
-        tap_obj = FastSyncTapYugabyte(args.tap, tap_type_to_target_type)
-        for schema in schemas:
-            all_tables_in_this_schema = get_tables_size(schema, tap_obj)
-            only_selected_tables = filter_out_selected_tables(all_tables_in_this_schema, args.tables)
-            table_with_maximum_size = get_maximum_value_from_list_of_dicts(only_selected_tables, 'table_size')
-            if table_with_maximum_size.get('table_size') > float(args.autoresync_size):
-                can_run_sync = False
-                table_sync_excs.append(
-                    f're-sync can not be done because size of table '
-                    f'`{table_with_maximum_size["table_name"]}` is greater than `{args.autoresync_size}`!'
-                    f' Use --force argument to force fast_sync!')
+    table_sync_excs = get_resync_size_errors(args.tap, args.tables, args.autoresync_size)
 
     # Start loading tables in parallel in spawning processes
-    if can_run_sync:
+    if not table_sync_excs:
         with multiprocessing.Pool(pool_size) as proc:
             table_sync_excs = list(
                 filter(
