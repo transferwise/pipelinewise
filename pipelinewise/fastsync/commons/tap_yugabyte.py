@@ -400,6 +400,10 @@ class FastSyncTapYugabyte:
 
         return {'lsn': current_lsn, 'version': 1}
 
+    def unpin_snapshot(self):
+        """Export current data when the slot boundary will not be saved as the tap's resume point."""
+        self._snapshot_ht = None
+
     @classmethod
     def fetch_table_sizes_mb(cls, connection_config: Dict, tables) -> Dict[str, Optional[float]]:
         """

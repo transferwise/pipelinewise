@@ -1,3 +1,4 @@
+from pipelinewise.fastsync import yugabyte_to_snowflake
 from tests.end_to_end.helpers import assertions
 from tests.end_to_end.target_snowflake.tap_yugabyte import TapYugabyte
 
@@ -365,4 +366,62 @@ class TestPartialSyncYugabyteToSF(TapYugabyte):
 
         assertions.assert_partial_sync_rows_in_target(
             self.e2e_env, 'yugabyte', self.table, column_to_check, primary_key, expected_records_for_column
+        )
+
+
+class TestBoundedPartialSyncLogBasedYugabyteToSF(TapYugabyte):
+    """Bounded PartialSync of a LOG_BASED table against an unconsumed replication slot"""
+
+    def setUp(self):
+        super().setUp(tap_id='yugabyte_to_sf', target_id='snowflake')
+        self.target_table = (
+            f'ppw_e2e_tap_yugabyte_logical1{self.e2e_env.sf_schema_postfix}.logical1_table1'
+        )
+        self.tap_parameters = {
+            'env': self.e2e_env,
+            'tap': self.tap_id,
+            'tap_type': 'yugabyte',
+            'target': self.target_id,
+            'source_db': 'logical1',
+            'table': 'logical1_table1',
+            'column': 'cid',
+        }
+        assertions.assert_resync_tables_success(
+            self.tap_id,
+            self.target_id,
+            expected_streams={'logical1-logical1_table1'},
+            tables='logical1.logical1_table1',
+        )
+
+    def prepare_source(self):
+        """Start from a fresh slot so its boundary postdates the recreated fixture tables."""
+        super().prepare_source()
+        logical_schema = f'ppw_e2e_tap_yugabyte_logical1{self.e2e_env.sf_schema_postfix}'.upper()
+        self.addCleanup(self.drop_sf_schema_if_exists, logical_schema)
+        self.drop_sf_schema_if_exists(logical_schema)
+        # drop_slot retries through YugabyteDB's lingering active-slot window after a previous run.
+        yugabyte_to_snowflake.FastSyncTapYugabyte.drop_slot({
+            'host': self.e2e_env.get_conn_env_var('TAP_YUGABYTE', 'HOST'),
+            'port': self.e2e_env.get_conn_env_var('TAP_YUGABYTE', 'PORT'),
+            'user': self.e2e_env.get_conn_env_var('TAP_YUGABYTE', 'USER'),
+            'password': self.e2e_env.get_conn_env_var('TAP_YUGABYTE', 'PASSWORD'),
+            'dbname': self.e2e_env.get_conn_env_var('TAP_YUGABYTE', 'DB'),
+            'tap_id': self.tap_id,
+        })
+
+    def test_bounded_partial_sync_exports_current_rows(self):
+        """Exporting at the slot boundary would restore pre-change rows the saved state never replays"""
+        self.e2e_env.run_query_tap_yugabyte(
+            "UPDATE logical1.logical1_table1 SET cvarchar = 'updated row' WHERE cid = 1"
+        )
+        self.e2e_env.delete_record_from_source('yugabyte', 'logical1.logical1_table1', 'WHERE cid = 3')
+
+        assertions.assert_partial_sync_table_success(self.tap_parameters, start_value=1, end_value=4)
+
+        rows = self.e2e_env.run_query_target_snowflake(
+            f'SELECT cid, cvarchar FROM {self.target_table} ORDER BY cid'
+        )
+        self.assertEqual(
+            [(1, 'updated row'), (2, 'inserted row'), (4, 'inserted row')],
+            [tuple(row) for row in rows],
         )

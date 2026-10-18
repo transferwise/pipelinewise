@@ -482,3 +482,45 @@ class PartialSyncTestCase(TestCase):
                     mocked_save_state.assert_not_called()
                 else:
                     mocked_save_state.assert_called_with('state.json', table_name, bookmark)
+
+    @mock.patch('pipelinewise.fastsync.partialsync.utils.load_into_snowflake')
+    @mock.patch('pipelinewise.fastsync.partialsync.utils.upload_to_s3', return_value=(['FOO_S3_KEYS'], 'FOO_PATTERN'))
+    @mock.patch('pipelinewise.fastsync.commons.utils.save_state_file')
+    @mock.patch('pipelinewise.fastsync.partialsync.yugabyte_to_snowflake.FastSyncTapYugabyte')
+    @mock.patch('pipelinewise.fastsync.commons.utils.get_bookmark_for_table', return_value='foo_bookmark')
+    @mock.patch('pipelinewise.fastsync.partialsync.yugabyte_to_snowflake.FastSyncTargetSnowflake')
+    @mock.patch.object(yugabyte_to_snowflake.iceberg_routes, 'require_native_target_format')
+    def test_partial_sync_unpins_slot_snapshot_only_when_state_is_not_saved(self, _mocked_native_format,
+                                                                            _mocked_fastsync_sf, _mocked_bookmark,
+                                                                            mocked_fastsyncyb, mocked_save_state,
+                                                                            _mocked_upload_to_s3, _mocked_load_into_sf):
+        """A bounded sync keeps the tap's state, so its export must read current data, not the slot boundary"""
+        for end_value in ('<S>2', None):
+            with self.subTest(end_value=end_value), TemporaryDirectory() as temp_directory:
+                mocked_fastsyncyb.reset_mock()
+                mocked_save_state.reset_mock()
+                source = mocked_fastsyncyb.return_value
+                source.map_column_types_to_target.return_value = {
+                    'columns': ['foo type1'], 'primary_key': 'foo_primary', 'source_column_names': ['foo_column'],
+                }
+
+                def export_data_to_file(*_args, directory=temp_directory, **_kwargs):
+                    with open(f'{directory}/t1', 'w', encoding='utf8') as exported_file:
+                        exported_file.write('F')
+                    return [f'{directory}/t1']
+
+                source.export_source_table_data.side_effect = export_data_to_file
+                args = PartialSync2SFArgs(temp_test_dir='FOO_DIR', end_value=end_value)
+                test_table = ('foo', {
+                    'column': 'foo_column', 'start_value': '<S>1', 'end_value': end_value, 'drop_target_table': False,
+                })
+
+                self.assertIs(yugabyte_to_snowflake.partial_sync_table(test_table, args), True)
+
+                calls = [name for name, _args, _kwargs in source.mock_calls]
+                if end_value:
+                    self.assertLess(calls.index('unpin_snapshot'), calls.index('export_source_table_data'))
+                    mocked_save_state.assert_not_called()
+                else:
+                    source.unpin_snapshot.assert_not_called()
+                    mocked_save_state.assert_called_once_with('state.json', 'foo', 'foo_bookmark')

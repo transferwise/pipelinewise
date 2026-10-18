@@ -299,8 +299,9 @@ a declared primary key fall back to a plain, non-resumable full scan.
 
 ``LOG_BASED`` bootstraps its initial scan from a snapshot pinned to the
 replication slot's own restart boundary (``SET yb_read_time``), so the
-snapshot and the streaming start position are provably consistent. An
-interrupted bootstrap resumes from a ``bootstrap_in_progress`` bookmark
+snapshot and the streaming start position are provably consistent. A
+PartialSync with an end value saves no replication position, so its export
+reads current data instead. An interrupted bootstrap resumes from a ``bootstrap_in_progress`` bookmark
 rather than an ``xmin`` sentinel. Views and materialized views are rejected
 for ``LOG_BASED``.
 

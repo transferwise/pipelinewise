@@ -275,7 +275,7 @@ guards, and non-atomic reset recovery.
 
 ``--end_value`` is optional. When absent, PipelineWise captures the current
 replication position and can update state after the merge. PartialSync is
-available only from MariaDB/MySQL or PostgreSQL to Snowflake. See
+available only from MariaDB/MySQL, PostgreSQL, or YugabyteDB to Snowflake. See
 :ref:`partial_sync_cases`.
 
 

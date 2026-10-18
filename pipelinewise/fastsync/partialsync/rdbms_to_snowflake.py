@@ -322,12 +322,7 @@ def _prepare_iceberg_partial_export(run: _PartialSyncRun) -> bool:
         run, snowflake_types, start_value, end_value
     )
     run.column_name = run.boundary.column_name
-    run.bookmark = common_utils.get_bookmark_for_table(
-        run.table_name,
-        run.args.properties,
-        run.source,
-        **run.source_adapter.bookmark_kwargs(run.args),
-    )
+    run.bookmark = _fetch_partial_bookmark(run)
     run.where_clause_sql = run.boundary.snowflake_where_clause()
     run.attempt = run.publisher.prepare_partial_sync(
         run.spec,
@@ -378,14 +373,22 @@ def _prepare_native_partial_export(run: _PartialSyncRun) -> bool:
         )
         run.source_columns = columns_diff['staging_columns']
 
-    run.bookmark = common_utils.get_bookmark_for_table(
+    run.bookmark = _fetch_partial_bookmark(run)
+    run.where_clause_sql = run.boundary.snowflake_where_clause()
+    return True
+
+
+def _fetch_partial_bookmark(run: _PartialSyncRun) -> Dict:
+    bookmark = common_utils.get_bookmark_for_table(
         run.table_name,
         run.args.properties,
         run.source,
         **run.source_adapter.bookmark_kwargs(run.args),
     )
-    run.where_clause_sql = run.boundary.snowflake_where_clause()
-    return True
+    if run.args.end_value:
+        # update_state_file skips bounded syncs, so the bookmark must not shape the export.
+        run.source_adapter.discard_unsaved_bookmark(run.source)
+    return bookmark
 
 
 def _resolve_partial_boundary(run: _PartialSyncRun):

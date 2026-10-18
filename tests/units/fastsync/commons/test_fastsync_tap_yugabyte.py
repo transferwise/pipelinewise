@@ -589,6 +589,14 @@ class TestFastSyncTapYugabyte(TestCase):
         export_sql = self.yugabyte.curr.copy_expert.call_args.args[0]
         self.assertIn('FROM public."my_table"', export_sql)
 
+    def test_unpin_snapshot_clears_slot_boundary(self):
+        """A bounded PartialSync must not export at a slot boundary it never saves"""
+        self.yugabyte._snapshot_ht = 123456789
+
+        self.yugabyte.unpin_snapshot()
+
+        self.assertIsNone(self.yugabyte._snapshot_ht)
+
     def test_copy_table_skips_snapshot_pin_when_hybrid_time_is_unknown(self):
         """copy_table must not attempt to set yb_read_time for FULL_TABLE/non-CDC syncs"""
         table_columns = [{'safe_sql_value': '"id"'}]

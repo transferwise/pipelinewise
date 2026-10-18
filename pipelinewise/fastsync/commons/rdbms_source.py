@@ -51,6 +51,10 @@ class RdbmsSnowflakeSource(ABC):
     def bookmark_kwargs(self, args) -> Dict[str, str]:
         """Return source-specific bookmark lookup arguments."""
 
+    def discard_unsaved_bookmark(self, source) -> None:
+        """Drop source state tied to a bookmark that will not be saved."""
+        del source
+
     @abstractmethod
     def open(self, source) -> None:
         """Open the source connection or connections."""
@@ -190,6 +194,10 @@ class YugabyteSnowflakeSource(RdbmsSnowflakeSource):
 
     def bookmark_kwargs(self, args) -> Dict[str, str]:
         return {'dbname': args.tap.get('dbname')}
+
+    def discard_unsaved_bookmark(self, source) -> None:
+        # A slot-pinned export would predate CDC the tap's saved state has already consumed.
+        source.unpin_snapshot()
 
     def open(self, source) -> None:
         source.open_connection()
