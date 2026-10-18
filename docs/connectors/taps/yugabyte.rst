@@ -314,21 +314,60 @@ Resync size limit
 selected table is larger than the limit. ``--force`` bypasses it. The limit
 does not apply to PostgreSQL targets, the same as for PostgreSQL sources.
 
-YugabyteDB measures size differently from PostgreSQL. PipelineWise compares
-``pg_table_size`` plus ``pg_indexes_size``, summed over a partitioned table's
-partitions. On YugabyteDB this is:
+PipelineWise reads the size with ``pg_table_size`` plus ``pg_indexes_size``,
+summed over a partitioned table's partitions. YugabyteDB stores data
+differently from PostgreSQL, so the same functions measure different things:
 
-- the on-disk size of one copy of the data, read from the leader replicas;
-  the replication factor does not change it;
-- compressed data files plus the write-ahead log (WAL). The WAL stays until
-  data is flushed and log segments roll over, so the size depends on recent
-  writes. A freshly loaded table can report more than its data. A settled table
-  can report several times less than the CSV that FastSync exports;
-- refreshed by heartbeat, so a table loaded in the last minute can report 0.
+.. list-table::
+   :header-rows: 1
+   :widths: 20 40 40
 
-YugabyteDB reports no size for colocated tables, and views have none. The
-check blocks these tables; use ``--force`` to resync them. Set ``table_mb`` with
-headroom rather than as an exact export size.
+   * - Aspect
+     - PostgreSQL
+     - YugabyteDB
+   * - What is counted
+     - On-disk table, TOAST, and index storage. Only large values are
+       compressed.
+     - Compressed data files (SST) plus the write-ahead log (WAL), for the
+       table and its secondary indexes.
+   * - Copies counted
+     - The single server's copy.
+     - One copy, read from the leader replicas. The replication factor does not
+       change it.
+   * - Stability
+     - Stable. Roughly tracks the CSV that FastSync exports.
+     - Changes with recent writes, flushes, and WAL clean-up.
+
+The YugabyteDB figure changes over a table's life. In a test with about
+540 MB of exported CSV and data that compressed poorly:
+
+- **Right after a large load**, it read about twice the export size. The WAL
+  still held a copy of every write, next to the data files.
+- **Once settled**, it read about 1.3 times the export size. YugabyteDB removes
+  old WAL once data is flushed and about 15 minutes have passed
+  (``log_min_seconds_to_retain``). Each tablet keeps at least two WAL segments
+  of 64 MB by default (``log_min_segments_to_retain`` and
+  ``log_segment_size_mb``), so up to 128 MB per tablet remains.
+- **Data that compresses well reads lower.** A settled table reads about its
+  compressed data plus that WAL floor. Repetitive data compressed about 3.5 to
+  1 in testing, so it can read well below its export size.
+
+Some readings are low or missing:
+
+- A table loaded in the last minute can read 0. YugabyteDB refreshes sizes by
+  heartbeat.
+- Secondary indexes built after a bulk load can read close to 0 until they are
+  flushed.
+- Tables in a CDC stream can keep WAL for longer (``cdc_wal_retention_time_secs``),
+  so they read higher.
+- Colocated tables report no size, and views have none. The check blocks these
+  tables. Use ``--force`` to resync them.
+
+Set ``table_mb`` to the largest table you are willing to resync, with
+headroom. Expect a table to read up to twice its export size just after a
+large load. To see the figure the check uses, run
+``SELECT pg_table_size('schema.table') + pg_indexes_size('schema.table')``.
+For a partitioned table, add up the results for its partitions.
 
 
 Acknowledgement and recovery
