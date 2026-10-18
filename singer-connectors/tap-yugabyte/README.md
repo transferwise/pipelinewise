@@ -68,6 +68,7 @@ Full list of options in `config.json`:
 | debug_lsn                  | String  | No        | None    | If set to `"true"` then add `_sdc_lsn` property to the singer messages to debug the YugabyteDB LSN position in the WAL stream.                                                         |
 | tap_id                     | String  | No        | None    | ID of the pipeline/tap                                                                                                                                                                 |
 | itersize                   | Integer | No        | 20000   | Size of YSQL cursor iterator when doing INCREMENTAL or FULL_TABLE                                                                                                                      |
+| keyset_buckets             | Integer | No        | 3       | Number of hash buckets in keyset scans, from 2 to 1024. It must match the bucket count of every table's prerequisite index; changing it means rebuilding them. See [INDEXES.md](INDEXES.md).|
 | default_replication_method | String  | No        | None    | Default replication method to use when no one is provided in the catalog (Values: `LOG_BASED`, `INCREMENTAL` or `FULL_TABLE`)                                                          |
 | limit                      | Integer | No        | None    | Adds a limit to INCREMENTAL queries to limit the number of records returns per run                                                                                                     |
 

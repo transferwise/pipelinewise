@@ -120,6 +120,12 @@ Configuration
      - No
      - ``20000``
      - Server-side cursor fetch size for non-FastSync scans.
+   * - ``keyset_buckets``
+     - No
+     - ``3``
+     - Number of hash buckets in this tap's keyset scans, from ``2`` to
+       ``1024``. It must match the bucket count of every table's
+       `Required indexes`_. Changing it means rebuilding those indexes.
    * - ``limit``
      - No
      - Unlimited
@@ -164,8 +170,10 @@ YugabyteDB rejects ``NaN`` in decimal columns, so these keys never need the
 text mapping that PostgreSQL keys use. See :ref:`exact_decimal_mapping` for the
 fallback used by wider or unconstrained declarations.
 
-Arrays, enums, composite types, and other user-defined types are discovered
-with inclusion ``unsupported`` and excluded from the sync. ``hstore`` is
+Arrays are discovered as array columns and are synced. FullSync loads them
+into Snowflake ``VARIANT`` or PostgreSQL ``JSONB``. Enums are discovered as
+strings and are synced. Composite types and other user-defined types are
+discovered with inclusion ``unsupported`` and excluded from the sync. ``hstore`` is
 available on YugabyteDB and is exported as-is; it is not mapped to
 Snowflake ``VARIANT``, unlike tap-postgres's explicit Iceberg v3 route.
 

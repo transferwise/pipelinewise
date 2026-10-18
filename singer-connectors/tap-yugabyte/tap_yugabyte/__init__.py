@@ -8,6 +8,8 @@ from singer.catalog import Catalog
 import tap_yugabyte.db as post_db
 import tap_yugabyte.sync_strategies.common as sync_common
 
+from tap_yugabyte import keyset
+
 from tap_yugabyte.sync_strategies import logical_replication
 from tap_yugabyte.sync_strategies import full_table
 from tap_yugabyte.sync_strategies import incremental
@@ -25,6 +27,22 @@ REQUIRED_CONFIG_KEYS = [
     'user',
     'password'
 ]
+
+
+def parse_keyset_buckets(value):
+    """Return the configured keyset bucket count as an int, rejecting values no bucket index can serve.
+
+    The count is interpolated into scan SQL, so anything but a whole number is refused rather than coerced.
+    """
+    try:
+        buckets = int(str(value))
+    except ValueError:
+        raise ValueError(f'keyset_buckets must be a whole number, got {value!r}') from None
+
+    if not keyset.BUCKETS_MIN <= buckets <= keyset.BUCKETS_MAX:
+        raise ValueError(f'keyset_buckets must be between {keyset.BUCKETS_MIN} and {keyset.BUCKETS_MAX}, '
+                         f'got {buckets}')
+    return buckets
 
 
 def do_discovery(conn_config):
@@ -371,6 +389,9 @@ def main_impl():
         'logical_poll_total_seconds': float(args.config.get('logical_poll_total_seconds', 0)),
         'limit': int(limit) if limit else None
     }
+    if args.config.get('keyset_buckets') is not None:
+        conn_config['keyset_buckets'] = parse_keyset_buckets(args.config['keyset_buckets'])
+
     if args.config.get('decimal_target'):
         conn_config['decimal_target'] = args.config['decimal_target']
 

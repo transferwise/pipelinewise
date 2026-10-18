@@ -22,6 +22,10 @@ import re
 import psycopg2
 
 BUCKETS_DEFAULT = 3
+# 1 yields an empty SPLIT AT VALUES, so no index can match it; above 1024,
+# SET yb_max_merge_scan_streams is rejected at scan time.
+BUCKETS_MIN = 2
+BUCKETS_MAX = 1024
 INDEX_SUFFIX = '_pw_keyset'
 
 # Name fragments that hint at what a temporal column records. They rank
