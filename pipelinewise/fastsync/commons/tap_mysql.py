@@ -305,6 +305,8 @@ class FastSyncTapMySql:
             ssl={'': True}
         )
         self._source_regex_verified = False
+        install_mysql_worker_signal_handlers()
+        _ACTIVE_MYSQL_SOURCES.add(self)
 
         # Set session variables by running a list of SQLs which is defined
         # in the optional session_sqls connection parameters
@@ -361,6 +363,7 @@ class FastSyncTapMySql:
         )
         self.conn = None
         self.conn_unbuffered = None
+        _ACTIVE_MYSQL_SOURCES.discard(self)
 
         for connection_name, connection in connections:
             if connection is None:
@@ -426,7 +429,7 @@ class FastSyncTapMySql:
                 n_retry,
                 exc,
             )
-            if n_retry > 0:
+            if n_retry > 0 and not self._terminating:
                 LOGGER.info('Reopening the connections.')
                 self.close_connections(silent=True)
                 self.open_connections()
