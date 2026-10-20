@@ -1,5 +1,85 @@
+import os
+import shlex
+import signal
+import subprocess
+import tempfile
+import time
+
+import pymysql
+
 from tests.end_to_end.helpers import assertions
 from tests.end_to_end.target_snowflake.tap_mariadb import TapMariaDB
+
+
+BLOCKED_SESSION_WAIT_SECONDS = 300
+TERMINATION_WAIT_SECONDS = 30
+POLL_SECONDS = 0.5
+
+
+def _connect(e2e_env, connector):
+    return pymysql.connect(
+        host=e2e_env.get_conn_env_var(connector, 'HOST'),
+        port=int(e2e_env.get_conn_env_var(connector, 'PORT')),
+        user=e2e_env.get_conn_env_var(connector, 'USER'),
+        password=e2e_env.get_conn_env_var(connector, 'PASSWORD'),
+        database=e2e_env.get_conn_env_var(connector, 'DB'),
+        charset='utf8mb4',
+        ssl={'': True},
+        autocommit=True,
+    )
+
+
+def _user_sessions(conn):
+    """Return this user's sessions as ``{id: (state, info)}``."""
+    with conn.cursor() as cursor:
+        cursor.execute(
+            'SELECT ID, STATE, INFO FROM information_schema.PROCESSLIST '
+            "WHERE USER = SUBSTRING_INDEX(CURRENT_USER(), '@', 1)"
+        )
+        return {row[0]: (row[1] or '', row[2] or '') for row in cursor.fetchall()}
+
+
+def _kill_sessions(conn, session_ids):
+    with conn.cursor() as cursor:
+        for session_id in session_ids:
+            try:
+                cursor.execute('KILL CONNECTION %s', (session_id,))
+            except pymysql.MySQLError:
+                pass
+
+
+def _stop_process_group(proc):
+    if proc.poll() is None:
+        os.killpg(proc.pid, signal.SIGKILL)
+        proc.wait()
+
+
+def _process_output(log):
+    log.seek(0)
+    return log.read().decode('utf-8', errors='replace')
+
+
+def assert_table_locked(test_case, proc, monitor_conn, table, preexisting_sessions, log):
+    """Wait until the PartialSync source query is blocked by the table lock."""
+    deadline = time.monotonic() + BLOCKED_SESSION_WAIT_SECONDS
+    while True:
+        test_case.assertIsNone(
+            proc.poll(), f'PartialSync exited before its export blocked:\n{_process_output(log)}'
+        )
+        test_case.assertLess(
+            time.monotonic(), deadline, f'PartialSync export never blocked:\n{_process_output(log)}'
+        )
+        time.sleep(POLL_SECONDS)
+        sessions = _user_sessions(monitor_conn)
+        blocked_sessions = {
+            session_id for session_id, (state, info) in sessions.items()
+            if session_id not in preexisting_sessions
+            and 'metadata lock' in state.lower()
+            and table in info
+        }
+        if blocked_sessions:
+            return set(sessions) - preexisting_sessions
+
 
 
 def _safe_mysql_datetime(column):
@@ -114,6 +194,53 @@ class TestPartialSyncMariaDBToSF(TapMariaDB):
             self.e2e_env, 'mysql', self.table, column_to_check, primary_key, expected_records_for_column
         )
 
+    def test_terminated_partial_sync_kills_blocked_source_query(self):
+        """SIGTERM ends the run's MariaDB sessions instead of leaving the export running."""
+        # Setup
+        lock_conn = _connect(self.tap_parameters['env'], 'TAP_MYSQL')
+        monitor_conn = _connect(self.tap_parameters['env'], 'TAP_MYSQL')
+        self.addCleanup(lock_conn.close)
+        self.addCleanup(monitor_conn.close)
+        own_sessions = {lock_conn.thread_id(), monitor_conn.thread_id()}
+        preexisting_sessions = set(_user_sessions(monitor_conn)) | own_sessions
+
+        with lock_conn.cursor() as cursor:
+            cursor.execute(f'LOCK TABLES `{self.tap_parameters['table']}` WRITE')
+
+        log = tempfile.TemporaryFile()
+        self.addCleanup(log.close)
+        command = assertions._get_command_for_partial_sync(self.tap_parameters, start_value=4, end_value=6)
+        proc = subprocess.Popen(
+            shlex.split(command), stdout=log, stderr=subprocess.STDOUT, start_new_session=True,
+        )
+        run_sessions = set()
+
+        # Cleanups run in reverse: stop the run, kill leftovers, then release the lock.
+        self.addCleanup(lambda: _kill_sessions(monitor_conn, run_sessions))
+        self.addCleanup(_stop_process_group, proc)
+
+        # Wait for the table to be locked before proceeding
+        run_sessions.update(
+            assert_table_locked(self, proc, monitor_conn, self.tap_parameters['table'], preexisting_sessions, log)
+        )
+
+        os.killpg(proc.pid, signal.SIGTERM)
+        try:
+            proc.wait(timeout=TERMINATION_WAIT_SECONDS)
+        except subprocess.TimeoutExpired:
+            self.fail(f'PartialSync did not exit after SIGTERM:\n{_process_output(log)}')
+        self.assertNotEqual(proc.returncode, 0, _process_output(log))
+
+        deadline = time.monotonic() + TERMINATION_WAIT_SECONDS
+        remaining = run_sessions & set(_user_sessions(monitor_conn))
+        while remaining and time.monotonic() < deadline:
+            time.sleep(POLL_SECONDS)
+            remaining = run_sessions & set(_user_sessions(monitor_conn))
+        self.assertEqual(
+            remaining, set(),
+            f'Source sessions outlived the terminated PartialSync:\n{_process_output(log)}',
+        )
+    
     def test_unbounded_empty_range_removes_target_only_row(self):
         """Publish an empty source range so its target-only row is deleted."""
         source_max = self.e2e_env.run_query_tap_mysql(

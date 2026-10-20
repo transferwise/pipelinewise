@@ -1,5 +1,6 @@
 import csv
 import io
+import signal
 
 import pymysql
 
@@ -1080,3 +1081,194 @@ class TestFastSyncTapMySql(TestCase):
 
         assert result['binary_lengths'] == {'ID': 16, 'TOKEN': 255, 'EMPTY': 0}
         assert tap_mysql.declared_binary_lengths(columns[3:]) == {}
+
+
+class TestFastSyncTapMySqlTerminationCancel(TestCase):
+    """Termination kills server sessions that would otherwise keep running after the client exits."""
+
+    def setUp(self) -> None:
+        self.connection_config = {
+            'host': 'primary.foo.com',
+            'port': 3306,
+            'user': 'my_user',
+            'password': 'secret',
+            'replica_host': 'replica.foo.com',
+        }
+        self.previous = {signum: signal.getsignal(signum) for signum in tap_mysql.CANCEL_SIGNALS}
+        self.addCleanup(self._restore_signals)
+        self.mysql = FastSyncTapMySql(self.connection_config, lambda value: value)
+        self.addCleanup(self.mysql.close_connections, silent=True)
+
+    def _restore_signals(self):
+        for signum, handler in self.previous.items():
+            signal.signal(signum, handler)
+
+    def _open(self, buffered_thread_id=11, unbuffered_thread_id=12):
+        buffered, unbuffered = MagicMock(), MagicMock()
+        buffered.get_server_info.return_value = '8.0.39'
+        buffered.thread_id.return_value = buffered_thread_id
+        unbuffered.thread_id.return_value = unbuffered_thread_id
+        with patch('pymysql.connect', side_effect=[buffered, unbuffered]), \
+                patch.object(self.mysql, 'run_session_sqls'):
+            self.mysql.open_connections()
+        return buffered, unbuffered
+
+    @staticmethod
+    def _cancel_connection():
+        cancel_conn = MagicMock()
+        cancel_conn.__enter__.return_value = cancel_conn
+        cursor = cancel_conn.cursor.return_value.__enter__.return_value
+        return cancel_conn, cursor
+
+    def test_worker_handler_registers_and_unregisters_active_sources(self):
+        """The process handler stays installed while each tap registers only its active sessions."""
+        previous_handler = Mock()
+        signal.signal(signal.SIGTERM, previous_handler)
+
+        self._open()
+        for signum in tap_mysql.CANCEL_SIGNALS:
+            self.assertEqual(signal.getsignal(signum), tap_mysql._cancel_active_mysql_sources)
+        self.assertIn(self.mysql, tap_mysql._ACTIVE_MYSQL_SOURCES)
+    
+        self.mysql.close_connections(silent=True)
+        self.assertNotIn(self.mysql, tap_mysql._ACTIVE_MYSQL_SOURCES)
+        self.assertEqual(signal.getsignal(signal.SIGTERM), tap_mysql._cancel_active_mysql_sources)
+
+    def test_reinstall_keeps_the_original_signal_handler(self):
+        """Repeated worker initialization must preserve the handler from before our wrapper."""
+        previous_handler = Mock()
+        signal.signal(signal.SIGTERM, previous_handler)
+        self._open()
+
+        tap_mysql.install_mysql_worker_signal_handlers()
+        with patch.object(self.mysql, 'cancel_running_queries'):
+            tap_mysql._cancel_active_mysql_sources(signal.SIGTERM, None)
+
+        previous_handler.assert_called_once_with(signal.SIGTERM, None)
+        self.assertIs(tap_mysql._PREVIOUS_SIGNAL_HANDLERS[signal.SIGTERM], previous_handler)
+
+    def test_ignored_signal_stays_ignored(self):
+        """A process that ignores a signal is not made to act on it."""
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+        self._open()
+
+        self.assertIs(signal.getsignal(signal.SIGINT), signal.SIG_IGN)
+        self.assertEqual(signal.getsignal(signal.SIGTERM), tap_mysql._cancel_active_mysql_sources)
+
+    def test_failed_handler_installation_logs_that_cancellation_is_unavailable(self):
+        """A failed signal registration warns that termination cancellation is unavailable."""
+        signal.signal(signal.SIGTERM, signal.SIG_DFL)
+        with patch.object(
+            tap_mysql.signal,
+            'signal',
+            side_effect=ValueError('signal only works in main thread of the main interpreter'),
+        ) as set_signal, self.assertLogs(tap_mysql.LOGGER, 'WARNING') as logs:
+            tap_mysql.install_mysql_worker_signal_handlers()
+
+        set_signal.assert_any_call(signal.SIGTERM, tap_mysql._cancel_active_mysql_sources)
+        self.assertIn('SIGTERM cancellation handler', logs.output[0])
+        self.assertIn('may not be cancelled on termination', logs.output[0])
+        self.assertNotIn(signal.SIGTERM, tap_mysql._PREVIOUS_SIGNAL_HANDLERS)
+
+    def test_non_main_thread_skips_signal_installation(self):
+        """Detect the unsupported thread context before attempting signal registration."""
+        # Patching current_thread would also break logging, which reads current_thread().name.
+        with patch.object(tap_mysql.threading, 'main_thread', return_value=object()), \
+                patch.object(tap_mysql.signal, 'signal') as set_signal, \
+                self.assertLogs(tap_mysql.LOGGER, 'WARNING') as logs:
+
+            tap_mysql.install_mysql_worker_signal_handlers()
+
+        set_signal.assert_not_called()
+        self.assertIn('only be installed from the main thread', logs.output[0])
+
+    def test_cancel_kills_both_sessions_on_the_same_server_with_bounded_timeouts(self):
+        """The kill reaches the replica that runs the export and cannot outlast the stop grace period."""
+        self._open()
+        cancel_conn, cursor = self._cancel_connection()
+
+        with patch('pymysql.connect', return_value=cancel_conn) as connect:
+            self.mysql.cancel_running_queries()
+
+        kwargs = connect.call_args.kwargs
+        self.assertEqual(kwargs['host'], 'replica.foo.com')
+        for timeout in ('connect_timeout', 'read_timeout', 'write_timeout'):
+            self.assertEqual(kwargs[timeout], tap_mysql.CANCEL_TIMEOUT_SECONDS)
+        self.assertEqual(
+            cursor.execute.call_args_list,
+            [call('KILL CONNECTION %s', (11,)), call('KILL CONNECTION %s', (12,))],
+        )
+
+    def test_cancel_skips_finished_sessions_and_never_raises(self):
+        """A session that already ended or an unreachable server cannot block process exit."""
+        self._open()
+        cancel_conn, cursor = self._cancel_connection()
+        cursor.execute.side_effect = [pymysql.err.OperationalError(1094, 'Unknown thread id: 11'), None]
+
+        with patch('pymysql.connect', return_value=cancel_conn):
+            self.mysql.cancel_running_queries()
+        self.assertEqual(cursor.execute.call_count, 2)
+
+        with patch('pymysql.connect', side_effect=pymysql.err.OperationalError(2003, 'unreachable')), \
+                self.assertLogs(tap_mysql.LOGGER, 'WARNING'):
+            self.mysql.cancel_running_queries()
+
+    def test_cancel_without_open_sessions_does_not_connect(self):
+        """Closed instances have nothing to kill."""
+        with patch('pymysql.connect') as connect:
+            self.mysql.cancel_running_queries()
+        connect.assert_not_called()
+
+    def test_worker_signal_cancels_active_sources_then_delegates(self):
+        """The worker cancels active sources, then preserves its prior signal behavior."""
+        previous_handler = Mock()
+        signal.signal(signal.SIGTERM, previous_handler)
+        self._open()
+
+        with patch.object(self.mysql, 'cancel_running_queries') as cancel:
+            tap_mysql._cancel_active_mysql_sources(signal.SIGTERM, None)
+
+        cancel.assert_called_once_with()
+        previous_handler.assert_called_once_with(signal.SIGTERM, None)
+
+    def test_signal_with_default_disposition_terminates_the_process(self):
+        """Default SIGTERM is redelivered so the process exits with the expected signal status."""
+        signal.signal(signal.SIGTERM, signal.SIG_DFL)
+        self._open()
+
+        with patch.object(self.mysql, 'cancel_running_queries') as cancel, \
+                patch.object(tap_mysql.signal, 'signal') as set_signal, \
+                patch.object(tap_mysql.os, 'kill') as kill:
+            tap_mysql._cancel_active_mysql_sources(signal.SIGTERM, None)
+
+        cancel.assert_called_once_with()
+        set_signal.assert_called_once_with(signal.SIGTERM, signal.SIG_DFL)
+        kill.assert_called_once_with(tap_mysql.os.getpid(), signal.SIGTERM)
+
+    def test_forked_child_does_not_kill_parent_sessions(self):
+        """Pool workers inherit the parent's handler but must not kill the parent's sessions."""
+        previous_handler = Mock()
+        signal.signal(signal.SIGTERM, previous_handler)
+        self._open()
+
+        with patch.object(tap_mysql.os, 'getpid', return_value=tap_mysql.os.getpid() + 1), \
+                patch.object(self.mysql, 'cancel_running_queries') as cancel:
+            tap_mysql._cancel_active_mysql_sources(signal.SIGTERM, None)
+
+        cancel.assert_not_called()
+        previous_handler.assert_called_once_with(signal.SIGTERM, None)
+
+    def test_query_does_not_reconnect_after_termination(self):
+        """A killed statement must not be rerun on a fresh session while the process stops."""
+        self.mysql._terminating = True
+        conn = MagicMock()
+        conn.cursor.return_value.__enter__.return_value.execute.side_effect = (
+            pymysql.err.OperationalError(2013, 'Lost connection')
+        )
+
+        with patch.object(self.mysql, 'open_connections') as reopen, \
+                self.assertRaises(pymysql.err.OperationalError):
+            self.mysql.query('SELECT MAX(id) FROM t', conn=conn)
+
+        reopen.assert_not_called()

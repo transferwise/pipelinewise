@@ -88,7 +88,8 @@ def install_mysql_worker_signal_handlers():
             signal.signal(signum, _cancel_active_mysql_sources)
         except ValueError as exc:
             LOGGER.warning(
-                'Could not install the %s cancellation handler.',
+                'Could not install the %s cancellation handler: %s. MySQL queries may not be cancelled on '
+                'termination.',
                 signal.Signals(signum).name,
                 exc,
             )
