@@ -5,7 +5,10 @@ from unittest import TestCase, mock
 
 from pipelinewise.fastsync.partialsync import mysql_to_snowflake
 from pipelinewise.fastsync.partialsync.utils import parse_args_for_partial_sync
-from pipelinewise.fastsync.commons.tap_mysql import FastSyncTapMySql
+from pipelinewise.fastsync.commons.tap_mysql import (
+    FastSyncTapMySql,
+    install_mysql_worker_signal_handlers,
+)
 from pipelinewise.fastsync.commons.partial_sync_boundary import (
     PartialSyncBoundary,
 )
@@ -460,6 +463,11 @@ class PartialSyncTestCase(TestCase):
                         with mock.patch('sys.argv', argv_list):
                             expected_args = parse_args_for_partial_sync(mysql_to_snowflake.REQUIRED_CONFIG_KEYS)
                             mysql_to_snowflake.main()
+
+                    self.assertIs(
+                        mocked_pool.call_args.kwargs['initializer'],
+                        install_mysql_worker_signal_handlers,
+                    )
 
                     expected_log_messages = [
                         [
