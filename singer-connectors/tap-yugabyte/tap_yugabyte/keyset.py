@@ -416,7 +416,13 @@ def split_at_values(buckets):
     return ', '.join(f'({b})' for b in range(1, buckets))
 
 
-def index_ddl(fq_table_name, table_name, pk_columns, buckets, tablets=None):
+def split_clause(buckets, colocated=False):
+    """The SPLIT AT VALUES suffix, or nothing for a colocated table: YugabyteDB
+    rejects split options on a colocated index, which always shares one tablet."""
+    return '' if colocated else f' SPLIT AT VALUES ({split_at_values(buckets)})'
+
+
+def index_ddl(fq_table_name, table_name, pk_columns, buckets, tablets=None, colocated=False):
     """DDL for the prerequisite index.
 
     The bucket column is range-sharded, not hashed, so the tablet boundaries can
@@ -427,14 +433,14 @@ def index_ddl(fq_table_name, table_name, pk_columns, buckets, tablets=None):
     """
     return (
         f'CREATE UNIQUE INDEX {quoted_name(index_name(table_name))} ON {fq_table_name} '
-        f'(({bucket_expr(pk_columns, buckets)}) ASC, {order_by_sql(pk_columns)}) '
-        f'SPLIT AT VALUES ({split_at_values(buckets)})'
+        f'(({bucket_expr(pk_columns, buckets)}) ASC, {order_by_sql(pk_columns)})'
+        f'{split_clause(buckets, colocated)}'
     )
 
 
 _INDEX_SHAPE_SQL = """
 SELECT pg_get_indexdef(i.oid), x.indisunique, p.num_tablets,
-       x.indisvalid, x.indisready, x.indoption[0]
+       x.indisvalid, x.indisready, x.indoption[0], p.is_colocated
 FROM pg_class c
 JOIN pg_namespace n ON n.oid = c.relnamespace
 JOIN pg_index x ON x.indrelid = c.oid
@@ -480,34 +486,20 @@ def describe_index(cur, schema_name, table_name, wanted_name):
     row = cur.fetchone()
     if row is None:
         return None
-    indexdef, is_unique, num_tablets, is_valid, is_ready, leading_indoption = row
-    # the key list is the parenthesised group following `USING lsm `
-    body = indexdef[indexdef.index('USING lsm (') + len('USING lsm ('):]
-    body = body[:body.rindex(')')]
-    depth, current, parts = 0, [], []
-    for char in body:
-        if char == ',' and depth == 0:
-            parts.append(''.join(current).strip())
-            current = []
-            continue
-        if char == '(':
-            depth += 1
-        elif char == ')':
-            depth -= 1
-        current.append(char)
-    parts.append(''.join(current).strip())
-    trailing = [part.rsplit(' ', 1)[0].strip('"') for part in parts[1:]]
+    indexdef, is_unique, num_tablets, is_valid, is_ready, leading_indoption, colocated = row
+    keys = _index_key_columns(indexdef)
     return {
         'name': wanted_name,
         'definition': indexdef,
         'unique': is_unique,
         'buckets': parse_index_buckets(indexdef),
-        'bucket_columns': _bucket_columns(parts[0]),
-        'trailing': trailing,
+        'bucket_columns': _bucket_columns(keys[0]),
+        'trailing': keys[1:],
         'tablets': num_tablets,
         'valid': is_valid,
         'ready': is_ready,
         'bucket_is_ordered': _column_is_ordered(leading_indoption),
+        'colocated': bool(colocated),
     }
 
 
@@ -578,7 +570,8 @@ def check_index(cur, schema_name, table_name, wanted_name, pk_columns,
             f"orders by {', '.join(trailing)}.")
     if not found['unique']:
         problems.append(f'{wanted_name} is not UNIQUE.')
-    if found['tablets'] is not None and found['tablets'] < buckets:
+    # a colocated index cannot be split, so one shared tablet is its only shape
+    if found['tablets'] is not None and found['tablets'] < buckets and not found['colocated']:
         cause = ('Without SPLIT AT VALUES the whole index is one tablet and the '
                  'buckets share it.' if found['bucket_is_ordered'] else
                  'SPLIT AT VALUES is not legal on a hashed bucket, which is the '
@@ -615,10 +608,11 @@ def validate_index(cur, schema_name, table_name, pk_columns, buckets):
                                   pk_columns, buckets)
     if found is None:
         fq_table_name = f'"{schema_name}"."{table_name}"'
+        colocated = table_is_colocated(cur, schema_name, table_name)
         return False, (
             f'Parallel keyset sync of {schema_name}.{table_name} requires a bucket '
             f'index. Create it with:\n  '
-            f'{index_ddl(fq_table_name, table_name, pk_columns, buckets)};'
+            f'{index_ddl(fq_table_name, table_name, pk_columns, buckets, colocated=colocated)};'
         )
     if problems:
         return False, '\n  '.join(problems)
@@ -782,12 +776,21 @@ STRATEGY_BUCKET_INDEX = 'bucket_index'
 STRATEGY_PLAIN_SCAN = 'plain_scan'
 
 _SHARDING_SQL = """
-SELECT c.relkind, p.num_hash_key_columns, p.num_tablets
+SELECT c.relkind, p.num_hash_key_columns, p.num_tablets, p.is_colocated
 FROM pg_class c
 JOIN pg_namespace n ON n.oid = c.relnamespace
 CROSS JOIN LATERAL yb_table_properties(c.oid) p
 WHERE n.nspname = %s AND c.relname = %s
 """
+
+
+def table_is_colocated(cur, schema_name, table_name):
+    """Whether the table shares its database's colocation tablet, which decides
+    whether its keyset indexes can be split one bucket per tablet."""
+    cur.execute(_SHARDING_SQL, (schema_name, table_name))
+    row = cur.fetchone()
+    return bool(row and row[3])
+
 
 # An index can serve ordered range access on `column` when that column leads it
 # and is stored in sorted order. A HASH leading column cannot: it is ordered by
@@ -914,7 +917,7 @@ def plan_keyset_strategy(cur, schema_name, table_name, pk_columns, pk_types, buc
     row = cur.fetchone()
     if row is None:
         return _no_index_possible([f'{schema_name}.{table_name} was not found'])
-    relkind, num_hash_key_columns, num_tablets = row[0], row[1], row[2]
+    relkind, num_hash_key_columns, num_tablets, colocated = row
 
     if relkind in ('v', 'm'):
         return _no_index_possible(['a view has no primary key and cannot be indexed'])
@@ -935,7 +938,7 @@ def plan_keyset_strategy(cur, schema_name, table_name, pk_columns, pk_types, buc
 
     fq_table_name = f'"{schema_name}"."{table_name}"'
     ddl = index_ddl(fq_table_name, table_name, pk_columns, buckets,
-                    tablets=num_tablets or buckets)
+                    tablets=num_tablets or buckets, colocated=bool(colocated))
     if num_hash_key_columns == 0:
         return {
             'strategy': STRATEGY_PK_RANGE,
@@ -1119,8 +1122,11 @@ def require_monotonic_key(cur, schema_name, table_name, column, pk_columns=()):
     which every primary key has by definition, and monotonicity buys it nothing --
     a UUID key pages exactly as well.
     """
+    # pg_get_serial_sequence parses its table argument as SQL, so a mixed-case
+    # name must arrive quoted or it is folded to lower case and not found
     cur.execute(_KEY_FACTS_SQL,
-                (f'{schema_name}.{table_name}', schema_name, table_name, column))
+                (f'{quoted_name(schema_name)}.{quoted_name(table_name)}',
+                 schema_name, table_name, column))
     row = cur.fetchone()
     if row is None:
         return {'usable': False, 'column': column, 'tiebreaker': None,
@@ -1369,7 +1375,7 @@ def index_for_replication_key(table_name, replication_key, pk_columns):
 
 
 def replication_key_index_ddl(fq_table_name, table_name, replication_key,
-                              pk_columns, buckets):
+                              pk_columns, buckets, colocated=False):
     """Bucketed index for an INCREMENTAL replication key.
 
     A plain (key ASC) index serves the watermark query, but a replication key is
@@ -1418,7 +1424,7 @@ def replication_key_index_ddl(fq_table_name, table_name, replication_key,
         # key column, `(bucket ASC, "id" ASC, "id" ASC)`, which the server
         # accepts: a service owner running it builds a second copy of an index
         # they already have, and nothing ever reads it.
-        return index_ddl(fq_table_name, table_name, pk_columns, buckets)
+        return index_ddl(fq_table_name, table_name, pk_columns, buckets, colocated=colocated)
 
     trailing = ', '.join(f'{c} ASC' for c in quoted(pk_columns))
     return (
@@ -1426,8 +1432,8 @@ def replication_key_index_ddl(fq_table_name, table_name, replication_key,
         f'{quoted_name(replication_key_index_name(table_name, replication_key))} '
         f'ON {fq_table_name} '
         f'(({bucket_expr(pk_columns, buckets)}) ASC, "{replication_key}" ASC, '
-        f'{trailing}) '
-        f'SPLIT AT VALUES ({split_at_values(buckets)})'
+        f'{trailing})'
+        f'{split_clause(buckets, colocated)}'
     )
 
 

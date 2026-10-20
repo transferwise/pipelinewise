@@ -24,6 +24,17 @@
   since YugabyteDB's DocDB storage has no equivalent
 - Fall back to a plain, non-resumable full scan for tables without a primary
   key
+- Create a `<table>_pw_keyset` bucket index before syncing a table with
+  FULL_TABLE or LOG_BASED, and a replication-key index for INCREMENTAL on a
+  timestamp. The tap never creates them. Without one, a table falls back to a
+  plain, non-resumable scan. See
+  [required indexes](docs/connectors/taps/yugabyte.rst#required-indexes)
+- Add the `tap-yugabyte-index-check` command. It checks a tap YAML against the
+  source and prints `OK`, `ACTION` with the exact DDL to run, or `BLOCK` for
+  each table. It reads `keyset_buckets` and `limit` from `db_conn`
+- Accept a keyset index on its single shared tablet in a colocated database.
+  The index DDL for colocated tables has no `SPLIT AT VALUES`, which
+  YugabyteDB rejects there
 - Add INCREMENTAL replication, resuming from a persisted replication-key
   bookmark;
 - Read `uuid[]`, `money[]`, `bit[]`, `citext[]` and enum array columns as

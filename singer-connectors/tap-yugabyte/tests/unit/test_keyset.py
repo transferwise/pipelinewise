@@ -223,6 +223,15 @@ class TestTheFourIndexShapes:
                                                      ['id'], 4)):
             assert ddl.endswith('SPLIT AT VALUES ((1), (2), (3))')
 
+    def test_no_shape_splits_a_colocated_table(self):
+        for ddl in (keyset.index_ddl('s.t', 't', ['id'], 4, colocated=True),
+                    keyset.replication_key_index_ddl('s.t', 't', 'created_at',
+                                                     ['id'], 4, colocated=True),
+                    keyset.replication_key_index_ddl('s.t', 't', 'id', ['id'], 4,
+                                                     colocated=True)):
+            assert 'SPLIT AT' not in ddl
+            assert ddl.endswith(' ASC)')
+
     def test_replication_key_that_is_the_primary_key_reuses_shape_1(self):
         # naming an index nobody created means the DDL the preflight prints
         # builds a second copy of an index the table already has
@@ -519,6 +528,13 @@ class TestRequireMonotonicKey:
         assert v['usable'] is True       # usable, but not safe on its own
         assert 'caches 100 values per connection' in v['risks'][0]
 
+    def test_mixed_case_names_reach_the_sequence_lookup_quoted(self):
+        # unquoted, pg_get_serial_sequence folds "Sales"."Orders" to sales.orders
+        # and the whole check failed with "schema does not exist"
+        cur = FakeCursor([(True, True, None, 'bigint', False, None)])
+        keyset.require_monotonic_key(cur, 'Sales', 'Order"Lines', 'id', ['id'])
+        assert cur.executed[0][1][0] == '"Sales"."Order""Lines"'
+
     def test_nullable_key_is_a_hard_failure(self):
         cur = FakeCursor([(False, True, None, 'timestamptz', False, None), []])
         v = keyset.require_monotonic_key(cur, 's', 'orders', 'updated_at', ['id'])
@@ -780,10 +796,10 @@ class TestRuntimeGateMatchesThePreflight:
         shape = dict(
             indexdef='CREATE UNIQUE INDEX t_pw_keyset ON s.t USING lsm '
                      '(((yb_hash_code(id) % 3)) ASC, id ASC)',
-            unique=True, tablets=3, valid=True, ready=True, indoption=0)
+            unique=True, tablets=3, valid=True, ready=True, indoption=0, colocated=False)
         shape.update(over)
         return (shape['indexdef'], shape['unique'], shape['tablets'],
-                shape['valid'], shape['ready'], shape['indoption'])
+                shape['valid'], shape['ready'], shape['indoption'], shape['colocated'])
 
     def test_a_correct_index_passes(self):
         usable, reason = keyset.validate_index(
@@ -807,6 +823,13 @@ class TestRuntimeGateMatchesThePreflight:
             self._cursor(self._row(tablets=1)), 's', 't', ['id'], 3)
         assert usable is False
         assert 'tablet' in reason
+
+    def test_a_colocated_index_is_accepted_on_its_one_tablet(self):
+        # YugabyteDB rejects SPLIT AT on a colocated index, so one shared tablet
+        # is the only shape it can have; refusing it dropped the table to a plain scan
+        usable, reason = keyset.validate_index(
+            self._cursor(self._row(tablets=1, colocated=True)), 's', 't', ['id'], 3)
+        assert usable is True and reason is None
 
     def test_a_missing_index_still_reports_the_ddl_to_run(self):
         usable, reason = keyset.validate_index(
@@ -850,8 +873,9 @@ class TestPlanKeysetStrategy:
     table full_table.sync_table then refused, dropping it to a single
     non-resumable pass."""
 
-    HASH_PK = ('r', 1, 3)        # relkind, num_hash_key_columns, num_tablets
-    RANGE_PK = ('r', 0, 1)
+    HASH_PK = ('r', 1, 3, False)        # relkind, num_hash_key_columns, num_tablets, is_colocated
+    RANGE_PK = ('r', 0, 1, False)
+    COLOCATED_PK = ('r', 0, 1, True)
 
     def _plan(self, sharding, pk=('id',), types=('bigint',), hashable=True):
         return keyset.plan_keyset_strategy(
@@ -879,6 +903,12 @@ class TestPlanKeysetStrategy:
         assert 'range-sharded' in note
         assert 'yb_hash_code(id) % 3' in note
 
+    def test_a_colocated_table_gets_ddl_without_split_options(self):
+        plan = self._plan(self.COLOCATED_PK)
+        assert plan['index_required'] is True
+        assert 'SPLIT AT' not in plan['index_ddl']
+        assert plan['index_ddl'] == keyset.index_ddl('"s"."t"', 't', ['id'], 3, colocated=True)
+
     def test_a_hash_sharded_key_needs_the_bucket_index(self):
         plan = self._plan(self.HASH_PK)
         assert plan['strategy'] == keyset.STRATEGY_BUCKET_INDEX
@@ -892,7 +922,7 @@ class TestPlanKeysetStrategy:
         assert 'no primary key' in plan['blockers'][0]
 
     def test_a_view_is_not_indexable(self):
-        plan = self._plan(('v', 0, 1))
+        plan = self._plan(('v', 0, 1, False))
         assert plan['strategy'] == keyset.STRATEGY_PLAIN_SCAN
         assert plan['index_required'] is False
 

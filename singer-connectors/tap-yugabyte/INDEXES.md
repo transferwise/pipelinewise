@@ -676,13 +676,22 @@ fixed constant.
 ## Checking a config before you run it
 
 ```bash
-singer-connectors/tap-yugabyte/tools/yb_index_check.py tap_yugabyte.yml \
+tap-yugabyte-index-check tap_yugabyte.yml \
   --host <host> --port 5433 --user <user> --dbname <db> [--buckets N] [--limit N]
 ```
 
-Pass `--limit` whatever the tap config's `limit` is. It is what caps the rows one
-`INCREMENTAL` run reads, and it is the difference between the tie-group check
-guessing and knowing — see "Both ends now say when this is happening" above.
+The command installs with the connector.
+
+`--buckets` and `--limit` default to `keyset_buckets` and `limit` under the YAML's
+`db_conn`, so the check uses the values the tap will run with. The limit is what
+caps the rows one `INCREMENTAL` run reads, and it is the difference between the
+tie-group check guessing and knowing — see "Both ends now say when this is
+happening" above. A table without `replication_method` is checked as
+`FULL_TABLE`, the PipelineWise default for this tap.
+
+In a colocated database every index shares the colocation tablet, and YugabyteDB
+rejects `SPLIT AT VALUES` on it. The check prints the DDL without the split and
+accepts the single tablet. For a partitioned table, index and select the parent.
 
 It reads the tap YAML the service owner already maintains, checks every table
 against the live source, and prints one of:

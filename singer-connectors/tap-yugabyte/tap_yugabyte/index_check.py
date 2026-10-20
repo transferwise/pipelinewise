@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Check a tap-yugabyte YAML against the source, and report the indexes it needs.
 
 Service owners choose a replication method and key per table. Those choices imply
@@ -7,7 +6,7 @@ run reports: a missing one is not an error, it is a full table scan on every
 sync. This reads the config the owner already wrote, checks each table against
 the live source, and prints the DDL to close the gap.
 
-    yb_index_check.py tap_yugabyte.yml --host h --port 5433 --user u --dbname d
+    tap-yugabyte-index-check tap_yugabyte.yml --host h --port 5433 --user u --dbname d
 
 Exit status is 0 when nothing needs doing, 1 when any table needs an index or has
 a configuration that cannot work.
@@ -15,15 +14,18 @@ a configuration that cannot work.
 
 import argparse
 import os
-import sys
 
 import psycopg2
 import yaml
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from tap_yugabyte import keyset  # noqa: E402
+from tap_yugabyte import keyset
+from tap_yugabyte import parse_keyset_buckets
 
 OK, ACTION, BLOCK = 'OK', 'ACTION', 'BLOCK'
+
+# PipelineWise's own default for tap-yugabyte tables that name no method
+# (pipelinewise/cli/tap_properties.py); the tap YAML has no key to override it.
+DEFAULT_REPLICATION_METHOD = 'FULL_TABLE'
 
 
 def _repair_ddl(schema_name, found, create_statement):
@@ -165,8 +167,9 @@ def check_incremental(cur, schema_name, table_name, replication_key, buckets,
     else:
         notes.extend(problems)
         fq_table_name = f'"{schema_name}"."{table_name}"'
+        colocated = keyset.table_is_colocated(cur, schema_name, table_name)
         ddl.extend(_repair_ddl(schema_name, found, keyset.replication_key_index_ddl(
-            fq_table_name, table_name, replication_key, pk_columns, buckets)))
+            fq_table_name, table_name, replication_key, pk_columns, buckets, colocated)))
         if status != BLOCK:
             status = ACTION
 
@@ -177,8 +180,12 @@ def check_incremental(cur, schema_name, table_name, replication_key, buckets,
     return status, notes, ddl
 
 
+def table_method(table):
+    return (table.get('replication_method') or DEFAULT_REPLICATION_METHOD).upper()
+
+
 def check_table(cur, schema_name, table, buckets, run_limit=None):
-    method = (table.get('replication_method') or '').upper()
+    method = table_method(table)
     table_name = table['table_name']
     if method == 'FULL_TABLE':
         return check_full_table(cur, schema_name, table_name, buckets)
@@ -190,7 +197,58 @@ def check_table(cur, schema_name, table, buckets, run_limit=None):
     return BLOCK, [f'Unknown replication_method {method!r}.'], []
 
 
-def main():
+def tap_settings(config, buckets=None, limit=None):
+    """The bucket count and row limit the tap will run with: the flag when given,
+    otherwise what the tap YAML passes the tap under db_conn.
+
+    Checking against a bucket count the tap is not configured for reports every
+    correct index as wrong, so the YAML is the default rather than a constant.
+    """
+    db_conn = config.get('db_conn') or {}
+    if buckets is None:
+        configured = db_conn.get('keyset_buckets')
+        buckets = (parse_keyset_buckets(configured) if configured is not None
+                   else keyset.BUCKETS_DEFAULT)
+    if limit is None and db_conn.get('limit'):
+        limit = int(db_conn['limit'])
+    return buckets, limit
+
+
+def worse(current, status):
+    if BLOCK in (current, status):
+        return BLOCK
+    if ACTION in (current, status):
+        return ACTION
+    return OK
+
+
+def run(config, cur, buckets, limit):
+    """Check every table in a tap YAML and print the report; return the worst status."""
+    all_ddl, worst = [], OK
+    for schema in config.get('schemas') or []:
+        schema_name = schema['source_schema']
+        for table in schema.get('tables') or []:
+            status, notes, ddl = check_table(cur, schema_name, table, buckets, limit)
+            key = table.get('replication_key')
+            heading = f"{schema_name}.{table['table_name']}  [{table_method(table)}"
+            heading += f" on {key}]" if key else "]"
+            print(f'\n{status:6s} {heading}')
+            for note in notes:
+                print(f'       - {note}')
+            for statement in ddl:
+                print(f'       $ {statement}')
+            all_ddl.extend(ddl)
+            worst = worse(worst, status)
+
+    if all_ddl:
+        print('\n' + '=' * 72 + '\nAll DDL, to hand to the service owner:\n')
+        for statement in all_ddl:
+            print(f'  {statement}')
+    print(f'\nWorst status: {worst}')
+    return worst
+
+
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('config', help='tap YAML the service owner maintains')
     parser.add_argument('--host', required=True)
@@ -198,51 +256,27 @@ def main():
     parser.add_argument('--user', required=True)
     parser.add_argument('--dbname', required=True)
     parser.add_argument('--password', default=os.environ.get('PGPASSWORD'))
-    parser.add_argument('--buckets', type=int, default=keyset.BUCKETS_DEFAULT,
-                        help='keyset_buckets the tap is configured for')
+    parser.add_argument('--buckets', type=int, default=None,
+                        help='keyset_buckets the tap is configured for; defaults to '
+                             'db_conn.keyset_buckets in the YAML, then 3')
     parser.add_argument('--limit', type=int, default=None,
                         help='`limit` the tap is configured for, which caps the '
-                             'rows one INCREMENTAL run reads. Given it, the tie-'
-                             'group check is exact rather than a heuristic: a '
-                             'group of at least this many rows can never advance '
-                             'the bookmark')
-    args = parser.parse_args()
+                             'rows one INCREMENTAL run reads; defaults to '
+                             'db_conn.limit in the YAML. Given it, the tie-group '
+                             'check is exact rather than a heuristic: a group of '
+                             'at least this many rows can never advance the bookmark')
+    args = parser.parse_args(argv)
 
     with open(args.config, encoding='utf-8') as handle:
-        config = yaml.safe_load(handle)
+        config = yaml.safe_load(handle) or {}
+    buckets, limit = tap_settings(config, args.buckets, args.limit)
 
     conn = psycopg2.connect(host=args.host, port=args.port, user=args.user,
                             dbname=args.dbname, password=args.password)
     conn.autocommit = True
-    all_ddl, worst = [], OK
-
-    with conn.cursor() as cur:
-        for schema in config.get('schemas') or []:
-            schema_name = schema['source_schema']
-            for table in schema.get('tables') or []:
-                status, notes, ddl = check_table(cur, schema_name, table,
-                                                 args.buckets, args.limit)
-                method = table.get('replication_method')
-                key = table.get('replication_key')
-                heading = f"{schema_name}.{table['table_name']}  [{method}"
-                heading += f" on {key}]" if key else "]"
-                print(f'\n{status:6s} {heading}')
-                for note in notes:
-                    print(f'       - {note}')
-                for statement in ddl:
-                    print(f'       $ {statement}')
-                all_ddl.extend(ddl)
-                if status == BLOCK or (status == ACTION and worst != BLOCK):
-                    worst = status
-    conn.close()
-
-    if all_ddl:
-        print('\n' + '=' * 72 + '\nAll DDL, to hand to the service owner:\n')
-        for statement in all_ddl:
-            print(f'  {statement}')
-    print(f'\nWorst status: {worst}')
+    try:
+        with conn.cursor() as cur:
+            worst = run(config, cur, buckets, limit)
+    finally:
+        conn.close()
     return 0 if worst == OK else 1
-
-
-if __name__ == '__main__':
-    sys.exit(main())

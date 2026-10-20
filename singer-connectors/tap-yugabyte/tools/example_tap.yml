@@ -1,4 +1,4 @@
-# The config a service owner maintains. tools/yb_index_check.py reads this.
+# The config a service owner maintains. tap-yugabyte-index-check reads this.
 id: "tap_yugabyte"
 type: "tap-yugabyte"
 schemas:

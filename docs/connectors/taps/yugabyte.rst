@@ -274,15 +274,23 @@ The full contract -- exact DDL, the rules that must not be varied, what each
 mistake costs, and the feature matrix -- is in
 ``singer-connectors/tap-yugabyte/INDEXES.md``.
 
-Check a tap config against a live source before running it:
+In a colocated database, the index has no ``SPLIT AT VALUES`` and shares the
+colocation tablet. YugabyteDB rejects split options on colocated indexes. For a
+partitioned table, create the index on the parent table and select the parent.
+
+Check a tap config against a live source before running it. The
+``tap-yugabyte-index-check`` command installs with the connector:
 
 .. code-block:: bash
 
-    singer-connectors/tap-yugabyte/tools/yb_index_check.py tap_yugabyte.yml \
+    tap-yugabyte-index-check tap_yugabyte.yml \
       --host <host> --port 5433 --user <user> --dbname <db>
 
 It prints ``OK``, ``ACTION`` (with the exact ``CREATE UNIQUE INDEX`` to run) or
-``BLOCK`` per table, and exits non-zero unless every table is ``OK``.
+``BLOCK`` per table, and exits non-zero unless every table is ``OK``. It reads
+``keyset_buckets`` and ``limit`` from the YAML's ``db_conn``. ``--buckets`` and
+``--limit`` override them. A table without ``replication_method`` is checked as
+``FULL_TABLE``, the PipelineWise default for this tap.
 
 
 Replication behaviour

@@ -23,6 +23,7 @@ setup(name='pipelinewise-tap-yugabyte',
           "psycopg2-yugabytedb-binary==2.9.3.5.post1; sys_platform == 'darwin'",
           "psycopg2-yugabytedb-binary==2.9.3.5; sys_platform == 'linux'",
           'python-dateutil==2.9.0.post0',
+          'PyYAML==6.0.3',
           'pytz==2026.5',
           'strict-rfc3339==0.7',
           'simplejson==4.1.1'
@@ -37,6 +38,7 @@ setup(name='pipelinewise-tap-yugabyte',
       entry_points='''
           [console_scripts]
           tap-yugabyte=tap_yugabyte:main
+          tap-yugabyte-index-check=tap_yugabyte.index_check:main
       ''',
       packages=['tap_yugabyte', 'tap_yugabyte.sync_strategies']
       )
