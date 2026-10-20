@@ -882,7 +882,11 @@ def assert_snowflake_sync_table_rolls_back_later_upload_failure(
 
 
 def assert_main_impl_exit_normally_on_success(
-    main_impl: callable, package_nm: str, tap_class_nm: str, target_class_nm: str
+    main_impl: callable,
+    package_nm: str,
+    tap_class_nm: str,
+    target_class_nm: str,
+    pool_initializer: callable = None,
 ) -> None:
     objects_to_mock = _create_object_names_to_mock(
         package_nm, tap_class_nm, target_class_nm
@@ -926,13 +930,22 @@ def assert_main_impl_exit_normally_on_success(
 
                         # assertions
                         utils_mock.get_pool_size.assert_called_once_with({})
-                        multiproc_mock.Pool.assert_called_once_with(10)
+                        if pool_initializer is None:
+                            multiproc_mock.Pool.assert_called_once_with(10)
+                        else:
+                            multiproc_mock.Pool.assert_called_once_with(
+                                10, initializer=pool_initializer
+                            )
                         assert utils_mock.parse_args.call_count == 1
                         assert mock_enter.return_value.map.call_count == 1
 
 
 def assert_main_impl_should_exit_with_error_on_failure(
-    main_impl: callable, package_nm: str, tap_class_nm: str, target_class_nm: str
+    main_impl: callable,
+    package_nm: str,
+    tap_class_nm: str,
+    target_class_nm: str,
+    pool_initializer: callable = None,
 ) -> None:
     objects_to_mock = _create_object_names_to_mock(
         package_nm, tap_class_nm, target_class_nm
@@ -984,4 +997,9 @@ def assert_main_impl_should_exit_with_error_on_failure(
                                 'fastsync_parallelism': 4,
                             }
                         )
-                        multiproc_mock.Pool.assert_called_once_with(10)
+                        if pool_initializer is None:
+                            multiproc_mock.Pool.assert_called_once_with(10)
+                        else:
+                            multiproc_mock.Pool.assert_called_once_with(
+                                10, initializer=pool_initializer
+                            )
