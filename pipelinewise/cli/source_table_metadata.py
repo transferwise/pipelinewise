@@ -121,7 +121,9 @@ def _mysql_keys(cursor, schema, table):
         })
         key['columns'].append(row['column_name'])
         if row['kind'] == 'FOREIGN KEY':
-            key.update({field: row[field] for field in ['referenced_schema', 'referenced_table', 'on_update', 'on_delete']})
+            key.update({field: row[field] for field in [
+                'referenced_schema', 'referenced_table', 'on_update', 'on_delete']
+                        })
             key.setdefault('referenced_columns', []).append(row['referenced_column'])
     result = _keys_result()
     for key in constraints.values():
@@ -139,7 +141,9 @@ def _postgres_keys(cursor, schema, table):
     """Keep ordered local and referenced columns together for composite keys."""
     result = _keys_result()
     for row in _query_rows(cursor, POSTGRES_KEYS_SQL, (schema, table)):
-        key = {field: row[field] for field in ['name', 'columns', 'is_deferrable', 'initially_deferred', 'is_validated']}
+        key = {field: row[field] for field in [
+            'name', 'columns', 'is_deferrable', 'initially_deferred', 'is_validated'
+        ]}
         if row['kind'] == 'p':
             result['primary_key'] = key
         elif row['kind'] == 'u':
