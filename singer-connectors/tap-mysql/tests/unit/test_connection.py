@@ -5,11 +5,13 @@ from unittest.mock import patch, MagicMock, call
 from pymysql.cursors import Cursor, DictCursor
 from pymysql.err import OperationalError
 from pymysqlreplication import BinLogStreamReader
+import singer.logger as singer_logger
 from tap_mysql.connection import (
     DEFAULT_SESSION_SQLS,
     MARIADB_MAX_STATEMENT_TIME_SQL,
     MYSQL_MAX_EXECUTION_TIME_SQL,
     MySQLConnection,
+    connect_with_backoff,
     fetch_server_id,
     fetch_server_uuid,
     make_connection_wrapper,
@@ -18,6 +20,16 @@ from tap_mysql.connection import (
 
 
 class TestConnection(unittest.TestCase):
+
+    def test_connection_reports_actual_host_once(self):
+        conn = MySQLConnection({'host': 'replica.example', 'port': 3306,
+                                'user': 'private-login', 'password': 'private-password'})
+        with patch.object(singer_logger, '_REPORTED_SOURCE_HOSTS', set()), \
+                patch.object(conn, 'connect'), patch('tap_mysql.connection.run_session_sqls'), \
+                self.assertLogs('tap_mysql', level='INFO') as logs:
+            connect_with_backoff(conn)
+            connect_with_backoff(conn)
+        self.assertEqual(logs.output, ['INFO:tap_mysql:Connecting to MySQL/MariaDB source host: replica.example'])
 
     def test_default_charset_supports_four_byte_unicode(self):
         conn = MySQLConnection({'host': 'localhost', 'port': 3306, 'user': 'test', 'password': 'test'})

@@ -13,6 +13,7 @@ from tempfile import mkstemp
 from joblib import Parallel, delayed, parallel_backend
 from jsonschema import Draft7Validator, FormatChecker
 from singer import get_logger
+from singer.decimal_support import schema_has_decimals, validate_decimal_record
 
 from target_postgres.db_sync import DbSync
 
@@ -88,6 +89,7 @@ def persist_lines(config, lines) -> None:  # noqa: C901
     schemas = {}
     key_properties = {}
     validators = {}
+    decimal_streams = {}
     records_to_load = {}
     row_count = {}
     stream_to_sync = {}
@@ -115,6 +117,8 @@ def persist_lines(config, lines) -> None:  # noqa: C901
 
             # Get schema for this record's stream
             stream = o['stream']
+            if decimal_streams[stream]:
+                validate_decimal_record(o['record'], schemas[stream])
 
             # Validate record
             if config.get('validate_records'):
@@ -180,6 +184,7 @@ def persist_lines(config, lines) -> None:  # noqa: C901
 
             schemas[stream] = float_to_decimal(o['schema'])
             validators[stream] = Draft7Validator(schemas[stream], format_checker=FormatChecker())
+            decimal_streams[stream] = schema_has_decimals(schemas[stream])
 
             # flush records from previous stream SCHEMA
             if row_count.get(stream, 0) > 0:

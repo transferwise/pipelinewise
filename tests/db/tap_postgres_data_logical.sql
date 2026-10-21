@@ -14,6 +14,8 @@ CREATE TABLE logical1.logical1_table1(
     PRIMARY KEY (cid)
 );
 
+CREATE INDEX logical1_table1_updated_at_idx ON logical1.logical1_table1 (updated_at);
+
 CREATE TABLE logical1.logical1_table2(
     cid serial NOT NULL,
     cvarchar varchar,

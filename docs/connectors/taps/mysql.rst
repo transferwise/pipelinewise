@@ -129,6 +129,20 @@ Configuration
 Common tap settings are documented in :ref:`yaml_configuration`. Generate the
 full template with ``pipelinewise init``.
 
+Snowflake native and managed Iceberg v3 targets store ``SET`` values as
+``VARCHAR(134217728)``, the ``TINYBLOB``/``BLOB``/``MEDIUMBLOB``/``LONGBLOB``
+family as binary, and ``YEAR`` as ``NUMBER(38,0)``. Singer and FastSync use the
+same mappings. Binary values travel as hexadecimal text and are restored to
+binary by the target. Snowflake's 64 MiB binary value limit still applies, so a
+larger ``LONGBLOB`` value cannot be represented in one target cell.
+PostgreSQL targets store ``YEAR`` as ``SMALLINT`` through both Singer and
+FullSync.
+Existing Snowflake and PostgreSQL tables keep a nonempty target primary key
+that is a subset of the refreshed source key during Singer replication. FullSync
+the table to adopt newly supported key columns. Retained text BLOB keys use uppercase
+hexadecimal to match historical FastSync rows. See :ref:`exact_decimal_mapping`
+for key compatibility and resync rules.
+
 
 Operational notes
 -----------------
@@ -172,6 +186,11 @@ Operational notes
   affected tables when upgrading a tap suspected of dropping rows.
 - MariaDB 11.4 zero ``End_log_pos`` values are supported. Do not enable
   ``binlog_legacy_event_pos`` for PipelineWise.
+- MariaDB 11.2 and later log extra status variables on some DDL. For example,
+  a statement that names a character set without a collation adds one.
+  Binlog replication skips status variables that the bundled decoder does not
+  recognize. It still reads the statement and continues. No server setting
+  change is needed.
 - PipelineWise retries a lost file/position connection twice from
   target-acknowledged state, waiting 30 seconds before the second attempt and
   60 seconds before the third. Recoverable disconnects log warnings; a
@@ -183,8 +202,12 @@ Operational notes
   per-row delete images. FullSync that table to capture the resulting contents
   before resuming Singer.
 - The connector interprets ``TINYINT(1)`` as Boolean; other display widths are
-  integers. Snowflake bulk mappings use floating-point ``DECIMAL`` and Boolean
-  ``BIT`` values, so they do not preserve arbitrary decimal precision or
+  integers. ``DECIMAL(p,s)`` and its ``NUMERIC(p,s)`` alias retain supported
+  dimensions in Snowflake and PostgreSQL. New Snowflake columns use the precise
+  mapping; legacy floating-point target columns remain unchanged unless
+  ``version_legacy_float_columns`` is enabled on the tap. See
+  :ref:`exact_decimal_mapping` for numeric fallback and column versioning.
+  Snowflake bulk mappings use Boolean ``BIT`` values and do not preserve
   multi-bit bitsets. MySQL ``TIME`` values outside a 24-hour clock cannot be
   represented by Snowflake ``TIME``.
 - The bundled decoder does not distinguish SQL ``NULL`` from JSON literal

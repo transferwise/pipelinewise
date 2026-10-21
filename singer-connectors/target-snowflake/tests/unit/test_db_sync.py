@@ -119,7 +119,7 @@ class TestDBSync(unittest.TestCase):
             'd_or_null': 'date',
             'time': 'time',
             'time_or_null': 'time',
-            'binary': 'binary',
+            'binary': 'binary(67108864)',
             'num': 'float',
             'int': 'number',
             'int_or_str': 'varchar(134217728)',
@@ -822,7 +822,7 @@ class TestDBSync(unittest.TestCase):
         )
         self.assertEqual(
             db_sync.column_type(self.json_types['binary']),
-            'binary',
+            'binary(67108864)',
         )
         for invalid_version in (None, 2, 4, 3.0, True, '3'):
             with self.subTest(invalid_version=invalid_version), self.assertRaisesRegex(

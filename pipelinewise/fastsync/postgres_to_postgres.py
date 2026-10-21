@@ -12,6 +12,7 @@ from ..logger import Logger
 from .commons import utils
 from .commons.tap_postgres import FastSyncTapPostgres
 from .commons.target_postgres import FastSyncTargetPostgres
+from .commons.source_numeric import postgres_decimal_type
 
 LOGGER = Logger().get_logger(__name__)
 
@@ -30,8 +31,13 @@ REQUIRED_CONFIG_KEYS = {
 LOCK = multiprocessing.Lock()
 
 
-def tap_type_to_target_type(pg_type, *_):
+def tap_type_to_target_type(
+    pg_type, _character_length=None, numeric_precision=None, numeric_scale=None, *, is_key=False, postgres_version=None,
+):
     """Data type mapping from Postgres to Postgres"""
+    if pg_type in ('numeric', 'decimal'):
+        return postgres_decimal_type(numeric_precision, numeric_scale, 'postgres',
+                                     is_key=is_key, postgres_version=postgres_version)
     return {
         'char': 'CHARACTER VARYING',
         'character': 'CHARACTER VARYING',
@@ -48,7 +54,6 @@ def tap_type_to_target_type(pg_type, *_):
         'smallserial': 'DOUBLE PRECISION',
         'serial': 'DOUBLE PRECISION',
         'bigserial': 'DOUBLE PRECISION',
-        'numeric': 'DOUBLE PRECISION',
         'double precision': 'DOUBLE PRECISION',
         'real': 'DOUBLE PRECISION',
         'bool': 'BOOLEAN',

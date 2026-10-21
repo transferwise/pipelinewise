@@ -337,6 +337,7 @@ def _stage_full_export(run: _FullSyncRun) -> None:
         run.table,
         run.size_bytes,
         is_temporary=True,
+        columns=run.snowflake_columns,
         **staging_options,
     )
     if run.args.target.get('archive_load_files', False):

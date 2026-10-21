@@ -2,6 +2,7 @@
 Snowflake Upload Client
 """
 import os
+from singer.snowflake_errors import sanitize_snowflake_errors
 
 from .base_upload_client import BaseUploadClient
 
@@ -13,6 +14,7 @@ class SnowflakeUploadClient(BaseUploadClient):
         super().__init__(connection_config)
         self.dblink = dblink
 
+    @sanitize_snowflake_errors
     def upload_file(self, file, stream, temp_dir = None):
         """Upload file to an internal snowflake stage"""
         # Generating key in S3 bucket
@@ -31,6 +33,7 @@ class SnowflakeUploadClient(BaseUploadClient):
 
         return key
 
+    @sanitize_snowflake_errors
     def delete_object(self, stream: str, key: str) -> None:
         """Delete object form internal snowflake stage"""
         self.logger.info('Deleting %s from internal snowflake stage', key)

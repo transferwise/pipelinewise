@@ -12,6 +12,7 @@ from pipelinewise.fastsync.commons.snowflake_iceberg_recovery import (
     TableFormatDiscoveryError,
 )
 from pipelinewise.fastsync.commons.snowflake_types import (
+    SNOWFLAKE_MAX_BINARY,
     SNOWFLAKE_MAX_VARCHAR,
     SNOWFLAKE_MAX_VARCHAR_LENGTH,
 )
@@ -27,7 +28,7 @@ _ICEBERG_STRING_TYPES = {
     'CHARACTER VARYING',
 }
 _V3_LOGICAL_TO_PHYSICAL_TYPES = {
-    'binary': 'binary(67108864)',
+    'binary': SNOWFLAKE_MAX_BINARY.lower(),
     'boolean': 'boolean',
     'date': 'date',
     'float': 'double',

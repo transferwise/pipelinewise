@@ -14,6 +14,15 @@ record protocol between source taps and targets:
 FastSync bypasses this protocol for supported bulk-transfer routes. See
 :ref:`fast_sync_main`.
 
+The shared PipelineWise Singer library is bundled under
+``singer-connectors/singer-python`` and installed into each consuming environment
+by the Makefile and Docker workflows. Its local distribution version identifies
+the bundled implementation separately from the upstream release. Exact dependency
+pins and local install arguments resolve this bundled distribution in each environment.
+Jira retains its separate upstream Singer
+dependency. SQL-source decimals use an explicitly marked decimal-string schema
+on the supported routes; see :ref:`exact_decimal_mapping`.
+
 
 Messages
 --------

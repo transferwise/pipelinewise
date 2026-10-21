@@ -16,6 +16,7 @@ from pipelinewise.fastsync.commons.snowflake_iceberg import (
     TABLE_FORMAT_NATIVE,
 )
 from pipelinewise.fastsync.commons.snowflake_types import (
+    SNOWFLAKE_MAX_BINARY,
     SNOWFLAKE_MAX_VARCHAR,
     canonical_native_metadata_type,
     canonical_native_type,
@@ -102,7 +103,6 @@ def test_native_partial_accepts_same_family_with_sufficient_capacity(source_type
     ('NUMBER(18,4)', {'type': 'FIXED', 'precision': 18, 'scale': 2}),
     ('NUMBER(18,2)', {'type': 'FIXED', 'precision': 18, 'scale': 4}),
     ('NUMBER', {'type': 'REAL'}),
-    ('FLOAT', {'type': 'FIXED', 'precision': 38, 'scale': 0}),
     ('BINARY', {'type': 'BINARY', 'length': 1024}),
     ('BINARY', {'type': 'TEXT', 'length': 134217728}),
     ('TIMESTAMP_NTZ', {'type': 'TIMESTAMP_NTZ', 'scale': 6}),
@@ -117,6 +117,78 @@ def test_native_partial_rejects_type_or_capacity_loss(source_type, metadata):
     with pytest.raises(utils.NativePartialSyncCompatibilityError, match='cannot safely publish.*FullSync'):
         utils.diff_source_target_columns(target, [f'"VALUE" {source_type}'])
     assert target['sf_object'].method_calls == [mock.call.query('SHOW COLUMNS IN TABLE TARGET."ORDERS"')]
+
+
+LEGACY_BINARY = {'type': 'BINARY', 'length': 8388608}
+
+
+@pytest.mark.parametrize(('declared_length', 'metadata'), [
+    (16, LEGACY_BINARY),
+    (65535, LEGACY_BINARY),
+    (0, {'type': 'BINARY', 'length': 1}),
+    (16, {'type': 'BINARY', 'length': 16}),
+])
+def test_native_partial_keeps_binary_width_that_holds_declared_source_length(declared_length, metadata):
+    target = _target(metadata)
+    result = utils.diff_source_target_columns(
+        target, [f'"VALUE" {SNOWFLAKE_MAX_BINARY}'], binary_lengths={'VALUE': declared_length},
+    )
+    live_type = f'BINARY({metadata["length"]})'
+    assert result['staging_columns'] == [f'"VALUE" {live_type}']
+    assert result['column_versions'] == {}
+    assert result['varchar_columns_to_widen'] == []
+    assert utils.diff_source_target_columns(target, result['staging_columns'])['staging_columns'] == [
+        f'"VALUE" {live_type}',
+    ]
+
+
+def test_native_partial_keeps_mapped_binary_staging_type_when_target_has_full_width():
+    result = utils.diff_source_target_columns(
+        _target({'type': 'BINARY', 'length': 67108864}), [f'"VALUE" {SNOWFLAKE_MAX_BINARY}'],
+        binary_lengths={'VALUE': 16},
+    )
+    assert result['staging_columns'] == [f'"VALUE" {SNOWFLAKE_MAX_BINARY}']
+
+
+@pytest.mark.parametrize(('source_type', 'metadata', 'binary_lengths'), [
+    pytest.param(SNOWFLAKE_MAX_BINARY, LEGACY_BINARY, None, id='undeclared-length'),
+    pytest.param(SNOWFLAKE_MAX_BINARY, LEGACY_BINARY, {'OTHER': 16}, id='other-column-length'),
+    pytest.param(SNOWFLAKE_MAX_BINARY, {'type': 'BINARY', 'length': 8}, {'VALUE': 16}, id='narrower-than-source'),
+    pytest.param(SNOWFLAKE_MAX_BINARY, {'type': 'TEXT', 'length': 134217728}, {'VALUE': 16}, id='text-target'),
+    pytest.param('NUMBER', LEGACY_BINARY, {'VALUE': 16}, id='non-binary-mapping'),
+])
+def test_native_partial_rejects_binary_width_without_declared_source_capacity(source_type, metadata, binary_lengths):
+    target = _target(metadata)
+    with pytest.raises(utils.NativePartialSyncCompatibilityError, match='cannot safely publish.*FullSync'):
+        utils.diff_source_target_columns(target, [f'"VALUE" {source_type}'], binary_lengths=binary_lengths)
+    assert target['sf_object'].method_calls == [mock.call.query('SHOW COLUMNS IN TABLE TARGET."ORDERS"')]
+
+
+def test_native_partial_export_stages_legacy_binary_key_with_its_live_width():
+    run = mock.Mock(native_target_exists=True, has_dynamic_boundary=False)
+    run.table_name = 'source.orders'
+    run.column_name = 'seq'
+    run.target_schema = 'TARGET'
+    run.target_table = 'ORDERS'
+    run.args.drop_target_table = False
+    run.args.target = {}
+    run.source.map_column_types_to_target.return_value = {
+        'columns': [f'"ID" {SNOWFLAKE_MAX_BINARY}', '"SEQ" NUMBER'], 'source_column_names': ['id', 'seq'],
+        'primary_key': ['"ID"'], 'binary_lengths': {'ID': 16},
+    }
+    run.snowflake.query.return_value = [
+        {'column_name': 'ID', 'data_type': json.dumps(LEGACY_BINARY)},
+        {'column_name': 'SEQ', 'data_type': json.dumps({'type': 'FIXED', 'precision': 38, 'scale': 0})},
+    ]
+    run.source_adapter.bookmark_kwargs.return_value = {}
+    with mock.patch.object(
+        rdbms_to_snowflake, '_resolve_partial_boundary', return_value=('1', None),
+    ), mock.patch.object(
+        rdbms_to_snowflake.common_utils, 'get_bookmark_for_table', return_value={'lsn': 1},
+    ):
+        assert rdbms_to_snowflake._prepare_native_partial_export(run) is True
+    assert run.binary_lengths == {'ID': 16}
+    assert run.source_columns == ['"ID" BINARY(8388608)', '"SEQ" NUMBER']
 
 
 def test_native_partial_normalizes_catalog_keys_and_unquoted_column_identifiers():
