@@ -381,6 +381,57 @@ class TestFastSyncTargetSnowflake(TestCase):
             ' compression=GZIP binary_format=HEX)'
         ]
 
+    def test_float_copy_projection_preserves_source_and_metadata_order(self):
+        """CSV FLOAT fields saturate overflow while ordinary and metadata positions remain intact."""
+        columns = ['"ID" NUMBER(38,0)', '"AMOUNT" FLOAT', '_SDC_EXTRACTED_AT TIMESTAMP_NTZ',
+                   '_SDC_BATCHED_AT TIMESTAMP_NTZ', '_SDC_DELETED_AT VARCHAR']
+        self.snowflake.copy_to_table('key', 'schema', 'items', 1, is_temporary=True, columns=columns)
+        query = self.snowflake.executed_queries[-1]
+        assert 'SELECT $1, CASE WHEN $2 IS NULL THEN NULL' in query
+        assert 'TRY_TO_DOUBLE($2)' in query
+        assert "IFF(SUBSTR($2, 1, 1) = '-', -1.7976931348623157e308, 1.7976931348623157e308)" in query
+        assert ", $3, $4, $5 FROM '@dummy_stage/key')" in query
+        assert '$6' not in query
+        assert 'empty_field_as_null=TRUE' in query
+
+    def test_double_copy_projection_saturates_iceberg_float_overflow(self):
+        """Iceberg's canonical DOUBLE uses the same guarded CSV conversion as FLOAT."""
+        columns = ['"ID" NUMBER(38,0)', '"AMOUNT" DOUBLE', '_SDC_EXTRACTED_AT TIMESTAMP_NTZ',
+                   '_SDC_BATCHED_AT TIMESTAMP_NTZ', '_SDC_DELETED_AT VARCHAR']
+        self.snowflake.copy_to_table('key', 'schema', 'items', 1, is_temporary=True, columns=columns)
+        query = self.snowflake.executed_queries[-1]
+        assert 'SELECT $1, CASE WHEN $2 IS NULL THEN NULL' in query
+        assert 'TRY_TO_DOUBLE($2)' in query
+        assert "IFF(SUBSTR($2, 1, 1) = '-', -1.7976931348623157e308, 1.7976931348623157e308)" in query
+
+    def test_float_copy_projection_preserves_variant_and_binary_conversions(self):
+        """A float projection must keep the conversions direct COPY normally performs."""
+        columns = [
+            '"ID" NUMBER(38,0)',
+            '"AMOUNT" FLOAT',
+            '"PAYLOAD" VARIANT',
+            '"CONTENTS" BINARY(67108864)',
+            '_SDC_EXTRACTED_AT TIMESTAMP_NTZ',
+            '_SDC_BATCHED_AT TIMESTAMP_NTZ',
+            '_SDC_DELETED_AT VARCHAR',
+        ]
+
+        self.snowflake.copy_to_table('key', 'schema', 'items', 1, is_temporary=True, columns=columns)
+
+        query = self.snowflake.executed_queries[-1]
+        assert 'TRY_TO_DOUBLE($2)' in query
+        assert 'PARSE_JSON($3)' in query
+        assert "TO_BINARY($4, 'HEX')" in query
+        assert ", $5, $6, $7 FROM '@dummy_stage/key')" in query
+
+    def test_numeric_copy_uses_existing_direct_stage_sql(self):
+        """Supplying exact numeric columns does not change the established COPY form."""
+        self.snowflake.copy_to_table('key', 'schema', 'items', 1, is_temporary=True)
+        original = self.snowflake.executed_queries[-1]
+        self.snowflake.copy_to_table('key', 'schema', 'items', 1, is_temporary=True,
+                                    columns=['"ID" NUMBER(38,0)', '"AMOUNT" NUMERIC(10,2)'])
+        assert self.snowflake.executed_queries[-1] == original
+
     def test_grant_select_on_table(self):
         """Validate if GRANT command generated correctly"""
         # GRANT table with standard table and column names

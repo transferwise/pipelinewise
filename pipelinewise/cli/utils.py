@@ -103,6 +103,8 @@ def is_state_message(line: str) -> bool:
     Detects if a string is a valid state message
     """
     try:
+        if not line.lstrip().startswith('{'):
+            return False
         json_object = json.loads(line)
         return 'bookmarks' in json_object
     except Exception:

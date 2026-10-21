@@ -43,6 +43,7 @@ Global configuration
      slack:
        token: "{{ env_var['SLACK_BOT_TOKEN'] }}"
        channel: "#pipeline-alerts"
+       data_diff_channel: "#data-diff-alerts"  # Optional
 
    allowed_resync_max_size:
      table_mb: 50000
@@ -73,6 +74,11 @@ Global configuration
      - No
      - None
      - Configures Slack or VictorOps failure delivery. See :ref:`alerts`.
+   * - ``alert_handlers.slack.data_diff_channel``
+     - No
+     - Slack ``channel``
+     - Sets a separate global Slack destination for data-diff alerts.
+       Tap-specific copies remain enabled. See :ref:`slack_alert_handler`.
    * - ``allowed_resync_max_size`` / ``table_mb``
      - No
      - No limit
@@ -112,6 +118,7 @@ Tap configuration
      password: "{{ env_var['POSTGRES_PASSWORD'] }}"
      dbname: "orders"
    target: "snowflake"
+   version_legacy_float_columns: false
    batch_size_rows: 20000
    stream_buffer_size: 0
    schemas:
@@ -229,6 +236,15 @@ Tap configuration
      - Managed-Iceberg version discriminator. Its only supported value is integer
        ``3``; it is required with ``target_table_format: iceberg`` and invalid
        otherwise.
+   * - ``version_legacy_float_columns``
+     - ``false``
+     - For MariaDB/MySQL or PostgreSQL taps writing to Snowflake, set ``true``
+       to retain an eligible non-key legacy floating-point decimal column under a
+       timestamped name and create its fixed-point replacement. New decimal
+       columns use the current precision-preserving mapping regardless of this
+       setting. Existing floating-point decimal keys remain unchanged even when
+       this option is enabled. Configure it at the tap root, not in ``db_conn``
+       or the shared target.
    * - ``validate_records``
      - ``false``
      - Validates Singer records against their emitted schema before loading.

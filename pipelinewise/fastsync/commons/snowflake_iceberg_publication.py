@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import logging
 import math
 import time
 from typing import Any, Dict, Optional, Tuple
@@ -65,8 +66,12 @@ from pipelinewise.fastsync.commons.snowflake_iceberg_versions import (
 from pipelinewise.fastsync.commons.snowflake_iceberg_staging import (
     validate_partial_staging_primary_key,
 )
+from pipelinewise.fastsync.commons.snowflake_decimal_evolution import (
+    partial_compatibility, partial_preparation, retained_column_types,
+)
 
 
+LOGGER = logging.getLogger(__name__)
 _PUBLICATION_SUBMITTED_AT = 'publication_submitted_at'
 _TERMINAL_HISTORY_STATUSES = frozenset({
     'success',
@@ -285,15 +290,25 @@ class SnowflakeIcebergPublicationService:
             raise TableCompatibilityError('Iceberg PartialSync requires a primary key')
         snapshot = self.inspect_table(spec.name)
         drop_target = bool(attempt.manifest_payload.drop_target)
+        planned_versions = attempt.manifest_payload.column_versions or {}
+        decimal_columns = attempt.manifest_payload.decimal_columns or tuple(planned_versions)
+        version_legacy_float_columns = bool(
+            attempt.manifest_payload.version_legacy_float_columns
+        )
         if snapshot.fingerprint == attempt.pre_publication_target_fingerprint:
             method, additions = self._partial_method(
-                spec, snapshot, drop_target, iceberg_version
+                spec, snapshot, drop_target, iceberg_version, decimal_columns=decimal_columns,
+                version_legacy_float_columns=version_legacy_float_columns,
             )
         elif attempt.method == PUBLICATION_PARTIAL_MERGE:
-            compatibility, additions = self._compatibility(spec, snapshot.spec)
+            compatibility, additions = partial_compatibility(
+                spec, snapshot.spec, boundary_column=attempt.manifest_payload.column_name,
+                decimal_columns=decimal_columns,
+                version_legacy_float_columns=version_legacy_float_columns,
+            )
             if (
                 snapshot.table_format != expected_table_format
-                or compatibility not in ('exact', 'additive')
+                or compatibility not in ('exact', 'additive', 'versioning')
             ):
                 raise RecoveryManifestError('Iceberg target changed after the partial range was resolved')
             method = PUBLICATION_PARTIAL_MERGE
@@ -315,6 +330,17 @@ class SnowflakeIcebergPublicationService:
             f'ALTER ICEBERG TABLE {spec.name.quoted} ADD COLUMN {column.definition}'
             for column in additions
         )
+        column_renames = ()
+        if method == PUBLICATION_PARTIAL_MERGE:
+            preparation_plan = partial_preparation(
+                spec, snapshot.spec, attempt.manifest_payload.column_versions or {},
+                boundary_column=attempt.manifest_payload.column_name,
+                historical_columns=attempt.manifest_payload.historical_columns,
+                decimal_columns=decimal_columns,
+                version_legacy_float_columns=version_legacy_float_columns,
+            )
+            preparation = preparation_plan.statements
+            column_renames = preparation_plan.column_renames
         if method == PUBLICATION_PARTIAL_BOOTSTRAP_CTAS:
             publication = (
                 self._ctas_sql(
@@ -338,10 +364,13 @@ class SnowflakeIcebergPublicationService:
             )
         else:
             publication = self._partial_merge_sql(spec, attempt)
-        return PublicationPlan(method, preparation, publication, snapshot.fingerprint, attempt.query_tag)
+        return PublicationPlan(
+            method, preparation, publication, snapshot.fingerprint, attempt.query_tag, column_renames,
+        )
 
     def _partial_method(
-        self, spec, snapshot, drop_target, iceberg_version
+        self, spec, snapshot, drop_target, iceberg_version, decimal_columns=(),
+        version_legacy_float_columns=False,
     ):
         if snapshot.table_format == TABLE_FORMAT_MISSING:
             return PUBLICATION_PARTIAL_BOOTSTRAP_CTAS, ()
@@ -349,7 +378,10 @@ class SnowflakeIcebergPublicationService:
         self._reject_text_variant_mismatch(spec, snapshot.spec)
         if drop_target:
             return PUBLICATION_PARTIAL_REPLACEMENT_CTAS, ()
-        compatibility, additions = self._compatibility(spec, snapshot.spec)
+        compatibility, additions = partial_compatibility(
+            spec, snapshot.spec, decimal_columns=decimal_columns,
+            version_legacy_float_columns=version_legacy_float_columns,
+        )
         if compatibility == 'incompatible':
             raise TableCompatibilityError(
                 f'Existing Iceberg table {spec.name.quoted} is incompatible with PartialSync; '
@@ -714,11 +746,16 @@ class SnowflakeIcebergPublicationService:
         if snapshot.fingerprint != plan.target_fingerprint:
             raise RecoveryManifestError('Iceberg target changed after publication planning')
 
-        for statement in plan.preparation_statements:
+        renames = {rename.statement_index: rename for rename in plan.column_renames}
+        for index, statement in enumerate(plan.preparation_statements):
             self.snowflake.query(statement, query_tag_props={**attempt.query_tag, 'phase': 'schema_evolution'})
+            rename = renames.get(index)
+            if rename is not None:
+                LOGGER.info('Column "%s" in table "%s" has been renamed to "%s"',
+                            rename.column_name, spec.name.quoted, rename.archived_name)
         if plan.preparation_statements:
             evolved = self.inspect_table(spec.name)
-            compatibility, additions = self._compatibility(spec, evolved.spec)
+            compatibility, additions = self._published_compatibility(attempt, spec, evolved.spec)
             if compatibility != 'exact' or additions:
                 raise RecoveryManifestError('Iceberg schema evolution did not produce the staged schema')
             attempt.update_manifest_payload({
@@ -770,7 +807,7 @@ class SnowflakeIcebergPublicationService:
             raise RecoveryManifestError(
                 'Published target is not the requested managed Iceberg version'
             )
-        compatibility, additions = self._compatibility(spec, snapshot.spec)
+        compatibility, additions = self._published_compatibility(attempt, spec, snapshot.spec)
         if compatibility != 'exact' or additions:
             raise RecoveryManifestError('Published Iceberg target schema does not match the staged schema')
         where_clause = (
@@ -804,6 +841,23 @@ class SnowflakeIcebergPublicationService:
             self.publisher._verify_replacement_metadata(
                 attempt
             )
+
+    def _published_compatibility(self, attempt, spec, actual):
+        if attempt.method == PUBLICATION_PARTIAL_MERGE:
+            return partial_compatibility(
+                spec, actual, allow_versions=False,
+                historical_columns=retained_column_types(
+                    attempt.manifest_payload.historical_columns, attempt.manifest_payload.column_versions or {},
+                ),
+                decimal_columns=(
+                    attempt.manifest_payload.decimal_columns
+                    or tuple(attempt.manifest_payload.column_versions or {})
+                ),
+                version_legacy_float_columns=bool(
+                    attempt.manifest_payload.version_legacy_float_columns
+                ),
+            )
+        return self._compatibility(spec, actual)
 
     def _content_evidence(
         self,

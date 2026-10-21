@@ -4,6 +4,7 @@ import math
 import time
 
 import snowflake.connector
+from singer.snowflake_errors import sanitize_snowflake_error, sanitize_snowflake_errors
 
 from pipelinewise.utils import pem2der
 
@@ -31,6 +32,7 @@ class SnowflakeSqlClient:
     def _monotonic():
         return time.monotonic()
 
+    @sanitize_snowflake_errors
     def open_connection(
         self,
         query_tag_props=None,
@@ -66,6 +68,7 @@ class SnowflakeSqlClient:
             **timeout_options,
         )
 
+    @sanitize_snowflake_errors
     def query(self, query, params=None, query_tag_props=None):
         """Execute one statement and return dictionary rows when present."""
         if self.sql_logger is not None:
@@ -75,6 +78,7 @@ class SnowflakeSqlClient:
                 cursor.execute(query, params)
                 return cursor.fetchall() if cursor.description else []
 
+    @sanitize_snowflake_errors
     def query_with_timeout(self, query, params, timeout_seconds):
         """Execute one lookup within connector and statement deadlines."""
         deadline = self._monotonic() + timeout_seconds
@@ -94,6 +98,7 @@ class SnowflakeSqlClient:
                 cursor.execute(query, params, timeout=statement_timeout)
                 return cursor.fetchall() if cursor.description else []
 
+    @sanitize_snowflake_errors
     def execute_transaction(self, queries, query_tag_props=None):
         """Execute all statements in one explicit transaction."""
         connection = self.open_connection(query_tag_props, autocommit=False)
@@ -104,7 +109,8 @@ class SnowflakeSqlClient:
                         self.sql_logger.debug('Running transaction query: %s', query)
                     cursor.execute(query)
             connection.commit()
-        except Exception:
+        except Exception as error:
+            sanitize_snowflake_error(error)
             self._rollback(connection)
             raise
         finally:
@@ -116,7 +122,8 @@ class SnowflakeSqlClient:
             return
         try:
             connection.rollback()
-        except Exception:  # pragma: no cover - driver-specific cleanup failure
+        except Exception as error:  # pragma: no cover - driver-specific cleanup failure
+            sanitize_snowflake_error(error)
             self.sql_logger.warning(
                 'Failed to roll back Snowflake publication transaction',
                 exc_info=True,
@@ -128,7 +135,8 @@ class SnowflakeSqlClient:
             return
         try:
             connection.close()
-        except Exception:  # pragma: no cover - driver-specific cleanup failure
+        except Exception as error:  # pragma: no cover - driver-specific cleanup failure
+            sanitize_snowflake_error(error)
             self.sql_logger.warning(
                 'Failed to close Snowflake publication connection',
                 exc_info=True,

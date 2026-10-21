@@ -657,6 +657,7 @@ def _map_tap_to_target_functions(
         'run_query_target_snowflake': {
             'target_sql_get_cols_fn': db.sql_get_columns_snowflake,
             'target_sql_dynamic_row_count_fn': db.sql_dynamic_row_count_snowflake,
+            'target_sql_show_cols_fn': db.sql_show_columns_snowflake,
         },
     }
 
@@ -760,7 +761,7 @@ def assert_all_columns_exist(
         Converts list of columns with char separators to dictionary
 
         :param cols: list of ':' separated strings using the format of
-                     column_name:column_type:column_type_extra
+                     column_name:column_type:column_type_extra[:numeric_precision:numeric_scale]
         :return: Dictionary of columns where key is the column_name
         """
         cols_dict = {}
@@ -770,6 +771,11 @@ def assert_all_columns_exist(
                 'type': col_props[1],
                 'type_extra': col_props[2],
             }
+            if len(col_props) == 5 and col_props[1] in ('numeric', 'decimal', 'number'):
+                cols_dict[col_props[0]].update(
+                    numeric_precision=int(col_props[3]) if col_props[3] else None,
+                    numeric_scale=int(col_props[4]) if col_props[4] else None,
+                )
 
         return cols_dict
 
@@ -783,6 +789,10 @@ def assert_all_columns_exist(
         table[0].lower(): _cols_list_to_dict(table[1].lower().split(';'))
         for table in target_table_cols_raw
     }
+    if column_type_mapper_fn and 'target_sql_show_cols_fn' in funcs:
+        _add_binary_column_widths(
+            target_table_columns_map, target_schemas, target_query_runner_fn, funcs['target_sql_show_cols_fn'],
+        )
 
     for source_table_name, source_table_columns in source_table_columns_map.items():
 
@@ -810,16 +820,9 @@ def assert_all_columns_exist(
             if column_type_mapper_fn is None:
                 continue
 
-            expected_target_column_type = (
-                column_type_mapper_fn(
-                    source_column_type_info['type'],
-                    source_column_type_info['type_extra'],
-                )
-                .replace(' NULL', '')
-                .lower()
+            expected_target_column_type, actual_target_column_type = _column_comparison_types(
+                source_column_type_info, target_column_type_info, column_type_mapper_fn,
             )
-
-            actual_target_column_type = target_column_type_info['type'].lower()
 
             if actual_target_column_type != expected_target_column_type:
                 raise Exception(
@@ -827,6 +830,44 @@ def assert_all_columns_exist(
                     f'Expected: {expected_target_column_type} '
                     f'Actual: {actual_target_column_type}'
                 )
+
+
+def _add_binary_column_widths(table_columns, schemas, query_runner, show_columns_sql):
+    """SHOW COLUMNS exposes binary lengths that INFORMATION_SCHEMA leaves NULL."""
+    binary_columns = {
+        (table_name, name)
+        for table_name, columns in table_columns.items()
+        for name, column in columns.items()
+        if column['type'].lower() in ('binary', 'varbinary')
+    }
+    if not binary_columns:
+        return
+    for schema in schemas:
+        for row in _run_sql(query_runner, show_columns_sql(schema)):
+            table_name, _schema_name, name, raw_type = row[:4]
+            column_key = (table_name.lower(), name.lower())
+            if column_key not in binary_columns:
+                continue
+            column_type = json.loads(raw_type)
+            if column_type.get('type') == 'BINARY' and column_type.get('length') is not None:
+                table_columns[column_key[0]][column_key[1]]['type'] = f'binary({column_type["length"]})'
+
+
+def _column_comparison_types(source, target, column_type_mapper_fn):
+    """Compare declared fixed-point dimensions while preserving other type checks."""
+    mapper_args = [source['type'], source['type_extra']]
+    is_decimal = source['type'] in ('numeric', 'decimal')
+    if is_decimal and 'numeric_precision' in source:
+        mapper_args.extend((source['numeric_precision'], source['numeric_scale']))
+    expected = column_type_mapper_fn(*mapper_args).replace(' NULL', '').lower()
+    actual = target['type'].lower()
+    if is_decimal or re.fullmatch(r'(?:numeric|decimal|number)\(\d+,\d+\)', expected):
+        expected = re.sub(r'^(decimal|number)\b', 'numeric', expected)
+        if actual in ('numeric', 'decimal', 'number'):
+            actual = 'numeric'
+            if target.get('numeric_precision') is not None:
+                actual += f'({target["numeric_precision"]},{target["numeric_scale"]})'
+    return expected, actual
 
 
 def assert_date_column_naive_in_target(

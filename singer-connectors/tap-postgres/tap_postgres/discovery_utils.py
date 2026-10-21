@@ -4,6 +4,7 @@ import copy
 from typing import List, Optional
 import psycopg2.extras
 from singer import metadata
+from singer.decimal_support import decimal_schema, postgres_numeric_scale
 
 import tap_postgres.db as post_db
 
@@ -40,12 +41,12 @@ BASE_RECURSIVE_SCHEMAS = {
 }
 
 
-def discover_db(connection, filter_schemas=None, tables: Optional[List[str]] = None):
+def discover_db(connection, filter_schemas=None, tables: Optional[List[str]] = None, decimal_target=None):
     """
     Discover streams in the DB cluster
     """
     table_info = produce_table_info(connection, filter_schemas, tables)
-    db_streams = discover_columns(connection, table_info)
+    db_streams = discover_columns(connection, table_info, decimal_target)
     return db_streams
 
 
@@ -140,7 +141,7 @@ AND has_column_privilege(pg_class.oid, attname, 'SELECT') = true """
         return table_info
 
 
-def discover_columns(connection, table_info):
+def discover_columns(connection, table_info, decimal_target=None):
     """
     Generates more info about columns of the given table
     """
@@ -160,8 +161,12 @@ def discover_columns(connection, table_info):
             metadata.write(mdata, (), 'database-name', database_name)
             metadata.write(mdata, (), 'row-count', table_info[schema_name][table_name]['row_count'])
             metadata.write(mdata, (), 'is-view', table_info[schema_name][table_name].get('is_view'))
+            if decimal_target:
+                metadata.write(mdata, (), 'decimal-target', decimal_target)
 
-            column_schemas = {col_name: schema_for_column(col_info) for col_name, col_info in columns.items()}
+            column_schemas = {
+                col_name: schema_for_column(col_info, decimal_target) for col_name, col_info in columns.items()
+            }
 
             schema = {'type': 'object',
                       'properties': column_schemas,
@@ -193,7 +198,7 @@ def discover_columns(connection, table_info):
     return entries
 
 
-def schema_for_column_datatype(col):  # noqa: C901
+def schema_for_column_datatype(col, decimal_target=None):  # noqa: C901
     """
     Build json schema for columns with non-array datatype
     """
@@ -240,6 +245,10 @@ def schema_for_column_datatype(col):  # noqa: C901
         return schema
 
     if data_type == 'numeric':
+        if decimal_target:
+            schema = decimal_schema(col.numeric_precision, postgres_numeric_scale(col.numeric_scale))
+            schema['type'] = nullable_column('string', col.is_primary_key)
+            return schema
         schema['type'] = nullable_column('number', col.is_primary_key)
         scale = post_db.numeric_scale(col)
         precision = post_db.numeric_precision(col)
@@ -291,7 +300,7 @@ def schema_for_column_datatype(col):  # noqa: C901
     return schema
 
 
-def schema_for_column(col_info):  # noqa: C901
+def schema_for_column(col_info, decimal_target=None):  # noqa: C901
     """
     Built json schema for the give column
     """
@@ -301,7 +310,7 @@ def schema_for_column(col_info):  # noqa: C901
 
     column_schema = {'type': ["null", "array"]}
     if not col_info.is_array:
-        return schema_for_column_datatype(col_info)
+        return schema_for_column_datatype(col_info, decimal_target)
 
     if col_info.sql_data_type == 'integer[]':
         column_schema['items'] = {'$ref': '#/definitions/sdc_recursive_integer_array'}

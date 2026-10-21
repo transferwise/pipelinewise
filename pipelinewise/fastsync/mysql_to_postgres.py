@@ -11,6 +11,7 @@ from ..logger import Logger
 from .commons import utils
 from .commons.tap_mysql import FastSyncTapMySql
 from .commons.target_postgres import FastSyncTargetPostgres
+from .commons.source_numeric import mysql_decimal_type
 
 LOGGER = Logger().get_logger(__name__)
 
@@ -22,8 +23,10 @@ REQUIRED_CONFIG_KEYS = {
 LOCK = multiprocessing.Lock()
 
 
-def tap_type_to_target_type(mysql_type, mysql_column_type):
+def tap_type_to_target_type(mysql_type, mysql_column_type, *, is_key=False, postgres_version=None):
     """Data type mapping from MySQL to Postgres"""
+    if mysql_type in ('decimal', 'numeric'):
+        return mysql_decimal_type(mysql_column_type, 'postgres', is_key=is_key, postgres_version=postgres_version)
     return {
         'char': 'CHARACTER VARYING',
         'varchar': 'CHARACTER VARYING',
@@ -55,7 +58,6 @@ def tap_type_to_target_type(mysql_type, mysql_column_type):
         'mediumint': 'INTEGER NULL',
         'bigint': 'BIGINT NULL',
         'bit': 'BOOLEAN',
-        'decimal': 'DOUBLE PRECISION',
         'double': 'DOUBLE PRECISION',
         'float': 'DOUBLE PRECISION',
         'bool': 'BOOLEAN',
@@ -65,6 +67,7 @@ def tap_type_to_target_type(mysql_type, mysql_column_type):
         'timestamp': 'TIMESTAMP WITHOUT TIME ZONE',
         'time': 'TIME WITHOUT TIME ZONE',
         'json': 'JSONB',
+        'year': 'SMALLINT NULL',
     }.get(
         mysql_type,
         'CHARACTER VARYING',

@@ -1,3 +1,4 @@
+import os
 from typing import Union
 
 import psycopg2
@@ -98,7 +99,12 @@ def sql_get_columns_postgres(schemas: list) -> str:
     sql_schemas = ', '.join(f"'{schema}'" for schema in schemas)
 
     return f"""
-    SELECT table_name, STRING_AGG(CONCAT(column_name, ':', data_type, ':'), ';' ORDER BY column_name)
+    SELECT table_name,
+           STRING_AGG(
+             CONCAT(column_name, ':', data_type, '::',
+                    CASE WHEN data_type = 'numeric' THEN numeric_precision::text ELSE '' END, ':',
+                    CASE WHEN data_type = 'numeric' THEN numeric_scale::text ELSE '' END),
+             ';' ORDER BY column_name)
      FROM information_schema.columns
     WHERE table_schema IN ({sql_schemas})
     GROUP BY table_name
@@ -122,7 +128,12 @@ def sql_get_columns_snowflake(schemas: list) -> str:
                    )
                  ELSE REPLACE(data_type, 'TEXT', 'VARCHAR')
                END,
-               ':'
+               '::',
+               CASE WHEN data_type IN ('NUMBER', 'NUMERIC', 'DECIMAL')
+                 THEN COALESCE(TO_VARCHAR(numeric_precision), '') ELSE '' END,
+               ':',
+               CASE WHEN data_type IN ('NUMBER', 'NUMERIC', 'DECIMAL')
+                 THEN COALESCE(TO_VARCHAR(numeric_scale), '') ELSE '' END
              ),
              ';'
            )
@@ -131,6 +142,13 @@ def sql_get_columns_snowflake(schemas: list) -> str:
     WHERE table_schema IN ({sql_schemas})
     GROUP BY table_name
     ORDER BY table_name"""
+
+
+def sql_show_columns_snowflake(schema: str, database: str = None) -> str:
+    """Read physical type lengths omitted by INFORMATION_SCHEMA.COLUMNS."""
+    database = database if database is not None else os.environ['TARGET_SNOWFLAKE_DBNAME']
+    identifiers = [name.upper().replace('"', '""') for name in (database, schema)]
+    return 'SHOW COLUMNS IN SCHEMA ' + '.'.join(f'"{name}"' for name in identifiers)
 
 
 def sql_dynamic_row_count_mysql(schemas: list) -> str:

@@ -63,7 +63,8 @@ def test_report_and_runtime_share_native_configuration_query_and_mapping(tap_typ
     metadata = POSTGRES_COLUMNS if tap_type == 'tap-postgres' else MYSQL_COLUMNS
     with mock.patch.object(runtime, 'query', return_value=metadata) as runtime_query, \
             mock.patch.object(runtime, 'get_primary_keys', return_value=['ID']):
-        expected = runtime.map_column_types_to_target('source.records')['columns']
+        expected_mapping = runtime.map_column_types_to_target('source.records')
+    expected = expected_mapping['columns']
     runtime_sql = runtime_query.call_args.args[0]
     runtime_params = runtime_query.call_args.kwargs['params']
 
@@ -75,6 +76,7 @@ def test_report_and_runtime_share_native_configuration_query_and_mapping(tap_typ
             mock.patch.object(source, 'get_primary_keys') as primary_keys:
         actual = report.mapped_source_columns(connection, source, 'source.records')
     assert actual == expected
+    assert actual.binary_lengths == expected_mapping.get('binary_lengths', {})
     assert source.connection_config == runtime.connection_config
     assert config == original_config
     assert source.target_iceberg_version is None
@@ -89,8 +91,9 @@ def test_report_and_runtime_share_native_configuration_query_and_mapping(tap_typ
     else:
         assert source.source_engine == runtime.source_engine
         assert source.uses_mariadb_json_aliases is runtime.uses_mariadb_json_aliases is False
-        assert actual == ['"JSON" VARIANT', '"JSON_ALIAS" VARCHAR(134217728)', '"BINARY" BINARY',
+        assert actual == ['"JSON" VARIANT', '"JSON_ALIAS" VARCHAR(134217728)', '"BINARY" BINARY(67108864)',
                           '"BOOLEAN" BOOLEAN', '"NUMBER" NUMBER']
+        assert actual.binary_lengths == {'BINARY': 32}
         assert 'information_schema.check_constraints' not in runtime_sql
         connection.cursor.assert_called_once_with(pymysql.cursors.DictCursor)
 
