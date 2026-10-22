@@ -2451,28 +2451,7 @@ class PipelineWise:
         target_id = self.args.target
         tap_id = self.args.tap
         targets = self.get_targets()
-        if target_id != '*':
-            targets = [item for item in targets if item.get('id') == target_id]
-            if not targets:
-                self.logger.error('Cannot find %s target in the imported configuration', target_id)
-                raise SystemExit(1)
-
-        matches = [
-            (target['id'], tap)
-            for target in targets
-            for tap in target.get('taps', [])
-            if tap.get('id') == tap_id
-        ]
-        if not matches:
-            self.logger.error('Cannot find %s tap in %s target', tap_id, target_id)
-            raise SystemExit(1)
-        if len(matches) > 1:
-            self.logger.error(
-                'Multiple taps match %s:\n%s\nUse --target <target_id> to select a target.',
-                tap_id, '\n'.join(f'  --tap {tap["id"]} --target {target}' for target, tap in matches),
-            )
-            raise SystemExit(1)
-        target_id, tap = matches[0]
+        tap, target_id = utils.get_tap_target_id(tap_id, target_id, targets)
 
         if tap.get('type') not in {'tap-mysql', 'tap-postgres'}:
             self.logger.error('This command only supports mysql and postgres taps')

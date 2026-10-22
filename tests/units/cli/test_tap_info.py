@@ -95,6 +95,7 @@ class TapInfoTestCase(TestCase):
         ]
         with (
             mock.patch.object(instance, 'get_targets', return_value=targets),
+            mock.patch('pipelinewise.cli.utils.LOGGER') as logger,
             mock.patch('builtins.open') as open_file,
         ):
             with self.assertRaises(SystemExit) as system_exit:
@@ -102,7 +103,7 @@ class TapInfoTestCase(TestCase):
 
         self.assertEqual(system_exit.exception.code, 1)
         open_file.assert_not_called()
-        error_args = instance.logger.error.call_args.args
+        error_args = logger.error.call_args.args
         message = error_args[0] % error_args[1:]
         for target in targets:
             self.assertIn(f'--tap tap_one --target {target["id"]}', message)

@@ -33,6 +33,33 @@ from .errors import InvalidConfigException
 LOGGER = logging.getLogger(__name__)
 
 
+def get_tap_target_id(tap_id, target_id, targets) -> tuple[dict, str]:
+    """Resolve one imported tap and target, rejecting missing or ambiguous matches."""
+    if target_id != '*':
+        targets = [item for item in targets if item.get('id') == target_id]
+        if not targets:
+            LOGGER.error('Cannot find %s target in the imported configuration', target_id)
+            raise SystemExit(1)
+
+    matches = [
+        (target['id'], tap)
+        for target in targets
+        for tap in target.get('taps', [])
+        if tap.get('id') == tap_id
+    ]
+    if not matches:
+        LOGGER.error('Cannot find %s tap in %s target', tap_id, target_id)
+        raise SystemExit(1)
+    if len(matches) > 1:
+        LOGGER.error(
+            'Multiple taps match %s:\n%s\nUse --target <target_id> to select a target.',
+            tap_id, '\n'.join(f'  --tap {tap["id"]} --target {target}' for target, tap in matches),
+        )
+        raise SystemExit(1)
+    target_id, tap = matches[0]
+    return tap, target_id
+
+
 class AnsibleJSONEncoder(json.JSONEncoder):
     """
     Simple encoder class to deal with JSON encoding of Ansible internal types
