@@ -1,5 +1,4 @@
 """Read source table allocation sizes without scanning replicated rows."""
-from contextlib import closing
 from pathlib import Path
 import ssl
 from tempfile import TemporaryDirectory
@@ -71,11 +70,3 @@ def read_source_table_size(cursor, tap_type, schema, table):
     if row is None or (tap_type == 'tap-postgres' and row[1] == 0):
         raise ValueError(f'Cannot read source table size for {schema}.{table}; check source access and catalog')
     return int(row[0]) if row[0] is not None else None
-
-
-def get_source_table_sizes(tap_type, config, tables):
-    """Return sizes keyed by (schema, table), including indexes and descendant partitions."""
-    if not tables:
-        return {}
-    with closing(open_source_connection(tap_type, config)) as connection, connection.cursor() as cursor:
-        return {(schema, table): read_source_table_size(cursor, tap_type, schema, table) for schema, table in tables}
