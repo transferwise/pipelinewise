@@ -1,3 +1,8 @@
+0.97.0 (2026-10-23)
+-------------------
+- Fix Dcocker-compose for dev environment.
+- Add new command `tap_info` to get some information about the taps and selected tables.
+
 0.96.3 (2026-10-14)
 -------------------
 
