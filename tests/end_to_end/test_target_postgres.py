@@ -44,6 +44,10 @@ class TestTargetPostgres:
         self.run_query_target_postgres = self.e2e.run_query_target_postgres
         self.mongodb_con = self.e2e.get_tap_mongodb_connection()
 
+    def teardown_method(self):
+        """Stop the MongoDB client's monitor threads before pytest closes captured streams."""
+        self.mongodb_con.client.close()
+
     @classmethod
     def teardown_class(cls):
         """Delete namespaced tap S3 fixtures after dependent tests finish."""

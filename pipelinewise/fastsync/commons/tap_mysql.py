@@ -5,9 +5,12 @@ import glob
 import logging
 import os
 import re
+import signal
+import threading
 import pymysql
 from singer.logger import log_source_host
 import pymysql.cursors
+from pymysql.constants import ER
 
 from argparse import Namespace
 from typing import Tuple, Dict, Callable
@@ -44,6 +47,70 @@ DEFAULT_SESSION_SQLS = [
 MARIADB_MAX_STATEMENT_TIME_SQL = 'SET @@session.max_statement_time=0'
 MYSQL_MAX_EXECUTION_TIME_SQL = 'SET @@session.max_execution_time=0'
 _REPORTED_SESSION_ENGINE_SELECTIONS = set()
+CANCEL_TIMEOUT_SECONDS = 2
+CANCEL_SIGNALS = (signal.SIGTERM, signal.SIGINT)
+_ACTIVE_MYSQL_SOURCES = set()
+_PREVIOUS_SIGNAL_HANDLERS = {}
+_SIGNAL_HANDLER_OWNER_PID = None
+
+
+def install_mysql_worker_signal_handlers():
+    """Install one per-process handler that cancels active MySQL sources before shutdown."""
+    global _SIGNAL_HANDLER_OWNER_PID
+    current_pid = os.getpid()
+
+    # If the current process is not the owner of the signal handler reset any changed signal handlers
+    if _SIGNAL_HANDLER_OWNER_PID != current_pid:
+        for signum, previous_handler in _PREVIOUS_SIGNAL_HANDLERS.items():
+            if signal.getsignal(signum) == _cancel_active_mysql_sources:
+                signal.signal(signum, previous_handler)
+        _ACTIVE_MYSQL_SOURCES.clear()
+        _PREVIOUS_SIGNAL_HANDLERS.clear()
+        _SIGNAL_HANDLER_OWNER_PID = current_pid
+
+    if threading.current_thread() is not threading.main_thread():
+        LOGGER.warning(
+            'Could not install MySQL cancellation handlers because Python signal handlers can only be '
+            'installed from the main thread. MySQL queries may not be cancelled on termination.'
+        )
+        return
+
+    for signum in CANCEL_SIGNALS:
+        # Skip if the current handler is already our custom cancellation handler or is set to be ignored
+        current_handler = signal.getsignal(signum)
+        if current_handler == _cancel_active_mysql_sources:
+            continue
+        if current_handler == signal.SIG_IGN:
+            _PREVIOUS_SIGNAL_HANDLERS.pop(signum, None)
+            continue
+        _PREVIOUS_SIGNAL_HANDLERS.pop(signum, None)
+        try:
+            signal.signal(signum, _cancel_active_mysql_sources)
+        except ValueError as exc:
+            LOGGER.warning(
+                'Could not install the %s cancellation handler: %s. MySQL queries may not be cancelled on '
+                'termination.',
+                signal.Signals(signum).name,
+                exc,
+            )
+            continue
+        _PREVIOUS_SIGNAL_HANDLERS[signum] = current_handler
+
+
+def _cancel_active_mysql_sources(signum, frame):
+    """Cancel active source sessions, then preserve the process's previous signal behavior."""
+    if os.getpid() == _SIGNAL_HANDLER_OWNER_PID:
+        for source in tuple(_ACTIVE_MYSQL_SOURCES):
+            source._terminating = True
+            source.cancel_running_queries()
+
+    # Restore the previous signal handler and re-raise the signal to allow the process to terminate as expected
+    previous_handler = _PREVIOUS_SIGNAL_HANDLERS.get(signum, signal.SIG_DFL)
+    if callable(previous_handler):
+        previous_handler(signum, frame)
+        return
+    signal.signal(signum, signal.SIG_DFL)
+    os.kill(os.getpid(), signum)
 
 
 def declared_binary_lengths(columns):
@@ -124,6 +191,7 @@ class FastSyncTapMySql:
         self.is_replica = False
         self._mariadb_json_aliases_enabled = False
         self._source_regex_verified = False
+        self._terminating = False
 
     @property
     def is_mariadb(self) -> bool:
@@ -238,6 +306,8 @@ class FastSyncTapMySql:
             ssl={'': True}
         )
         self._source_regex_verified = False
+        install_mysql_worker_signal_handlers()
+        _ACTIVE_MYSQL_SOURCES.add(self)
 
         # Set session variables by running a list of SQLs which is defined
         # in the optional session_sqls connection parameters
@@ -294,6 +364,7 @@ class FastSyncTapMySql:
         )
         self.conn = None
         self.conn_unbuffered = None
+        _ACTIVE_MYSQL_SOURCES.discard(self)
 
         for connection_name, connection in connections:
             if connection is None:
@@ -304,6 +375,35 @@ class FastSyncTapMySql:
                 if not silent:
                     LOGGER.exception(exc)
                     LOGGER.info('%s connection seems to be already closed.', connection_name.capitalize())
+
+    def cancel_running_queries(self):
+        """Kill the server sessions of open connections from a separate short-lived connection."""
+        thread_ids = [
+            connection.thread_id()
+            for connection in (self.conn, self.conn_unbuffered)
+            if connection is not None and connection.open
+        ]
+        if not thread_ids:
+            return
+
+        conn_params, _ = self.get_connection_parameters()
+        try:
+            with pymysql.connect(
+                **conn_params,
+                ssl={'': True},
+                connect_timeout=CANCEL_TIMEOUT_SECONDS,
+                read_timeout=CANCEL_TIMEOUT_SECONDS,
+                write_timeout=CANCEL_TIMEOUT_SECONDS,
+            ) as cancel_conn, cancel_conn.cursor() as cursor:
+                for thread_id in thread_ids:
+                    try:
+                        cursor.execute('KILL CONNECTION %s', (thread_id,))
+                        LOGGER.info('Killed source session %s.', thread_id)
+                    except pymysql.MySQLError as exc:
+                        if not exc.args or exc.args[0] != ER.NO_SUCH_THREAD:
+                            raise
+        except Exception as exc:
+            LOGGER.warning('Could not kill source sessions %s: %s', thread_ids, exc)
 
     def query(self, query, conn=None, params=None, return_as_cursor=False, n_retry=1):
         """
@@ -330,7 +430,7 @@ class FastSyncTapMySql:
                 n_retry,
                 exc,
             )
-            if n_retry > 0:
+            if n_retry > 0 and not self._terminating:
                 LOGGER.info('Reopening the connections.')
                 self.close_connections(silent=True)
                 self.open_connections()
