@@ -26,6 +26,7 @@ from .constants import ConnectorType
 from . import commands
 from .commands import TapParams, TargetParams, TransformParams
 from .config import Config
+from pipelinewise.cli.source_table_metadata import get_source_table_details
 from .fastsync_capabilities import (
     FastSyncOperation,
     resolve_fastsync_capabilities,
@@ -124,12 +125,12 @@ class PipelineWise:
         }
         is_data_diff_command = getattr(args, 'command', None) in data_diff_commands
 
-        if args.tap != '*' and not is_data_diff_command:
+        if args.tap != '*' and not is_data_diff_command and args.command != 'tap_info':
             self.tap = self.get_tap(args.target, args.tap)
             self.tap_bin = self.get_connector_bin(self.tap['type'])
             self.tap_python_bin = self.get_connector_python_bin(self.tap['type'])
 
-        if args.target != '*' and not is_data_diff_command:
+        if args.target != '*' and not is_data_diff_command and args.command != 'tap_info':
             self.target = self.get_target(args.target)
             self.target_bin = self.get_connector_bin(self.target['type'])
             self.target_python_bin = self.get_connector_python_bin(self.target['type'])
@@ -2444,6 +2445,77 @@ class PipelineWise:
         for state_item in state_items_to_update:
             self._update_state_file(state_item[0], state_item[1])
             self.logger.info('state file is reset for log based tables!')
+
+    def tap_info(self):
+        """Print JSON information for an imported tap under the selected target."""
+        target_id = self.args.target
+        tap_id = self.args.tap
+        targets = self.get_targets()
+        tap, target_id = utils.get_tap_target_id(tap_id, target_id, targets)
+
+        if tap.get('type') not in {'tap-mysql', 'tap-postgres'}:
+            self.logger.error('This command only supports mysql and postgres taps')
+            raise SystemExit(1)
+
+        tap_dir = self.get_tap_dir(target_id, tap_id)
+        tap_config_path = os.path.join(tap_dir, 'config.json')
+        with open(tap_config_path, encoding='utf-8') as tap_config_file:
+            tap_config = json.load(tap_config_file)
+
+        with open(os.path.join(tap_dir, 'selection.json'), encoding='utf-8') as selection_file:
+            selection = json.load(selection_file)
+        with open(os.path.join(tap_dir, 'properties.json'), encoding='utf-8') as catalog_file:
+            catalog = json.load(catalog_file)
+        streams = {stream['tap_stream_id'].lower(): stream for stream in catalog['streams']}
+        missing_streams = [
+            item['tap_stream_id'] for item in selection['selection']
+            if item['tap_stream_id'].lower() not in streams
+        ]
+        if missing_streams:
+            self.logger.error(
+                'Selected streams are missing from the catalog for %s: %s. '
+                'Check the source configuration and selection, then run '
+                'pipelinewise discover_tap --tap %s --target %s to refresh the catalog.',
+                tap_id, ', '.join(missing_streams), tap_id, target_id,
+            )
+            raise SystemExit(1)
+
+        selected_tables = {}
+        for item in selection['selection']:
+            stream = streams[item['tap_stream_id'].lower()]
+            table_metadata = next(meta['metadata'] for meta in stream['metadata'] if meta['breadcrumb'] == [])
+            schema_name = table_metadata.get('schema-name') or table_metadata['database-name']
+            selected_tables.setdefault(schema_name, {})[stream['table_name']] = {
+                'replication_method': item.get('replication_method', table_metadata.get('replication-method')),
+            }
+
+        tables = [(schema, table) for schema, entries in selected_tables.items() for table in entries]
+        details = get_source_table_details(tap['type'], tap_config, tables)
+        for (schema, table), metadata in details.items():
+            table_info = selected_tables[schema][table]
+            table_info.update({
+                key: value for key, value in metadata.items() if key not in {'unique_constraints', 'foreign_keys'}
+            })
+            if metadata.get('primary_key') is not None:
+                table_info['primary_key'] = {
+                    field: metadata['primary_key'][field] for field in ['name', 'columns']
+                }
+            if 'indexes' in metadata:
+                table_info['indexes'] = [
+                    {'name': index['name'], 'columns': [column['name'] for column in index['columns']]}
+                    for index in metadata['indexes']
+                ]
+
+        tap_information = {
+            'tap_information': {
+                'tap_id': tap_id,
+                'target_id': target_id,
+                'tap_type': tap['type'],
+                'source_database': tap_config['host'],
+                'selected_tables': selected_tables,
+            }
+        }
+        print(json.dumps(tap_information, indent=4))
 
     def _get_data_from_switchover_file(self):
         new_log_file = None

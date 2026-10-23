@@ -47,6 +47,7 @@ COMMANDS = [
     'list_data_diff_checks',
     'run_data_diff_checks',
     'rerun_data_diff_check',
+    'tap_info'
 ]
 
 
@@ -189,7 +190,16 @@ def _validate_command_specific_arguments(args):
     if args.command == 'copy_native_to_iceberg':
         _validate_iceberg_copy_arguments(args)
 
+    if args.command == 'tap_info':
+        _validate_tap_info(args)
+
     _validate_data_diff_arguments(args)
+
+
+def _validate_tap_info(args):
+    """Require a tap ID for tap information."""
+    if args.tap == '*':
+        raise CommandSpecificArgumentsException('You must specify a source name using the argument --tap')
 
 
 def _validate_iceberg_copy_arguments(args):
