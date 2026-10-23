@@ -26,6 +26,8 @@ services:
       TAP_ORACLE_MYSQL_USER: ${TAP_ORACLE_MYSQL_USER:-pipelinewise}
       TAP_ORACLE_MYSQL_PASSWORD: ${TAP_ORACLE_MYSQL_PASSWORD:-secret}
       TAP_ORACLE_MYSQL_DB: ${TAP_ORACLE_MYSQL_DB:-mysql8_source_db}
+      GODEBUG: "asyncpreempt=0,cgocheck=0"
+      GOMAXPROCS: "1"
     volumes:
       - ../:/opt/pipelinewise
       # don't create container specific .virtualenvs files on host
@@ -159,7 +161,7 @@ services:
       # $$ escapes Compose interpolation so the shell expands it.
       test:
         - CMD-SHELL
-        - mariadb-admin ping -h 127.0.0.1 -u root -p"$$MYSQL_ROOT_PASSWORD" --silent
+        - mariadb-admin ping -h 127.0.0.1 -u root -p"$$MYSQL_ROOT_PASSWORD" --ssl-ca=/etc/my.cnf.d/certificates/ca-cert.pem --silent
       interval: 5s
       timeout: 5s
       retries: 20
@@ -247,7 +249,12 @@ services:
       # which waits on this healthcheck, so checking for a replica set would deadlock.
       test:
         - CMD-SHELL
-        - mongosh --quiet --tls --tlsAllowInvalidCertificates --eval 'db.adminCommand({ping:1}).ok' | grep -q 1
+        - mongosh --quiet --tls 
+          --tlsAllowInvalidCertificates
+          -u "${TAP_MONGODB_ROOT_USER}"
+          -p "${TAP_MONGODB_ROOT_PASSWORD}"
+          --authenticationDatabase admin
+          --eval 'db.adminCommand({ping:1}).ok' | grep -q 1
       interval: 5s
       timeout: 10s
       retries: 20
