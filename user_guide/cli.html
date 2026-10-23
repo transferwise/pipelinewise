@@ -134,6 +134,7 @@
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#inspect-and-test">Inspect and test</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#status"><code class="docutils literal notranslate"><span class="pre">status</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tap-info"><code class="docutils literal notranslate"><span class="pre">tap_info</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#test-tap-connection"><code class="docutils literal notranslate"><span class="pre">test_tap_connection</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#discover-tap"><code class="docutils literal notranslate"><span class="pre">discover_tap</span></code></a></li>
 </ul>
@@ -419,51 +420,55 @@ reconciliation failure; automation must retain that exit status and the run log.
 <td><p>List imported pipelines and last results.</p></td>
 <td><p>No.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">test_tap_connection</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">tap_info</span></code></p></td>
+<td><p>Returns some information about the taps and source tables.</p></td>
+<td><p>No.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">test_tap_connection</span></code></p></td>
 <td><p>Test source connectivity.</p></td>
 <td><p>No target load.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">discover_tap</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">discover_tap</span></code></p></td>
 <td><p>Refresh or inspect source catalog metadata.</p></td>
 <td><p>Runs source discovery.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">run_tap</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">run_tap</span></code></p></td>
 <td><p>Run normal initial and ongoing replication.</p></td>
 <td><p>Loads target data and advances acknowledged state.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">stop_tap</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">stop_tap</span></code></p></td>
 <td><p>Terminate a managed running pipeline.</p></td>
 <td><p>Stops processes; may leave replayable work.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">fast_sync</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fast_sync</span></code></p></td>
 <td><p>FullSync or configured PartialSync selected tables.</p></td>
 <td><p>Rebuilds/merges data and resets bookmarks.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">partial_sync_table</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">partial_sync_table</span></code></p></td>
 <td><p>Repair one bounded source range.</p></td>
 <td><p>Merges target data; can update state.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">copy_native_to_iceberg</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">copy_native_to_iceberg</span></code></p></td>
 <td><p>Build or promote one managed Iceberg v3 copy.</p></td>
 <td><p>Creates companion tables; can rename the live table.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">reset_state</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">reset_state</span></code></p></td>
 <td><p>Move CDC state after a controlled switchover.</p></td>
 <td><p>Changes bookmarks without copying data.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">encrypt_string</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">encrypt_string</span></code></p></td>
 <td><p>Produce an Ansible Vault YAML value.</p></td>
 <td><p>No pipeline state.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">list_data_diff_checks</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">list_data_diff_checks</span></code></p></td>
 <td><p>Inspect persisted data-diff definitions and coverage.</p></td>
 <td><p>No.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">run_data_diff_checks</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">run_data_diff_checks</span></code></p></td>
 <td><p>Run due data-diff checks.</p></td>
 <td><p>Persists attempts and coverage.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">rerun_data_diff_check</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">rerun_data_diff_check</span></code></p></td>
 <td><p>Retry a failed window with its original settings and bounds.</p></td>
 <td><p>Saves a new attempt.</p></td>
 </tr>
@@ -543,6 +548,14 @@ plan a new initial sync before importing that change.</p>
 </div>
 <p>Shows imported tap-target pairs, enabled state, current status, and last run
 result. A successful status row does not prove source-to-target equality.</p>
+</section>
+<section id="tap-info">
+<h3><code class="docutils literal notranslate"><span class="pre">tap_info</span></code><a class="headerlink" href="#tap-info" title="Link to this heading"></a></h3>
+<p>Run <code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">tap_info</span> <span class="pre">--tap</span> <span class="pre">&lt;tap_id&gt;</span></code> to get information about the tap
+and its selected tables, including table sizes, indexes, and primary keys.
+This command is available only for MySQL and PostgreSQL taps.
+Only <code class="docutils literal notranslate"><span class="pre">--tap</span></code> is required. Use <code class="docutils literal notranslate"><span class="pre">--target</span> <span class="pre">&lt;target_id&gt;</span></code> to select a target.
+If the tap ID exists under multiple targets.</p>
 </section>
 <section id="test-tap-connection">
 <span id="cli-test-tap-connection"></span><h3><code class="docutils literal notranslate"><span class="pre">test_tap_connection</span></code><a class="headerlink" href="#test-tap-connection" title="Link to this heading"></a></h3>
