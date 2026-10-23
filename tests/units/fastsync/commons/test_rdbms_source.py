@@ -50,3 +50,19 @@ def test_mysql_source_transformations(iceberg_version):
     assert source.source_transformations is args.transform
     # The route's validated version is passed in; the adapter never reads target config itself.
     assert source.target_iceberg_version == iceberg_version
+
+
+@pytest.mark.parametrize('iceberg_version', [None, 3])
+def test_yugabyte_source_transformations(iceberg_version):
+    """YugabyteDB receives the configured rules before its Snowflake export."""
+    factory = mock.Mock()
+    mapper = mock.Mock()
+    adapter = RdbmsSnowflakeSource.yugabyte(factory, mapper)
+    args = Namespace(tap={'dbname': 'source'}, transform={'transformations': []})
+
+    source = adapter.create(args, iceberg_version)
+
+    factory.assert_called_once_with(args.tap, mapper)
+    assert source.source_transformations is args.transform
+    assert source.target_iceberg_version == iceberg_version
+    assert source.hstore_as_json is (iceberg_version is not None)

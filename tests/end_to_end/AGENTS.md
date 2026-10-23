@@ -48,7 +48,8 @@ run_e2e \
   tests/end_to_end/test_numeric_replication.py::test_postgres_decimal_float_underflow \
   tests/end_to_end/test_postgres_stream_buffer_recovery.py \
   tests/end_to_end/data_diff/test_postgres_to_postgres.py \
-  tests/end_to_end/data_diff/test_mysql_to_postgres.py
+  tests/end_to_end/data_diff/test_mysql_to_postgres.py \
+  tests/end_to_end/data_diff/test_yugabyte_to_postgres.py
 
 run_e2e \
   tests/end_to_end/target_snowflake/test_native_to_iceberg_converter.py \
@@ -61,10 +62,13 @@ run_e2e \
 run_e2e \
   tests/end_to_end/target_snowflake/tap_postgres/test_partial_sync_pg_to_sf.py \
   tests/end_to_end/target_snowflake/tap_postgres/test_multiline_native_pg_to_sf.py \
-  tests/end_to_end/data_diff/test_postgres_to_snowflake.py
+  tests/end_to_end/data_diff/test_postgres_to_snowflake.py \
+  tests/end_to_end/target_snowflake/tap_yugabyte/test_partial_sync_yugabyte_to_sf.py
 
 run_e2e \
   tests/end_to_end/target_snowflake/tap_mariadb/test_partial_sync_mariadb_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_postgres/test_defined_partial_sync_pg_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_yugabyte/test_replicate_yugabyte_to_sf.py \
   tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_with_split_large_files.py \
   tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py::TestIcebergV3MySQLToSnowflake::test_iceberg_replication_preserves_keys_and_supplementary_unicode
 
@@ -95,6 +99,7 @@ run_e2e \
 
 run_e2e \
   'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[postgres-native]' \
+  'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[yugabyte-native]' \
   tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_transformations_are_private_through_publication
 
 run_e2e \
@@ -118,6 +123,7 @@ run_e2e \
 
 run_e2e \
   tests/end_to_end/test_numeric_replication.py::test_postgres_bounded_numeric_key_snowflake \
+  tests/end_to_end/test_numeric_replication.py::test_yugabyte_bounded_numeric_key_snowflake \
   tests/end_to_end/test_numeric_replication.py::test_mysql_bounded_decimal_key_snowflake \
   tests/end_to_end/test_numeric_replication.py::test_mysql_extended_types_snowflake \
   tests/end_to_end/test_numeric_replication.py::test_mysql_legacy_binary_width_partial_sync_snowflake
@@ -210,9 +216,17 @@ MariaDB native CI groups above; the matrix contract enforces exact-once coverage
   `rs.status()` deadlocks startup. Keep container `PATH` literal to prevent host
   Compose interpolation.
 - `entrypoint.sh` explicitly runs `tap_mysql_db.sh`, `tap_oracle_mysql_db.sh`,
-  `tap_postgres_db.sh`, `tap_mongodb.sh`, and `target_postgres.sh`; wire new seed
-  scripts there. Alembic runs only after successful `import_config` persists
-  data-diff definitions.
+  `tap_postgres_db.sh`, `tap_yugabyte_db.sh`, `tap_mongodb.sh`, and
+  `target_postgres.sh`; wire new seed scripts there. Alembic runs only after
+  successful `import_config` persists data-diff definitions.
+- tap-yugabyte reuses tap-postgres's YSQL-compatible schema/row-count helpers in
+  `assertions.py` (`sql_get_columns_postgres`,
+  `sql_dynamic_row_count_postgres`) via its own `run_query_tap_yugabyte` entry in
+  `_map_tap_to_target_functions`; LOG_BASED coverage lives in
+  `test_target_postgres.py::test_replicate_yugabyte_to_pg` alongside
+  `test_replicate_pg_to_pg`, so both share group one's serial fixtures — a DML
+  value inserted by one test (e.g. `city.id = 4080`) must not collide with a
+  fixture the other reuses across reruns.
 - Docker `initdb.d` runs only on empty volumes. Deleting
   `pipelinewise-backend-data` destroys local state; identify it exactly and get
   permission first.

@@ -14,7 +14,7 @@ from uuid import uuid4
 import pytest
 from dotenv import load_dotenv
 
-from pipelinewise.fastsync import mysql_to_snowflake, postgres_to_snowflake
+from pipelinewise.fastsync import mysql_to_snowflake, postgres_to_snowflake, yugabyte_to_snowflake
 from pipelinewise.fastsync.commons.partial_sync_boundary import PartialSyncBoundary
 from pipelinewise.fastsync.commons.snowflake_iceberg_routes import validate_route_config
 from pipelinewise.fastsync.commons.transform_utils import TransformationType
@@ -65,11 +65,15 @@ class _SourceExport:
     table_name: str
 
     @property
+    def postgres_dialect(self):
+        return self.engine in ('postgres', 'yugabyte')
+
+    @property
     def table(self):
         return f'{self.schema}.{self.table_name}'
 
     def quoted(self, value):
-        quote = '"' if self.engine == 'postgres' else '`'
+        quote = '"' if self.postgres_dialect else '`'
         return quote + value.replace(quote, quote * 2) + quote
 
     @property
@@ -86,7 +90,7 @@ class _SourceExport:
             f'{self.quoted(name)} {column_type}'
             for name, column_type in columns
         )
-        suffix = '' if self.engine == 'postgres' else ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
+        suffix = '' if self.postgres_dialect else ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
         self.execute(f'CREATE TABLE {self.quoted_table} ({definitions}){suffix}')
         placeholders = ', '.join('%s' for _ in columns)
         with self.source.conn.cursor() as cursor:
@@ -120,6 +124,7 @@ def source_export(request):
         'postgres': 'TAP_POSTGRES',
         'mysql': 'TAP_ORACLE_MYSQL',
         'mariadb': 'TAP_MYSQL',
+        'yugabyte': 'TAP_YUGABYTE',
     }[engine]
     fields = ('HOST', 'PORT', 'USER', 'PASSWORD', 'DB')
     missing = [f'{prefix}_{field}' for field in fields if not os.environ.get(f'{prefix}_{field}')]
@@ -128,7 +133,7 @@ def source_export(request):
     config = {field.lower(): os.environ[f'{prefix}_{field}'] for field in fields}
     config['dbname'] = config.pop('db')
     config['engine'] = engine
-    route = postgres_to_snowflake if engine == 'postgres' else mysql_to_snowflake
+    route = {'postgres': postgres_to_snowflake, 'yugabyte': yugabyte_to_snowflake}.get(engine, mysql_to_snowflake)
     adapter = route._source_adapter()
     target = (
         {'target_table_format': 'iceberg', 'iceberg_version': 3, 'data_flattening_max_level': 0}
@@ -142,14 +147,14 @@ def source_export(request):
     adapter.open(source)
     fixture = _SourceExport(
         source, adapter, engine, iceberg,
-        'public' if engine == 'postgres' else config['dbname'],
+        'public' if engine in ('postgres', 'yugabyte') else config['dbname'],
         f'ppw_transform_{uuid4().hex[:12]}',
     )
     try:
         yield fixture
     finally:
         try:
-            if engine != 'postgres':
+            if engine not in ('postgres', 'yugabyte'):
                 source.conn_unbuffered.rollback()
             fixture.execute(f'DROP TABLE IF EXISTS {fixture.quoted_table}')
         finally:

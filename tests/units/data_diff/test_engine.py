@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from unittest.mock import MagicMock, Mock, call, patch
 
+import psycopg2
 import pytest
 
 from pipelinewise.data_diff.comparison import (
@@ -18,6 +19,7 @@ from pipelinewise.data_diff.engine import (
     MySQLAdapter,
     PostgresAdapter,
     SnowflakeAdapter,
+    YugabyteAdapter,
     _ordered_results,
     build_metric_query,
     canonical_value,
@@ -1380,3 +1382,241 @@ def test_hidden_leading_index_blocks_a_source_table():
     assert preflight["has_leading_index"] is False
     # Naming it separates "no index" from "an index you disabled".
     assert any("ix_ts" in finding for finding in preflight["findings"])
+
+
+def test_yugabyte_source_is_direct_read_only_utc_and_time_limited():
+    connection, cursor = _connection_with_cursor()
+    check = {"source_type": "tap-yugabyte", "statement_timeout_seconds": 300}
+    config = {
+        "host": "yb-node",
+        "port": 5433,
+        "user": "reader",
+        "password": "secret",
+        "dbname": "payments",
+        "ssl": "true",
+        "load_balance": "true",
+        "topology_keys": "aws.eu-west-1.eu-west-1a",
+    }
+
+    with patch(
+        "pipelinewise.data_diff.engine.psycopg2.connect",
+        return_value=connection,
+    ) as connect:
+        adapter = connect_source(check, config)
+
+    assert isinstance(adapter, YugabyteAdapter)
+    assert connect.call_args.kwargs["host"] == "yb-node"
+    assert connect.call_args.kwargs["port"] == 5433
+    assert connect.call_args.kwargs["sslmode"] == "require"
+    # The main venv's psycopg2-binary rejects the YugabyteDB driver's connection keys.
+    assert "load_balance" not in connect.call_args.kwargs
+    assert "topology_keys" not in connect.call_args.kwargs
+    connection.set_session.assert_called_once_with(readonly=True, autocommit=False)
+    assert cursor.execute.call_args_list == [
+        call("SELECT set_config('TimeZone', 'UTC', true)"),
+        call("SELECT set_config('statement_timeout', %s, true)", ("300s",)),
+    ]
+
+
+BUCKET = "(yb_hash_code(id) % 3)"
+
+
+def _yb_index_row(name, key_columns, key_attnums, key_options, **overrides):
+    """One YugabyteAdapter catalog row; attnum 0 marks an expression key."""
+    return {
+        "index_name": name,
+        "access_method": "lsm",
+        "is_unique": False,
+        "is_partial": False,
+        "is_expression": 0 in key_attnums,
+        "is_valid": True,
+        "is_ready": True,
+        "key_attnums": key_attnums,
+        "key_options": key_options,
+        "key_columns": key_columns,
+        "primary_key": ["id"],
+        **overrides,
+    }
+
+
+def _yugabyte_adapter(rows):
+    cursor = MagicMock()
+    cursor.__enter__ = Mock(return_value=cursor)
+    cursor.__exit__ = Mock(return_value=False)
+    cursor.fetchall.return_value = rows
+    connection = Mock()
+    connection.cursor.return_value = cursor
+    return YugabyteAdapter(connection, statement_timeout_seconds=60), cursor
+
+
+@pytest.mark.parametrize(
+    "row,usable",
+    [
+        # pg_index.indoption per key column: ASC 0, DESC 3, YugabyteDB HASH 4.
+        (_yb_index_row("asc", ["updated_at"], [2], [0]), True),
+        (_yb_index_row("desc", ["updated_at"], [2], [3]), True),
+        (_yb_index_row("hash", ["updated_at"], [2], [4]), False),
+        (_yb_index_row("partial", ["updated_at"], [2], [0], is_partial=True), False),
+        (_yb_index_row("building", ["updated_at"], [2], [0], is_ready=False), False),
+        (_yb_index_row("invalid", ["updated_at"], [2], [0], is_valid=False), False),
+        (_yb_index_row("gin", ["updated_at"], [2], [0], access_method="ybgin"), False),
+        (_yb_index_row("expression", ["lower(note)"], [0], [0]), False),
+    ],
+    ids=lambda value: value.get("index_name") if isinstance(value, dict) else None,
+)
+def test_yugabyte_plain_index_usability(row, usable):
+    adapter, _cursor = _yugabyte_adapter([row])
+
+    index = adapter.indexes("public", "payments")[0]
+
+    assert index["is_usable"] is usable
+    assert index["bucket"] is None
+    assert index["columns"] == row["key_columns"]
+
+
+@pytest.mark.parametrize(
+    "row,usable,bucket",
+    [
+        (
+            _yb_index_row("keyset", [BUCKET, "updated_at", "id"], [0, 2, 1], [0, 0, 0]),
+            True, {"columns": ["id"], "modulus": 3},
+        ),
+        (
+            _yb_index_row(
+                "composite", ["(yb_hash_code(a, b) % 5)", "updated_at", "a", "b"],
+                [0, 3, 1, 2], [0, 0, 0, 0], primary_key=["a", "b"],
+            ),
+            True, {"columns": ["a", "b"], "modulus": 5},
+        ),
+        (
+            _yb_index_row(
+                "quoted", ['(yb_hash_code("Id") % 4)', "Up At", "Id"],
+                [0, 2, 1], [0, 0, 0], primary_key=["Id"],
+            ),
+            True, {"columns": ["Id"], "modulus": 4},
+        ),
+        # A non-key column can be NULL, and NULL % N matches no IN-list value.
+        (
+            _yb_index_row(
+                "hashes_timestamp", ["(yb_hash_code(updated_at) % 3)", "updated_at", "id"],
+                [0, 2, 1], [0, 0, 0],
+            ),
+            False, {"columns": ["updated_at"], "modulus": 3},
+        ),
+        (
+            _yb_index_row("no_primary_key", [BUCKET, "updated_at"], [0, 2], [0, 0], primary_key=[]),
+            False, {"columns": ["id"], "modulus": 3},
+        ),
+        (
+            _yb_index_row("hashed_bucket", [BUCKET, "updated_at", "id"], [0, 2, 1], [4, 0, 0]),
+            False, {"columns": ["id"], "modulus": 3},
+        ),
+        (
+            _yb_index_row("hashed_timestamp", [BUCKET, "updated_at", "id"], [0, 2, 1], [0, 4, 0]),
+            False, {"columns": ["id"], "modulus": 3},
+        ),
+        (
+            _yb_index_row("expression_after_bucket", [BUCKET, "lower(note)"], [0, 0], [0, 0]),
+            False, {"columns": ["id"], "modulus": 3},
+        ),
+        (
+            _yb_index_row("bucket_only", [BUCKET], [0], [0]),
+            False, {"columns": ["id"], "modulus": 3},
+        ),
+        (
+            _yb_index_row("partial_keyset", [BUCKET, "updated_at"], [0, 2], [0, 0], is_partial=True),
+            False, {"columns": ["id"], "modulus": 3},
+        ),
+    ],
+    ids=lambda value: value.get("index_name") if isinstance(value, dict) else None,
+)
+def test_yugabyte_bucket_index_usability(row, usable, bucket):
+    adapter, _cursor = _yugabyte_adapter([row])
+
+    index = adapter.indexes("public", "payments")[0]
+
+    assert index["is_usable"] is usable
+    assert index["bucket"] == bucket
+    # Preflight reads the leading column after the bucket, which `bucket` records.
+    assert index["columns"] == row["key_columns"][1:]
+
+
+@pytest.mark.parametrize("expression", ["(yb_hash_code(id) % 0)", "(yb_hash_code(id) % 3 + 1)", "(id % 3)"])
+def test_yugabyte_unrecognised_leading_expression_is_not_a_bucket(expression):
+    adapter, _cursor = _yugabyte_adapter(
+        [_yb_index_row("other", [expression, "updated_at"], [0, 2], [0, 0])]
+    )
+
+    index = adapter.indexes("public", "payments")[0]
+
+    assert index["is_usable"] is False
+    assert index["bucket"] is None
+    assert index["columns"] == [expression, "updated_at"]
+
+
+def test_yugabyte_bucket_predicate_is_bound_into_the_window_and_minimum_queries():
+    adapter, cursor = _yugabyte_adapter([
+        _yb_index_row(
+            "keyset", ['(yb_hash_code("Id", b) % 3)', "updated_at", "Id", "b"],
+            [0, 3, 1, 2], [0, 0, 0, 0], primary_key=["Id", "b"],
+        )
+    ])
+    predicate = '(yb_hash_code("Id", "b") %% 3) IN (0, 1, 2)'
+
+    sql = build_metric_query(adapter, "public", "payments", "Id", "updated_at", ("row_count",))
+    cursor.fetchone.return_value = (None,)
+    adapter.minimum_timestamp(
+        "public", "payments", _column("updated_at", "timestamp without time zone"),
+        datetime(2026, 7, 22, tzinfo=timezone.utc),
+    )
+
+    assert sql.endswith(f'WHERE "updated_at" >= %s AND "updated_at" < %s AND {predicate}')
+    assert cursor.execute.call_args.args[0].endswith(f'WHERE "updated_at" < %s AND {predicate}')
+    # The catalog is read once per table, however many queries are built.
+    assert cursor.fetchall.call_count == 1
+
+
+@pytest.mark.parametrize(
+    "rows",
+    [
+        [],
+        [_yb_index_row("asc", ["updated_at"], [2], [0])],
+        # A plain timestamp index already serves the scan; leave the query unchanged.
+        [
+            _yb_index_row("asc", ["updated_at"], [2], [0]),
+            _yb_index_row("keyset", [BUCKET, "updated_at", "id"], [0, 2, 1], [0, 0, 0]),
+        ],
+        [_yb_index_row("keyset_on_pk", [BUCKET, "id"], [0, 1], [0, 0])],
+        [_yb_index_row("hashed_bucket", [BUCKET, "updated_at", "id"], [0, 2, 1], [4, 0, 0])],
+    ],
+)
+def test_yugabyte_window_predicate_is_added_only_for_a_leading_bucket_index(rows):
+    adapter, _cursor = _yugabyte_adapter(rows)
+
+    assert adapter.window_predicates("public", "payments", "updated_at") == []
+
+
+def test_yugabyte_bucket_index_passes_preflight_without_counting_rows():
+    adapter, cursor = _yugabyte_adapter(
+        [_yb_index_row("keyset", [BUCKET, "updated_at", "id"], [0, 2, 1], [0, 0, 0])]
+    )
+
+    preflight = preflight_source(adapter, "public", "payments", "updated_at", "SELECT 1", ())
+
+    assert preflight["status"] == "PASS"
+    assert preflight["has_leading_index"] is True
+    assert preflight["table_rows"] is None
+    assert cursor.fetchone.call_count == 0
+
+
+def test_yugabyte_catalog_failure_reaches_preflight_once():
+    # The failed read aborts the transaction, so a re-read would report that instead.
+    adapter, cursor = _yugabyte_adapter([])
+    cursor.execute.side_effect = psycopg2.OperationalError("catalog unavailable")
+
+    sql = build_metric_query(adapter, "public", "payments", "id", "updated_at", ("row_count",))
+    preflight = preflight_source(adapter, "public", "payments", "updated_at", sql, ())
+
+    assert preflight["status"] == "ERROR"
+    assert preflight["error"] == "catalog unavailable"
+    assert cursor.execute.call_count == 1

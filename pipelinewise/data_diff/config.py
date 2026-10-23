@@ -35,6 +35,8 @@ SUPPORTED_ROUTES = {
     ("tap-mysql", "target-snowflake"),
     ("tap-postgres", "target-postgres"),
     ("tap-postgres", "target-snowflake"),
+    ("tap-yugabyte", "target-postgres"),
+    ("tap-yugabyte", "target-snowflake"),
 }
 _DURATION_PART = re.compile(r"(\d+)(s|min|h|d|w)")
 _DURATION_MULTIPLIERS = {
@@ -219,7 +221,7 @@ def extract_check_definitions(
                     route = (source_type, target_type)
                     if route not in SUPPORTED_ROUTES:
                         raise DataDiffConfigError(
-                            "Data diff supports only MySQL/MariaDB or PostgreSQL sources "
+                            "Data diff supports only MySQL/MariaDB, PostgreSQL, or YugabyteDB sources "
                             "with PostgreSQL or Snowflake targets; "
                             f"got {source_type} -> {target_type} "
                             f"for tap '{tap_id}'"

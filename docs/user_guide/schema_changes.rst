@@ -72,7 +72,7 @@ required merely because an old target column remains.
 Decimal mapping
 ---------------
 
-MariaDB/MySQL ``DECIMAL(p,s)`` or ``NUMERIC(p,s)`` and PostgreSQL
+MariaDB/MySQL ``DECIMAL(p,s)`` or ``NUMERIC(p,s)`` and PostgreSQL or YugabyteDB
 ``NUMERIC(p,s)`` or ``DECIMAL(p,s)`` retain their declared precision and scale
 where supported by Snowflake native, Snowflake managed Iceberg v3, and PostgreSQL
 targets. This applies to Singer and supported FullSync/PartialSync routes. New
@@ -82,7 +82,8 @@ Approximate ``FLOAT``, ``DOUBLE``, and ``REAL`` columns keep their existing mapp
 Other sources and destination combinations keep their existing behavior.
 PostgreSQL numeric primary keys use canonical text on Snowflake so a ``NaN``
 key remains representable; other supported decimal columns use the mapping
-below.
+below. YugabyteDB rejects ``NaN`` in decimal columns, so its supported numeric
+primary keys use the fixed-point mapping.
 
 Run ``import_config`` after upgrading to refresh the generated tap configuration
 and catalogs before replication resumes. Decimal values and decimal replication

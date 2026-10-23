@@ -63,12 +63,14 @@ def test_postgres_does_not_inherit_snowflake_limits(precision, scale):
     assert postgres_to_postgres.tap_type_to_target_type('numeric', None, precision, scale) == expected
 
 
-@pytest.mark.parametrize('tap_type', ('tap-mysql', 'tap-postgres', 'tap-salesforce', 'tap-mixpanel', 'tap-snowflake'))
+@pytest.mark.parametrize(
+    'tap_type', ('tap-mysql', 'tap-postgres', 'tap-yugabyte', 'tap-salesforce', 'tap-mixpanel', 'tap-snowflake'),
+)
 @pytest.mark.parametrize('target_type', ('target-snowflake', 'target-postgres', 'target-s3-csv'))
 def test_generated_decimal_mode_is_limited_to_supported_pairs(tap_type, target_type):
     tap = {'type': tap_type, 'db_conn': {'host': 'source', 'decimal_target': 'snowflake'}}
     config = Config.generate_tap_connection_config(tap, {}, target_type)
-    if tap_type in ('tap-mysql', 'tap-postgres') and target_type != 'target-s3-csv':
+    if tap_type in ('tap-mysql', 'tap-postgres', 'tap-yugabyte') and target_type != 'target-s3-csv':
         assert config['decimal_target'] == target_type.removeprefix('target-')
     else:
         assert 'decimal_target' not in config

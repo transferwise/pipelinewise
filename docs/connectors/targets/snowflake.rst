@@ -7,8 +7,9 @@ Snowflake target
 CSV files into native or managed Iceberg v3 tables. It also supports FastSync
 for selected database sources.
 
-MariaDB/MySQL and PostgreSQL source ``DECIMAL`` and ``NUMERIC`` columns retain
-supported precision and scale in new native and managed Iceberg columns.
+MariaDB/MySQL, PostgreSQL, and YugabyteDB source ``DECIMAL`` and ``NUMERIC``
+columns retain supported precision and scale in new native and managed Iceberg
+columns.
 Existing legacy floating-point decimal columns remain unchanged unless
 ``version_legacy_float_columns`` is enabled on the tap. See
 :ref:`exact_decimal_mapping` for compatible numeric declarations, FLOAT

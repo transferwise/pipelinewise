@@ -28,13 +28,14 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
   `ddl_user`/`ddl_password` may equal app credentials. It cannot depend on
   data-diff or replication orchestration; an AST test enforces this.
 - `data_diff/`: may use backend-db, never Singer/FastSync execution. Supports
-  MySQL/MariaDB or PostgreSQL → PostgreSQL/Snowflake. Ownership: `adapters.py`
-  dialects; `engine.py` execution; `repository.py` persistence; `runner.py`
-  scheduling/remediation; `config.py`, `comparison.py`, `coverage.py` their
-  named concerns; `runtime.py` generated connector JSON; `credentials.py`
-  private keys. `import_config` persists definitions only after connector
-  generation/discovery. Add database types at the adapter boundary and AST
-  coverage for new dependency seams.
+  MySQL/MariaDB, PostgreSQL, or YugabyteDB → PostgreSQL/Snowflake; YugabyteDB
+  uses stock psycopg2 in the main venv.
+  Ownership: `adapters.py` dialects; `engine.py` execution; `repository.py`
+  persistence; `runner.py` scheduling/remediation; `config.py`,
+  `comparison.py`, `coverage.py` their named concerns; `runtime.py` generated
+  connector JSON; `credentials.py` private keys. `import_config` persists
+  definitions only after connector generation/discovery. Add database types at
+  the adapter boundary and AST coverage for new dependency seams.
 
 ## Backend schema
 
