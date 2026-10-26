@@ -933,16 +933,35 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         terminate.assert_called_once_with(os.getpid(), pipelinewise_module.STOP_TAP_CHILD_TIMEOUT_SECONDS)
         assert os.path.isfile(ppw.tap['files']['pidfile'])
 
-    @pytest.mark.parametrize('records_this_process', [True, False])
-    def test_owner_removes_pidfile_only_while_it_records_this_process(self, tmp_path, records_this_process):
+    def test_owner_keeps_pidfile_until_shutdown_output_is_written(self, tmp_path):
         ppw = _pipelinewise_with_pidfile(tmp_path)
-        _write_pidfile(ppw, os.getpid() if records_this_process else os.getpid() + 1)
+        pidfile_path = ppw.tap['files']['pidfile']
+        pidfile_present = []
 
+        def stop_on_first_line(line):
+            if line == 'started\n':
+                ppw.stop_tap(signal.SIGTERM, None)
+            pidfile_present.append(os.path.isfile(pidfile_path))
+            return line
+
+        script = tmp_path / 'tap.py'
+        script.write_text(
+            'import time\n'
+            'print("started", flush=True)\n'
+            'time.sleep(0.2)\n'
+            'print(\'{"type": "STATE", "value": {}}\', flush=True)\n',
+            encoding='utf-8',
+        )
         with patch.object(ppw, '_terminate_process_tree') as terminate, pytest.raises(SystemExit):
-            ppw.stop_tap(signal.SIGTERM, None)
+            with pidfile.PIDFile(pidfile_path):
+                pipelinewise_module.commands.run_command(
+                    f'{sys.executable} "{script}"', str(tmp_path / 'tap.log'), stop_on_first_line
+                )
 
         terminate.assert_called_once_with(os.getpid(), pipelinewise_module.STOP_TAP_TIMEOUT_SECONDS)
-        assert os.path.isfile(ppw.tap['files']['pidfile']) is not records_this_process
+        # Only the shutdown STATE line reaches the append; the first line exits inside stop_tap.
+        assert pidfile_present == [True]
+        assert not os.path.isfile(pidfile_path)
 
     def test_command_signals_the_recorded_tap_process(self, tmp_path):
         ppw = _pipelinewise_with_pidfile(tmp_path)
@@ -1007,7 +1026,7 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         with _recorded_tap_is_running(False), \
                 patch.object(pipelinewise_module.psutil.Process, 'terminate') as terminate, \
                 patch.object(pipelinewise_module.psutil.Process, 'kill') as kill, \
-                pytest.raises(SystemExit) as exc:
+                pytest.raises(SystemExit):
             ppw.stop_tap()
 
         terminate.assert_not_called()
