@@ -64,6 +64,10 @@ MYSQL_BINLOG_DISCONNECT_CONTROL_PREFIX = 'PIPELINEWISE_CONTROL:'
 MYSQL_BINLOG_DISCONNECT_RETRY_DELAYS_SECONDS = (30, 60)
 MYSQL_BINLOG_DISCONNECT_MAX_ATTEMPTS = len(MYSQL_BINLOG_DISCONNECT_RETRY_DELAYS_SECONDS) + 1
 MYSQL_BINLOG_RETRY_PENDING_ENV = 'PIPELINEWISE_MYSQL_BINLOG_RETRY_PENDING'
+# Forked sync processes stop their own children first, then drain the children's output into the run log.
+STOP_TAP_CHILD_TIMEOUT_SECONDS = 10
+STOP_TAP_TIMEOUT_SECONDS = STOP_TAP_CHILD_TIMEOUT_SECONDS + commands.SHUTDOWN_OUTPUT_DRAIN_SECONDS + 5
+STOP_TAP_COMMAND_TIMEOUT_SECONDS = STOP_TAP_TIMEOUT_SECONDS + 5
 
 
 def _persist_singer_state(path: str, state: str) -> None:
@@ -143,6 +147,7 @@ class PipelineWise:
         )
         self.tap_run_log_file = None
         self.force_fast_sync = True
+        self._owner_pid = os.getpid()
 
         # Catch SIGINT and SIGTERM to exit gracefully
         if not is_data_diff_command:
@@ -1415,47 +1420,17 @@ class PipelineWise:
         """
         Stop running tap
 
-        The command finds the tap specific pidfile that was created by run_tap command and sends
-        a SIGTERM to the process.
+        The stop_tap command sends SIGTERM to the PipelineWise process recorded in the tap pidfile. As a
+        signal handler, it stops this process's children, marks its run log terminated and exits.
         """
+        if sig is None:
+            self._signal_tap_from_pidfile()
+
         self.logger.info('Trying to stop tap gracefully...')
-
-        pid = os.getpid()
-        pid_from_file = None
-        pidfile_path = self.tap['files']['pidfile']
-        try:
-            with open(pidfile_path, encoding='utf-8') as pid_file:
-                pid_from_file = int(pid_file.read())
-
-            pgid = os.getpgid(pid)
-            parent = psutil.Process(pid)
-
-            for child in parent.children(recursive=True):
-                if os.getpgid(child.pid) == pgid:
-                    self.logger.info('Sending SIGTERM to child pid %s...', child.pid)
-                    try:
-                        child.terminate()
-                        try:
-                            child.wait(timeout=5)
-                        except psutil.TimeoutExpired:
-                            child.kill()
-                    except psutil.NoSuchProcess:
-                        pass
-
-        except ProcessLookupError:
-            if os.getpgid(pid) != pid_from_file:
-                self.logger.error(
-                    'Pid %s not found. Is the tap running on this machine? '
-                    'Stopping taps remotely is not supported.',
-                    pid,
-                )
-                sys.exit(1)
-
-        except FileNotFoundError:
-            self.logger.error(
-                'No pidfile found at %s. Tap does not seem to be running.', pidfile_path
-            )
-            sys.exit(1)
+        is_owner = os.getpid() == self._owner_pid
+        self._terminate_process_tree(
+            os.getpid(), STOP_TAP_TIMEOUT_SECONDS if is_owner else STOP_TAP_CHILD_TIMEOUT_SECONDS
+        )
 
         if self.tap_run_log_file:
             tap_run_log_file_running = f'{self.tap_run_log_file}.running'
@@ -1464,13 +1439,90 @@ class PipelineWise:
             if os.path.isfile(tap_run_log_file_running):
                 os.rename(tap_run_log_file_running, tap_run_log_file_terminated)
 
-        # Remove pidfile.
-        try:
-            os.remove(pidfile_path)
-        except Exception:
-            pass
+        if is_owner:
+            self._remove_own_pidfile()
 
         sys.exit(1)
+
+    def _signal_tap_from_pidfile(self) -> None:
+        """Send SIGTERM to the tap process in the pidfile; return only if that process is this one."""
+        pidfile_path = self.tap['files']['pidfile']
+        try:
+            with open(pidfile_path, encoding='utf-8') as pid_file:
+                pid = int(pid_file.read())
+        except FileNotFoundError:
+            self.logger.error(
+                'No pidfile found at %s. Tap does not seem to be running.', pidfile_path
+            )
+            sys.exit(1)
+
+        if pid == os.getpid():
+            return
+
+        if not pidfile.PIDFile(pidfile_path).is_running:
+            self.logger.error(
+                'Pid %s not found. Is the tap running on this machine? '
+                'Stopping taps remotely is not supported.',
+                pid,
+            )
+            sys.exit(1)
+
+        self.logger.info('Sending SIGTERM to tap pid %s...', pid)
+        try:
+            tap_process = psutil.Process(pid)
+            tap_process.terminate()
+            tap_process.wait(timeout=STOP_TAP_COMMAND_TIMEOUT_SECONDS)
+        except psutil.NoSuchProcess:
+            pass
+        except psutil.TimeoutExpired:
+            self.logger.warning(
+                'Tap pid %s did not stop in %s seconds. Killing its process tree.',
+                pid,
+                STOP_TAP_COMMAND_TIMEOUT_SECONDS,
+            )
+            self._terminate_process_tree(pid, 0)
+            try:
+                tap_process.kill()
+            except psutil.NoSuchProcess:
+                pass
+        sys.exit(1)
+
+    def _terminate_process_tree(self, root_pid: int, timeout: float) -> None:
+        """Send SIGTERM to the root's descendants in its process group, then SIGKILL survivors after timeout."""
+        try:
+            pgid = os.getpgid(root_pid)
+            descendants = psutil.Process(root_pid).children(recursive=True)
+        except (ProcessLookupError, psutil.NoSuchProcess):
+            return
+
+        signalled = []
+        for child in descendants:
+            try:
+                if os.getpgid(child.pid) != pgid:
+                    continue
+                self.logger.info('Sending SIGTERM to child pid %s...', child.pid)
+                child.terminate()
+            except (ProcessLookupError, psutil.NoSuchProcess):
+                continue
+            signalled.append(child)
+
+        _, alive = psutil.wait_procs(signalled, timeout=timeout)
+        for child in alive:
+            self.logger.warning('Child pid %s did not stop in %s seconds. Sending SIGKILL.', child.pid, timeout)
+            try:
+                child.kill()
+            except psutil.NoSuchProcess:
+                pass
+
+    def _remove_own_pidfile(self) -> None:
+        """Remove the tap pidfile only while it still records this process."""
+        pidfile_path = self.tap['files']['pidfile']
+        try:
+            with open(pidfile_path, encoding='utf-8') as pid_file:
+                if int(pid_file.read()) == os.getpid():
+                    os.remove(pidfile_path)
+        except (OSError, ValueError):
+            pass
 
     def fast_sync(self):
         """Entry point for the fast_sync CLI command."""
