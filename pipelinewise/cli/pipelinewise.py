@@ -1420,7 +1420,8 @@ class PipelineWise:
         Stop running tap
 
         The stop_tap command sends SIGTERM to the PipelineWise process recorded in the tap pidfile. As a
-        signal handler, it stops this process's children, marks its run log terminated and exits.
+        signal handler, it stops this process's children, marks its run log terminated and exits. The run's
+        PIDFile context removes the pidfile only after shutdown output and state have been written.
         """
         if sig is None:
             self._signal_tap_from_pidfile()
@@ -1437,9 +1438,6 @@ class PipelineWise:
 
             if os.path.isfile(tap_run_log_file_running):
                 os.rename(tap_run_log_file_running, tap_run_log_file_terminated)
-
-        if is_owner:
-            self._remove_own_pidfile()
 
         sys.exit(1)
 
@@ -1512,16 +1510,6 @@ class PipelineWise:
                 child.kill()
             except psutil.NoSuchProcess:
                 pass
-
-    def _remove_own_pidfile(self) -> None:
-        """Remove the tap pidfile only while it still records this process."""
-        pidfile_path = self.tap['files']['pidfile']
-        try:
-            with open(pidfile_path, encoding='utf-8') as pid_file:
-                if int(pid_file.read()) == os.getpid():
-                    os.remove(pidfile_path)
-        except (OSError, ValueError):
-            pass
 
     def fast_sync(self):
         """Entry point for the fast_sync CLI command."""
