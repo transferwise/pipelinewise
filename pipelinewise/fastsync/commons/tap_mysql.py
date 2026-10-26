@@ -113,6 +113,16 @@ def _cancel_active_mysql_sources(signum, frame):
     os.kill(os.getpid(), signum)
 
 
+def _exit_on_signal(signum, frame):
+    raise SystemExit(128 + signum)
+
+
+def install_mysql_sync_signal_handlers():
+    """Make SIGTERM unwind the FastSync process so its worker pool is terminated."""
+    if signal.getsignal(signal.SIGTERM) == signal.SIG_DFL:
+        signal.signal(signal.SIGTERM, _exit_on_signal)
+
+
 def declared_binary_lengths(columns):
     """Return declared MySQL BINARY and VARBINARY byte lengths keyed by uppercase column name."""
     lengths = {}
