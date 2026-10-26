@@ -8,6 +8,7 @@ from datetime import datetime
 
 from pipelinewise.fastsync.commons.tap_mysql import (
     FastSyncTapMySql,
+    install_mysql_sync_signal_handlers,
     install_mysql_worker_signal_handlers,
 )
 from pipelinewise.fastsync.commons.target_snowflake import FastSyncTargetSnowflake
@@ -106,6 +107,7 @@ def main_impl():
 
 def main():
     """Main entry point"""
+    install_mysql_sync_signal_handlers()
     try:
         main_impl()
     except Exception as exc:

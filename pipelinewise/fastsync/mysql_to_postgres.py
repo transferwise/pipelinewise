@@ -9,7 +9,11 @@ from typing import Union
 from datetime import datetime
 from ..logger import Logger
 from .commons import utils
-from .commons.tap_mysql import FastSyncTapMySql, install_mysql_worker_signal_handlers
+from .commons.tap_mysql import (
+    FastSyncTapMySql,
+    install_mysql_sync_signal_handlers,
+    install_mysql_worker_signal_handlers,
+)
 from .commons.target_postgres import FastSyncTargetPostgres
 from .commons.source_numeric import mysql_decimal_type
 
@@ -210,6 +214,7 @@ def main_impl():
 
 def main():
     """Main entry point"""
+    install_mysql_sync_signal_handlers()
     try:
         main_impl()
     except Exception as exc:

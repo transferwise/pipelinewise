@@ -398,8 +398,9 @@ class PartialSyncTestCase(TestCase):
         for file_part in expected_file_parts:
             self.assertIn(file_part, actual_file_parts)
 
+    @mock.patch('pipelinewise.fastsync.partialsync.mysql_to_snowflake.install_mysql_sync_signal_handlers')
     @mock.patch('pipelinewise.fastsync.partialsync.mysql_to_snowflake.multiprocessing.Pool')
-    def test_running_partial_sync_mysql_to_snowflake(self, mocked_pool):
+    def test_running_partial_sync_mysql_to_snowflake(self, mocked_pool, mocked_install_handlers):
         """Test the whole partial_sync_mysql_to_snowflake module works as expected"""
         test_table = {}
         expected_args = None
@@ -468,6 +469,7 @@ class PartialSyncTestCase(TestCase):
                         mocked_pool.call_args.kwargs['initializer'],
                         install_mysql_worker_signal_handlers,
                     )
+                    mocked_install_handlers.assert_called_with()
 
                     expected_log_messages = [
                         [
