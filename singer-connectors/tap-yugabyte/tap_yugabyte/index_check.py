@@ -25,7 +25,7 @@ OK, ACTION, BLOCK = 'OK', 'ACTION', 'BLOCK'
 
 # PipelineWise's own default for tap-yugabyte tables that name no method
 # (pipelinewise/cli/tap_properties.py); the tap YAML has no key to override it.
-DEFAULT_REPLICATION_METHOD = 'FULL_TABLE'
+DEFAULT_REPLICATION_METHOD = 'LOG_BASED'
 
 
 def _repair_ddl(schema_name, found, create_statement):

@@ -33,6 +33,7 @@ tables must be discovered automatically. Discovery reads
 ``information_schema``, which is privilege-filtered: a table the user cannot
 read is silently absent from the catalog rather than reported as an error.
 
+Tables without ``replication_method`` use LOG_BASED, as with tap-postgres.
 LOG_BASED replication also requires:
 
 - port ``5433``, the YSQL default (see the warning below);
@@ -51,8 +52,8 @@ LOG_BASED replication also requires:
    2.9.3.5.post1, ignore the configured ``port`` on replication connections
    and always connect to 5433. PipelineWise rejects LOG_BASED tables on any
    other port when it loads the configuration, and the tap stops before it
-   reads any data. If the cluster is reachable only on another port, use
-   FULL_TABLE or INCREMENTAL.
+   reads any data. If the cluster is reachable only on another port, set
+   FULL_TABLE or INCREMENTAL on every table.
 
 The following grants are enough for every replication method, FastSync, and
 data-diff. Run the first block as a superuser and the second as the owner of
@@ -69,9 +70,9 @@ each source schema:
    ALTER DEFAULT PRIVILEGES FOR ROLE <owner> IN SCHEMA <schema>
    GRANT SELECT ON TABLES TO pipelinewise;
 
-Omit ``REPLICATION`` and the ``yb_read_time`` grant when no table uses
-LOG_BASED. The user does not need superuser, object ownership, or write
-privileges. Revoke the ``yb_read_time`` grant before dropping the role.
+Omit ``REPLICATION`` and the ``yb_read_time`` grant only when every table sets
+FULL_TABLE or INCREMENTAL. The user does not need superuser, object
+ownership, or write privileges. Revoke the ``yb_read_time`` grant before dropping the role.
 
 .. warning::
 
@@ -290,7 +291,7 @@ It prints ``OK``, ``ACTION`` (with the exact ``CREATE UNIQUE INDEX`` to run) or
 ``BLOCK`` per table, and exits non-zero unless every table is ``OK``. It reads
 ``keyset_buckets`` and ``limit`` from the YAML's ``db_conn``. ``--buckets`` and
 ``--limit`` override them. A table without ``replication_method`` is checked as
-``FULL_TABLE``, the PipelineWise default for this tap.
+``LOG_BASED``, the PipelineWise default for this tap.
 
 
 Replication behaviour

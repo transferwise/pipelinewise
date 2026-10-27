@@ -201,11 +201,14 @@ class TestConfig:
             schemas=[{'source_schema': 'public', 'target_schema': 'public', 'tables': [table]}],
         )
 
-    @pytest.mark.parametrize('port', [15436, '15436', 5432])
-    def test_yugabyte_log_based_rejects_ports_the_driver_ignores(self, port):
-        """LOG_BASED would otherwise fail after FastSync, when the driver connects to 5433 instead."""
+    @pytest.mark.parametrize(
+        'port, replication_method',
+        [(15436, 'LOG_BASED'), ('15436', 'LOG_BASED'), (5432, 'LOG_BASED'), (15436, None)],
+    )
+    def test_yugabyte_log_based_rejects_ports_the_driver_ignores(self, port, replication_method):
+        """LOG_BASED, explicit or the default, would otherwise fail after FastSync on the driver's 5433."""
         with pytest.raises(InvalidConfigException) as error:
-            Config.validate_yugabyte_log_based_port(self._yugabyte_tap(port, 'LOG_BASED'))
+            Config.validate_yugabyte_log_based_port(self._yugabyte_tap(port, replication_method))
 
         message = str(error.value)
         assert f'public.orders on port {port}' in message
@@ -218,12 +221,11 @@ class TestConfig:
             ('5433', 'LOG_BASED', 'tap-yugabyte'),
             (15436, 'FULL_TABLE', 'tap-yugabyte'),
             (15436, 'INCREMENTAL', 'tap-yugabyte'),
-            (15436, None, 'tap-yugabyte'),
             (15436, 'LOG_BASED', 'tap-postgres'),
         ],
     )
     def test_yugabyte_log_based_port_check_allows_unaffected_configs(self, port, replication_method, tap_type):
-        """Port 5433, non-LOG_BASED tables, the FULL_TABLE default, and other taps are unaffected."""
+        """Port 5433, explicit non-LOG_BASED tables, and other taps are unaffected."""
         Config.validate_yugabyte_log_based_port(self._yugabyte_tap(port, replication_method, tap_type))
 
     def test_from_yamls_rejects_yugabyte_log_based_on_unsupported_port(self, tmp_path):

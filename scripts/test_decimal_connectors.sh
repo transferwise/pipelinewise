@@ -15,6 +15,7 @@ case "${1:-}" in
     postgres)
         run_decimal_tests tap-mysql tests/integration/test_decimal_mapping.py
         run_decimal_tests tap-postgres tests/integration/test_decimal_mapping.py
+        run_decimal_tests tap-yugabyte tests/integration/test_decimal_mapping.py
         run_decimal_tests target-postgres tests/integration/test_decimals.py
         ;;
     snowflake)

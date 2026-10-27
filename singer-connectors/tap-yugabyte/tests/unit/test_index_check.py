@@ -70,11 +70,11 @@ def stub_key_checks(monkeypatch):
 
 
 class TestRouting:
-    def test_a_table_without_a_method_is_checked_as_full_table(self, monkeypatch):
-        # PipelineWise defaults tap-yugabyte tables to FULL_TABLE; reporting them
+    def test_a_table_without_a_method_is_checked_as_log_based(self, monkeypatch):
+        # PipelineWise defaults tap-yugabyte tables to LOG_BASED; reporting them
         # as an unknown method blocked every table that relied on the default
         seen = []
-        monkeypatch.setattr(index_check, 'check_full_table',
+        monkeypatch.setattr(index_check, 'check_log_based',
                             lambda cur, s, t, b: seen.append(t) or (OK, [], []))
         assert index_check.check_table(None, 's', {'table_name': 't'}, 3)[0] == OK
         assert seen == ['t']
@@ -284,7 +284,7 @@ class TestMain:
                          'schemas:\n  - source_schema: s\n    tables:\n      - table_name: t\n', cur)
         out = capsys.readouterr().out
         assert code == 0
-        assert 'OK     s.t  [FULL_TABLE]' in out
+        assert 'OK     s.t  [LOG_BASED]' in out
         assert 'All DDL' not in out
         assert 'Worst status: OK' in out
 
