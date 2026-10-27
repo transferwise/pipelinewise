@@ -1,4 +1,4 @@
-0.97.0 (2026-10-18)
+0.98.0 (2026-10-27)
 -------------------
 
 **tap-yugabyte**
@@ -131,6 +131,11 @@
 - Document that `LOG_BASED` does not replicate `TRUNCATE` or primary-key
   changes. Resync the table after either. See
   [Replication behaviour](docs/connectors/taps/yugabyte.rst#replication-behaviour)
+
+0.97.0 (2026-10-23)
+-------------------
+- Fix Dcocker-compose for dev environment.
+- Add new command `tap_info` to get some information about the taps and selected tables.
 
 0.96.3 (2026-10-14)
 -------------------

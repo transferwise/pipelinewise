@@ -31,6 +31,9 @@ Command summary
    * - ``status``
      - List imported pipelines and last results.
      - No.
+   * - ``tap_info``
+     - Returns some information about the taps and source tables.
+     - No.
    * - ``test_tap_connection``
      - Test source connectivity.
      - No target load.
@@ -159,6 +162,16 @@ Inspect and test
 
 Shows imported tap-target pairs, enabled state, current status, and last run
 result. A successful status row does not prove source-to-target equality.
+
+
+``tap_info``
+''''''''''''
+
+Run ``pipelinewise tap_info --tap <tap_id>`` to get information about the tap
+and its selected tables, including table sizes, indexes, and primary keys.
+This command is available only for MySQL and PostgreSQL taps.
+Only ``--tap`` is required. Use ``--target <target_id>`` to select a target.
+If the tap ID exists under multiple targets.
 
 
 .. _cli_test_tap_connection:
