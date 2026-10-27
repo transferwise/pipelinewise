@@ -427,7 +427,8 @@ Some readings are low or missing:
 Set ``table_mb`` to the largest table you are willing to resync, with
 headroom. Expect a table to read up to twice its export size just after a
 large load. To see the figure the check uses, run
-``SELECT pg_table_size('schema.table') + pg_indexes_size('schema.table')``.
+``pipelinewise tap_info --tap <tap_id>`` and read each table's ``size_bytes``.
+It is ``null`` for colocated tables and views.
 For a partitioned table, add up the results for its partitions.
 
 

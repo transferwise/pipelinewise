@@ -2472,8 +2472,8 @@ class PipelineWise:
         targets = self.get_targets()
         tap, target_id = utils.get_tap_target_id(tap_id, target_id, targets)
 
-        if tap.get('type') not in {'tap-mysql', 'tap-postgres'}:
-            self.logger.error('This command only supports mysql and postgres taps')
+        if tap.get('type') not in {'tap-mysql', 'tap-postgres', 'tap-yugabyte'}:
+            self.logger.error('This command only supports mysql, postgres and yugabyte taps')
             raise SystemExit(1)
 
         tap_dir = self.get_tap_dir(target_id, tap_id)

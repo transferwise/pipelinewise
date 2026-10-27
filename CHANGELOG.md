@@ -43,6 +43,9 @@
 - Add the `tap-yugabyte-index-check` command. It checks a tap YAML against the
   source and prints `OK`, `ACTION` with the exact DDL to run, or `BLOCK` for
   each table. It reads `keyset_buckets` and `limit` from `db_conn`
+- Support `pipelinewise tap_info` for YugabyteDB taps. Colocated tables
+  report `size_bytes` as `null`. See
+  [resync size limit](docs/connectors/taps/yugabyte.rst#resync-size-limit)
 - Accept a keyset index on its single shared tablet in a colocated database.
   The index DDL for colocated tables has no `SPLIT AT VALUES`, which
   YugabyteDB rejects there

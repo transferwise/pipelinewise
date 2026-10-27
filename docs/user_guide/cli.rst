@@ -169,9 +169,13 @@ result. A successful status row does not prove source-to-target equality.
 
 Run ``pipelinewise tap_info --tap <tap_id>`` to get information about the tap
 and its selected tables, including table sizes, indexes, and primary keys.
-This command is available only for MySQL and PostgreSQL taps.
-Only ``--tap`` is required. Use ``--target <target_id>`` to select a target.
-If the tap ID exists under multiple targets.
+This command is available only for MySQL, PostgreSQL, and YugabyteDB taps.
+Only ``--tap`` is required. If the tap ID exists under multiple targets, use
+``--target <target_id>`` to select one.
+
+``size_bytes`` is ``null`` for views and foreign tables. For YugabyteDB it is
+also ``null`` for colocated tables. YugabyteDB measures size differently from
+PostgreSQL; see :ref:`YugabyteDB resync size limit <yugabyte_resync_size_limit>`.
 
 
 .. _cli_test_tap_connection:
