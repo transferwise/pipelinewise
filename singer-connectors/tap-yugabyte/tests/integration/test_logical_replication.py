@@ -198,8 +198,8 @@ class TestUnselectedTableSlotAdvancement(unittest.TestCase):
 
 class TestIdleRunAndSlotAcknowledgement(unittest.TestCase):
     """YugabyteDB never streams pg_logical_emit_message, so an idle run ends at the idle timeout and keeps
-    its bookmark. The slot moves once a run acknowledges a streamed commit from its input state; the
-    bootstrap boundary is not a streamed commit, so acknowledging it leaves the slot in place."""
+    its bookmark. A run acknowledges two below the streamed commit in its input state, so the slot trails
+    the target by one transaction and the bootstrap boundary leaves it in place."""
 
     maxDiff = None
     table_name = 'lr_idle_ack_table'
@@ -261,8 +261,40 @@ class TestIdleRunAndSlotAcknowledgement(unittest.TestCase):
             with conn.cursor() as cur:
                 insert_record(cur, self.table_name, {'id': 2, 'val': 'second-commit'})
 
+        # The slot is acknowledged two below the bookmark, so the last acknowledged transaction replays once.
+        state, messages = _capture_singer_messages(tap_yugabyte.do_sync, conn_config, catalog, 'LOG_BASED', state)
+        self.assertEqual([1, 2], [m['record']['id'] for m in messages if m['type'] == 'RECORD'])
+        second_lsn = state['bookmarks'][tap_stream_id]['lsn']
+        self.assertGreater(second_lsn, committed_lsn)
+        self.assertGreater(committed_lsn, baseline_confirmed_flush_lsn)
+        offset = logical_replication.SLOT_FEEDBACK_LSN_OFFSET
+        self.assertLessEqual(self._confirmed_flush_lsn(slot_name), committed_lsn - offset)
+
         state, messages = _capture_singer_messages(tap_yugabyte.do_sync, conn_config, catalog, 'LOG_BASED', state)
         self.assertEqual([2], [m['record']['id'] for m in messages if m['type'] == 'RECORD'])
-        self.assertGreater(state['bookmarks'][tap_stream_id]['lsn'], committed_lsn)
-        self.assertGreater(committed_lsn, baseline_confirmed_flush_lsn)
-        self.assertEqual(committed_lsn, self._confirmed_flush_lsn(slot_name))
+        self.assertEqual(second_lsn, state['bookmarks'][tap_stream_id]['lsn'])
+        confirmed_flush_lsn = self._confirmed_flush_lsn(slot_name)
+        self.assertGreater(confirmed_flush_lsn, baseline_confirmed_flush_lsn)
+        self.assertLessEqual(confirmed_flush_lsn, second_lsn - offset)
+
+
+class TestReplicaIdentityNothing(unittest.TestCase):
+    """REPLICA IDENTITY NOTHING streams no updates, so a LOG_BASED sync stops before reading the slot."""
+
+    table_name = 'lr_identity_nothing_table'
+
+    def setUp(self):
+        ensure_test_table({'name': self.table_name, 'columns': [{'name': 'id', 'type': 'integer', 'primary_key': True}]})
+        self.addCleanup(drop_table, self.table_name)
+        with get_test_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(f'ALTER TABLE {self.table_name} REPLICA IDENTITY NOTHING')
+
+    def test_log_based_sync_rejects_replica_identity_nothing(self):
+        conn_config = get_test_connection_config()
+        conn_config['tap_id'] = 'tap_identity_nothing_test'
+        stream = _discover_stream(conn_config, self.table_name)
+        set_replication_method_for_stream(stream, 'LOG_BASED')
+
+        with self.assertRaisesRegex(Exception, f'REPLICA IDENTITY NOTHING: public.{self.table_name}'):
+            tap_yugabyte.do_sync(conn_config, {'streams': [stream]}, 'LOG_BASED', {})

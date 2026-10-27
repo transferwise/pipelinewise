@@ -10,6 +10,8 @@ from unittest.mock import patch
 
 from tap_yugabyte.sync_strategies import logical_replication
 
+SLOT_OFFSET = logical_replication.SLOT_FEEDBACK_LSN_OFFSET
+
 
 class TestInterruptedTransaction(unittest.TestCase):
     """Exercise real row consumption with a mocked replication connection."""
@@ -77,7 +79,7 @@ class TestInterruptedTransaction(unittest.TestCase):
                     return None
                 if check_feedback_boundary:
                     for call in cursor.send_feedback.call_args_list:
-                        self.assertLessEqual(call.kwargs['flush_lsn'], 100)
+                        self.assertLessEqual(call.kwargs['flush_lsn'], 100 - SLOT_OFFSET)
                     clock.now.return_value += timedelta(seconds=logical_replication.FEEDBACK_POLL_INTERVAL)
                 msg = next(pending)
                 payload = json.loads(msg.payload)
@@ -116,9 +118,9 @@ class TestInterruptedTransaction(unittest.TestCase):
         self.assertTrue(feedback)
         flush_limit = expected_flush_lsn if expected_flush_lsn is not None else acknowledged_lsn or 100
         for call in feedback:
-            self.assertLessEqual(call.kwargs['flush_lsn'], flush_limit)
+            self.assertLessEqual(call.kwargs['flush_lsn'], flush_limit - SLOT_OFFSET)
         if acknowledged_lsn is not None:
-            self.assertEqual(flush_limit, feedback[-1].kwargs['flush_lsn'])
+            self.assertEqual(flush_limit - SLOT_OFFSET, feedback[-1].kwargs['flush_lsn'])
         for checkpoint in checkpoints:
             self.assertEqual(expected_lsn, checkpoint['bookmarks']['public-items']['lsn'])
         self.assertEqual(expected_lsn, state['bookmarks']['public-items']['lsn'])

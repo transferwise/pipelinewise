@@ -40,10 +40,12 @@ LOG_BASED replication also requires:
 - the `wal2json <https://github.com/eulerto/wal2json>`_ output plugin, which
   ships pre-packaged with YugabyteDB;
 - the ``REPLICATION`` role attribute, to create, consume, and drop the
-  replication slot; and
+  replication slot;
 - ``SET`` on the ``yb_read_time`` parameter. The initial snapshot pins this
   setting to the slot's start point. Without it, the first sync fails with
-  ``permission denied to set parameter "yb_read_time"``.
+  ``permission denied to set parameter "yb_read_time"``; and
+- a replica identity other than ``NOTHING`` on every table. PostgreSQL targets
+  need ``DEFAULT`` or ``FULL``. See :ref:`yugabyte_replica_identity`.
 
 .. warning::
 
@@ -314,13 +316,54 @@ reads current data instead. An interrupted bootstrap resumes from a ``bootstrap_
 rather than an ``xmin`` sentinel. Views and materialized views are rejected
 for ``LOG_BASED``.
 
-``LOG_BASED`` does not replicate ``TRUNCATE``. An update that changes a primary
-key adds a row under the new key, and the row under the old key stays in the
-target. After either change, resync the table:
+An update that changes a primary key streams as a delete of the old key and an
+insert of the new key. The target removes the row under the old key.
+
+``LOG_BASED`` does not replicate ``TRUNCATE``. After a ``TRUNCATE``, resync the
+table:
 
 .. code-block:: bash
 
    pipelinewise fast_sync --tap <tap_id> --target <target_id> --tables <schema.table>
+
+A filtered ``fast_sync`` like this one also repairs a damaged target table. It
+keeps the slot and exports the table as it was at the slot's restart point. It
+saves that point as the table's bookmark. The next run replays every later
+change, including deletes and key changes, so the target ends up matching the
+source. The export reads history at the restart point. YugabyteDB keeps that
+history while the slot exists, even past
+``timestamp_history_retention_interval_sec``. A slot that nothing consumes for
+``cdc_intent_retention_ms`` (default eight hours) expires. Then run the
+unfiltered ``fast_sync`` to create a new slot.
+
+.. _yugabyte_replica_identity:
+
+Replica identity
+''''''''''''''''
+
+A table's replica identity decides what YugabyteDB streams for an update.
+YugabyteDB fixes it for each table when the replication slot is created.
+
+.. list-table::
+   :header-rows: 1
+
+   * - Replica identity
+     - What an update streams
+   * - ``CHANGE`` (YugabyteDB default)
+     - The primary key and the changed columns only.
+   * - ``DEFAULT`` or ``FULL``
+     - The whole new row.
+   * - ``NOTHING``
+     - Nothing. Deletes also lose their key values, so the tap refuses to start.
+
+Snowflake targets keep the current value of every column an update leaves out.
+PostgreSQL targets write ``NULL`` into those columns. For a PostgreSQL target,
+set ``REPLICA IDENTITY DEFAULT`` or ``FULL`` on every ``LOG_BASED`` table before
+the first ``fast_sync``.
+
+Changing the replica identity of a replicated table has no effect until the slot
+is recreated. Stop replication, run ``ALTER TABLE <schema.table> REPLICA
+IDENTITY DEFAULT``, then run the unfiltered ``fast_sync``.
 
 
 .. _yugabyte_resync_size_limit:
@@ -395,6 +438,14 @@ Consuming WAL does not by itself advance the slot's safe flush position.
 PipelineWise sends feedback only up to the minimum target-acknowledged LSN
 stored in ``state.json``. Missing, unreadable, invalid, or regressing state
 retains the previous safe LSN.
+
+The feedback is two below that LSN. A bookmark is a transaction's commit record
+LSN, and YugabyteDB can give the next transaction that same LSN. Feedback at the
+bookmark itself would confirm that next transaction before the target has it.
+The lower feedback confirms only earlier transactions. YugabyteDB also confirms
+the position a run starts streaming from, so each run starts from the same lower
+LSN. After a restart, the last acknowledged transaction replays, and the target
+applies it again by primary key.
 
 YugabyteDB does not stream ``pg_logical_emit_message`` records, so an idle
 source sends nothing that can end a run. A run stops after

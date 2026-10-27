@@ -47,6 +47,7 @@ run_e2e \
   tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_postgres \
   tests/end_to_end/test_numeric_replication.py::test_postgres_decimal_float_underflow \
   tests/end_to_end/test_postgres_stream_buffer_recovery.py \
+  tests/end_to_end/test_yugabyte_recovery.py \
   tests/end_to_end/data_diff/test_postgres_to_postgres.py \
   tests/end_to_end/data_diff/test_mysql_to_postgres.py \
   tests/end_to_end/data_diff/test_yugabyte_to_postgres.py
@@ -63,7 +64,8 @@ run_e2e \
   tests/end_to_end/target_snowflake/tap_postgres/test_partial_sync_pg_to_sf.py \
   tests/end_to_end/target_snowflake/tap_postgres/test_multiline_native_pg_to_sf.py \
   tests/end_to_end/data_diff/test_postgres_to_snowflake.py \
-  tests/end_to_end/target_snowflake/tap_yugabyte/test_partial_sync_yugabyte_to_sf.py
+  tests/end_to_end/target_snowflake/tap_yugabyte/test_partial_sync_yugabyte_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_yugabyte/test_partial_sync_repair_yugabyte_to_sf.py
 
 run_e2e \
   tests/end_to_end/target_snowflake/tap_mariadb/test_partial_sync_mariadb_to_sf.py \
@@ -226,7 +228,9 @@ MariaDB native CI groups above; the matrix contract enforces exact-once coverage
   `test_target_postgres.py::test_replicate_yugabyte_to_pg` alongside
   `test_replicate_pg_to_pg`, so both share group one's serial fixtures — a DML
   value inserted by one test (e.g. `city.id = 4080`) must not collide with a
-  fixture the other reuses across reruns.
+  fixture the other reuses across reruns. `test_yugabyte_recovery.py` and
+  `test_partial_sync_repair_yugabyte_to_sf.py` use their own taps and slots;
+  teardown waits out YugabyteDB's active-slot window before dropping them.
 - Docker `initdb.d` runs only on empty volumes. Deleting
   `pipelinewise-backend-data` destroys local state; identify it exactly and get
   permission first.

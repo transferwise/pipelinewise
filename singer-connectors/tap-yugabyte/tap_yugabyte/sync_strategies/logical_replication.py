@@ -25,6 +25,9 @@ LOGGER = singer.get_logger('tap_yugabyte')
 
 UPDATE_BOOKMARK_PERIOD = 10000
 FEEDBACK_POLL_INTERVAL = 10
+# The next transaction's HybridTime can equal a COMMIT LSN (commit HT + 1), so a feedback or START_REPLICATION position
+# at or one below it can skip that transaction; two below replays one acknowledged transaction instead.
+SLOT_FEEDBACK_LSN_OFFSET = 2
 FALLBACK_DATETIME = '9999-12-31T23:59:59.999+00:00'
 FALLBACK_DATE = '9999-12-31T00:00:00+00:00'
 # psycopg2-yugabytedb 2.9.3.5 and 2.9.3.5.post1 replace the configured port with 5433 on replication connections.
@@ -676,6 +679,19 @@ def _write_lsn_state(state, logical_streams, lsn):
     return state
 
 
+def _slot_lsn(acknowledged_lsn):
+    """Return the slot position that confirms only transactions committed before the target-acknowledged LSN."""
+    return max(acknowledged_lsn - SLOT_FEEDBACK_LSN_OFFSET, 0)
+
+
+def _send_slot_feedback(cur, acknowledged_lsn):
+    """Confirm to the slot only transactions committed before the target-acknowledged LSN."""
+    slot_lsn = _slot_lsn(acknowledged_lsn)
+    LOGGER.info('Confirming write up to %s, flush to %s (target acknowledged %s)',
+                slot_lsn, slot_lsn, acknowledged_lsn)
+    cur.send_feedback(write_lsn=slot_lsn, flush_lsn=slot_lsn, reply=True, force=True)
+
+
 def wal2json_options(logical_streams, conn_info):
     """Build wal2json options; decimal routes need typmods and exact numeric text."""
     decimal_target = conn_info.get('decimal_target')
@@ -699,7 +715,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):  # noqa
         stream['tap_stream_id']: get_bookmark(state, stream['tap_stream_id'], 'lsn')
         for stream in logical_streams
     }
-    start_lsn = target_acknowledged_lsn
+    start_lsn = _slot_lsn(target_acknowledged_lsn)
     lsn_to_flush = None
     time_extracted = utils.now()
     slot = locate_replication_slot(conn_info)
@@ -793,8 +809,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):  # noqa
                     lsn_to_flush = target_acknowledged_lsn
                     if lsn_currently_processing < lsn_to_flush:
                         lsn_to_flush = lsn_currently_processing
-                    LOGGER.info('Confirming write up to %s, flush to %s', lsn_to_flush, lsn_to_flush)
-                    cur.send_feedback(write_lsn=lsn_to_flush, flush_lsn=lsn_to_flush, reply=True, force=True)
+                    _send_slot_feedback(cur, lsn_to_flush)
 
                 elif int(msg.data_start) > lsn_currently_processing:
                     lsn_currently_processing = msg.data_start
@@ -829,8 +844,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):  # noqa
                     )
                     if target_lsn_is_complete and target_acknowledged_lsn > lsn_to_flush:
                         lsn_to_flush = target_acknowledged_lsn
-                        LOGGER.info('Confirming write up to %s, flush to %s', lsn_to_flush, lsn_to_flush)
-                        cur.send_feedback(write_lsn=lsn_to_flush, flush_lsn=lsn_to_flush, reply=True, force=True)
+                        _send_slot_feedback(cur, lsn_to_flush)
 
                 poll_timestamp = datetime.datetime.now(datetime.UTC)
 

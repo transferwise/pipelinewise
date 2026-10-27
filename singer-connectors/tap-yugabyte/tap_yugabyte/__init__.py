@@ -101,6 +101,36 @@ def do_sync_incremental(conn_config, stream, state, desired_columns, md_map):
     return state
 
 
+def ensure_log_based_replica_identity(conn_config, streams, default_replication_method):
+    """Reject LOG_BASED tables whose replica identity is NOTHING.
+
+    YugabyteDB then streams no updates and deletes without key values, so the target can never apply them.
+    """
+    tables = []
+    for stream in streams:
+        stream_md = metadata.to_map(stream['metadata']).get((), {})
+        if stream_md.get('replication-method', default_replication_method) == 'LOG_BASED' \
+                and not stream_md.get('is-view'):
+            tables.append((stream_md.get('schema-name'), stream['table_name']))
+    if not tables:
+        return
+
+    with post_db.open_connection(conn_config) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                'SELECT n.nspname, c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace '
+                "WHERE c.relreplident = 'n' AND (n.nspname, c.relname) IN %s ORDER BY 1, 2",
+                (tuple(tables),),
+            )
+            blocked = [f'{schema_name}.{table_name}' for schema_name, table_name in cur.fetchall()]
+    if blocked:
+        raise Exception(
+            f'LOG_BASED replication cannot use REPLICA IDENTITY NOTHING: {", ".join(blocked)}. '
+            'Set REPLICA IDENTITY DEFAULT, FULL or CHANGE, then rerun the unfiltered fast_sync '
+            'so the replication slot is recreated with the new identity.'
+        )
+
+
 def sync_method_for_streams(streams, state, default_replication_method):
     """
     Determines the replication method of each stream
@@ -277,6 +307,7 @@ def do_sync(conn_config, catalog, default_replication_method, state, state_file=
     LOGGER.info("Selected streams: %s ", [s['tap_stream_id'] for s in streams])
     if any_logical_streams(streams, default_replication_method):
         logical_replication.ensure_replication_port(conn_config)
+        ensure_log_based_replica_identity(conn_config, streams, default_replication_method)
         # Use of logical replication requires fetching an lsn
         end_lsn = logical_replication.fetch_current_lsn(conn_config)
         LOGGER.debug("end_lsn = %s ", end_lsn)

@@ -19,6 +19,17 @@
 - Advance LOG_BASED checkpoints and WAL flush eligibility only after consuming commit
   records; retain starting checkpoints when no commit is consumed and never regress
   checkpoints below a newer target acknowledgement
+- Acknowledge the replication slot, and start each run, two below the target's
+  bookmark. YugabyteDB can give a transaction the same LSN as the previous
+  commit record, so acknowledging or starting at the bookmark itself could skip
+  that transaction after a restart. The last acknowledged transaction now
+  replays once instead
+- Refuse to start LOG_BASED on a table with `REPLICA IDENTITY NOTHING`, which
+  streams no updates
+- Set `REPLICA IDENTITY DEFAULT` or `FULL` on LOG_BASED tables that load into
+  PostgreSQL. With YugabyteDB's default `CHANGE`, PostgreSQL targets write
+  `NULL` into the columns an update leaves out. See
+  [replica identity](docs/connectors/taps/yugabyte.rst#replica-identity)
 - Add FULL_TABLE replication, resuming an interrupted sync with parameterized
   primary-key keyset pagination instead of Postgres heap-specific `xmin`,
   since YugabyteDB's DocDB storage has no equivalent

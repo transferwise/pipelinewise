@@ -1106,7 +1106,7 @@ class TestLogicalReplication(unittest.TestCase):
         mocked_start_replication.assert_called_with(
             slot_name=rep_slot,
             decode=True,
-            start_lsn=state['bookmarks']['foo-bar']['lsn'],
+            start_lsn=state['bookmarks']['foo-bar']['lsn'] - logical_replication.SLOT_FEEDBACK_LSN_OFFSET,
             status_interval=10,
             options={
                 'format-version': '2',
@@ -1144,7 +1144,7 @@ class TestLogicalReplication(unittest.TestCase):
         mocked_start_replication.assert_called_with(
             slot_name=rep_slot,
             decode=True,
-            start_lsn=state['bookmarks']['foo-bar']['lsn'],
+            start_lsn=state['bookmarks']['foo-bar']['lsn'] - logical_replication.SLOT_FEEDBACK_LSN_OFFSET,
             status_interval=10,
             options={
                 'format-version': '2',
@@ -1250,9 +1250,8 @@ class TestLogicalReplication(unittest.TestCase):
 
         self.assertEqual(state, actual_output)
         mocked_send_feedback = mocked_connect.return_value.cursor.return_value.send_feedback
-        mocked_send_feedback.assert_called_with(write_lsn=test_message.data_start,
-                                                flush_lsn=test_message.data_start,
-                                                reply=True, force=True)
+        slot_lsn = test_message.data_start - logical_replication.SLOT_FEEDBACK_LSN_OFFSET
+        mocked_send_feedback.assert_called_with(write_lsn=slot_lsn, flush_lsn=slot_lsn, reply=True, force=True)
 
 
 class TestLogicalReplicationFeedback(unittest.TestCase):
@@ -1307,10 +1306,11 @@ class TestLogicalReplicationFeedback(unittest.TestCase):
         return state
 
     @staticmethod
-    def _expected_feedback(*lsns):
+    def _expected_feedback(*acknowledged_lsns):
         return [
-            call(write_lsn=lsn, flush_lsn=lsn, reply=True, force=True)
-            for lsn in lsns
+            call(write_lsn=lsn - logical_replication.SLOT_FEEDBACK_LSN_OFFSET,
+                 flush_lsn=lsn - logical_replication.SLOT_FEEDBACK_LSN_OFFSET, reply=True, force=True)
+            for lsn in acknowledged_lsns
         ]
 
     def test_minimum_acknowledged_lsn_uses_oldest_stream(self):
@@ -1427,6 +1427,43 @@ class TestLogicalReplicationFeedback(unittest.TestCase):
 
         self.assertIs(error, termination)
         self.assertEqual(self._expected_feedback(100, 125, 150), feedback)
+
+    def test_feedback_stays_below_a_next_transaction_at_the_acknowledged_commit_lsn(self):
+        """YugabyteDB can give the next transaction the HybridTime equal to the previous COMMIT LSN."""
+        state = self._state({'foo-bar': 100})
+        state_reader = mock_open(read_data=json.dumps(self._state({'foo-bar': 201})))
+        messages = [
+            self._message('B', 200),
+            self._message('I', 200),
+            self._message('C', 201),
+            self._message('B', 201),
+            self._message('I', 201),
+            self._message('C', 202),
+        ]
+
+        feedback, error, termination, _ = self._run_sync(state, messages, state_reader)
+
+        self.assertIs(error, termination)
+        self.assertEqual(self._expected_feedback(100, 201), feedback)
+        # The slot replays from the first commit above ack + 1, so 199 keeps the transaction at 201.
+        self.assertEqual(199, feedback[-1].kwargs['flush_lsn'])
+
+    def test_replication_starts_below_the_acknowledged_commit_lsn(self):
+        """YugabyteDB confirms the START_REPLICATION position like feedback, so it takes the same offset."""
+        state = self._state({'foo-bar': 201})
+
+        with patch('tap_yugabyte.sync_strategies.logical_replication.FEEDBACK_POLL_INTERVAL', 0), \
+                patch('tap_yugabyte.sync_strategies.logical_replication.sync_common.send_schema_message'), \
+                patch('tap_yugabyte.sync_strategies.logical_replication.singer.write_message'), \
+                patch('tap_yugabyte.sync_strategies.logical_replication.locate_replication_slot',
+                      return_value='replication_slot'), \
+                patch('psycopg2.connect') as mocked_connect:
+            cursor = mocked_connect.return_value.cursor.return_value
+            cursor.read_message.side_effect = RuntimeError('stop after starting replication')
+            with self.assertRaisesRegex(RuntimeError, 'stop after starting replication'):
+                logical_replication.sync_tables(self.conn_info, self.logical_streams, state, 1000, 'state.json')
+
+        self.assertEqual(199, cursor.start_replication.call_args.kwargs['start_lsn'])
 
     def test_feedback_remains_monotonic_when_target_state_regresses(self):
         state = self._state({'foo-bar': 100})

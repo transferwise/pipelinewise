@@ -232,6 +232,58 @@ class TestLogicalReplicationPort(unittest.TestCase):
         ensure_replication_port.assert_not_called()
 
 
+class TestLogBasedReplicaIdentity(unittest.TestCase):
+    """REPLICA IDENTITY NOTHING streams no updates, so LOG_BASED must stop before streaming"""
+
+    @staticmethod
+    def _stream(table_name, replication_method, is_view=False):
+        return {
+            'tap_stream_id': f'public-{table_name}',
+            'table_name': table_name,
+            'schema': {'properties': {'id': {}}},
+            'metadata': [{'breadcrumb': [], 'metadata': {
+                'selected': True, 'replication-method': replication_method,
+                'schema-name': 'public', 'is-view': is_view}}],
+        }
+
+    def _check(self, streams, blocked_rows):
+        with patch('tap_yugabyte.post_db.open_connection') as open_connection:
+            cur = open_connection.return_value.__enter__.return_value.cursor.return_value.__enter__.return_value
+            cur.fetchall.return_value = blocked_rows
+            tap_yugabyte.ensure_log_based_replica_identity({'dbname': 'db'}, streams, 'FULL_TABLE')
+        return open_connection, cur
+
+    def test_rejects_log_based_tables_with_replica_identity_nothing(self):
+        streams = [self._stream('a', 'LOG_BASED'), self._stream('b', 'LOG_BASED')]
+
+        with self.assertRaisesRegex(Exception, r'REPLICA IDENTITY NOTHING: public\.b\. .*unfiltered fast_sync'):
+            self._check(streams, [('public', 'b')])
+
+    def test_checks_only_log_based_tables(self):
+        streams = [self._stream('a', 'LOG_BASED'), self._stream('full', 'FULL_TABLE'),
+                   self._stream('view', 'LOG_BASED', is_view=True)]
+
+        _, cur = self._check(streams, [])
+
+        self.assertEqual(((('public', 'a'),),), cur.execute.call_args.args[1])
+
+    def test_skips_the_query_without_log_based_tables(self):
+        open_connection, _ = self._check([self._stream('full', 'FULL_TABLE')], [])
+
+        open_connection.assert_not_called()
+
+    def test_do_sync_rejects_replica_identity_nothing_before_fetching_lsn(self):
+        catalog = {'streams': [self._stream('a', 'LOG_BASED')]}
+        with patch('tap_yugabyte.post_db.open_connection') as open_connection, \
+                patch('tap_yugabyte.logical_replication.fetch_current_lsn') as fetch_current_lsn:
+            cur = open_connection.return_value.__enter__.return_value.cursor.return_value.__enter__.return_value
+            cur.fetchall.return_value = [('public', 'a')]
+            with self.assertRaisesRegex(Exception, 'REPLICA IDENTITY NOTHING'):
+                tap_yugabyte.do_sync({'port': 5433, 'dbname': 'db'}, catalog, 'FULL_TABLE', {'bookmarks': {}})
+
+        fetch_current_lsn.assert_not_called()
+
+
 class TestSyncLogicalStreamsBookmarks(unittest.TestCase):
     """sync_logical_streams prunes only deselected LOG_BASED bookmarks before streaming"""
 

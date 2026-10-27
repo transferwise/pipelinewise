@@ -264,6 +264,7 @@ def test_snowflake_e2e_matrix_contract():
                 'tests/end_to_end/target_snowflake/tap_postgres/test_multiline_native_pg_to_sf.py',
                 'tests/end_to_end/data_diff/test_postgres_to_snowflake.py',
                 'tests/end_to_end/target_snowflake/tap_yugabyte/test_partial_sync_yugabyte_to_sf.py',
+                'tests/end_to_end/target_snowflake/tap_yugabyte/test_partial_sync_repair_yugabyte_to_sf.py',
             ),
         ),
         'mariadb-partial': (

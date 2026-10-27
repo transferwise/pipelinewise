@@ -88,6 +88,7 @@ jobs:
           tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_postgres \
           tests/end_to_end/test_numeric_replication.py::test_postgres_decimal_float_underflow \
           tests/end_to_end/test_postgres_stream_buffer_recovery.py \
+          tests/end_to_end/test_yugabyte_recovery.py \
           tests/end_to_end/data_diff/test_postgres_to_postgres.py \
           tests/end_to_end/data_diff/test_mysql_to_postgres.py \
           tests/end_to_end/data_diff/test_yugabyte_to_postgres.py \
@@ -122,6 +123,7 @@ jobs:
               tests/end_to_end/target_snowflake/tap_postgres/test_multiline_native_pg_to_sf.py
               tests/end_to_end/data_diff/test_postgres_to_snowflake.py
               tests/end_to_end/target_snowflake/tap_yugabyte/test_partial_sync_yugabyte_to_sf.py
+              tests/end_to_end/target_snowflake/tap_yugabyte/test_partial_sync_repair_yugabyte_to_sf.py
           - shard: mariadb-partial
             check_name: e2e_tests_05
             test_paths: >-
