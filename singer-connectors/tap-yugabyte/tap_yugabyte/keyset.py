@@ -623,10 +623,10 @@ def pin_snapshot(conn, hybrid_time, security_definer_proc=None):
     """Pin this connection to a hybrid-time snapshot so every worker reads the
     same instant.
 
-    `yb_read_time` is superuser-only and is rejected inside an explicit
-    transaction block, so it is issued as its own statement with autocommit on.
-    A least-privilege tap user instead calls a SECURITY DEFINER procedure, which
-    is the pattern YugabyteDB documents for this case. The session is read-only
+    `yb_read_time` needs superuser or `SET` on the parameter and is rejected
+    inside an explicit transaction block, so it is issued as its own statement
+    with autocommit on. A SECURITY DEFINER procedure is the alternative when the
+    grant is not available. The session is read-only
     for as long as it stays pinned.
     """
     if hybrid_time is None:
@@ -734,7 +734,7 @@ def replication_key_warnings(candidate, pk_columns, sequence_cache_minval=None):
 
     Neither is fixed by a tiebreaker. A tiebreaker only makes the ordering
     total, which matters for deterministic paging; it does not make key order
-    agree with commit order. That needs either a lag window, or LOG_BASED.
+    agree with commit order. Only LOG_BASED does; the tap has no lag window.
     """
     warnings = []
     if candidate['tiebreaker_required']:
@@ -756,15 +756,14 @@ def replication_key_warnings(candidate, pk_columns, sequence_cache_minval=None):
             f'{cache} values per connection, so commit order does not follow id '
             f'order. Rows committed after the bookmark can carry ids far below '
             f'it and be missed permanently. Use LOG_BASED, or lower '
-            f'ysql_sequence_cache_minval, or carry a lag window of at least '
-            f'{cache} x (concurrent writers).'
+            f'ysql_sequence_cache_minval.'
         )
     if candidate['kind'] == 'created_timestamp':
         warnings.append(
             f"{candidate['column']} records transaction start time, so a long "
             f'transaction commits rows stamped earlier than an advanced '
-            f'bookmark. Carry a lag window wider than the longest write '
-            f'transaction, or use LOG_BASED.'
+            f'bookmark, and the tap has no lag window to reread them. Use '
+            f'LOG_BASED.'
         )
     return warnings
 
@@ -1166,15 +1165,13 @@ def require_monotonic_key(cur, schema_name, table_name, column, pk_columns=()):
             risks.append(
                 f'{column} draws from {sequence_name}, which caches {cache} values '
                 f'per connection. Commit order does not follow key order across '
-                f'{cache} x (concurrent writers). Lower the cache, carry a lag '
-                f'window at least that wide, or use LOG_BASED.'
+                f'{cache} x (concurrent writers). Lower the cache, or use LOG_BASED.'
             )
     elif data_type.startswith(('timestamp', 'date', 'time')):
         risks.append(
             f'{column} is a timestamp, so it records transaction start time. A long '
             f'write transaction commits rows stamped before an already-advanced '
-            f'bookmark. Carry a lag window wider than the longest write transaction, '
-            f'or use LOG_BASED.'
+            f'bookmark, and the tap has no lag window to reread them. Use LOG_BASED.'
         )
         if _name_rank(column.lower(), _MODIFIED_NAME_HINTS) is not None:
             triggers = _has_update_trigger(cur, schema_name, table_name)

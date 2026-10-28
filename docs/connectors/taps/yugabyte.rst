@@ -19,13 +19,20 @@ wire protocol.
      - Experimental
      - FullSync to PostgreSQL or Snowflake; PartialSync to Snowflake
 
+.. note::
+
+   YugabyteDB does not support managed Iceberg targets yet.
+
+LOG_BASED works only with PostgreSQL and Snowflake native targets. Only
+FastSync creates the replication slot, and other targets, such as S3 CSV, have
+no YugabyteDB FastSync route. PipelineWise rejects LOG_BASED tables on those
+targets. Use FULL_TABLE or INCREMENTAL there.
+
 
 Prerequisites
 -------------
 
-YSQL speaks the PostgreSQL wire protocol on port **5433**, not 5432. Pointing the
-tap at 5432 usually reaches a co-located PostgreSQL instance instead of the
-cluster.
+YSQL speaks the PostgreSQL wire protocol on port **5433**, not 5432.
 
 The runtime user needs ``CONNECT`` on the database, ``USAGE`` on each source
 schema, and ``SELECT`` on replicated tables. Grant default privileges if future
@@ -41,9 +48,9 @@ LOG_BASED replication also requires:
   ships pre-packaged with YugabyteDB;
 - the ``REPLICATION`` role attribute, to create, consume, and drop the
   replication slot;
-- ``SET`` on the ``yb_read_time`` parameter. The initial snapshot pins this
-  setting to the slot's start point. Without it, the first sync fails with
-  ``permission denied to set parameter "yb_read_time"``; and
+- ``SET`` on the ``yb_read_time`` parameter. FastSync uses it to pin the
+  initial snapshot to the slot's start point. Without it, the first sync fails
+  with ``permission denied to set parameter "yb_read_time"``; and
 - a replica identity other than ``NOTHING`` on every table. PostgreSQL targets
   need ``DEFAULT`` or ``FULL``. See :ref:`yugabyte_replica_identity`.
 
@@ -74,7 +81,7 @@ each source schema:
 
 Omit ``REPLICATION`` and the ``yb_read_time`` grant only when every table sets
 FULL_TABLE or INCREMENTAL. The user does not need superuser, object
-ownership, or write privileges. Revoke the ``yb_read_time`` grant before dropping the role.
+ownership, or write privileges.
 
 .. warning::
 
@@ -83,11 +90,14 @@ ownership, or write privileges. Revoke the ``yb_read_time`` grant before droppin
    ``SELECT``. The tap discards unselected tables only after receiving them.
    Replicate from a database that holds only data the pipeline may read.
 
-FastSync owns the replication slot's full lifecycle: it creates a
-``wal2json`` slot with LSN type ``HYBRID_TIME`` on first sync and drops it
-when the tap is removed, retrying a transient "slot is active" error for up
-to five minutes to tolerate YugabyteDB's post-disconnect active-slot window.
-Slot names follow ``pipelinewise_<dbname>_<tap_id>``.
+Only FastSync creates the replication slot. It creates a ``wal2json`` slot
+with LSN type ``HYBRID_TIME`` on the first sync. Slot names follow
+``pipelinewise_<dbname>_<tap_id>``.
+
+PipelineWise drops the slot when the tap's configuration is removed. By default,
+YugabyteDB reports a slot as active for five minutes after its last consumer
+disconnects. PipelineWise retries a "slot is active" error for up to five and a
+half minutes to wait out that window.
 
 FastSync and the tap fail if the slot's plugin is not ``wal2json`` or its
 ``yb_lsn_type`` is not ``HYBRID_TIME``. A slot created without the
@@ -205,7 +215,7 @@ opened for this tap, including FastSync FullSync/PartialSync bulk exports and
 LOG_BASED streaming, since both connect through YugabyteDB's
 native-load-balancing psycopg2 driver.
 
-Three features run inside PipelineWise itself, which uses the stock psycopg2
+Four features run inside PipelineWise itself, which uses the stock psycopg2
 driver. They ignore both options and connect directly to the configured
 ``host``:
 
@@ -213,10 +223,10 @@ driver. They ignore both options and connect directly to the configured
   and ``pipelinewise import_config`` drops its slot. Keep that host reachable,
   or drop the slot manually if it is not.
 - The slot reset that runs before an unfiltered ``fast_sync``.
+- ``pipelinewise tap_info``.
 - :ref:`data_diff` checks.
 
-Common tap settings are documented in :ref:`yaml_configuration`. Generate the
-full template with ``pipelinewise init``.
+Common tap settings are documented in :ref:`yaml_configuration`.
 
 Decimals
 --------
@@ -242,12 +252,23 @@ Snowflake ``VARIANT``, unlike tap-postgres's explicit Iceberg v3 route.
 Required indexes
 -----------------
 
-**Every table this tap reads needs a prerequisite index, and the tap will not
-create it.** YugabyteDB shards a primary key by hash unless it was declared
-``ASC``/``DESC``, and a hash-sharded key has no order to scan along, so every
-ordered, resumable read needs an index to supply one. Without it the tap still
-returns correct rows -- it reads the whole table to do it, on every run and
-every resume, and neither the query plan nor the tap log says so.
+**The tap never creates indexes.** YugabyteDB shards a primary key by hash
+unless it was declared ``ASC``/``DESC``. A hash-sharded key has no order to scan
+along, so every ordered, resumable read by the tap needs an index to supply one.
+Without it the tap still returns correct rows, but it reads the whole table on
+every run and every resume. A ``FULL_TABLE`` scan logs ``Falling back to a
+non-resumable full scan``. An ``INCREMENTAL`` read gives no sign in the query
+plan or the log.
+
+Which tables need one depends on the target:
+
+- On PostgreSQL and Snowflake targets, FastSync copies ``FULL_TABLE`` tables
+  and ``LOG_BASED`` initial snapshots with a plain ``COPY``. They need no
+  index. The change stream needs none either.
+- ``INCREMENTAL`` tables, PartialSync, and data-diff need the replication-key
+  index on every target.
+- On a target without FastSync, such as S3 CSV, the tap scans ``FULL_TABLE``
+  tables itself. They need the ``<table>_pw_keyset`` index.
 
 There are four, and they are one shape: the **primary key** hashed into ``N``
 buckets ``ASC``, then the ordering column, then the **primary key** again,
@@ -262,10 +283,11 @@ buckets ``ASC``, then the ordering column, then the **primary key** again,
      - Enables
    * - ``bucket, PK``
      - ``<table>_pw_keyset``
-     - ``FULL_TABLE``, parallel export, resume, ``LOG_BASED`` initial snapshot
+     - ``FULL_TABLE`` scanned by the tap (targets without FastSync), with
+       parallel buckets and resume
    * - ``bucket, PK`` monotonic
      - *the same index*
-     - the above, plus ``INCREMENTAL`` where the replication key is the primary key
+     - ``INCREMENTAL`` where the replication key is the primary key
    * - ``bucket, created_at, PK``
      - ``<table>_<column>_pw_keyset``
      - ``INCREMENTAL`` (new rows only), PartialSync, data-diff on that column
@@ -295,6 +317,11 @@ It prints ``OK``, ``ACTION`` (with the exact ``CREATE UNIQUE INDEX`` to run) or
 ``--limit`` override them. A table without ``replication_method`` is checked as
 ``LOG_BASED``, the PipelineWise default for this tap.
 
+The check assumes a PostgreSQL or Snowflake target. Pass
+``--target-type target-s3-csv`` for an S3 CSV target. Then ``FULL_TABLE``
+tables need ``<table>_pw_keyset``, and ``LOG_BASED`` tables are blocked. A YAML
+with ``target_table_format: iceberg`` blocks every table.
+
 
 Replication behaviour
 ----------------------
@@ -303,21 +330,30 @@ Replication behaviour
 inclusively (``>=``), so the boundary row is re-emitted on every run and the
 target must deduplicate on the primary key. Deletes are not captured.
 
-``FULL_TABLE`` resumes an interrupted sync with parameterized primary-key
-keyset pagination, since YugabyteDB's distributed MVCC exposes no
-cluster-wide monotonic row version like PostgreSQL's ``xmin``. Tables without
-a declared primary key fall back to a plain, non-resumable full scan.
+On PostgreSQL and Snowflake targets, FastSync copies every ``FULL_TABLE`` table
+on every run. On a target without FastSync, the tap scans the table itself. It
+resumes an interrupted scan with primary-key keyset pagination, because
+YugabyteDB has no row version like PostgreSQL's ``xmin``. The scan needs the
+``<table>_pw_keyset`` index; see `Required indexes`_. Tables without a declared
+primary key fall back to a plain, non-resumable full scan.
 
-``LOG_BASED`` bootstraps its initial scan from a snapshot pinned to the
-replication slot's own restart boundary (``SET yb_read_time``), so the
-snapshot and the streaming start position are provably consistent. A
-PartialSync with an end value saves no replication position, so its export
-reads current data instead. An interrupted bootstrap resumes from a ``bootstrap_in_progress`` bookmark
-rather than an ``xmin`` sentinel. Views and materialized views are rejected
-for ``LOG_BASED``.
+FastSync loads a ``LOG_BASED`` table's initial snapshot. It pins the export to
+the replication slot's restart point with ``SET yb_read_time``, and saves that
+point as the table's bookmark. The snapshot and the change stream therefore
+meet exactly. A PartialSync with an end value saves no replication position, so
+its export reads current data instead. Views and materialized views are
+rejected for ``LOG_BASED``.
 
 An update that changes a primary key streams as a delete of the old key and an
 insert of the new key. The target removes the row under the old key.
+
+.. warning::
+
+   YugabyteDB can drop a change event when the same session runs a DDL
+   statement right after a DML statement on a replicated table. The tap never
+   receives that row change, and nothing reports it. Run DDL and DML on
+   replicated tables in separate sessions. If a change was lost, resync the
+   table as shown below.
 
 ``LOG_BASED`` does not replicate ``TRUNCATE``. After a ``TRUNCATE``, resync the
 table:
@@ -357,13 +393,21 @@ YugabyteDB fixes it for each table when the replication slot is created.
      - Nothing. Deletes also lose their key values, so the tap refuses to start.
 
 Snowflake targets keep the current value of every column an update leaves out.
-PostgreSQL targets write ``NULL`` into those columns. For a PostgreSQL target,
-set ``REPLICA IDENTITY DEFAULT`` or ``FULL`` on every ``LOG_BASED`` table before
-the first ``fast_sync``.
+PostgreSQL targets would write ``NULL`` into those columns. So for a PostgreSQL
+target, every ``LOG_BASED`` table needs ``REPLICA IDENTITY DEFAULT`` or
+``FULL``. PipelineWise checks this before FastSync creates or resets the slot,
+and the tap checks it again at the start of every run. Either check stops with
+the names of the tables to fix. Set ``DEFAULT`` before the first ``fast_sync``.
+
+Prefer ``DEFAULT``. With ``FULL``, a transaction that inserts a row and then
+updates it can stop the change stream for every table, with the error
+``Failed to get the beforeimage``.
 
 Changing the replica identity of a replicated table has no effect until the slot
-is recreated. Stop replication, run ``ALTER TABLE <schema.table> REPLICA
-IDENTITY DEFAULT``, then run the unfiltered ``fast_sync``.
+is recreated. The checks read the table's current setting, so they cannot see
+the identity an existing slot holds. Stop replication, run ``ALTER TABLE
+<schema.table> REPLICA IDENTITY DEFAULT``, then run the unfiltered
+``fast_sync``.
 
 
 .. _yugabyte_resync_size_limit:
@@ -375,8 +419,9 @@ Resync size limit
 selected table is larger than the limit. ``--force`` bypasses it. The limit
 does not apply to PostgreSQL targets, the same as for PostgreSQL sources.
 
-PipelineWise reads the size with ``pg_table_size`` plus ``pg_indexes_size``,
-summed over a partitioned table's partitions. YugabyteDB stores data
+PipelineWise reads the size with ``pg_table_size`` plus ``pg_indexes_size``.
+A partitioned table includes every partition, at every level. A selected
+partition reports its own size. YugabyteDB stores data
 differently from PostgreSQL, so the same functions measure different things:
 
 .. list-table::
@@ -422,22 +467,21 @@ Some readings are low or missing:
 - Tables in a CDC stream can keep WAL for longer (``cdc_wal_retention_time_secs``),
   so they read higher.
 - Colocated tables report no size, and views have none. The check blocks these
-  tables. Use ``--force`` to resync them.
+  tables, and tables it cannot find. Use ``--force`` to resync them.
 
 Set ``table_mb`` to the largest table you are willing to resync, with
 headroom. Expect a table to read up to twice its export size just after a
 large load. To see the figure the check uses, run
 ``pipelinewise tap_info --tap <tap_id>`` and read each table's ``size_bytes``.
 It is ``null`` for colocated tables and views.
-For a partitioned table, add up the results for its partitions.
 
 
 Acknowledgement and recovery
 -----------------------------
 
 Consuming WAL does not by itself advance the slot's safe flush position.
-PipelineWise sends feedback only up to the minimum target-acknowledged LSN
-stored in ``state.json``. Missing, unreadable, invalid, or regressing state
+The tap sends feedback only up to the minimum target-acknowledged LSN stored in
+``state.json``. Missing, unreadable, invalid, or regressing state
 retains the previous safe LSN.
 
 The feedback is two below that LSN. A bookmark is a transaction's commit record

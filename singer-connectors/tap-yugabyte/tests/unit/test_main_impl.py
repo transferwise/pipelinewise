@@ -246,18 +246,42 @@ class TestLogBasedReplicaIdentity(unittest.TestCase):
                 'schema-name': 'public', 'is-view': is_view}}],
         }
 
-    def _check(self, streams, blocked_rows):
+    def _check(self, streams, blocked_rows, decimal_target=None):
+        conn_config = {'dbname': 'db'}
+        if decimal_target:
+            conn_config['decimal_target'] = decimal_target
         with patch('tap_yugabyte.post_db.open_connection') as open_connection:
             cur = open_connection.return_value.__enter__.return_value.cursor.return_value.__enter__.return_value
             cur.fetchall.return_value = blocked_rows
-            tap_yugabyte.ensure_log_based_replica_identity({'dbname': 'db'}, streams, 'FULL_TABLE')
+            tap_yugabyte.ensure_log_based_replica_identity(conn_config, streams, 'FULL_TABLE')
         return open_connection, cur
 
     def test_rejects_log_based_tables_with_replica_identity_nothing(self):
         streams = [self._stream('a', 'LOG_BASED'), self._stream('b', 'LOG_BASED')]
 
-        with self.assertRaisesRegex(Exception, r'REPLICA IDENTITY NOTHING: public\.b\. .*unfiltered fast_sync'):
-            self._check(streams, [('public', 'b')])
+        with self.assertRaisesRegex(
+                Exception, r'REPLICA IDENTITY NOTHING: public\.b\. Set REPLICA IDENTITY DEFAULT, FULL or CHANGE.*'
+                           r'unfiltered fast_sync'):
+            self._check(streams, [('public', 'b', 'n')])
+
+    def test_nothing_on_a_postgres_target_does_not_suggest_change(self):
+        with self.assertRaisesRegex(Exception, r'NOTHING: public\.a\. Set REPLICA IDENTITY DEFAULT or FULL,'):
+            self._check([self._stream('a', 'LOG_BASED')], [('public', 'a', 'n')], decimal_target='postgres')
+
+    def test_rejects_change_identity_on_a_postgres_target(self):
+        """CHANGE streams only the changed columns, and target-postgres writes NULL into the rest."""
+        with self.assertRaisesRegex(Exception, r'PostgreSQL cannot use REPLICA IDENTITY CHANGE: public\.a\. .*NULL'):
+            self._check([self._stream('a', 'LOG_BASED')], [('public', 'a', 'c')], decimal_target='postgres')
+
+    def test_accepts_change_identity_on_a_snowflake_target(self):
+        for decimal_target in ('snowflake', None):
+            with self.subTest(decimal_target=decimal_target):
+                self._check([self._stream('a', 'LOG_BASED')], [('public', 'a', 'c')], decimal_target=decimal_target)
+
+    def test_accepts_default_and_full_on_a_postgres_target(self):
+        _, cur = self._check([self._stream('a', 'LOG_BASED')], [], decimal_target='postgres')
+
+        self.assertIn("relreplident IN ('n', 'c')", cur.execute.call_args.args[0])
 
     def test_checks_only_log_based_tables(self):
         streams = [self._stream('a', 'LOG_BASED'), self._stream('full', 'FULL_TABLE'),
@@ -277,7 +301,7 @@ class TestLogBasedReplicaIdentity(unittest.TestCase):
         with patch('tap_yugabyte.post_db.open_connection') as open_connection, \
                 patch('tap_yugabyte.logical_replication.fetch_current_lsn') as fetch_current_lsn:
             cur = open_connection.return_value.__enter__.return_value.cursor.return_value.__enter__.return_value
-            cur.fetchall.return_value = [('public', 'a')]
+            cur.fetchall.return_value = [('public', 'a', 'n')]
             with self.assertRaisesRegex(Exception, 'REPLICA IDENTITY NOTHING'):
                 tap_yugabyte.do_sync({'port': 5433, 'dbname': 'db'}, catalog, 'FULL_TABLE', {'bookmarks': {}})
 

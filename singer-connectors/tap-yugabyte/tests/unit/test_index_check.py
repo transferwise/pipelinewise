@@ -70,19 +70,35 @@ def stub_key_checks(monkeypatch):
 
 
 class TestRouting:
-    def test_a_table_without_a_method_is_checked_as_log_based(self, monkeypatch):
+    def test_a_table_without_a_method_is_checked_as_log_based(self):
         # PipelineWise defaults tap-yugabyte tables to LOG_BASED; reporting them
         # as an unknown method blocked every table that relied on the default
-        seen = []
-        monkeypatch.setattr(index_check, 'check_log_based',
-                            lambda cur, s, t, b: seen.append(t) or (OK, [], []))
-        assert index_check.check_table(None, 's', {'table_name': 't'}, 3)[0] == OK
-        assert seen == ['t']
+        status, notes, ddl = index_check.check_table(None, 's', {'table_name': 't'}, 3, fastsync=True)
+        assert (status, ddl) == (OK, [])
+        assert 'initial snapshot' in notes[0]
 
-    def test_methods_are_case_insensitive(self, monkeypatch):
-        monkeypatch.setattr(index_check, 'check_log_based', lambda *a: (OK, ['log'], []))
+    @pytest.mark.parametrize('method', ['FULL_TABLE', 'LOG_BASED', 'full_table', 'log_based'])
+    def test_fastsync_routes_need_no_keyset_index(self, method):
+        """FastSync copies these tables with a plain COPY, so no catalog query runs and no DDL is asked for."""
+        status, notes, ddl = index_check.check_table(
+            None, 's', {'table_name': 't', 'replication_method': method}, 3, fastsync=True)
+        assert (status, ddl) == (OK, [])
+        assert 'plain COPY' in notes[0]
+
+    def test_log_based_blocks_without_fastsync(self):
+        """Only FastSync creates the replication slot, and PipelineWise rejects LOG_BASED without it."""
+        status, notes, ddl = index_check.check_table(
+            None, 's', {'table_name': 't', 'replication_method': 'LOG_BASED'}, 3)
+        assert (status, ddl) == (BLOCK, [])
+        assert 'needs FastSync' in notes[0]
+
+    def test_full_table_without_fastsync_checks_the_keyset_index(self, monkeypatch):
+        seen = []
+        monkeypatch.setattr(index_check, 'check_full_table',
+                            lambda cur, s, t, b: seen.append(t) or (ACTION, [], ['ddl']))
         assert index_check.check_table(
-            None, 's', {'table_name': 't', 'replication_method': 'log_based'}, 3)[1] == ['log']
+            None, 's', {'table_name': 't', 'replication_method': 'full_table'}, 3)[0] == ACTION
+        assert seen == ['t']
 
     def test_incremental_passes_its_key_and_limit(self, monkeypatch):
         seen = []
@@ -141,12 +157,6 @@ class TestPrimaryKeyIndex:
             ScriptedCursor(sharding=('r', 0, 1, True)), 's', 't', 3)
         assert 'SPLIT AT' not in ddl[0]
 
-    def test_log_based_needs_the_same_index_and_says_why(self):
-        cur = ScriptedCursor(indexes={'t_pw_keyset': shape(pk_def())})
-        status, notes, _ = index_check.check_log_based(cur, 's', 't', 3)
-        assert status == OK
-        assert any('initial snapshot' in n for n in notes)
-
 
 class TestIncremental:
     def test_no_replication_key_blocks(self, stub_key_checks):
@@ -171,7 +181,7 @@ class TestIncremental:
         cur = ScriptedCursor(indexes={'t_updated_at_pw_keyset': shape(indexdef)})
         status, notes, ddl = index_check.check_incremental(cur, 's', 't', 'updated_at', 3)
         assert status == OK and ddl == []
-        assert any('resumes inside a tie' in n for n in notes)
+        assert any('rereads every row that shares the bookmarked value' in n for n in notes)
 
     def test_a_hard_failure_is_not_downgraded_by_missing_index_ddl(self, stub_key_checks):
         stub_key_checks['key'] = key_facts(hard_failures=['updated_at is nullable.'])
@@ -279,9 +289,8 @@ class TestMain:
         return code
 
     def test_all_ok_exits_zero_without_a_ddl_block(self, monkeypatch, tmp_path, capsys):
-        cur = ScriptedCursor(indexes={'t_pw_keyset': shape(pk_def())})
         code = self._run(monkeypatch, tmp_path,
-                         'schemas:\n  - source_schema: s\n    tables:\n      - table_name: t\n', cur)
+                         'schemas:\n  - source_schema: s\n    tables:\n      - table_name: t\n', ScriptedCursor())
         out = capsys.readouterr().out
         assert code == 0
         assert 'OK     s.t  [LOG_BASED]' in out
@@ -291,18 +300,45 @@ class TestMain:
     def test_any_action_exits_one_and_collects_the_ddl(self, monkeypatch, tmp_path, capsys):
         code = self._run(monkeypatch, tmp_path,
                          'schemas:\n  - source_schema: s\n    tables:\n'
-                         '      - {table_name: t, replication_method: LOG_BASED}\n',
-                         ScriptedCursor())
+                         '      - {table_name: t, replication_method: FULL_TABLE}\n',
+                         ScriptedCursor(), ['--target-type', 'target-s3-csv'])
         out = capsys.readouterr().out
         assert code == 1
         assert 'All DDL, to hand to the service owner:' in out
         assert 'Worst status: ACTION' in out
 
+    @pytest.mark.parametrize('argv', [[], ['--target-type', 'target-postgres'],
+                                      ['--target-type', 'target-snowflake']])
+    def test_fastsync_targets_ask_for_no_full_table_index(self, monkeypatch, tmp_path, capsys, argv):
+        code = self._run(monkeypatch, tmp_path,
+                         'schemas:\n  - source_schema: s\n    tables:\n'
+                         '      - {table_name: t, replication_method: FULL_TABLE}\n',
+                         ScriptedCursor(), argv)
+        assert code == 0, capsys.readouterr().out
+
+    def test_managed_iceberg_blocks_every_table(self, monkeypatch, tmp_path, capsys):
+        code = self._run(monkeypatch, tmp_path,
+                         'target_table_format: iceberg\niceberg_version: 3\n'
+                         'schemas:\n  - source_schema: s\n    tables:\n'
+                         '      - {table_name: t, replication_method: FULL_TABLE}\n',
+                         ScriptedCursor())
+        out = capsys.readouterr().out
+        assert code == 1
+        assert 'BLOCK  s.t  [FULL_TABLE]' in out
+        assert 'managed Iceberg' in out
+
+    def test_an_unknown_target_type_is_refused(self, monkeypatch, tmp_path):
+        with pytest.raises(SystemExit):
+            index_check.main(['tap.yml', '--host', 'h', '--user', 'u', '--dbname', 'd',
+                              '--target-type', 'target-bigquery'])
+
     def test_bucket_count_comes_from_the_yaml(self, monkeypatch, tmp_path, capsys):
         cur = ScriptedCursor(indexes={'t_pw_keyset': shape(pk_def(buckets=8), tablets=8)})
         code = self._run(monkeypatch, tmp_path,
                          'db_conn: {keyset_buckets: 8}\n'
-                         'schemas:\n  - source_schema: s\n    tables:\n      - table_name: t\n', cur)
+                         'schemas:\n  - source_schema: s\n    tables:\n'
+                         '      - {table_name: t, replication_method: FULL_TABLE}\n',
+                         cur, ['--target-type', 'target-s3-csv'])
         assert code == 0, capsys.readouterr().out
 
     def test_the_connection_is_closed_when_a_check_fails(self, monkeypatch, tmp_path):
@@ -312,8 +348,9 @@ class TestMain:
 
         with pytest.raises(RuntimeError):
             self._run(monkeypatch, tmp_path,
-                      'schemas:\n  - source_schema: s\n    tables:\n      - table_name: t\n',
-                      Exploding())
+                      'schemas:\n  - source_schema: s\n    tables:\n'
+                      '      - {table_name: t, replication_method: FULL_TABLE}\n',
+                      Exploding(), ['--target-type', 'target-s3-csv'])
 
 
 class TestDescribeRealIndexDefinitions:

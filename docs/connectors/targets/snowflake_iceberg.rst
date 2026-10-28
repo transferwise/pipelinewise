@@ -54,6 +54,7 @@ Connector support levels still apply and are listed in
 managed Iceberg v3 only when PipelineWise routes the selected streams through
 Singer. Any Iceberg selection that would invoke another source's FastSync
 component is rejected before mutation.
+YugabyteDB does not support managed Iceberg targets yet.
 
 
 Snowflake prerequisites

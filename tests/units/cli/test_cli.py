@@ -1163,6 +1163,27 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
             f'{pipelinewise.venv_dir}fastsync-yugabyte/bin/yugabyte-to-{target}', 'tap-yugabyte', target_type,
         )
 
+    def test_yugabyte_slot_reset_preflight_blocks_postgres_replica_identity(self):
+        """A reset would fix CHANGE into the new slot, so a PostgreSQL target rejects it before any change."""
+        pipelinewise = self._init_for_sync_tables_states_cleanup()
+        pipelinewise.tap['type'] = ConnectorType.TAP_YUGABYTE.value
+        pipelinewise.target['type'] = ConnectorType.TARGET_POSTGRES.value
+        tap_config = dict.fromkeys(yugabyte_to_postgres.REQUIRED_CONFIG_KEYS['tap'], 'test')
+        target_config = dict.fromkeys(yugabyte_to_postgres.REQUIRED_CONFIG_KEYS['target'], 'test')
+        properties = {'streams': []}
+        with patch.object(pipelinewise, '_check_if_complete_tap_configuration'), patch.object(
+            pipelinewise, '_load_required_json_object', side_effect=[tap_config, target_config, {}, properties],
+        ), patch.object(
+            fastsync_utils, 'get_tables_from_properties', return_value=['public.full'],
+        ), patch.object(
+            yugabyte_to_postgres, 'check_replica_identity',
+            side_effect=RuntimeError('needs REPLICA IDENTITY DEFAULT or FULL: public.full (CHANGE).'),
+        ) as check:
+            with pytest.raises(PreRunChecksException, match=r'public\.full \(CHANGE\)\. No source or state changes'):
+                pipelinewise._preflight_source_slot_reset({'full_sync': ['public.full'], 'partial_sync': {}})
+
+        check.assert_called_once_with(tap_config, properties, ['public.full'])
+
     @pytest.mark.parametrize('force, expected_limit', [(False, 10), (True, None)])
     def test_yugabyte_slot_reset_preflight_blocks_oversized_snowflake_resync(self, force, expected_limit):
         """An oversized or unsized YugabyteDB table blocks the reset unless --force lifts the limit."""

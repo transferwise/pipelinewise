@@ -98,9 +98,9 @@ jobs:
             singer-connectors/tap-mongodb/tests/test_logging.py
 
   test_tap_yugabyte_index_check:
-    name: Integration tests (tap-yugabyte index check)
+    name: Integration tests (tap-yugabyte index check and logical replication)
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 40
 
     steps:
       - name: Checking out repo
@@ -132,6 +132,19 @@ jobs:
           . ./venv/bin/activate
           . ./tests/integration/env
           coverage run --source=tap_yugabyte -m pytest -v tests/integration/test_index_check.py
+          coverage report
+
+      # The only real-server checks of slot acknowledgement and interrupted-transaction recovery.
+      - name: Run logical replication integration tests
+        working-directory: singer-connectors/tap-yugabyte
+        env:
+          COVERAGE_FILE: .coverage.logical_replication
+        run: |
+          . ./venv/bin/activate
+          . ./tests/integration/env
+          coverage run --source=tap_yugabyte -m pytest -v \
+            tests/integration/test_logical_replication.py \
+            tests/integration/test_interrupted_transaction.py
           coverage report
 
   connector_tests:

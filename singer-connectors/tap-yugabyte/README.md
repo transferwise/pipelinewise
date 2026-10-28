@@ -120,18 +120,25 @@ to the tap for the next sync.
 
 ### Replication method notes
 
-* **FULL_TABLE** resumes an interrupted sync with parameterized primary-key keyset pagination, since
-  YugabyteDB's distributed MVCC exposes no cluster-wide monotonic row version like PostgreSQL's `xmin`.
-  Tables without a declared primary key fall back to a plain, non-resumable full scan.
-* **INCREMENTAL** requires a `replication-key`. The bookmark is compared inclusively (`>=`), so the boundary
-  row is re-emitted on every run and the target must deduplicate on the primary key. Deletes are not captured.
-* **LOG_BASED** bootstraps its initial scan from a snapshot pinned to the replication slot's own restart
-  boundary (`SET yb_read_time`), so the snapshot and the streaming start position are provably consistent. When
-  run from PipelineWise, that initial snapshot is performed by FastSync rather than by this Singer tap. The
-  bootstrap reuses the same `FULL_TABLE` sync path, so a `bootstrap_in_progress` bookmark (rather than an
-  `xmin` sentinel) lets an interrupted bootstrap resume mid-scan only for tables with a declared primary key;
-  on a table with no primary key the bootstrap restarts its full scan from scratch. Views and materialized
-  views are rejected for `LOG_BASED`.
+* **FULL_TABLE** resumes an interrupted sync with primary-key keyset pagination, since YugabyteDB's distributed
+  MVCC exposes no cluster-wide monotonic row version like PostgreSQL's `xmin`. When the tap scans the table
+  itself, resume and parallel buckets need the `<table>_pw_keyset` index described in [INDEXES.md](INDEXES.md).
+  Without a usable index, or on a table with no primary key, the tap logs a warning and falls back to one
+  non-resumable full scan. When run from PipelineWise with a PostgreSQL or Snowflake target, FastSync copies
+  FULL_TABLE tables on every run and the tap does not scan them.
+* **INCREMENTAL** requires a `replication-key` and an index on it (see [INDEXES.md](INDEXES.md)). The bookmark is
+  compared inclusively (`>=`), so every row sharing the bookmarked value is re-emitted on the next run and the
+  target must deduplicate on the primary key. Deletes are not captured.
+* **LOG_BASED**: when run from PipelineWise, FastSync loads the initial snapshot. It pins the export to the
+  replication slot's restart point with `SET yb_read_time`, so the snapshot and the stream start agree.
+  PipelineWise rejects LOG_BASED tables on targets without FastSync, such as S3 CSV, because only FastSync creates
+  the replication slot. YugabyteDB does not support managed Iceberg targets yet.
+* When the tap runs standalone, its own LOG_BASED initial scan reuses the FULL_TABLE path and is **not** pinned to
+  the slot's restart point. A `bootstrap_in_progress` bookmark lets an interrupted scan resume, which also needs
+  `<table>_pw_keyset`.
+* An update that changes a primary key streams as a delete of the old key and an insert of the new key. The target
+  removes the row under the old key.
+* Views and materialized views are rejected for LOG_BASED.
 
 ### Log Based replication requirements
 
@@ -142,10 +149,16 @@ to the tap for the next sync.
 
 * **wal2json plugin**: `wal2json` ships pre-packaged with YugabyteDB, so no separate installation step is
   required (unlike PostgreSQL).
-* **Privileges**: the tap user needs the `REPLICATION` role attribute and `SET` on the `yb_read_time`
-  parameter (`GRANT SET ON PARAMETER yb_read_time TO <user>`). Without the latter, the initial snapshot fails
-  with `permission denied to set parameter "yb_read_time"`. The slot streams changes from every table in the
+* **Privileges**: the tap user needs the `REPLICATION` role attribute. When run from PipelineWise, FastSync also
+  sets `yb_read_time`, which needs superuser or `GRANT SET ON PARAMETER yb_read_time TO <user>`. The grant is the
+  least-privilege option. Without either, the initial snapshot fails with
+  `permission denied to set parameter "yb_read_time"`. The slot streams changes from every table in the
   database, regardless of table privileges.
+* **Replica identity**: the tap refuses LOG_BASED tables with `REPLICA IDENTITY NOTHING`. On PostgreSQL targets it
+  also refuses `CHANGE`, YugabyteDB's default, because an update then streams only the changed columns and the
+  target writes `NULL` into the rest. Set `REPLICA IDENTITY DEFAULT` or `FULL`. FastSync to PostgreSQL checks the
+  same before it creates the slot. The slot fixes each table's identity when it is created, so after a change
+  rerun the unfiltered fast_sync to recreate the slot.
 * **Port**: Log based replication works only on port 5433. The current YugabyteDB psycopg2 drivers
   (`psycopg2-yugabytedb-binary` 2.9.3.5 and 2.9.3.5.post1) ignore the configured `port` on replication
   connections and always connect to 5433. The tap stops before reading any data if LOG_BASED streams are
@@ -154,9 +167,9 @@ to the tap for the next sync.
   which counts compressed data files plus the write-ahead log and differs from PostgreSQL's. See
   [Resync size limit](../../docs/connectors/taps/yugabyte.rst#resync-size-limit).
 * **Existing replication slot**: Log based replication requires a dedicated logical replication slot with LSN
-  type `HYBRID_TIME`. When run from PipelineWise, FastSync owns the slot's full lifecycle: it creates the slot
-  on first sync and drops it when the tap is removed, retrying a transient "slot is active" error for up to
-  five minutes to tolerate YugabyteDB's post-disconnect active-slot window
+  type `HYBRID_TIME`. When run from PipelineWise, only FastSync creates the slot, on the first sync.
+  PipelineWise drops it when the tap is removed, retrying a transient "slot is active" error for up to
+  five and a half minutes to wait out YugabyteDB's post-disconnect active-slot window
   (`ysql_cdc_active_replication_slot_window_ms`, five minutes by default). Slot names follow
   `pipelinewise_<dbname>_<tap_id>`. FastSync and the tap fail if the slot's plugin is not `wal2json` or its
   `yb_lsn_type` is not `HYBRID_TIME`. A slot created without the `'HYBRID_TIME'` argument gets YugabyteDB's
@@ -172,10 +185,13 @@ to the tap for the next sync.
   **Note**: Replication slots are specific to a given database in a cluster. If you want to connect multiple
   databases - whether in one integration or several - you’ll need to create a replication slot for each database.
 
-* **Acknowledgement and recovery**: consuming WAL does not by itself advance the slot's safe flush position.
-  PipelineWise sends feedback only up to the minimum target-acknowledged LSN stored in `state.json`. After an
-  unexpected termination, restart the same tap without advancing state - unacknowledged changes remain
-  replayable while the slot exists. Resync only when the slot is unavailable.
+* **Acknowledgement and recovery**: consuming WAL does not by itself advance the slot. The tap sends slot feedback
+  two below the minimum target-acknowledged LSN stored in `state.json`, and starts each run from that same LSN.
+  YugabyteDB can give the next transaction the same LSN as the previous commit record, so this keeps it from being
+  skipped. As a result the last acknowledged transaction replays once on the next run, and the target deduplicates
+  it. A run with no new changes stops after `logical_poll_total_seconds` (default 300). After an unexpected
+  termination, restart the same tap without advancing state. Unacknowledged changes remain replayable while the
+  slot exists. Resync only when the slot is unavailable.
 
 ### To run tests:
 

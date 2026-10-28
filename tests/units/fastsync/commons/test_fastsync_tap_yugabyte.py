@@ -89,27 +89,64 @@ class TestFastSyncTapYugabyte(TestCase):
 
         self.assertEqual('permission denied', str(context.exception))
 
-    def test_fetch_table_sizes_mb_reads_each_schema_once_and_marks_unsized_tables(self):
-        """Sizes are MB per selected table; NULL (colocated) and absent tables (views) are None"""
+    def test_fetch_table_sizes_mb_reads_each_table_with_the_tap_info_query(self):
+        """Sizes are MB per selected table; NULL (colocated, views) and missing tables are None"""
         cursor = MagicMock()
-        cursor.fetchall.side_effect = [
-            [('orders', 2 * 1024 * 1024), ('unselected', 99 * 1024 * 1024)],
-            [('coloc', None)],
-        ]
+        cursor.fetchone.side_effect = [(2 * 1024 * 1024, 1), (None, 1), (None, 1), (0, 0)]
         connection = MagicMock()
         connection.cursor.return_value.__enter__.return_value = cursor
+        tables = ['public.orders', 'public.a_view', 'sales.coloc', 'sales.missing']
         with patch.object(FastSyncTapYugabyte, 'admin_connection', return_value=connection) as admin_connection:
-            sizes = FastSyncTapYugabyte.fetch_table_sizes_mb(
-                {'host': 'h', 'load_balance': 'true'}, ['public.orders', 'public.a_view', 'sales.coloc'],
-            )
+            sizes = FastSyncTapYugabyte.fetch_table_sizes_mb({'host': 'h', 'load_balance': 'true'}, tables)
 
-        self.assertEqual({'public.orders': 2.0, 'public.a_view': None, 'sales.coloc': None}, sizes)
+        self.assertEqual(
+            {'public.orders': 2.0, 'public.a_view': None, 'sales.coloc': None, 'sales.missing': None}, sizes,
+        )
         admin_connection.assert_called_once_with({'host': 'h', 'load_balance': 'true'})
         self.assertEqual(
-            [call(tap_yugabyte._TABLE_SIZE_SQL, ('public',)), call(tap_yugabyte._TABLE_SIZE_SQL, ('sales',))],
+            [call(tap_yugabyte.TABLE_SIZE_SQL, tuple(table.split('.'))) for table in tables],
             cursor.execute.call_args_list,
         )
         connection.close.assert_called_once_with()
+
+    def test_postgres_replica_identity_rejects_change_and_nothing(self):
+        """CHANGE and NOTHING would load NULLs into PostgreSQL, so they fail before a slot exists."""
+        connection = MagicMock()
+        cursor = connection.cursor.return_value.__enter__.return_value
+        cursor.fetchall.return_value = [('public.a', 'c'), ('public.b', 'n')]
+        with patch.object(FastSyncTapYugabyte, 'admin_connection', return_value=connection) as admin_connection:
+            with self.assertRaisesRegex(
+                    RuntimeError, r'DEFAULT or FULL: public\.a \(CHANGE\), public\.b \(NOTHING\)'):
+                FastSyncTapYugabyte.check_postgres_replica_identity(
+                    {'host': 'h', 'load_balance': 'true'}, ['public.a', 'public.b', 'public.c'],
+                )
+
+        admin_connection.assert_called_once_with({'host': 'h', 'load_balance': 'true'})
+        self.assertEqual(
+            ((('public', 'a'), ('public', 'b'), ('public', 'c')),), cursor.execute.call_args.args[1],
+        )
+        connection.close.assert_called_once_with()
+
+    def test_postgres_replica_identity_accepts_default_and_full(self):
+        connection = MagicMock()
+        connection.cursor.return_value.__enter__.return_value.fetchall.return_value = []
+        with patch.object(FastSyncTapYugabyte, 'admin_connection', return_value=connection):
+            FastSyncTapYugabyte.check_postgres_replica_identity({}, ['public.a'])
+
+        connection.close.assert_called_once_with()
+
+    def test_postgres_replica_identity_skips_the_query_without_log_based_tables(self):
+        with patch.object(FastSyncTapYugabyte, 'admin_connection') as admin_connection:
+            FastSyncTapYugabyte.check_postgres_replica_identity({}, [])
+
+        admin_connection.assert_not_called()
+
+    def test_tap_info_and_the_resync_size_check_share_one_query(self):
+        """tap_info shows the figure allowed_resync_max_size compares, partitions included"""
+        from pipelinewise.cli import source_table_sizes
+
+        self.assertIs(tap_yugabyte.TABLE_SIZE_SQL, source_table_sizes.SOURCE_TABLE_SIZE_SQL['tap-yugabyte'])
+        self.assertIn('WITH RECURSIVE', tap_yugabyte.TABLE_SIZE_SQL)
 
     def test_fetch_table_sizes_mb_closes_connection_after_query_failure(self):
         connection = MagicMock()
@@ -546,6 +583,19 @@ class TestFastSyncTapYugabyte(TestCase):
                         before_reset.assert_not_called()
                 self.assertEqual(sleep_mock.call_count, len(rows) - 1)
                 connection.close.assert_called_once_with()
+
+    def test_slot_retries_outlast_the_active_slot_window(self):
+        """The sleeps between attempts exceed ysql_cdc_active_replication_slot_window_ms (300 seconds)."""
+        active = ('pipelinewise_my_db_my_tap', 'my_db', 'wal2json', True)
+        connection = MagicMock()
+        connection.cursor.return_value.__enter__.return_value.fetchall.return_value = [active]
+        with patch.object(FastSyncTapYugabyte, 'get_connection', return_value=connection), patch.object(
+            tap_yugabyte.time, 'sleep',
+        ) as sleep_mock:
+            with self.assertRaisesRegex(RuntimeError, r'still active after 330 seconds'):
+                FastSyncTapYugabyte.reset_slot({'dbname': 'my_db', 'tap_id': 'my_tap'}, before_reset=MagicMock())
+
+        self.assertGreater(sum(c.args[0] for c in sleep_mock.call_args_list), 300)
 
     def test_reset_slot_name_length_boundary(self):
         """Accept exactly 63 characters; reject a longer name before SQL or state changes."""

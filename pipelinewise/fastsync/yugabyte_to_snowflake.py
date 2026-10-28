@@ -109,7 +109,7 @@ def get_resync_size_errors(tap_config, tables, maximum_table_size):
         if size_mb is None:
             errors.append(
                 f're-sync can not be done because YugabyteDB reports no size for table `{table}`'
-                ' (colocated tables and views have none)! Use --force argument to force fast_sync!')
+                ' (colocated tables, views and missing tables have none)! Use --force argument to force fast_sync!')
         elif size_mb > float(maximum_table_size):
             errors.append(
                 f're-sync can not be done because size of table `{table}` is greater than `{maximum_table_size}`!'

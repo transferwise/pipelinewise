@@ -5,7 +5,7 @@ import json
 import pytest
 
 from pipelinewise.cli.config import Config
-from pipelinewise.cli.errors import InvalidTransformationException
+from pipelinewise.cli.errors import InvalidConfigException, InvalidTransformationException
 from pipelinewise.cli.pipelinewise import PipelineWise
 from tests.units.cli.cli_args import CliArgs
 
@@ -104,8 +104,9 @@ def test_other_routes_keep_their_existing_condition_syntax(tmp_path, command, ta
 
 
 @pytest.mark.parametrize('command', ['validate', 'import_config'])
-def test_yugabyte_iceberg_has_no_source_side_route_to_check(tmp_path, command):
+def test_yugabyte_iceberg_is_rejected_before_transformations_are_checked(tmp_path, command):
     _write_project(tmp_path, tap_type='tap-yugabyte', iceberg=True, transformations=[{
         'column': 'secret', 'type': 'HASH', 'when': [{'column': 'secret', 'regex_match': r'\d+'}],
     }])
-    _validate_project(tmp_path, command)
+    with pytest.raises(InvalidConfigException, match='YugabyteDB does not support managed Iceberg targets'):
+        _validate_project(tmp_path, command)

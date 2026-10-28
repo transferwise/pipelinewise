@@ -112,16 +112,20 @@ the legacy slot may serve other taps and is preferred by the replication reader.
 Coordinate any legacy-slot migration with your DBA and all affected taps; this
 command does not migrate or delete a legacy slot.
 
-For YugabyteDB, the reset differs in two ways:
+For YugabyteDB, the reset differs in three ways:
 
 - ``allowed_resync_max_size`` uses YugabyteDB's on-disk size, which differs
   from PostgreSQL's. It also blocks colocated tables and views, which have no
   size. See :ref:`yugabyte_resync_size_limit`.
 - YugabyteDB reports a slot as active for
   ``ysql_cdc_active_replication_slot_window_ms`` (default five minutes) after its
-  last consumer disconnects. The reset waits up to five minutes for the flag to
-  clear. A slot that stays active longer has a live consumer: stop it and retry.
-  State is unchanged until the slot is free.
+  last consumer disconnects. The reset waits up to five and a half minutes for
+  the flag to clear. A slot that stays active longer has a live consumer: stop
+  it and retry. State is unchanged until the slot is free.
+- For a PostgreSQL target, every LOG_BASED table needs ``REPLICA IDENTITY
+  DEFAULT`` or ``FULL``, because the new slot fixes each table's identity.
+  Otherwise the reset stops before any change. See
+  :ref:`yugabyte_replica_identity`.
 
 After these checks, PipelineWise saves a unique
 ``state.json.before-slot-reset-<id>.bak`` alongside the state file, clears every
@@ -184,9 +188,9 @@ Partial repair
      --start_value <inclusive_start> \
      --end_value <inclusive_end>
 
-PartialSync is available only from MariaDB/MySQL or PostgreSQL to Snowflake. If
-``--end_value`` is omitted, PipelineWise captures the current replication
-position and updates state after the merge. See :ref:`partial_sync_cases` for
+PartialSync is available only from MariaDB/MySQL, PostgreSQL, or YugabyteDB to
+Snowflake. If ``--end_value`` is omitted, PipelineWise captures the current
+replication position and updates state after the merge. See :ref:`partial_sync_cases` for
 schema and delete behaviour.
 
 

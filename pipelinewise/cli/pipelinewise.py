@@ -1615,6 +1615,11 @@ class PipelineWise:
 
         fastsync_utils.check_config(tap_config, route.REQUIRED_CONFIG_KEYS['tap'])
         fastsync_utils.check_config(target_config, route.REQUIRED_CONFIG_KEYS['target'])
+        if tap_type == ConnectorType.TAP_YUGABYTE.value and target_type == ConnectorType.TARGET_POSTGRES.value:
+            try:
+                route.check_replica_identity(tap_config, properties, selected_tables['full_sync'])
+            except RuntimeError as exc:
+                raise PreRunChecksException(f'{exc} No source or state changes were made.') from exc
         # allowed_resync_max_size applies only to Snowflake routes.
         if target_type == ConnectorType.TARGET_SNOWFLAKE.value:
             size_errors = route.get_resync_size_errors(

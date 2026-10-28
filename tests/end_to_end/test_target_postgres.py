@@ -388,6 +388,11 @@ class TestTargetPostgres:
             'INSERT INTO logical1.logical1_table1 (cvarchar, varchar_col, bool_col) values '
             '(\'insert after alter table\', \'this is renamed column\', true);'
         )
+        #  LOG_BASED UPDATE of one column: with REPLICA IDENTITY CHANGE the target would NULL the others
+        self.run_query_tap_yugabyte(
+            'UPDATE logical1.logical1_table1 SET cvarchar = \'updated row\' WHERE cid = '
+            '(SELECT MIN(cid) FROM logical1.logical1_table1 WHERE varchar_col = \'inserted row\');'
+        )
 
         # 3. Run tap second time - both fastsync and a singer should be triggered, there are some FULL_TABLE
         assertions.assert_run_tap_success(
@@ -415,6 +420,12 @@ class TestTargetPostgres:
             'WHERE cvarchar = \'insert after alter table\';'
         )[0]
         assert result == ('this is renamed column', True)
+
+        result = self.run_query_target_postgres(
+            'SELECT varchar_col, updated_at IS NOT NULL FROM ppw_e2e_tap_yugabyte_logical1."logical1_table1" '
+            'WHERE cvarchar = \'updated row\';'
+        )
+        assert result == [('inserted row', True)]
 
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_s3_to_pg(self):

@@ -250,11 +250,17 @@ def test_an_interrupted_sync_resumes_without_loss_or_repeats(schema, table, colu
     assert len(set(keys)) == ROWS
 
 
-def test_log_based_needs_the_same_index(schema):
+def test_log_based_needs_fastsync_and_no_keyset_index(schema):
     table = 'ix_log_based'
     run_sql(f'CREATE TABLE {fq(schema, table)} (id bigint PRIMARY KEY)')
-    assert_index_becomes_ok(schema, table, method='LOG_BASED')
-    _, notes, _ = check(schema, table, method='LOG_BASED')
+    status, notes, ddl = check(schema, table, method='LOG_BASED')
+    assert (status, ddl) == (index_check.BLOCK, [])
+    assert 'needs FastSync' in notes[0]
+    with cursor() as cur:
+        status, notes, ddl = index_check.check_table(
+            cur, schema, {'table_name': table, 'replication_method': 'LOG_BASED'}, keyset.BUCKETS_DEFAULT,
+            fastsync=True)
+    assert (status, ddl) == (index_check.OK, [])
     assert any('initial snapshot' in note for note in notes)
 
 
@@ -471,11 +477,11 @@ def test_the_command_exits_one_until_its_own_ddl_is_applied(schema, tmp_path):
     config.write_text(
         f'db_conn: {{keyset_buckets: 3}}\n'
         f'schemas:\n  - source_schema: {schema}\n    tables:\n'
-        f'      - {{table_name: {table}}}\n'
+        f'      - {{table_name: {table}, replication_method: FULL_TABLE}}\n'
         f'      - {{table_name: {table}, replication_method: INCREMENTAL, replication_key: updated_at}}\n')
     cfg = get_test_connection_config()
     args = [*command, str(config), '--host', cfg['host'], '--port', str(cfg['port']),
-            '--user', cfg['user'], '--dbname', cfg['dbname']]
+            '--user', cfg['user'], '--dbname', cfg['dbname'], '--target-type', 'target-s3-csv']
     env = dict(os.environ, PGPASSWORD=cfg['password'])
 
     first = subprocess.run(args, env=env, capture_output=True, text=True, check=False)

@@ -9,7 +9,7 @@ import psycopg2
 import psycopg2.extras
 
 from argparse import Namespace
-from typing import Callable, Dict, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 from . import utils, split_gzip, yb_retry
 from .partial_sync_boundary import PartialSyncBoundary
@@ -26,8 +26,10 @@ LOGGER = logging.getLogger(__name__)
 # so slot administration retries instead of failing the resync outright. Dropping a slot
 # shortly after heavy CDC activity can also transiently surface as InFailedSqlTransaction
 # or SerializationFailure while the catalog-version bump from that activity settles.
-_DROP_SLOT_RETRY_ATTEMPTS = 10
+# Twelve attempts sleep 330 seconds in total, one interval past the default window.
+_DROP_SLOT_RETRY_ATTEMPTS = 12
 _DROP_SLOT_RETRY_INTERVAL_SECONDS = 30
+_DROP_SLOT_RETRY_WINDOW_SECONDS = (_DROP_SLOT_RETRY_ATTEMPTS - 1) * _DROP_SLOT_RETRY_INTERVAL_SECONDS
 _RETRYABLE_DROP_SLOT_ERRORS = (
     psycopg2.errors.InFailedSqlTransaction,
     psycopg2.errors.SerializationFailure,
@@ -37,19 +39,30 @@ _RETRYABLE_DROP_SLOT_ERRORS = (
 # psycopg2-binary rejects the YugabyteDB driver's load balancing connection options.
 _DRIVER_SPECIFIC_CONNECTION_OPTIONS = ('load_balance', 'topology_keys')
 
-# YugabyteDB reports a relation's leader-replica compressed SST plus WAL, and NULL for colocated tables.
-# A partitioned parent holds no data, so its partitions are summed.
-_TABLE_SIZE_SQL = """
-SELECT c.relname,
-       CASE WHEN bool_or(p.data_bytes IS NULL) THEN NULL ELSE SUM(p.data_bytes + p.index_bytes) END
-FROM pg_class c
-  JOIN pg_namespace n ON n.oid = c.relnamespace
-  CROSS JOIN LATERAL (
-      SELECT pg_table_size(r.oid) AS data_bytes, pg_indexes_size(r.oid) AS index_bytes
-      FROM (SELECT c.oid UNION ALL SELECT inhrelid FROM pg_inherits WHERE inhparent = c.oid) AS r(oid)
-  ) AS p
-WHERE n.nspname = %s AND c.relkind IN ('r', 'p', 'm') AND NOT c.relispartition
-GROUP BY c.relname
+# YugabyteDB reports a relation's leader-replica compressed SST plus WAL, and NULL for colocated tables; keep that
+# NULL rather than report a partial size. Partitioned tables sum their leaf partitions at every level.
+TABLE_SIZE_SQL = """
+WITH RECURSIVE relations AS (
+    SELECT c.oid, c.relkind
+    FROM pg_catalog.pg_class c
+    JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = %s AND c.relname = %s AND c.relkind IN ('r', 'p', 'm', 'v', 'f')
+    UNION ALL
+    SELECT c.oid, c.relkind
+    FROM relations parent
+    JOIN pg_catalog.pg_inherits i ON i.inhparent = parent.oid
+    JOIN pg_catalog.pg_class c ON c.oid = i.inhrelid
+), physical_relations AS (
+    SELECT DISTINCT oid, relkind,
+           CASE WHEN relkind IN ('r', 'm') THEN pg_catalog.pg_table_size(oid) END AS data_bytes,
+           CASE WHEN relkind IN ('r', 'm') THEN pg_catalog.pg_indexes_size(oid) END AS index_bytes
+    FROM relations
+)
+SELECT CASE WHEN bool_or(relkind IN ('v', 'f'))
+                 OR bool_or(relkind IN ('r', 'm') AND (data_bytes IS NULL OR index_bytes IS NULL)) THEN NULL
+            ELSE COALESCE(SUM(data_bytes + index_bytes) FILTER (WHERE relkind IN ('r', 'm')), 0) END,
+       COUNT(*)
+FROM physical_relations
 """
 
 # MISMATCHED_SCHEMA, one of the errors the general read-retry policy in yb_retry
@@ -251,7 +264,7 @@ class FastSyncTapYugabyte:
             if attempt == _DROP_SLOT_RETRY_ATTEMPTS:
                 raise RuntimeError(
                     f'Cannot reset YugabyteDB slot "{slot_name}": it is still active after '
-                    f'{_DROP_SLOT_RETRY_ATTEMPTS * _DROP_SLOT_RETRY_INTERVAL_SECONDS} seconds, longer than '
+                    f'{_DROP_SLOT_RETRY_WINDOW_SECONDS} seconds, longer than '
                     'ysql_cdc_active_replication_slot_window_ms, so a consumer is likely still streaming it. '
                     'Stop every consumer of this slot and retry. No source or state changes were made.'
                 )
@@ -366,6 +379,35 @@ class FastSyncTapYugabyte:
             else:
                 raise exc
 
+    @classmethod
+    def check_postgres_replica_identity(cls, connection_config: Dict, tables: List[str]) -> None:
+        """Reject LOG_BASED tables whose replica identity would load NULLs into a PostgreSQL target.
+
+        CHANGE streams only an update's changed columns and NOTHING streams no updates. The slot fixes each table's
+        identity when it is created, so this runs before a slot reset and before FastSync creates the slot.
+        """
+        if not tables:
+            return
+        connection = cls.admin_connection(connection_config)
+        try:
+            with connection.cursor() as cur:
+                cur.execute(
+                    "SELECT n.nspname || '.' || c.relname, c.relreplident FROM pg_class c "
+                    "JOIN pg_namespace n ON n.oid = c.relnamespace "
+                    "WHERE c.relreplident IN ('n', 'c') AND (n.nspname, c.relname) IN %s ORDER BY 1",
+                    (tuple(tuple(table.split('.', 1)) for table in tables),),
+                )
+                rows = cur.fetchall()
+        finally:
+            connection.close()
+        if rows:
+            names = {'n': 'NOTHING', 'c': 'CHANGE'}
+            blocked = ', '.join(f'{table} ({names[identity]})' for table, identity in rows)
+            raise RuntimeError(
+                f'LOG_BASED replication to PostgreSQL needs REPLICA IDENTITY DEFAULT or FULL: {blocked}. '
+                'Set REPLICA IDENTITY DEFAULT on these tables, then rerun.'
+            )
+
     def fetch_current_log_pos(self):
         """
         Create (if needed) the replication slot and return its HYBRID_TIME boundary.
@@ -421,20 +463,21 @@ class FastSyncTapYugabyte:
             connection_config: Dictionary with db credentials
             tables: Fully qualified `schema.table` names
         Returns:
-            Dictionary of table name to size in MB; None for colocated tables, views, or missing tables
+            Dictionary of table name to size in MB; None for colocated tables, views, or missing tables.
+            A partitioned table includes every partition; a selected partition reports its own size
         """
         sizes = {}
         connection = cls.admin_connection(connection_config)
         try:
             with connection.cursor() as cur:
-                for schema in sorted({table.split('.')[0] for table in tables}):
-                    cur.execute(_TABLE_SIZE_SQL, (schema,))
-                    for table_name, size_bytes in cur.fetchall():
-                        size_mb = None if size_bytes is None else float(size_bytes) / 1024 / 1024
-                        sizes[f'{schema}.{table_name}'] = size_mb
+                for table in tables:
+                    schema, table_name = table.split('.', 1)
+                    cur.execute(TABLE_SIZE_SQL, (schema, table_name))
+                    size_bytes, relations = cur.fetchone()
+                    sizes[table] = None if not relations or size_bytes is None else float(size_bytes) / 1024 / 1024
         finally:
             connection.close()
-        return {table: sizes.get(table) for table in tables}
+        return sizes
 
     def fetch_current_incremental_key_pos(self, table, replication_key):
         """

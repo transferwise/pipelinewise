@@ -66,16 +66,25 @@ After the change, verify the new target schema and representative values. Use
 :ref:`resync` only when its source and target cost is acceptable; a resync is not
 required merely because an old target column remains.
 
+.. warning::
+
+   On YugabyteDB LOG_BASED tables, run DDL and DML in separate sessions.
+   YugabyteDB can drop a change event when the same session runs a DDL
+   statement right after a DML statement. Nothing reports the lost change. See
+   :ref:`tap-yugabyte` for how to resync the table.
+
 
 .. _exact_decimal_mapping:
 
 Decimal mapping
 ---------------
 
-MariaDB/MySQL ``DECIMAL(p,s)`` or ``NUMERIC(p,s)`` and PostgreSQL or YugabyteDB
+MariaDB/MySQL ``DECIMAL(p,s)`` or ``NUMERIC(p,s)`` and PostgreSQL
 ``NUMERIC(p,s)`` or ``DECIMAL(p,s)`` retain their declared precision and scale
 where supported by Snowflake native, Snowflake managed Iceberg v3, and PostgreSQL
-targets. This applies to Singer and supported FullSync/PartialSync routes. New
+targets. YugabyteDB ``NUMERIC(p,s)`` or ``DECIMAL(p,s)`` retain them on Snowflake
+native and PostgreSQL targets; YugabyteDB does not support managed Iceberg
+targets yet. This applies to Singer and supported FullSync/PartialSync routes. New
 columns always use this mapping. Snowflake reports ``NUMERIC`` as its equivalent
 ``NUMBER`` type.
 Approximate ``FLOAT``, ``DOUBLE``, and ``REAL`` columns keep their existing mapping.

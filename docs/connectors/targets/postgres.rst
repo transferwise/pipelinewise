@@ -38,7 +38,8 @@ See :ref:`exact_decimal_mapping` for column versioning and key restrictions.
      - Native transfer
    * - PostgreSQL
      - Available
-     - FullSync from MariaDB/MySQL, PostgreSQL, or MongoDB; no PartialSync
+     - FullSync from MariaDB/MySQL, PostgreSQL, YugabyteDB, or MongoDB; no
+       PartialSync
 
 
 Prerequisites

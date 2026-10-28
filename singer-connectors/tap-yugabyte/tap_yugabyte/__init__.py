@@ -102,9 +102,10 @@ def do_sync_incremental(conn_config, stream, state, desired_columns, md_map):
 
 
 def ensure_log_based_replica_identity(conn_config, streams, default_replication_method):
-    """Reject LOG_BASED tables whose replica identity is NOTHING.
+    """Reject LOG_BASED tables whose replica identity cannot replicate to the target.
 
-    YugabyteDB then streams no updates and deletes without key values, so the target can never apply them.
+    NOTHING streams no updates and deletes without key values. On PostgreSQL targets, YugabyteDB's default CHANGE
+    streams only the changed columns of an update, and target-postgres writes NULL into the others.
     """
     tables = []
     for stream in streams:
@@ -115,18 +116,31 @@ def ensure_log_based_replica_identity(conn_config, streams, default_replication_
     if not tables:
         return
 
+    # PipelineWise sets decimal_target to the target type for PostgreSQL and Snowflake targets.
+    postgres_target = conn_config.get('decimal_target') == 'postgres'
     with post_db.open_connection(conn_config) as conn:
         with conn.cursor() as cur:
             cur.execute(
-                'SELECT n.nspname, c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace '
-                "WHERE c.relreplident = 'n' AND (n.nspname, c.relname) IN %s ORDER BY 1, 2",
+                'SELECT n.nspname, c.relname, c.relreplident FROM pg_class c '
+                'JOIN pg_namespace n ON n.oid = c.relnamespace '
+                "WHERE c.relreplident IN ('n', 'c') AND (n.nspname, c.relname) IN %s ORDER BY 1, 2",
                 (tuple(tables),),
             )
-            blocked = [f'{schema_name}.{table_name}' for schema_name, table_name in cur.fetchall()]
-    if blocked:
+            rows = cur.fetchall()
+    nothing = [f'{schema_name}.{table_name}' for schema_name, table_name, identity in rows if identity == 'n']
+    if nothing:
+        allowed = 'DEFAULT or FULL' if postgres_target else 'DEFAULT, FULL or CHANGE'
         raise Exception(
-            f'LOG_BASED replication cannot use REPLICA IDENTITY NOTHING: {", ".join(blocked)}. '
-            'Set REPLICA IDENTITY DEFAULT, FULL or CHANGE, then rerun the unfiltered fast_sync '
+            f'LOG_BASED replication cannot use REPLICA IDENTITY NOTHING: {", ".join(nothing)}. '
+            f'Set REPLICA IDENTITY {allowed}, then rerun the unfiltered fast_sync '
+            'so the replication slot is recreated with the new identity.'
+        )
+    change = [f'{schema_name}.{table_name}' for schema_name, table_name, identity in rows if identity == 'c']
+    if postgres_target and change:
+        raise Exception(
+            f'LOG_BASED replication to PostgreSQL cannot use REPLICA IDENTITY CHANGE: {", ".join(change)}. '
+            'CHANGE streams only the changed columns of an update, and the target would write NULL into '
+            'the rest. Set REPLICA IDENTITY DEFAULT, then rerun the unfiltered fast_sync '
             'so the replication slot is recreated with the new identity.'
         )
 

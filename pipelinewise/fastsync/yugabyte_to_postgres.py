@@ -5,7 +5,7 @@ import multiprocessing
 
 from functools import partial
 from argparse import Namespace
-from typing import Union
+from typing import List, Union
 from datetime import datetime
 
 from ..logger import Logger
@@ -151,6 +151,24 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
         return '{}: {}'.format(table, exc)
 
 
+def _log_based_tables(properties: dict, tables: List[str]) -> List[str]:
+    """Return the selected tables whose catalog metadata sets LOG_BASED."""
+    log_based = []
+    for stream in properties.get('streams', []):
+        table_meta = next(
+            (m.get('metadata', {}) for m in stream.get('metadata', []) if not m.get('breadcrumb')), {},
+        )
+        table = f"{table_meta.get('schema-name')}.{stream.get('table_name', stream.get('stream'))}"
+        if table_meta.get('replication-method') == 'LOG_BASED' and table in tables:
+            log_based.append(table)
+    return log_based
+
+
+def check_replica_identity(tap_config: dict, properties: dict, tables: List[str]) -> None:
+    """Fail before any slot is created when a LOG_BASED table would load NULLs into PostgreSQL."""
+    FastSyncTapYugabyte.check_postgres_replica_identity(tap_config, _log_based_tables(properties, tables))
+
+
 def main_impl():
     """Main sync logic"""
     args = utils.parse_args(REQUIRED_CONFIG_KEYS)
@@ -173,6 +191,8 @@ def main_impl():
         len(args.tables),
         pool_size,
     )
+
+    check_replica_identity(args.tap, args.properties, args.tables)
 
     # Create target schemas sequentially, Postgres doesn't like it running in parallel
     postgres_target = FastSyncTargetPostgres(args.target, args.transform)

@@ -14,6 +14,9 @@ CREATE TABLE logical1.logical1_table1(
     PRIMARY KEY (cid)
 );
 
+-- tap-yugabyte rejects the default CHANGE identity for LOG_BASED tables that load into PostgreSQL.
+ALTER TABLE logical1.logical1_table1 REPLICA IDENTITY DEFAULT;
+
 CREATE TABLE logical1.logical1_table2(
     cid serial NOT NULL,
     cvarchar varchar,

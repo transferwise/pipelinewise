@@ -36,7 +36,7 @@ DEFAULT_MAX_BACKOFF_SECONDS = 60.0
 PERMANENT_SQLSTATES = frozenset({
     '28000',  # invalid_authorization_specification
     '28P01',  # invalid_password
-    '42501',  # insufficient_privilege -- e.g. yb_read_time without superuser
+    '42501',  # insufficient_privilege -- e.g. yb_read_time without the SET grant
     '42P01',  # undefined_table
     '42703',  # undefined_column
     '42883',  # undefined_function -- e.g. yb_hash_code on an unsupported build

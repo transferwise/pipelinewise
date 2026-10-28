@@ -7,6 +7,7 @@ import pymysql
 
 from pipelinewise.fastsync.commons.tap_postgres import FastSyncTapPostgres
 from pipelinewise.fastsync.commons.tap_yugabyte import FastSyncTapYugabyte
+from pipelinewise.fastsync.commons.tap_yugabyte import TABLE_SIZE_SQL as YUGABYTE_TABLE_SIZE_SQL
 
 
 MYSQL_TABLE_SIZE_SQL = (
@@ -32,31 +33,6 @@ SELECT CASE WHEN bool_or(relkind IN ('v', 'f')) THEN NULL
 FROM (SELECT DISTINCT oid, relkind FROM relations) physical_relations
 """
 
-# YugabyteDB reports NULL pg_table_size for colocated tables; keep it NULL rather than
-# letting COALESCE or SUM report a misleading partial or zero size.
-YUGABYTE_TABLE_SIZE_SQL = """
-WITH RECURSIVE relations AS (
-    SELECT c.oid, c.relkind
-    FROM pg_catalog.pg_class c
-    JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-    WHERE n.nspname = %s AND c.relname = %s AND c.relkind IN ('r', 'p', 'm', 'v', 'f')
-    UNION ALL
-    SELECT c.oid, c.relkind
-    FROM relations parent
-    JOIN pg_catalog.pg_inherits i ON i.inhparent = parent.oid
-    JOIN pg_catalog.pg_class c ON c.oid = i.inhrelid
-), physical_relations AS (
-    SELECT DISTINCT oid, relkind,
-           CASE WHEN relkind IN ('r', 'm') THEN pg_catalog.pg_table_size(oid) END AS data_bytes,
-           CASE WHEN relkind IN ('r', 'm') THEN pg_catalog.pg_indexes_size(oid) END AS index_bytes
-    FROM relations
-)
-SELECT CASE WHEN bool_or(relkind IN ('v', 'f'))
-                 OR bool_or(relkind IN ('r', 'm') AND (data_bytes IS NULL OR index_bytes IS NULL)) THEN NULL
-            ELSE COALESCE(SUM(data_bytes + index_bytes) FILTER (WHERE relkind IN ('r', 'm')), 0) END,
-       COUNT(*)
-FROM physical_relations
-"""
 SOURCE_TABLE_SIZE_SQL = {
     'tap-mysql': MYSQL_TABLE_SIZE_SQL,
     'tap-postgres': POSTGRES_TABLE_SIZE_SQL,

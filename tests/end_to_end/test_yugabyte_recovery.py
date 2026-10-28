@@ -203,22 +203,25 @@ class _SourceWriter(threading.Thread):
 
     def run(self):
         try:
+            # `with connection` would open one transaction even under autocommit, committing only at the end.
             connection = _connect_yugabyte(self.e2e)
-            with connection, connection.cursor() as cursor:
-                while not self.stop_event.is_set():
-                    key, moved_to = next(self.keys), next(self.keys)
-                    existing = (self.commits % (INITIAL_ROWS - 10)) + 1
-                    for statement, params in (
-                        (f'INSERT INTO {SOURCE_SCHEMA}.{self.table} (id, payload, version) VALUES (%s, %s, 0)',
-                         (key, f'concurrent {key}')),
-                        (f'UPDATE {SOURCE_SCHEMA}.{self.table} SET version = version + 1 WHERE id = %s',
-                         (existing,)),
-                        (f'UPDATE {SOURCE_SCHEMA}.{self.table} SET id = %s WHERE id = %s', (moved_to, key)),
-                        (f'DELETE FROM {SOURCE_SCHEMA}.{self.table} WHERE id = %s', (existing + 1,)),
-                    ):
-                        cursor.execute(statement, params)
-                        self.commits += 1
-            connection.close()
+            try:
+                with connection.cursor() as cursor:
+                    while not self.stop_event.is_set():
+                        key, moved_to = next(self.keys), next(self.keys)
+                        existing = (self.commits % (INITIAL_ROWS - 10)) + 1
+                        for statement, params in (
+                            (f'INSERT INTO {SOURCE_SCHEMA}.{self.table} (id, payload, version) VALUES (%s, %s, 0)',
+                             (key, f'concurrent {key}')),
+                            (f'UPDATE {SOURCE_SCHEMA}.{self.table} SET version = version + 1 WHERE id = %s',
+                             (existing,)),
+                            (f'UPDATE {SOURCE_SCHEMA}.{self.table} SET id = %s WHERE id = %s', (moved_to, key)),
+                            (f'DELETE FROM {SOURCE_SCHEMA}.{self.table} WHERE id = %s', (existing + 1,)),
+                        ):
+                            cursor.execute(statement, params)
+                            self.commits += 1
+            finally:
+                connection.close()
         except Exception as exc:  # Surfaced by the test after join so a writer failure is never silent.
             self.error = exc
 
@@ -280,10 +283,13 @@ def test_initial_fullsync_replays_concurrent_writes(project):
     writer.start()
     try:
         wait_for('the source writer to commit', lambda: writer.commits >= 20)
+        commits_before_fullsync = writer.commits
         project.fast_sync()
         commits_during_fullsync = writer.commits
     finally:
         writer.stop()
+
+    assert commits_during_fullsync > commits_before_fullsync, 'the writer committed nothing while FastSync ran'
 
     slot = slot_status(project.e2e, project.slot_name)
     bookmarks = _bookmark_lsns(read_state(project.state_path))
@@ -296,7 +302,7 @@ def test_initial_fullsync_replays_concurrent_writes(project):
 
     _assert_target_matches_source(project.e2e, REPAIRED_TABLE)
     _assert_slot_behind_target_state(project)
-    assert writer.commits > commits_during_fullsync > 20
+    assert writer.commits >= commits_during_fullsync > 20
 
 
 def test_cdc_removes_the_old_row_when_a_primary_key_changes(project):
@@ -387,14 +393,16 @@ def test_buffered_changes_survive_interruption_and_restart(project):
     try:
         keys = project.keys.take(BUFFERED_RECORD_COUNT)
         connection = _connect_yugabyte(project.e2e)
-        with connection, connection.cursor() as cursor:
-            for key in keys:
-                cursor.execute(
-                    f'INSERT INTO {SOURCE_SCHEMA}.{BUFFERED_TABLE} (id, payload, version) '
-                    'VALUES (%s, repeat(md5(%s::text), %s), 0)',
-                    (key, key, PAYLOAD_REPETITIONS),
-                )
-        connection.close()
+        try:
+            with connection.cursor() as cursor:
+                for key in keys:
+                    cursor.execute(
+                        f'INSERT INTO {SOURCE_SCHEMA}.{BUFFERED_TABLE} (id, payload, version) '
+                        'VALUES (%s, repeat(md5(%s::text), %s), 0)',
+                        (key, key, PAYLOAD_REPETITIONS),
+                    )
+        finally:
+            connection.close()
 
         lock_connection = _connect_target(project.e2e)
         with lock_connection.cursor() as lock_cursor:

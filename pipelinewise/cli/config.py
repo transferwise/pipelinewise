@@ -131,6 +131,7 @@ class Config:
             cls.validate_snowflake_decimal_versioning(tap_data, targets[target_id])
             cls.validate_source_transformations(tap_data, targets[target_id])
             cls.validate_yugabyte_log_based_port(tap_data)
+            cls.validate_yugabyte_route(tap_data, targets[target_id])
 
             # Add generated extra keys that not available in the YAML
             tap_data['files'] = config.get_connector_files(
@@ -408,6 +409,40 @@ class Config:
                 )
 
         return selection
+
+    @classmethod
+    def validate_yugabyte_route(cls, tap: Dict, target: Dict) -> None:
+        """Reject tap-yugabyte routes where nothing creates the LOG_BASED replication slot.
+
+        Only FastSync creates the slot. Without it, LOG_BASED fails with "Unable to find replication slot" on its
+        second run, and the unfiltered fast_sync that would recreate it is unavailable.
+        """
+        if tap.get('type') != 'tap-yugabyte':
+            return
+        if tap.get('target_table_format') == cls.TABLE_FORMAT_ICEBERG:
+            raise InvalidConfigException(
+                f'Tap "{tap.get("id")}" uses target_table_format "iceberg". YugabyteDB does not support managed '
+                'Iceberg targets yet. Remove target_table_format or set it to "native".'
+            )
+        capabilities = fastsync_capabilities.resolve_fastsync_capabilities(
+            tap['type'], target['type'], tap.get('target_table_format'),
+        )
+        if capabilities.full_sync:
+            return
+        default_replication_method = utils.get_tap_default_replication_method(tap)
+        log_based_tables = [
+            f'{schema.get("source_schema")}.{table.get("table_name")}'
+            for schema in tap.get('schemas', [])
+            for table in schema.get('tables', [])
+            if table.get('replication_method', default_replication_method) == 'LOG_BASED'
+        ]
+        if log_based_tables:
+            raise InvalidConfigException(
+                f'Tap "{tap.get("id")}" uses LOG_BASED replication for {", ".join(log_based_tables)} with target '
+                f'"{target.get("id")}" ({target["type"]}). YugabyteDB LOG_BASED needs FastSync to create its '
+                'replication slot, and this target has no FastSync route. Use FULL_TABLE or INCREMENTAL for these '
+                'tables.'
+            )
 
     @classmethod
     def validate_yugabyte_log_based_port(cls, tap: Dict) -> None:

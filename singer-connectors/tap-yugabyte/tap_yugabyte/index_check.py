@@ -8,6 +8,11 @@ the live source, and prints the DDL to close the gap.
 
     tap-yugabyte-index-check tap_yugabyte.yml --host h --port 5433 --user u --dbname d
 
+PostgreSQL and Snowflake targets load FULL_TABLE tables and LOG_BASED initial
+snapshots through FastSync, which reads no keyset index. Pass
+`--target-type target-s3-csv` for a target without FastSync, where the tap scans
+FULL_TABLE tables itself.
+
 Exit status is 0 when nothing needs doing, 1 when any table needs an index or has
 a configuration that cannot work.
 """
@@ -26,6 +31,10 @@ OK, ACTION, BLOCK = 'OK', 'ACTION', 'BLOCK'
 # PipelineWise's own default for tap-yugabyte tables that name no method
 # (pipelinewise/cli/tap_properties.py); the tap YAML has no key to override it.
 DEFAULT_REPLICATION_METHOD = 'LOG_BASED'
+
+# Targets with a tap-yugabyte FastSync route (pipelinewise/cli/fastsync_capabilities.py).
+FASTSYNC_TARGET_TYPES = ('target-postgres', 'target-snowflake')
+TARGET_TYPES = FASTSYNC_TARGET_TYPES + ('target-s3-csv',)
 
 
 def _repair_ddl(schema_name, found, create_statement):
@@ -66,12 +75,13 @@ def _primary_key(cur, schema_name, table_name):
 def _pk_index(cur, schema_name, table_name, pk_columns, pk_types, buckets):
     """Shape 1/2: ((yb_hash_code(pk) % N) ASC, pk ASC) UNIQUE.
 
-    Required by FULL_TABLE and by the full-table bootstrap stage of LOG_BASED,
-    which runs the same code -- for every table with a primary key, whatever the
-    sharding. A range-sharded key used to be reported OK with nothing to do; the
-    tap has no code path that exploits it, so that OK predicted a parallel
-    resumable sync the operator never got. plan_keyset_strategy says which
-    sharding it is and why the index is needed either way.
+    Required by FULL_TABLE when the tap scans the table itself, on a target
+    without FastSync, for every table with a primary key, whatever the
+    sharding. INCREMENTAL on the primary key reuses it. A range-sharded key
+    used to be reported OK with nothing to do; the tap has no code path that
+    exploits it, so that OK predicted a parallel resumable sync the operator
+    never got. plan_keyset_strategy says which sharding it is and why the
+    index is needed either way.
     """
     plan = keyset.plan_keyset_strategy(cur, schema_name, table_name,
                                        pk_columns, pk_types, buckets)
@@ -91,23 +101,18 @@ def _pk_index(cur, schema_name, table_name, pk_columns, pk_types, buckets):
 
 
 def check_full_table(cur, schema_name, table_name, buckets):
-    """FULL_TABLE pages by primary key, so it needs the key to be scannable in
-    order."""
+    """A Singer FULL_TABLE scan pages by primary key, so it needs the key to be
+    scannable in order."""
     pk_columns, pk_types = _primary_key(cur, schema_name, table_name)
     return _pk_index(cur, schema_name, table_name, pk_columns, pk_types, buckets)
 
 
-def check_log_based(cur, schema_name, table_name, buckets):
-    """LOG_BASED reads the change stream -- but its first stage is a full-table
-    bootstrap that runs full_table.sync_table, so it needs the same index."""
-    pk_columns, pk_types = _primary_key(cur, schema_name, table_name)
-    status, notes, ddl = _pk_index(cur, schema_name, table_name,
-                                   pk_columns, pk_types, buckets)
-    notes.append('The change stream itself needs no index. The initial snapshot '
-                 'does: LOG_BASED bootstraps through the same full-table scan, '
-                 'and resumes it after an interruption.')
-    notes.append('It does need a replica identity that can name a deleted row.')
-    return status, notes, ddl
+def check_fastsync_table(method):
+    """FastSync copies FULL_TABLE tables and LOG_BASED initial snapshots with a plain COPY."""
+    if method == 'FULL_TABLE':
+        return OK, ['FastSync copies this table on every run with a plain COPY, which reads no keyset index.'], []
+    return OK, ['FastSync loads the initial snapshot with a plain COPY, and the change stream reads no index.',
+                'The table needs a replica identity other than NOTHING; PostgreSQL targets need DEFAULT or FULL.'], []
 
 
 def check_incremental(cur, schema_name, table_name, replication_key, buckets,
@@ -163,7 +168,8 @@ def check_incremental(cur, schema_name, table_name, replication_key, buckets,
     if found is not None and not problems:
         notes.append(f'{name} orders {replication_key} within each of {buckets} '
                      f'buckets and ends in the primary key, so the watermark scan '
-                     f'streams in order and resumes inside a tie.')
+                     f'streams in order. A resume still rereads every row that shares '
+                     f'the bookmarked value.')
     else:
         notes.extend(problems)
         fq_table_name = f'"{schema_name}"."{table_name}"'
@@ -184,16 +190,20 @@ def table_method(table):
     return (table.get('replication_method') or DEFAULT_REPLICATION_METHOD).upper()
 
 
-def check_table(cur, schema_name, table, buckets, run_limit=None):
+def check_table(cur, schema_name, table, buckets, run_limit=None, fastsync=False):
+    """Check one table for the route it runs on: `fastsync` when the target has a FastSync route."""
     method = table_method(table)
     table_name = table['table_name']
+    if method in ('FULL_TABLE', 'LOG_BASED') and fastsync:
+        return check_fastsync_table(method)
     if method == 'FULL_TABLE':
         return check_full_table(cur, schema_name, table_name, buckets)
     if method == 'INCREMENTAL':
         return check_incremental(cur, schema_name, table_name,
                                  table.get('replication_key'), buckets, run_limit)
     if method == 'LOG_BASED':
-        return check_log_based(cur, schema_name, table_name, buckets)
+        return BLOCK, ['LOG_BASED needs FastSync to create its replication slot, and this target has no '
+                       'FastSync route. PipelineWise rejects it. Use FULL_TABLE or INCREMENTAL.'], []
     return BLOCK, [f'Unknown replication_method {method!r}.'], []
 
 
@@ -222,13 +232,18 @@ def worse(current, status):
     return OK
 
 
-def run(config, cur, buckets, limit):
+def run(config, cur, buckets, limit, fastsync=True):
     """Check every table in a tap YAML and print the report; return the worst status."""
     all_ddl, worst = [], OK
+    iceberg = config.get('target_table_format') == 'iceberg'
     for schema in config.get('schemas') or []:
         schema_name = schema['source_schema']
         for table in schema.get('tables') or []:
-            status, notes, ddl = check_table(cur, schema_name, table, buckets, limit)
+            if iceberg:
+                status, notes, ddl = BLOCK, ['PipelineWise does not support YugabyteDB with managed Iceberg '
+                                             'targets yet. Remove target_table_format or set it to "native".'], []
+            else:
+                status, notes, ddl = check_table(cur, schema_name, table, buckets, limit, fastsync)
             key = table.get('replication_key')
             heading = f"{schema_name}.{table['table_name']}  [{table_method(table)}"
             heading += f" on {key}]" if key else "]"
@@ -265,6 +280,10 @@ def main(argv=None):
                              'db_conn.limit in the YAML. Given it, the tie-group '
                              'check is exact rather than a heuristic: a group of '
                              'at least this many rows can never advance the bookmark')
+    parser.add_argument('--target-type', choices=TARGET_TYPES, default=None,
+                        help='type of the target the tap loads into. PostgreSQL and Snowflake, '
+                             'the default, load FULL_TABLE and LOG_BASED tables through FastSync, '
+                             'which needs no keyset index; target-s3-csv has no FastSync route')
     args = parser.parse_args(argv)
 
     with open(args.config, encoding='utf-8') as handle:
@@ -276,7 +295,7 @@ def main(argv=None):
     conn.autocommit = True
     try:
         with conn.cursor() as cur:
-            worst = run(config, cur, buckets, limit)
+            worst = run(config, cur, buckets, limit, args.target_type != 'target-s3-csv')
     finally:
         conn.close()
     return 0 if worst == OK else 1

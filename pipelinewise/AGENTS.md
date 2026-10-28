@@ -17,10 +17,12 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
 - `fastsync/`: native bulk sync. FullSync replaces tables for initial loads,
   FULL_TABLE, and explicit `fast_sync`; PartialSync merges filtered ranges for
   `partial_sync_table`/`sync_start_from`. FullSync supports `tap-mysql`
-  (MariaDB/MySQL), `tap-postgres`, and `tap-mongodb` to PostgreSQL/Snowflake;
-  PartialSync supports `tap-mysql`/`tap-postgres` to Snowflake. S3 CSV remains
-  Singer-only. Keep MySQL/PostgreSQL→Snowflake lifecycle in
-  `commons/rdbms_to_snowflake.py` and `partialsync/rdbms_to_snowflake.py`;
+  (MariaDB/MySQL), `tap-postgres`, `tap-yugabyte`, and `tap-mongodb` to
+  PostgreSQL/Snowflake; PartialSync supports `tap-mysql`/`tap-postgres`/
+  `tap-yugabyte` to Snowflake. S3 CSV remains Singer-only, so `validate`
+  rejects YugabyteDB LOG_BASED there; YugabyteDB has no managed Iceberg route.
+  Keep MySQL/PostgreSQL→Snowflake lifecycle in `commons/rdbms_to_snowflake.py`
+  and `partialsync/rdbms_to_snowflake.py`;
   source modules only adapt source construction, mapping, and ordering. Put
   other shared primitives in `commons/`, imported by `partialsync/`, and align
   `docs/concept/fastsync.rst`.

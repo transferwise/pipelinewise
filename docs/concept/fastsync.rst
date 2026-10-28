@@ -52,6 +52,11 @@ Supported routes
      - Native, managed Iceberg v3
      - Yes
      - Yes
+   * - YugabyteDB
+     - Snowflake
+     - Native
+     - Yes
+     - Yes
    * - MongoDB
      - Snowflake
      - Native
@@ -63,6 +68,11 @@ Supported routes
      - Yes
      - No
    * - PostgreSQL
+     - PostgreSQL
+     - Native
+     - Yes
+     - No
+   * - YugabyteDB
      - PostgreSQL
      - Native
      - Yes
@@ -231,7 +241,8 @@ Configured PartialSync
      - Recreates the target before loading the filtered result.
 
 Exactly one of ``static_value`` and ``dynamic_value`` is allowed. Configured
-PartialSync is supported only from MariaDB/MySQL or PostgreSQL to Snowflake.
+PartialSync is supported only from MariaDB/MySQL, PostgreSQL, or YugabyteDB to
+Snowflake.
 
 If a dynamic query returns no boundary, PipelineWise treats the partial range as
 empty and completes successfully. Use a static boundary when an empty result
