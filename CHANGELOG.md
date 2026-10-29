@@ -87,6 +87,11 @@ Different from tap-postgres:
 - Wait up to five and a half minutes when dropping or resetting a slot, past
   YugabyteDB's five-minute window in which a slot stays active after its
   consumer disconnects
+- Load very large tables in batches, or raise `cdc_intent_retention_ms` and
+  `cdc_wal_retention_time_secs` for the first load. Nothing reads the slot
+  while FastSync runs, and an unread slot expires after eight hours by
+  default. See
+  [large initial loads](docs/connectors/taps/yugabyte.rst#large-initial-loads)
 - Run FastSync and PartialSync from a separate `fastsync-yugabyte`
   virtualenv with the `psycopg2-yugabytedb-binary` driver. The rest of
   PipelineWise and data-diff keep `psycopg2-binary`, connect directly to

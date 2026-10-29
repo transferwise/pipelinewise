@@ -364,6 +364,46 @@ history while the slot exists, even past
 ``cdc_intent_retention_ms`` (default eight hours) expires. Then run the
 unfiltered ``fast_sync`` to create a new slot.
 
+.. _yugabyte_large_initial_loads:
+
+Large initial loads
+'''''''''''''''''''
+
+Nothing reads the replication slot while FastSync runs. Streaming starts only
+after every table in the run is loaded. If that takes longer than
+``cdc_intent_retention_ms`` (default eight hours), the slot expires before the
+tap can use it. You then have to run the unfiltered ``fast_sync`` again.
+
+A table's copy cannot resume. If it fails, FastSync copies that table again
+from the start. Each table is copied by one statement, so more workers do not
+speed up one large table. ``fastsync_parallelism`` only loads more tables at
+once.
+
+Before loading tables of hundreds of gigabytes:
+
+1. Add the largest tables a few at a time. Add one batch to the tap YAML, run
+   ``import_config`` and ``run_tap``, and wait until the tap streams. The next
+   batch then copies from a slot the tap reads on every run, so the slot stays
+   current.
+2. If one batch can still take longer than eight hours, ask the DBA to raise
+   both retention flags on every YB-TServer for the load:
+
+   - ``cdc_intent_retention_ms``, for example ``172800000`` for 48 hours; and
+   - ``cdc_wal_retention_time_secs``, for example ``172800``.
+
+   ``cdc_wal_retention_time_secs`` multiplied by 1000 must be at least
+   ``cdc_intent_retention_ms``. Both flags can be changed without a restart.
+3. Watch tablet disk while the flags are raised. Every table in the database
+   keeps its write-ahead log and intents for the whole window, not only the
+   selected tables.
+4. Set both flags back to their previous values once the tap streams. A
+   scheduled tap reads the slot on every run.
+5. For tables with ``sync_start_from``, create the index on that column. The
+   first copy then reads only the selected rows. See `Required indexes`_.
+6. Give the PipelineWise host enough temporary disk for the largest export.
+   Set ``split_large_files`` on the Snowflake target to write it as several
+   files.
+
 .. _yugabyte_replica_identity:
 
 Replica identity
