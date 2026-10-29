@@ -1,3 +1,11 @@
+0.97.1 (2026-10-29)
+-------------------
+
+- Stop taps by signaling the PipelineWise process recorded in the tap-target
+  PID file, rather than the stop command itself. Allow child processes 25
+  seconds to shut down before killing survivors, and retain shutdown output in
+  the run log.
+
 0.97.0 (2026-10-23)
 -------------------
 - Fix Dcocker-compose for dev environment.

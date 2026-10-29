@@ -227,9 +227,13 @@ See :ref:`running_pipelines` for preflight and recovery.
 
    pipelinewise stop_tap --tap <tap_id> --target <target_id>
 
-Signals the process tree associated with the tap-target PID file. The target is
-given an opportunity to finish data already received. Restart without editing
-state after an unexpected interruption.
+Sends SIGTERM to the PipelineWise process in the tap-target PID file. That
+process stops its child processes, marks its run log ``.terminated``, and
+exits. The target is given an opportunity to finish data already received. If
+the run is still alive after 25 seconds, ``stop_tap`` kills its process tree.
+Restart without editing state after an unexpected interruption.
+
+Sending SIGTERM or SIGINT to the PipelineWise process has the same effect.
 
 
 .. _cli_fast_sync:

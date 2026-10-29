@@ -2,6 +2,7 @@
 PipelineWise CLI - Commands
 """
 import os
+import select
 import shlex
 import logging
 import json
@@ -19,6 +20,7 @@ DEFAULT_STREAM_BUFFER_SIZE = 0  # Disabled by default
 DEFAULT_STREAM_BUFFER_BIN = 'mbuffer'
 MIN_STREAM_BUFFER_SIZE = 10
 MAX_STREAM_BUFFER_SIZE = 2500
+SHUTDOWN_OUTPUT_DRAIN_SECONDS = 5
 
 PARAMS_VALIDATION_RETRY_PERIOD_SEC = 2
 PARAMS_VALIDATION_RETRY_TIMES = 3
@@ -493,6 +495,30 @@ def _command_log_redactor(command):
     return CredentialRedactor(configs)
 
 
+def _drain_output(stream, write_line, timeout):
+    """Write lines already emitted to a pipe, waiting at most timeout seconds for EOF."""
+    deadline = time.monotonic() + timeout
+    pending = b''
+    try:
+        os.set_blocking(stream.fileno(), False)
+        while True:
+            chunk = stream.read()
+            if chunk == b'':
+                break
+            if chunk:
+                *lines, pending = (pending + chunk).split(b'\n')
+                for line in lines:
+                    write_line(line + b'\n')
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            select.select([stream], [], [], remaining)
+        if pending:
+            write_line(pending)
+    except Exception:
+        LOGGER.exception('Could not write remaining command output to the log file.')
+
+
 def run_command(command: str, log_file: str = None, line_callback: callable = None):
     """
     Runs a shell command with or without log file with STDOUT and STDERR
@@ -523,7 +549,9 @@ def run_command(command: str, log_file: str = None, line_callback: callable = No
         with Popen(shlex.split(piped_command), stdout=PIPE, stderr=STDOUT) as proc:
             with open(log_file_running, 'a+', encoding='utf-8') as logfile:
                 stdout = ''
-                for line in iter(proc.stdout.readline, b''):
+
+                def write_line(line):
+                    nonlocal stdout
                     decoded_line = line.decode('utf-8')
                     # State and control messages drive acknowledgement and retries, not human logging.
                     if not (
@@ -538,6 +566,14 @@ def run_command(command: str, log_file: str = None, line_callback: callable = No
 
                     logfile.write(decoded_line)
                     logfile.flush()
+
+                try:
+                    for line in iter(proc.stdout.readline, b''):
+                        write_line(line)
+                except (SystemExit, KeyboardInterrupt):
+                    # Signal handlers exit from inside this loop; keep the children's shutdown output.
+                    _drain_output(proc.stdout, write_line, SHUTDOWN_OUTPUT_DRAIN_SECONDS)
+                    raise
 
                 proc.wait()
 
