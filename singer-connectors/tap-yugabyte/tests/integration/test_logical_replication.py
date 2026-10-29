@@ -90,13 +90,6 @@ class TestLogicalReplication(unittest.TestCase):
             with conn.cursor() as cur:
                 cur.execute(f"UPDATE {self.table_name} SET colour = 'purple' WHERE id = 1")
 
-        # A DDL statement executed immediately after a DML transaction on the SAME session,
-        # with no intervening delay, can make YugabyteDB's wal2json CDC stream either raise
-        # SerializationFailure on the DDL itself or silently drop the preceding DML's change
-        # event - even though the DML committed - confirmed by direct probing outside this
-        # suite. A brief pause plus a fresh session avoids the conflict.
-        time.sleep(2)
-
         with get_test_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(f'ALTER TABLE {self.table_name} ADD COLUMN nice_flag boolean')

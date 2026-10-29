@@ -347,14 +347,6 @@ rejected for ``LOG_BASED``.
 An update that changes a primary key streams as a delete of the old key and an
 insert of the new key. The target removes the row under the old key.
 
-.. warning::
-
-   YugabyteDB can drop a change event when the same session runs a DDL
-   statement right after a DML statement on a replicated table. The tap never
-   receives that row change, and nothing reports it. Run DDL and DML on
-   replicated tables in separate sessions. If a change was lost, resync the
-   table as shown below.
-
 ``LOG_BASED`` does not replicate ``TRUNCATE``. After a ``TRUNCATE``, resync the
 table:
 

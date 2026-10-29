@@ -56,10 +56,7 @@ class TestReplicateYugabyteToSF(TapYugabyte):
             "DELETE FROM public.country WHERE code = 'UMI'"
         )
 
-        #  LOG_BASED - DDL first, DML last: on YugabyteDB a DML immediately followed
-        #  by a DDL statement on the same session can silently drop the DML's wal2json
-        #  change event, so schema changes on a CDC-streamed table must never precede
-        #  the DML that depends on them within the same connection.
+        #  LOG_BASED - schema changes followed by a DML that uses the new columns
         self.e2e_env.run_query_tap_yugabyte(
             'ALTER TABLE logical1.logical1_table1 ADD COLUMN bool_col bool;'
         )

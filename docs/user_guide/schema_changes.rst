@@ -66,13 +66,6 @@ After the change, verify the new target schema and representative values. Use
 :ref:`resync` only when its source and target cost is acceptable; a resync is not
 required merely because an old target column remains.
 
-.. warning::
-
-   On YugabyteDB LOG_BASED tables, run DDL and DML in separate sessions.
-   YugabyteDB can drop a change event when the same session runs a DDL
-   statement right after a DML statement. Nothing reports the lost change. See
-   :ref:`tap-yugabyte` for how to resync the table.
-
 
 .. _exact_decimal_mapping:
 
