@@ -341,9 +341,11 @@ command completes recovery.
 
 Retry from the same imported target runtime directory with the same table,
 ``--eventual`` value, target account/database/user, and account role before
-resuming readers or writers. Do not delete its recovery manifest or companion
-tables. See :ref:`snowflake_iceberg` for preflight, unsupported metadata, and
-rollback behaviour.
+resuming readers or writers. After an interrupted cutover, a retry restores the
+native table name before it validates anything. A rerun after a completed
+``--eventual iceberg`` conversion changes nothing. Do not delete its recovery manifest or companion tables. See
+:ref:`snowflake_iceberg` for preflight, unsupported metadata, and rollback
+behaviour.
 
 
 Data-diff

@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from pipelinewise.fastsync.commons.snowflake_iceberg import (
     PHASE_FINALIZED,
+    PHASE_PREPARED,
     PHASE_PUBLISHED,
     PHASE_STAGED,
     PHASE_STAGING_CREATED,
@@ -18,6 +19,9 @@ from pipelinewise.fastsync.commons.snowflake_iceberg import (
 )
 from pipelinewise.fastsync.commons.snowflake_iceberg_coordination import (
     RecoveryCoordinator,
+)
+from pipelinewise.fastsync.commons.snowflake_iceberg_recovery import (
+    IcebergPublicationError,
 )
 from pipelinewise.fastsync.commons.snowflake_iceberg_inspection import (
     exact_named_table_rows,
@@ -64,6 +68,22 @@ TABLE_FORMAT_ICEBERG = 'iceberg'
 ROLLBACK_REQUIRED = 'rollback_required'
 
 LOGGER = logging.getLogger(__name__)
+
+
+def _wraps_unexpected_error(error: BaseException) -> bool:
+    """Return whether a validation error wraps a failure that is not a validation result."""
+    seen = set()
+    link = error
+    while id(link) not in seen:
+        seen.add(id(link))
+        link = link.__cause__ if link.__cause__ is not None else (
+            None if link.__suppress_context__ else link.__context__
+        )
+        if link is None:
+            return False
+        if not isinstance(link, (NativeToIcebergConversionError, IcebergPublicationError)):
+            return True
+    return True
 
 
 def _new_conversion_attempt(
@@ -130,6 +150,7 @@ class SnowflakeNativeToIcebergConverter:
         table = SnowflakeTableName.parse(fqtn)
         self._validate_companion_names(table)
         self._validate_database(table)
+        self._query_tag_context = {}
         recovery_identity = _manual_recovery_identity(
             self.snowflake.connection_config
         )
@@ -154,20 +175,13 @@ class SnowflakeNativeToIcebergConverter:
                     recovery_identity,
                 )
             else:
-                manifest = self._recover_completed_without_manifest(
+                manifest = self._attempt_without_manifest(
                     table,
                     eventual,
                     recovery_identity,
                 )
                 if manifest is None:
-                    metadata = self._inspect_source(table)
-                    manifest = _new_conversion_attempt(
-                        table,
-                        eventual,
-                        metadata,
-                        recovery_identity,
-                    )
-                    self.recovery_coordinator.save_conversion_attempt(manifest)
+                    return
 
             self._query_tag_context = {
                 'load_id': manifest.load_id,
@@ -272,13 +286,54 @@ class SnowflakeNativeToIcebergConverter:
                 'Conversion manifest identity or schema fingerprint is invalid'
             )
 
-    def _recover_completed_without_manifest(
+    def _attempt_without_manifest(
         self,
         table: SnowflakeTableName,
         eventual: str,
         recovery_identity: Dict[str, Any],
     ) -> Optional[IcebergPublicationAttempt]:
+        """Return the attempt to run, or None when the table is already converted."""
         state = self._table_state(table)
+        if eventual == EVENTUAL_ICEBERG and state == ConversionTableState(
+            TABLE_FORMAT_ICEBERG,
+            TABLE_FORMAT_MISSING,
+            TABLE_FORMAT_NATIVE,
+        ):
+            # Completed conversions are terminal: revalidating the stale backup
+            # against a table that may have changed can only fail or roll back.
+            assert_managed_v3(self._query, table)
+            LOGGER.info(
+                '%s is already a managed Iceberg table and %s is its native backup; '
+                'nothing to convert',
+                table.quoted,
+                table.with_suffix('_NATIVE').quoted,
+            )
+            return None
+
+        manifest = self._recover_completed_without_manifest(
+            table,
+            state,
+            eventual,
+            recovery_identity,
+        )
+        if manifest is None:
+            metadata = self._inspect_source(table)
+            manifest = _new_conversion_attempt(
+                table,
+                eventual,
+                metadata,
+                recovery_identity,
+            )
+            self.recovery_coordinator.save_conversion_attempt(manifest)
+        return manifest
+
+    def _recover_completed_without_manifest(
+        self,
+        table: SnowflakeTableName,
+        state: ConversionTableState,
+        eventual: str,
+        recovery_identity: Dict[str, Any],
+    ) -> Optional[IcebergPublicationAttempt]:
         if state == ConversionTableState(
             TABLE_FORMAT_NATIVE,
             TABLE_FORMAT_ICEBERG,
@@ -297,18 +352,10 @@ class SnowflakeNativeToIcebergConverter:
         if state == ConversionTableState(
             TABLE_FORMAT_ICEBERG,
             TABLE_FORMAT_MISSING,
-            TABLE_FORMAT_NATIVE,
+            TABLE_FORMAT_MISSING,
         ):
-            if eventual != EVENTUAL_ICEBERG:
-                raise self._manual_recovery_error(table)
-            metadata = self._inspect_source(table.with_suffix('_NATIVE'))
-            assert_managed_v3(self._query, table)
-            self._assert_equal_contents(table.with_suffix('_NATIVE'), table, metadata.columns)
-            return _new_conversion_attempt(
-                table,
-                eventual,
-                metadata,
-                recovery_identity,
+            raise NativeToIcebergConversionError(
+                f'{table.quoted} is already an Iceberg table; there is no native table to convert'
             )
 
         if state != ConversionTableState(
@@ -353,20 +400,11 @@ class SnowflakeNativeToIcebergConverter:
             TABLE_FORMAT_ICEBERG,
             TABLE_FORMAT_NATIVE,
         ):
-            if payload.eventual != EVENTUAL_ICEBERG:
+            if payload.eventual != EVENTUAL_ICEBERG or manifest.phase != PHASE_SUBMITTED:
                 raise self._manual_recovery_error(table)
-            metadata = self._inspect_source(table.with_suffix('_NATIVE'))
-            if metadata.fingerprint != payload.source_schema_fingerprint:
-                raise NativeToIcebergConversionError(
-                    'Native backup schema no longer matches the conversion manifest'
-                )
-            staging = table.with_suffix('_ICEBERG')
-            assert_managed_v3(self._query, staging)
-            assert_iceberg_table_spec(self._query, staging, manifest.table_spec)
-            assert_supported_metadata(staging, metadata, self._inspect_source(staging))
-            self._assert_equal_contents(table.with_suffix('_NATIVE'), staging, metadata.columns)
-            self._promote_staging(table, manifest)
-            return
+            # Close the reader gap before any scan, then cut over again from staging.
+            self._restore_native(table)
+            state = self._table_state(table)
 
         if state == ConversionTableState(
             TABLE_FORMAT_MISSING,
@@ -376,7 +414,8 @@ class SnowflakeNativeToIcebergConverter:
             self._restore_native(table)
             state = self._table_state(table)
 
-        if state not in (
+        # A published manifest only finalizes; repeating pre-cutover DDL cannot advance it.
+        if manifest.phase == PHASE_PUBLISHED or state not in (
             ConversionTableState(
                 TABLE_FORMAT_NATIVE,
                 TABLE_FORMAT_MISSING,
@@ -410,10 +449,12 @@ class SnowflakeNativeToIcebergConverter:
         )
         manifest.expected_row_count = row_count
         manifest.expected_row_fingerprint = str(row_hash)
-        self._transition(manifest, PHASE_STAGED)
 
         self._apply_metadata(staging, metadata)
         assert_supported_metadata(staging, metadata, self._inspect_source(staging))
+        # Saving only after parity keeps a rejected adopted companion from leaving
+        # a manifest that would block FastSync for the table.
+        self._transition(manifest, PHASE_STAGED)
         self._transition(manifest, PHASE_SUBMITTED)
 
         if payload.eventual == EVENTUAL_NATIVE:
@@ -441,7 +482,8 @@ class SnowflakeNativeToIcebergConverter:
             )
 
         assert_managed_v3(self._query, table.with_suffix('_ICEBERG'))
-        self._transition(manifest, PHASE_STAGING_CREATED)
+        if manifest.phase == PHASE_PREPARED:
+            self._transition(manifest, PHASE_STAGING_CREATED)
 
     @staticmethod
     def _create_iceberg_ctas(table: SnowflakeTableName, metadata: ConversionMetadata, iceberg_version: int) -> str:
@@ -536,9 +578,14 @@ class SnowflakeNativeToIcebergConverter:
         table: SnowflakeTableName,
         manifest: IcebergPublicationAttempt,
     ) -> None:
+        # Drift or a transient error keeps the promoted table: renaming it away could
+        # hide writes. Only a contract mismatch over proven-equal contents rolls back.
+        metadata = self.finalization_validator.validate_promoted_contents(table, manifest)
         try:
-            self.finalization_validator.validate_promoted(table, manifest)
-        except Exception:
+            self.finalization_validator.validate_promoted_contract(table, manifest, metadata)
+        except NativeToIcebergConversionError as contract_error:
+            if _wraps_unexpected_error(contract_error):
+                raise
             manifest.update_manifest_payload({ROLLBACK_REQUIRED: True})
             self.recovery_coordinator.save_conversion_attempt(manifest)
             try:
@@ -573,6 +620,7 @@ class SnowflakeNativeToIcebergConverter:
             TABLE_FORMAT_MISSING,
         )
         if state == promoted:
+            self.finalization_validator.validate_promoted_contents(table, manifest)
             self._rollback_promoted(table)
         elif state == rollback_started:
             self._restore_native(table)
@@ -583,7 +631,11 @@ class SnowflakeNativeToIcebergConverter:
         if state != restored:
             raise self._manual_recovery_error(table)
         manifest.update_manifest_payload(remove=(ROLLBACK_REQUIRED,))
-        self._transition(manifest, PHASE_SUBMITTED)
+        if manifest.phase in (PHASE_PREPARED, PHASE_STAGING_CREATED):
+            # A marker saved before staging evidence existed resumes from its own phase.
+            self.recovery_coordinator.save_conversion_attempt(manifest)
+        else:
+            self._transition(manifest, PHASE_SUBMITTED)
         return state
 
     def _rollback_promoted(self, table: SnowflakeTableName) -> None:

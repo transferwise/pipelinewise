@@ -7,6 +7,7 @@ from pipelinewise.fastsync.commons.snowflake_iceberg_recovery import (
     content_evidence_mismatch,
 )
 from pipelinewise.fastsync.commons.snowflake_iceberg_validation import (
+    ConversionMetadata,
     ConversionTableState,
     NativeToIcebergConversionError,
     SnowflakeTableName,
@@ -104,14 +105,20 @@ class SnowflakeConversionFinalizationValidator:
         manifest: IcebergPublicationAttempt,
     ) -> None:
         """Validate a promoted Iceberg table against its native backup."""
+        metadata = self.validate_promoted_contents(table, manifest)
+        self.validate_promoted_contract(table, manifest, metadata)
+
+    def validate_promoted_contents(
+        self,
+        table: SnowflakeTableName,
+        manifest: IcebergPublicationAttempt,
+    ) -> ConversionMetadata:
+        """Prove the promoted rows still equal the native backup and staged evidence."""
         metadata = self.inspect_source(table.with_suffix('_NATIVE'))
         if metadata.fingerprint != manifest.manifest_payload.source_schema_fingerprint:
             raise NativeToIcebergConversionError(
                 'Native backup schema no longer matches the conversion manifest'
             )
-        assert_managed_v3(self.query, table)
-        assert_iceberg_table_spec(self.query, table, manifest.table_spec)
-        assert_supported_metadata(table, metadata, self.inspect_source(table))
         row_count, row_hash = self.assert_equal_contents(
             table.with_suffix('_NATIVE'),
             table,
@@ -123,6 +130,18 @@ class SnowflakeConversionFinalizationValidator:
             row_hash,
             'Promoted Iceberg contents do not match staged conversion evidence',
         )
+        return metadata
+
+    def validate_promoted_contract(
+        self,
+        table: SnowflakeTableName,
+        manifest: IcebergPublicationAttempt,
+        metadata: ConversionMetadata,
+    ) -> None:
+        """Require the promoted table to keep the managed v3 contract and source metadata."""
+        assert_managed_v3(self.query, table)
+        assert_iceberg_table_spec(self.query, table, manifest.table_spec)
+        assert_supported_metadata(table, metadata, self.inspect_source(table))
 
     @staticmethod
     def _record_verified_evidence(

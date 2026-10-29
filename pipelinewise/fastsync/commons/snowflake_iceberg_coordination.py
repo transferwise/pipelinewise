@@ -347,6 +347,8 @@ class RecoveryCoordinator:
             raise RecoveryManifestError(
                 'Only manual conversion attempts use target-keyed manifests'
             )
+        # An unloadable manifest would block every later retry and FastSync run.
+        IcebergPublicationAttempt.from_dict(attempt.as_dict())
         self.recovery_store(attempt.target).save(attempt)
 
     def delete_conversion_attempt(
