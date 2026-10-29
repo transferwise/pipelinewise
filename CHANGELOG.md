@@ -1,3 +1,110 @@
+0.98.0 (2026-10-28)
+-------------------
+
+**New connector: tap-yugabyte (experimental)**
+
+Add `tap-yugabyte`, a source for YugabyteDB over its PostgreSQL-compatible YSQL
+API. It behaves like tap-postgres wherever YugabyteDB allows, and differs where
+YugabyteDB's storage and change data capture differ. See
+[YugabyteDB source](docs/connectors/taps/yugabyte.rst).
+
+What it supports:
+
+- Replicate tables with FULL_TABLE, INCREMENTAL, or LOG_BASED. LOG_BASED uses
+  YugabyteDB's `HYBRID_TIME` replication slots and the bundled `wal2json`
+  plugin
+- Load tables with FastSync FullSync to PostgreSQL and Snowflake native
+  targets, and PartialSync to Snowflake (`partial_sync_table` and
+  `sync_start_from`)
+- Apply source transformations in the export query on Snowflake routes. Check
+  them during `validate` and `import_config`. See
+  [load-time transformations](docs/user_guide/transformations.rst#validation-and-rollout)
+- Keep `NUMERIC(p,s)` and `DECIMAL(p,s)` precision and scale on Snowflake
+  native and PostgreSQL targets, as exact strings end to end. Numeric primary
+  keys stay fixed-point on Snowflake. See
+  [decimals](docs/connectors/taps/yugabyte.rst#decimals)
+- Read `uuid[]`, `money[]`, `bit[]`, `citext[]`, and enum arrays as lists
+- Export `timestamptz` values in UTC from FastSync and PartialSync, whatever
+  the source session time zone
+- Run data-diff checks against PostgreSQL and Snowflake targets. See
+  [data-diff](docs/user_guide/data_diff.rst)
+- Report table sizes with `pipelinewise tap_info`, and apply
+  `allowed_resync_max_size` to Snowflake FullSync
+- Spread connections across nodes with the `load_balance` and `topology_keys`
+  `db_conn` options
+- Check a tap YAML against the source with the `tap-yugabyte-index-check`
+  command, which prints the index DDL to run
+
+Same as tap-postgres:
+
+- Default tables without `replication_method` to LOG_BASED
+- Use one slot per tap, named `pipelinewise_<dbname>_<tap_id>`. FastSync creates
+  it, and PipelineWise drops it when the tap is removed
+- Reset the slot on an unfiltered `fast_sync`, after backing up and clearing
+  every bookmark. `--tables` keeps the slot. See
+  [source-slot reset](docs/user_guide/resync.rst#postgresql-and-yugabytedb-source-slot-reset)
+- Acknowledge the slot only up to the target's committed bookmark, so an
+  interrupted run replays rather than loses changes. A malformed change
+  message stops the run without advancing state. Fix the cause and restart
+  with the same state
+- Leave `TRUNCATE` unreplicated. Resync the table after one
+
+Different from tap-postgres:
+
+- Connect on port 5433 for LOG_BASED. The YugabyteDB psycopg2 drivers always
+  open replication connections there, so PipelineWise rejects LOG_BASED on any
+  other port. See [prerequisites](docs/connectors/taps/yugabyte.rst#prerequisites)
+- Grant the tap user `REPLICATION` and `SET` on `yb_read_time`. Superuser is
+  not required
+- Store positions as HybridTime values, not WAL byte offsets
+- Fail when the tap's slot is not a `wal2json` `HYBRID_TIME` slot. A slot
+  created without `'HYBRID_TIME'` streams nothing. Drop it and rerun the
+  unfiltered `fast_sync`
+- Pin the FastSync snapshot of a LOG_BASED table to the slot's restart point,
+  so the snapshot and the change stream meet exactly
+- Acknowledge and restart two positions below the bookmark, because
+  YugabyteDB can give a transaction the same position as the previous commit.
+  The last acknowledged transaction replays once. See
+  [acknowledgement and recovery](docs/connectors/taps/yugabyte.rst#acknowledgement-and-recovery)
+- Stop a LOG_BASED run after 300 seconds without changes, because YugabyteDB
+  sends nothing on an idle source. Set `logical_poll_total_seconds` to change
+  this, or `0` to disable it
+- Set `REPLICA IDENTITY DEFAULT` or `FULL` on LOG_BASED tables that load into
+  PostgreSQL. YugabyteDB's default `CHANGE` sends only changed columns, so
+  PipelineWise refuses it there. `NOTHING` is refused on every target. See
+  [replica identity](docs/connectors/taps/yugabyte.rst#replica-identity)
+- Stream a primary-key change as a delete of the old key and an insert of the
+  new one
+- Resume an interrupted tap FULL_TABLE scan by primary key instead of `xmin`.
+  Create a replication-key index for INCREMENTAL tables, and a
+  `<table>_pw_keyset` index for FULL_TABLE on targets without FastSync. The tap
+  never creates indexes. See
+  [required indexes](docs/connectors/taps/yugabyte.rst#required-indexes)
+- Measure `allowed_resync_max_size` as YugabyteDB's on-disk size: compressed
+  data plus write-ahead log, including indexes and every partition. Colocated
+  tables and views have no size and are blocked unless `--force` is used. See
+  [resync size limit](docs/connectors/taps/yugabyte.rst#resync-size-limit)
+- Wait up to five and a half minutes when dropping or resetting a slot, past
+  YugabyteDB's five-minute window in which a slot stays active after its
+  consumer disconnects
+- Load very large tables in batches, or raise `cdc_intent_retention_ms` and
+  `cdc_wal_retention_time_secs` for the first load. Nothing reads the slot
+  while FastSync runs, and an unread slot expires after eight hours by
+  default. See
+  [large initial loads](docs/connectors/taps/yugabyte.rst#large-initial-loads)
+- Run FastSync and PartialSync from a separate `fastsync-yugabyte`
+  virtualenv with the `psycopg2-yugabytedb-binary` driver. The rest of
+  PipelineWise and data-diff keep `psycopg2-binary`, connect directly to
+  `db_conn.host`, and ignore `load_balance`
+
+Not supported yet:
+
+- Managed Iceberg targets. PipelineWise rejects them during `validate` and
+  `import_config`
+- LOG_BASED on targets without FastSync, such as S3 CSV. Only FastSync creates
+  the slot. Use FULL_TABLE or INCREMENTAL there
+
+
 0.97.0 (2026-10-23)
 -------------------
 - Fix Dcocker-compose for dev environment.

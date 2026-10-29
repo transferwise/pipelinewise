@@ -169,9 +169,13 @@ result. A successful status row does not prove source-to-target equality.
 
 Run ``pipelinewise tap_info --tap <tap_id>`` to get information about the tap
 and its selected tables, including table sizes, indexes, and primary keys.
-This command is available only for MySQL and PostgreSQL taps.
-Only ``--tap`` is required. Use ``--target <target_id>`` to select a target.
-If the tap ID exists under multiple targets.
+This command is available only for MySQL, PostgreSQL, and YugabyteDB taps.
+Only ``--tap`` is required. If the tap ID exists under multiple targets, use
+``--target <target_id>`` to select one.
+
+``size_bytes`` is ``null`` for views and foreign tables. For YugabyteDB it is
+also ``null`` for colocated tables. YugabyteDB measures size differently from
+PostgreSQL; see :ref:`YugabyteDB resync size limit <yugabyte_resync_size_limit>`.
 
 
 .. _cli_test_tap_connection:
@@ -263,9 +267,10 @@ The command fails when FullSync is unavailable for the route. It never falls
 back to Singer. A table with ``sync_start_from`` uses PartialSync. ``sync_tables``
 remains a deprecated alias. Supplying ``--tables`` or setting
 ``--replication_method_only`` to anything other than ``*`` makes the resync
-filtered and retains the PostgreSQL replication slot, even if ``--tables`` lists
-every table. An unfiltered whole-tap PostgreSQL run with LOG_BASED tables resets
-its tap-specific slot once before workers start, with or without ``--force``.
+filtered and retains the PostgreSQL or YugabyteDB replication slot, even if
+``--tables`` lists every table. An unfiltered whole-tap PostgreSQL or YugabyteDB
+run with LOG_BASED tables resets its tap-specific slot once before workers start,
+with or without ``--force``.
 See :ref:`resync_postgres_slot_reset` for safety checks, backups, pending-Iceberg
 guards, and non-atomic reset recovery.
 
@@ -287,7 +292,7 @@ guards, and non-atomic reset recovery.
 
 ``--end_value`` is optional. When absent, PipelineWise captures the current
 replication position and can update state after the merge. PartialSync is
-available only from MariaDB/MySQL or PostgreSQL to Snowflake. See
+available only from MariaDB/MySQL, PostgreSQL, or YugabyteDB to Snowflake. See
 :ref:`partial_sync_cases`.
 
 

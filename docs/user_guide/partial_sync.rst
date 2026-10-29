@@ -4,8 +4,8 @@ PartialSync behaviour
 =====================
 
 PartialSync exports a bounded source range, loads a temporary target table, and
-merges that range into the existing target. It is available from MariaDB/MySQL or
-PostgreSQL to Snowflake.
+merges that range into the existing target. It is available from MariaDB/MySQL,
+PostgreSQL, or YugabyteDB to Snowflake.
 
 Changed non-key decimal definitions use column versioning before the merge.
 Historical versions remain available, and untouched rows have NULL in the new
@@ -14,9 +14,9 @@ column. Decimal primary-key changes and lossy decimal range mappings require Ful
 A table configured with ``sync_start_from`` also uses PartialSync during
 ``fast_sync``, including ``fast_sync --force``. The flag bypasses the FullSync
 size limit; it does not override the configured range or request a full-table
-reload. An unfiltered whole-tap PostgreSQL ``fast_sync`` still resets its
-LOG_BASED source slot before workers start; standalone ``partial_sync_table``
-retains it. See :ref:`resync_postgres_slot_reset`.
+reload. An unfiltered whole-tap PostgreSQL or YugabyteDB ``fast_sync`` still
+resets its LOG_BASED source slot before workers start; standalone
+``partial_sync_table`` retains it. See :ref:`resync_postgres_slot_reset`.
 
 
 Range semantics

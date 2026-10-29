@@ -9,6 +9,8 @@ for selected database sources.
 
 MariaDB/MySQL and PostgreSQL source ``DECIMAL`` and ``NUMERIC`` columns retain
 supported precision and scale in new native and managed Iceberg columns.
+YugabyteDB columns do the same in native tables; YugabyteDB does not support
+managed Iceberg targets yet.
 Existing legacy floating-point decimal columns remain unchanged unless
 ``version_legacy_float_columns`` is enabled on the tap. See
 :ref:`exact_decimal_mapping` for compatible numeric declarations, FLOAT
@@ -36,9 +38,9 @@ acknowledged. Metadata columns are enabled automatically; see
      - FastSync
    * - Snowflake
      - Available
-     - Native FullSync from MariaDB/MySQL, PostgreSQL, or MongoDB; native or
-       managed Iceberg v3 FullSync and PartialSync from MariaDB/MySQL or
-       PostgreSQL
+     - Native FullSync from MariaDB/MySQL, PostgreSQL, YugabyteDB, or MongoDB;
+       native PartialSync from YugabyteDB; native or managed Iceberg v3
+       FullSync and PartialSync from MariaDB/MySQL or PostgreSQL
 
 
 Prerequisites

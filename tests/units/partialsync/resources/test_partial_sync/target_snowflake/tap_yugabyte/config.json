@@ -1,0 +1,8 @@
+{
+    "dbname": "yugabyte_source_db",
+    "host": "db_yugabyte_source",
+    "password": "secret",
+    "port": 5433,
+    "tap_id": "test_yugabyte",
+    "user": "pipelinewise"
+}

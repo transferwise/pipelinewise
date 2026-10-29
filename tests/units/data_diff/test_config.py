@@ -176,7 +176,7 @@ def test_initial_full_scan_requires_boolean(tmp_path):
         _definitions(config)
 
 
-@pytest.mark.parametrize("source_type", ["tap-postgres", "tap-mysql"])
+@pytest.mark.parametrize("source_type", ["tap-postgres", "tap-mysql", "tap-yugabyte"])
 def test_postgres_target_routes_use_target_postgres_identifiers(tmp_path, source_type):
     definition = _definitions(
         _use_postgres_target(_config(tmp_path), source_type)
@@ -188,6 +188,28 @@ def test_postgres_target_routes_use_target_postgres_identifiers(tmp_path, source
     assert definition.target_key_column == "transfer_id"
     assert definition.target_timestamp_column == "updated_at"
     assert definition.target_compare_columns == ("status", "amount")
+
+
+def test_yugabyte_snowflake_route_uses_snowflake_identifiers(tmp_path):
+    config = _config(tmp_path)
+    config.targets["snowflake"]["taps"][0]["type"] = "tap-yugabyte"
+
+    definition = _definitions(config)[0]
+
+    assert definition.source_type == "tap-yugabyte"
+    assert definition.target_schema == "REPLICATED_PAYMENTS"
+    assert definition.target_table == "V2"
+    assert definition.target_timestamp_column == "UPDATED_AT"
+
+
+def test_rejects_an_unsupported_source_route(tmp_path):
+    config = _config(tmp_path)
+    config.targets["snowflake"]["taps"][0]["type"] = "tap-mongodb"
+
+    with pytest.raises(DataDiffConfigError, match="YugabyteDB sources") as error:
+        _definitions(config)
+
+    assert "tap-mongodb -> target-snowflake" in str(error.value)
 
 
 def test_ignores_definitions_when_no_backend_is_configured(tmp_path):

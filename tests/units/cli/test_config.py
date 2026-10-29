@@ -190,6 +190,103 @@ class TestConfig:
     def _table_format_target(**connection_settings):
         return _table_format_target(**connection_settings)
 
+    @staticmethod
+    def _yugabyte_tap(port, replication_method=None, tap_type='tap-yugabyte'):
+        table = {'table_name': 'orders'}
+        if replication_method:
+            table['replication_method'] = replication_method
+        return TestConfig._table_format_tap(
+            type=tap_type,
+            db_conn={'port': port},
+            schemas=[{'source_schema': 'public', 'target_schema': 'public', 'tables': [table]}],
+        )
+
+    @pytest.mark.parametrize(
+        'port, replication_method',
+        [(15436, 'LOG_BASED'), ('15436', 'LOG_BASED'), (5432, 'LOG_BASED'), (15436, None)],
+    )
+    def test_yugabyte_log_based_rejects_ports_the_driver_ignores(self, port, replication_method):
+        """LOG_BASED, explicit or the default, would otherwise fail after FastSync on the driver's 5433."""
+        with pytest.raises(InvalidConfigException) as error:
+            Config.validate_yugabyte_log_based_port(self._yugabyte_tap(port, replication_method))
+
+        message = str(error.value)
+        assert f'public.orders on port {port}' in message
+        assert 'psycopg2-yugabytedb-binary 2.9.3.5 and 2.9.3.5.post1' in message
+
+    @pytest.mark.parametrize(
+        'port, replication_method, tap_type',
+        [
+            (5433, 'LOG_BASED', 'tap-yugabyte'),
+            ('5433', 'LOG_BASED', 'tap-yugabyte'),
+            (15436, 'FULL_TABLE', 'tap-yugabyte'),
+            (15436, 'INCREMENTAL', 'tap-yugabyte'),
+            (15436, 'LOG_BASED', 'tap-postgres'),
+        ],
+    )
+    def test_yugabyte_log_based_port_check_allows_unaffected_configs(self, port, replication_method, tap_type):
+        """Port 5433, explicit non-LOG_BASED tables, and other taps are unaffected."""
+        Config.validate_yugabyte_log_based_port(self._yugabyte_tap(port, replication_method, tap_type))
+
+    @pytest.mark.parametrize('replication_method', ['LOG_BASED', 'FULL_TABLE', 'INCREMENTAL', None])
+    def test_yugabyte_rejects_managed_iceberg_targets(self, replication_method):
+        """No YugabyteDB Iceberg FastSync route exists, so nothing would create the LOG_BASED slot."""
+        tap = self._yugabyte_tap(5433, replication_method)
+        tap.update(target_table_format='iceberg', iceberg_version=3)
+
+        with pytest.raises(InvalidConfigException, match='YugabyteDB does not support managed Iceberg targets'):
+            Config.validate_yugabyte_route(tap, {'id': 'snowflake', 'type': 'target-snowflake'})
+
+    @pytest.mark.parametrize('replication_method', ['LOG_BASED', None])
+    def test_yugabyte_log_based_rejects_targets_without_fastsync(self, replication_method):
+        """LOG_BASED, explicit or the default, needs FastSync to create its replication slot."""
+        with pytest.raises(InvalidConfigException) as error:
+            Config.validate_yugabyte_route(
+                self._yugabyte_tap(5433, replication_method), {'id': 's3', 'type': 'target-s3-csv'},
+            )
+
+        assert 'LOG_BASED replication for public.orders with target "s3" (target-s3-csv)' in str(error.value)
+
+    @pytest.mark.parametrize(
+        'replication_method, target_type, settings, tap_type',
+        [
+            ('LOG_BASED', 'target-snowflake', {}, 'tap-yugabyte'),
+            (None, 'target-snowflake', {'target_table_format': 'native'}, 'tap-yugabyte'),
+            ('LOG_BASED', 'target-postgres', {}, 'tap-yugabyte'),
+            ('FULL_TABLE', 'target-s3-csv', {}, 'tap-yugabyte'),
+            ('INCREMENTAL', 'target-s3-csv', {}, 'tap-yugabyte'),
+            ('LOG_BASED', 'target-snowflake', {'target_table_format': 'iceberg'}, 'tap-postgres'),
+        ],
+    )
+    def test_yugabyte_route_check_allows_supported_configs(self, replication_method, target_type, settings,
+                                                           tap_type):
+        """FastSync routes, Singer-only methods without a slot, and other taps are unaffected."""
+        tap = self._yugabyte_tap(5433, replication_method, tap_type)
+        tap.update(settings)
+        Config.validate_yugabyte_route(tap, {'id': 'target', 'type': target_type})
+
+    def test_from_yamls_rejects_yugabyte_managed_iceberg(self, tmp_path):
+        """validate and import_config both reject the route before any connector runs."""
+        yaml_dir = tmp_path / 'yaml'
+        yaml_dir.mkdir()
+        tap = self._yugabyte_tap(5433, 'FULL_TABLE')
+        tap.update(target_table_format='iceberg', iceberg_version=3, data_flattening_max_level=0)
+        (yaml_dir / 'tap_test.yml').write_text(json.dumps(tap), encoding='utf-8')
+        (yaml_dir / 'target_test.yml').write_text(json.dumps(self._table_format_target()), encoding='utf-8')
+
+        with pytest.raises(InvalidConfigException, match='YugabyteDB does not support managed Iceberg targets'):
+            Config.from_yamls(str(tmp_path / 'runtime'), str(yaml_dir))
+
+    def test_from_yamls_rejects_yugabyte_log_based_on_unsupported_port(self, tmp_path):
+        """validate and import_config both load YAML through from_yamls, so the check runs before FastSync."""
+        yaml_dir = tmp_path / 'yaml'
+        yaml_dir.mkdir()
+        (yaml_dir / 'tap_test.yml').write_text(json.dumps(self._yugabyte_tap(15436, 'LOG_BASED')), encoding='utf-8')
+        (yaml_dir / 'target_test.yml').write_text(json.dumps(self._table_format_target()), encoding='utf-8')
+
+        with pytest.raises(InvalidConfigException, match='LOG_BASED requires port 5433'):
+            Config.from_yamls(str(tmp_path / 'runtime'), str(yaml_dir))
+
     @pytest.mark.parametrize(
         'settings',
         [

@@ -52,6 +52,11 @@ Supported routes
      - Native, managed Iceberg v3
      - Yes
      - Yes
+   * - YugabyteDB
+     - Snowflake
+     - Native
+     - Yes
+     - Yes
    * - MongoDB
      - Snowflake
      - Native
@@ -63,6 +68,11 @@ Supported routes
      - Yes
      - No
    * - PostgreSQL
+     - PostgreSQL
+     - Native
+     - Yes
+     - No
+   * - YugabyteDB
      - PostgreSQL
      - Native
      - Yes
@@ -184,10 +194,10 @@ Explicit FullSync
 This operation can replace target data and reset replication bookmarks. Review
 :ref:`resync` before running it against a large or actively written table.
 
-An unfiltered PostgreSQL ``fast_sync`` containing LOG_BASED tables resets the
-tap-specific slot once before workers start, with or without ``--force``.
-Filtered FastSync, automatic initial loads, and standalone PartialSync retain
-it. ``--force`` only bypasses the resync size limit; configured
+An unfiltered PostgreSQL or YugabyteDB ``fast_sync`` containing LOG_BASED
+tables resets the tap-specific slot once before workers start, with or without
+``--force``. Filtered FastSync, automatic initial loads, and standalone
+PartialSync retain it. ``--force`` only bypasses the resync size limit; configured
 ``sync_start_from`` ranges remain in effect. See :ref:`resync_postgres_slot_reset`
 for exact commands, safety checks, pending-Iceberg guards, and failure recovery.
 
@@ -231,7 +241,8 @@ Configured PartialSync
      - Recreates the target before loading the filtered result.
 
 Exactly one of ``static_value`` and ``dynamic_value`` is allowed. Configured
-PartialSync is supported only from MariaDB/MySQL or PostgreSQL to Snowflake.
+PartialSync is supported only from MariaDB/MySQL, PostgreSQL, or YugabyteDB to
+Snowflake.
 
 If a dynamic query returns no boundary, PipelineWise treats the partial range as
 empty and completes successfully. Use a static boundary when an empty result
