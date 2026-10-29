@@ -30,6 +30,17 @@ from tests.units.fastsync.commons.test_snowflake_iceberg_converter import (
 TABLE = 'database.schema.table'
 PROMOTED = {'TABLE_NATIVE': 'native', 'TABLE': 'iceberg'}
 ROW_COUNT_SCAN = 'SELECT COUNT(*) AS "ROW_COUNT"'
+ADDED_COLUMN = {
+    'COLUMN_NAME': 'ADDED_AFTER_CUTOVER',
+    'DATA_TYPE': 'NUMBER',
+    'IS_NULLABLE': 'YES',
+    'NUMERIC_PRECISION': 38,
+    'NUMERIC_SCALE': 0,
+    'DATETIME_PRECISION': None,
+    'COMMENT': None,
+    'COLUMN_DEFAULT': None,
+    'IS_IDENTITY': 'NO',
+}
 
 
 def _convert(tmp_path, snowflake, eventual=EVENTUAL_ICEBERG):
@@ -223,6 +234,55 @@ def test_reversed_cutover_with_published_manifest_needs_manual_recovery(tmp_path
         sql.startswith('SHOW TABLES IN SCHEMA') for sql, _, _ in snowflake.queries[query_count:]
     )
     assert _manifest(tmp_path)['phase'] == 'published'
+
+
+def test_published_manifest_never_restores_stale_backup(tmp_path):
+    """A published manifest whose promoted table vanished never makes the stale backup live."""
+    snowflake = FakeSnowflake()
+    _published_after_transient_error(tmp_path, snowflake)
+    del snowflake.formats['TABLE']
+    query_count = len(snowflake.queries)
+
+    with pytest.raises(NativeToIcebergConversionError, match='Cannot safely reconcile'):
+        _convert(tmp_path, snowflake)
+
+    assert not _renames(snowflake.queries[query_count:])
+    assert snowflake.formats == {'TABLE_NATIVE': 'native'}
+    assert _manifest(tmp_path)['phase'] == 'published'
+
+
+def test_post_cutover_column_change_keeps_promoted_table(tmp_path):
+    """A column added to the live table after cutover is never rolled away."""
+    snowflake = FakeSnowflake()
+    snowflake.post_promotion_companion_extra_columns = [ADDED_COLUMN]
+
+    with pytest.raises(NativeToIcebergConversionError, match='schema or primary key'):
+        _convert(tmp_path, snowflake)
+
+    assert snowflake.formats == PROMOTED
+    assert len(_renames(snowflake.queries)) == 2
+    manifest = _manifest(tmp_path)
+    assert manifest['phase'] == 'published'
+    assert ROLLBACK_REQUIRED not in manifest['context']
+
+
+def test_rollback_resume_refuses_changed_columns(tmp_path):
+    """A pending rollback never renames away a promoted table whose columns changed."""
+    snowflake = FakeSnowflake()
+    snowflake.post_promotion_companion_grants = [AUTOMATED_REFERENCES_GRANT]
+    snowflake.interrupt_iceberg_rollback = True
+    with pytest.raises(SystemExit, match='first rollback interruption'):
+        _convert(tmp_path, snowflake)
+    snowflake.interrupt_iceberg_rollback = False
+    snowflake.companion_extra_columns = [ADDED_COLUMN]
+    query_count = len(snowflake.queries)
+
+    with pytest.raises(NativeToIcebergConversionError, match='schema or primary key'):
+        _convert(tmp_path, snowflake)
+
+    assert not _renames(snowflake.queries[query_count:])
+    assert snowflake.formats == {'TABLE': 'iceberg', 'TABLE_NATIVE': 'native'}
+    assert _manifest(tmp_path)['context'][ROLLBACK_REQUIRED] is True
 
 
 def test_rollback_resume_refuses_changed_promoted_table(tmp_path):

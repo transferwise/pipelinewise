@@ -442,9 +442,9 @@ validation scan. It then validates the companion again and repeats the cutover.
 Keep the reader-and-writer outage in place and retry the identical command
 immediately. Do not resume readers merely because writers are stopped.
 
-After promotion, PipelineWise first proves that the promoted table still matches
-the ``_NATIVE`` backup and the staged evidence. Then it checks the table contract
-and metadata:
+After promotion, PipelineWise first proves that the promoted table's columns and
+rows still match the ``_NATIVE`` backup and the staged evidence. Then it checks
+the Iceberg table settings and metadata:
 
 .. list-table:: Validation after promotion
    :header-rows: 1
@@ -453,23 +453,25 @@ and metadata:
 
    * - Result
      - Outcome
-   * - Contents and metadata match
+   * - Columns, rows, and metadata match
      - The conversion finishes and the manifest is removed.
-   * - Contents differ
+   * - Columns or rows differ
      - The promoted table stays live and the manifest is kept. The command fails
        for inspection. PipelineWise never renames away a table that may have
        received writes. Iceberg FastSync refuses the table until you resolve it;
        see :ref:`troubleshooting_iceberg_conversion_contents_changed`.
-   * - Contents match, but the table contract or metadata differs
+   * - Columns and rows match, but the Iceberg table settings or metadata differ
      - PipelineWise records rollback intent, restores the native table name, and
        keeps the manifest. A retry cuts over again once the difference is fixed.
    * - A connection or other unexpected error
      - The promoted table stays live and the manifest is kept. Retry the identical
        command to finish validation.
 
-A pending rollback also proves that the promoted contents still match before it
-renames anything. If they differ, it stops in the same way as the "Contents
-differ" row.
+A pending rollback also proves that the promoted columns and rows still match
+before it renames anything. If they differ, it stops in the same way as the
+"Columns or rows differ" row. After promotion, PipelineWise never restores
+``<table>_NATIVE`` on its own: if the promoted table is missing, the command stops
+for manual recovery, because the backup may be older than the promoted table.
 
 A rerun after a completed ``--eventual iceberg`` conversion changes nothing. It
 confirms that ``<table>`` is a managed Iceberg v3 table and keeps

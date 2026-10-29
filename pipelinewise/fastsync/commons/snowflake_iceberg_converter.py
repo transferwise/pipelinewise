@@ -395,6 +395,11 @@ class SnowflakeNativeToIcebergConverter:
             self._finalize_or_restore_native(table, manifest)
             return
 
+        if manifest.phase == PHASE_PUBLISHED:
+            # After promotion _NATIVE is stale: restoring it or repeating pre-cutover DDL
+            # could expose old rows, so a published manifest without its promoted table stops.
+            raise self._manual_recovery_error(table)
+
         if state == ConversionTableState(
             TABLE_FORMAT_MISSING,
             TABLE_FORMAT_ICEBERG,
@@ -414,8 +419,7 @@ class SnowflakeNativeToIcebergConverter:
             self._restore_native(table)
             state = self._table_state(table)
 
-        # A published manifest only finalizes; repeating pre-cutover DDL cannot advance it.
-        if manifest.phase == PHASE_PUBLISHED or state not in (
+        if state not in (
             ConversionTableState(
                 TABLE_FORMAT_NATIVE,
                 TABLE_FORMAT_MISSING,

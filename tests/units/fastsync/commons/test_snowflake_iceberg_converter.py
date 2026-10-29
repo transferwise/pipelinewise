@@ -194,6 +194,7 @@ class FakeSnowflake:
         self.column_comment = 'identifier'
         self.companion_column_comment = None
         self.companion_column_overrides = {}
+        self.companion_extra_columns = []
         self.companion_primary_key = ('ID',)
         self.clustering_key = None
         self.owner = 'OWNER_ROLE'
@@ -209,6 +210,7 @@ class FakeSnowflake:
         self.commit_before_promotion_error = False
         self.post_promotion_staging_evidence = None
         self.post_promotion_companion_grants = None
+        self.post_promotion_companion_extra_columns = None
         self.post_promotion_query_error = None
         self._pending_query_error = None
         self.interrupt_iceberg_rollback = False
@@ -268,6 +270,7 @@ class FakeSnowflake:
             }
             if is_companion:
                 row.update(self.companion_column_overrides)
+                return [row, *self.companion_extra_columns]
             return [row]
         if sql.startswith('SHOW PRIMARY KEYS'):
             is_companion = any(
@@ -364,6 +367,8 @@ class FakeSnowflake:
                 self.staging_evidence = self.post_promotion_staging_evidence
             if self.post_promotion_companion_grants is not None:
                 self.companion_grants = self.post_promotion_companion_grants
+            if self.post_promotion_companion_extra_columns is not None:
+                self.companion_extra_columns = self.post_promotion_companion_extra_columns
             self._pending_query_error = self.post_promotion_query_error
             return []
         if sql.startswith(

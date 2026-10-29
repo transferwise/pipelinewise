@@ -113,12 +113,14 @@ class SnowflakeConversionFinalizationValidator:
         table: SnowflakeTableName,
         manifest: IcebergPublicationAttempt,
     ) -> ConversionMetadata:
-        """Prove the promoted rows still equal the native backup and staged evidence."""
+        """Prove the promoted columns and rows still equal the backup and staged evidence."""
         metadata = self.inspect_source(table.with_suffix('_NATIVE'))
         if metadata.fingerprint != manifest.manifest_payload.source_schema_fingerprint:
             raise NativeToIcebergConversionError(
                 'Native backup schema no longer matches the conversion manifest'
             )
+        # The spec was proven before cutover, so a difference now means the live table changed.
+        assert_iceberg_table_spec(self.query, table, manifest.table_spec)
         row_count, row_hash = self.assert_equal_contents(
             table.with_suffix('_NATIVE'),
             table,
@@ -140,7 +142,6 @@ class SnowflakeConversionFinalizationValidator:
     ) -> None:
         """Require the promoted table to keep the managed v3 contract and source metadata."""
         assert_managed_v3(self.query, table)
-        assert_iceberg_table_spec(self.query, table, manifest.table_spec)
         assert_supported_metadata(table, metadata, self.inspect_source(table))
 
     @staticmethod

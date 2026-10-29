@@ -10,12 +10,12 @@
 - Refuse to save a conversion manifest that a retry could not read.
 - Keep the promoted Iceberg table when a connection error interrupts the
   validation after cutover. Retry the same command to finish.
-- Keep the promoted Iceberg table and its manifest when its contents no longer
-  match the native backup after cutover. Iceberg FastSync refuses the table until
-  you resolve it. See
+- Keep the promoted Iceberg table and its manifest when its rows or columns no
+  longer match the native backup after cutover. Iceberg FastSync refuses the
+  table until you resolve it. See
   [contents changed after cutover](docs/user_guide/troubleshooting.rst#native-to-iceberg-contents-changed-after-cutover)
-- Restore the native table after cutover only for a table-contract or metadata
-  difference over matching contents. See
+- Restore the native table after cutover only for an Iceberg table settings or
+  metadata difference over matching rows and columns. See
   [interrupted conversion](docs/connectors/targets/snowflake_iceberg.rst#interrupted-conversion)
 - Restore the native table name first when retrying an interrupted cutover.
   Before this fix, the name stayed absent while the retry scanned both tables.
@@ -24,8 +24,9 @@
   metadata check.
 - Finish a rollback left by an earlier release's rerun, then convert the table
   again.
-- Stop with a recovery error, instead of repeating table changes, when a
-  published conversion was reversed by hand.
+- Stop with a recovery error, without renaming or changing any table, when a
+  published conversion's Iceberg table is missing or was reversed by hand.
+  The native backup can be older than the promoted table.
 - Refuse a table that was created as Iceberg with a clear message.
 
 0.97.0 (2026-10-23)

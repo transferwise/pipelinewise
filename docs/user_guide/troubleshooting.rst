@@ -695,12 +695,14 @@ Native-to-Iceberg contents changed after cutover
 
 ``copy_native_to_iceberg --eventual iceberg`` fails after promotion with
 ``does not match the projected contents``, ``Promoted Iceberg contents do not
-match staged conversion evidence``, or ``Native backup schema no longer matches
-the conversion manifest``. Every retry fails the same way. While the manifest
-exists, Iceberg FastSync refuses the table, and an Iceberg PostgreSQL tap cannot
-reset its replication slot.
+match staged conversion evidence``, ``schema or primary key does not match the
+conversion source``, or ``Native backup schema no longer matches the conversion
+manifest``. Every retry fails the same way. While the manifest exists, Iceberg
+FastSync refuses the table, and an Iceberg PostgreSQL tap cannot reset its
+replication slot.
 
-A writer changed the promoted table or its native backup after the cutover.
+A writer changed the rows or columns of the promoted table, or its native backup,
+after the cutover.
 PipelineWise keeps the promoted table live, because renaming it away could hide
 those writes. Keep every reader and writer of the table stopped, compare
 ``<table>`` with ``<table>_NATIVE``, and decide which copy is correct:
