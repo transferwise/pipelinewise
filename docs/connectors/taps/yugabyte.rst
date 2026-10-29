@@ -444,36 +444,55 @@ differently from PostgreSQL, so the same functions measure different things:
      - Stable. Roughly tracks the CSV that FastSync exports.
      - Changes with recent writes, flushes, and WAL clean-up.
 
-The YugabyteDB figure changes over a table's life. In a test with about
-540 MB of exported CSV and data that compressed poorly:
+What to expect
+''''''''''''''
 
-- **Right after a large load**, it read about twice the export size. The WAL
-  still held a copy of every write, next to the data files.
-- **Once settled**, it read about 1.3 times the export size. YugabyteDB removes
-  old WAL once data is flushed and about 15 minutes have passed
-  (``log_min_seconds_to_retain``). Each tablet keeps at least two WAL segments
-  of 64 MB by default (``log_min_segments_to_retain`` and
-  ``log_segment_size_mb``), so up to 128 MB per tablet remains.
-- **Data that compresses well reads lower.** A settled table reads about its
-  compressed data plus that WAL floor. Repetitive data compressed about 3.5 to
-  1 in testing, so it can read well below its export size.
+A YugabyteDB table's size moves as it is written, flushed, and cleaned up.
+Compared with the CSV that FastSync exports, expect these readings:
 
-Some readings are low or missing:
+.. list-table::
+   :header-rows: 1
+   :widths: 32 26 42
 
-- A table loaded in the last minute can read 0. YugabyteDB refreshes sizes by
-  heartbeat.
-- Secondary indexes built after a bulk load can read close to 0 until they are
-  flushed.
-- Tables in a CDC stream can keep WAL for longer (``cdc_wal_retention_time_secs``),
-  so they read higher.
-- Colocated tables report no size, and views have none. The check blocks these
-  tables, and tables it cannot find. Use ``--force`` to resync them.
+   * - Table state
+     - Size reads
+     - Why
+   * - Just after a large load
+     - Up to 2 times the export
+     - The WAL still holds a copy of every write.
+   * - Settled, data compresses poorly
+     - About 1.3 times the export
+     - Compressed data plus the WAL each tablet always keeps.
+   * - Settled, data compresses well
+     - Can be well below the export
+     - Repetitive data can compress about 3.5 to 1.
 
-Set ``table_mb`` to the largest table you are willing to resync, with
-headroom. Expect a table to read up to twice its export size just after a
-large load. To see the figure the check uses, run
-``pipelinewise tap_info --tap <tap_id>`` and read each table's ``size_bytes``.
-It is ``null`` for colocated tables and views.
+A table settles once its data is flushed and about 15 minutes have passed
+(``log_min_seconds_to_retain``). Each tablet still keeps at least two 64 MB WAL
+segments by default (``log_min_segments_to_retain`` and
+``log_segment_size_mb``). So allow up to 128 MB per tablet on top of the data.
+
+Readings to double-check
+''''''''''''''''''''''''
+
+- **0 or close to 0.** A table loaded in the last minute can read 0, because
+  YugabyteDB refreshes sizes by heartbeat. Secondary indexes built after a bulk
+  load read close to 0 until they are flushed. Check again a few minutes later.
+- **Higher than expected.** Tables in a CDC stream keep WAL for longer
+  (``cdc_wal_retention_time_secs``).
+- **No size.** Colocated tables report none, and views have none. The check
+  blocks these tables, and any table it cannot find. Use ``--force`` to resync
+  them.
+
+Setting the limit
+'''''''''''''''''
+
+1. Run ``pipelinewise tap_info --tap <tap_id>`` and read each table's
+   ``size_bytes``. This is the figure the check uses. It is ``null`` for
+   colocated tables and views.
+2. Set ``table_mb`` to the largest table you are willing to resync.
+3. Add headroom. A table can read up to twice its export size just after a
+   large load.
 
 
 Acknowledgement and recovery
