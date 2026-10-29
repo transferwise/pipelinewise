@@ -295,9 +295,8 @@ buckets ``ASC``, then the ordering column, then the **primary key** again,
      - ``<table>_<column>_pw_keyset``
      - ``INCREMENTAL`` (inserts and updates), PartialSync, data-diff on that column
 
-The full contract -- exact DDL, the rules that must not be varied, what each
-mistake costs, and the feature matrix -- is in
-``singer-connectors/tap-yugabyte/INDEXES.md``.
+``singer-connectors/tap-yugabyte/INDEXES.md`` has the exact DDL, the rules to
+follow, and what each mistake costs.
 
 In a colocated database, the index has no ``SPLIT AT VALUES`` and shares the
 colocation tablet. YugabyteDB rejects split options on colocated indexes. For a
