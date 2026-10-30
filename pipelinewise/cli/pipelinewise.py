@@ -1567,6 +1567,8 @@ class PipelineWise:
             self._check_target_table_format_supports_fastsync('partial_sync')
         if selected_tables['full_sync']:
             self._check_target_table_format_supports_fastsync('full_sync')
+        # A native target would be refused only after the slot reset and bookmark clearing.
+        self._check_fastsync_targets_are_iceberg(selected_tables)
 
         if reset_postgres_slot:
             tap_config, target_config = self._preflight_postgres_slot_reset(selected_tables)
@@ -1597,6 +1599,50 @@ class PipelineWise:
                 raise Exception(error)
             if process.exitcode != 0:
                 raise SystemExit(process.exitcode)
+
+    def _check_fastsync_targets_are_iceberg(self, selected_tables) -> None:
+        """Refuse an Iceberg FastSync before any source or state change while a target is native."""
+        if (
+            self.target['type'] != ConnectorType.TARGET_SNOWFLAKE.value
+            or self.tap.get('target_table_format') != Config.TABLE_FORMAT_ICEBERG
+        ):
+            return
+        source_tables = sorted(set(selected_tables['full_sync']) | set(selected_tables['partial_sync']))
+        self._run_in_child_process(self._assert_fastsync_targets_are_iceberg, source_tables)
+
+    def _assert_fastsync_targets_are_iceberg(self, source_tables) -> None:
+        from pipelinewise.cli import native_to_iceberg
+
+        native_to_iceberg.assert_fastsync_targets_ready(
+            self._iceberg_target_config(),
+            self.get_target_dir(self.target['id']),
+            source_tables,
+        )
+
+    def _iceberg_target_config(self) -> Dict:
+        """Return the target config with the tap's inheritable overrides, like the writers see it."""
+        target_config = self._load_required_json_object(self.target['files']['config'], 'target configuration')
+        target_config.update(self._load_required_json_object(
+            self.tap['files']['inheritable_config'], 'tap inheritable configuration',
+        ))
+        return target_config
+
+    def _run_in_child_process(self, target, *args) -> None:
+        """Run Snowflake work in a child so later FastSync forks inherit no connector state."""
+        process = Process(target=self._run_with_command_signals, args=(target, *args))
+        process.start()
+        process.join()
+        if process.exception:
+            error, _ = process.exception
+            raise error
+        if process.exitcode != 0:
+            raise SystemExit(process.exitcode)
+
+    def _run_with_command_signals(self, target, *args) -> None:
+        # The inherited stop_tap handler would delete the pidfile that the parent still holds.
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            signal.signal(sig, self._stop_command_on_signal)
+        target(*args)
 
     def _preflight_postgres_slot_reset(self, selected_tables):
         """Validate every local reset dependency before changing source or state."""
@@ -2343,13 +2389,7 @@ class PipelineWise:
 
         blockers = []
         if hasattr(self, 'tap'):
-            inheritable_config = utils.load_json(self.tap['files']['inheritable_config'])
-            if not isinstance(inheritable_config, dict):
-                raise PreRunChecksException(
-                    f'Missing or invalid tap inheritable configuration: '
-                    f'{self.tap["files"]["inheritable_config"]}. Run import_config first.'
-                )
-            target_config = {**target_config, **inheritable_config}
+            target_config = self._iceberg_target_config()
             catalog = utils.load_json(self.tap['files']['properties'])
             self._validate_tap_catalog(catalog, self.tap['files']['properties'])
             fastsync_capable = resolve_fastsync_capabilities(

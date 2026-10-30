@@ -3,7 +3,10 @@
 import json
 from unittest.mock import patch
 
+import pytest
+
 from pipelinewise.cli import native_to_iceberg
+from pipelinewise.cli.errors import PreRunChecksException
 from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_plan import (
     STATE_BLOCKED,
     STATE_ICEBERG,
@@ -13,6 +16,9 @@ from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_plan import (
 )
 from pipelinewise.fastsync.commons.snowflake_iceberg_model import SnowflakeObjectName
 from tests.units.fastsync.commons.test_snowflake_iceberg_converter import FakeSnowflake
+
+
+FASTSYNC_CONFIG = {'dbname': 'database', 'default_target_schema': 'schema'}
 
 
 def _target(table, writer_types=None):
@@ -103,6 +109,33 @@ def test_render_table_and_json():
     assert json.loads(
         native_to_iceberg.render_preflight_report(reports[:1], [], 'json')
     )['ready'] is True
+
+
+@pytest.mark.parametrize(
+    ('formats', 'message'),
+    [
+        ({'TABLE': 'native'}, 'DATABASE.SCHEMA.TABLE is native'),
+        ({'TABLE': 'native', 'TABLE_NATIVE': 'native'}, 'DATABASE.SCHEMA.TABLE is blocked'),
+        ({'TABLE': 'iceberg'}, None),
+        ({}, None),
+    ],
+)
+def test_fastsync_readiness_refuses_native_targets(tmp_path, formats, message):
+    """FastSync may only publish to a missing or Iceberg target."""
+    snowflake = FakeSnowflake()
+    snowflake.formats = formats
+
+    with patch.object(native_to_iceberg, 'SnowflakeQueryAdapter', return_value=snowflake):
+        if message is None:
+            native_to_iceberg.assert_fastsync_targets_ready(FASTSYNC_CONFIG, str(tmp_path), ['schema.table'])
+        else:
+            with pytest.raises(PreRunChecksException, match=message):
+                native_to_iceberg.assert_fastsync_targets_ready(
+                    FASTSYNC_CONFIG, str(tmp_path), ['schema.table'],
+                )
+
+    assert [sql for sql, _, _ in snowflake.queries] == ['SHOW TABLES IN SCHEMA "DATABASE"."SCHEMA"']
+    assert not list(tmp_path.iterdir())
 
 
 def test_tap_blockers_require_flattening_level_zero():

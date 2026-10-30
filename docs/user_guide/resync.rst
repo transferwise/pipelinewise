@@ -104,7 +104,11 @@ the resync size limit. Taps without enabled LOG_BASED tables do not reset a slot
 PipelineWise validates local configuration, preflights the FullSync size limit
 unless ``--force`` is supplied, and checks the source connection and slot before
 changing state. A preflight size-limit rejection leaves the slot and bookmarks
-unchanged. An active slot or a slot with an unexpected database
+unchanged. For a tap with ``target_table_format: iceberg``, every selected
+Snowflake target must also be missing or already Iceberg, with no pending
+conversion. A native target stops the command before the slot reset, so convert
+it first; see :ref:`cli_copy_native_to_iceberg`. ``fast_sync`` never converts
+tables itself. An active slot or a slot with an unexpected database
 or output plugin blocks the reset. Any legacy database-wide slot
 (``pipelinewise_<dbname>``) also blocks it, even if a tap-specific slot exists:
 the legacy slot may serve other taps and is preferred by the replication reader.

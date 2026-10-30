@@ -1,4 +1,4 @@
-"""Tap-scoped native-to-Iceberg conversion feasibility reports."""
+"""Tap-scoped native-to-Iceberg conversion checks and feasibility reports."""
 
 import json
 from dataclasses import asdict, dataclass
@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from tabulate import tabulate
 
+from pipelinewise.cli.errors import PreRunChecksException
 from pipelinewise.fastsync.commons.snowflake_iceberg import SnowflakeQueryAdapter
 from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_plan import (
     STATE_BLOCKED,
@@ -16,6 +17,7 @@ from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_plan import (
     ClassifiedTarget,
     ConversionTarget,
     classify_conversion_targets,
+    fastsync_target_table,
     plan_conversion_targets,
     selected_stream_ids,
 )
@@ -116,6 +118,34 @@ def preflight_report(
             tuple(blockers),
         ))
     return reports
+
+
+def assert_fastsync_targets_ready(
+    target_config: Mapping[str, Any],
+    runtime_dir: str,
+    source_tables: Sequence[str],
+) -> None:
+    """Refuse FastSync while a selected target is native or has pending conversion state."""
+    targets = [
+        ConversionTarget(source_table, fastsync_target_table(source_table, target_config))
+        for source_table in source_tables
+    ]
+    snowflake = SnowflakeQueryAdapter(dict(target_config))
+    not_ready = [
+        item for item in classify(targets, snowflake, runtime_dir)
+        if item.state not in (STATE_NEW, STATE_ICEBERG)
+    ]
+    if not_ready:
+        details = '; '.join(
+            f'{item.target.table.key} is {item.state}'
+            + (f' ({item.reasons[0]})' if item.reasons else '')
+            for item in not_ready
+        )
+        raise PreRunChecksException(
+            f'FastSync can only publish to new or Iceberg tables: {details}. Convert them '
+            'first with run_tap and native_to_iceberg_conversion enabled, or with '
+            'copy_native_to_iceberg --eventual iceberg. No source or state changes were made.'
+        )
 
 
 def render_preflight_report(
