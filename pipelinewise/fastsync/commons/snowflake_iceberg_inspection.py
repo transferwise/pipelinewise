@@ -27,6 +27,10 @@ from pipelinewise.fastsync.commons.snowflake_iceberg_versions import (
 )
 
 
+# Snowflake SHOW commands return at most this many rows without pagination.
+SHOW_COMMAND_ROW_LIMIT = 10000
+
+
 def exact_named_table_rows(
     rows: Iterable[Dict[str, Any]],
     expected_names: Sequence[str],
@@ -131,34 +135,67 @@ class SnowflakeTableInspector:
             version,
         )
 
+    def _show_schema_tables(
+        self,
+        database: str,
+        schema: str,
+        starts_with: Optional[str] = None,
+    ) -> Optional[Sequence[Dict[str, Any]]]:
+        """Return SHOW TABLES rows, or None when the schema does not exist."""
+        schema_fqtn = '.'.join(quote_identifier(value) for value in (database, schema))
+        show_tables_sql = f'SHOW TABLES IN SCHEMA {schema_fqtn}'
+        if starts_with is not None:
+            show_tables_sql += f' STARTS WITH {sql_string_literal(starts_with)}'
+        try:
+            return self.snowflake.query(show_tables_sql)
+        except snowflake.connector.errors.ProgrammingError as exc:
+            if exc.errno != 2043:  # Object does not exist, or operation cannot be performed.
+                raise
+            schema_rows = self.snowflake.query(
+                f'SHOW SCHEMAS IN DATABASE {quote_identifier(database)} '
+                f'STARTS WITH {sql_string_literal(schema)}'
+            )
+            exact_schemas = [
+                row for row in schema_rows if _row_value(row, 'name') == schema
+            ]
+            if not exact_schemas:
+                return None
+            # Another table worker may have created the schema after the first lookup.
+            return self.snowflake.query(show_tables_sql)
+
+    def discover_schema_table_rows(
+        self,
+        database: str,
+        schema: str,
+    ) -> Dict[str, Dict[str, Any]]:
+        """Return every SHOW TABLES row in one schema by exact name; empty when it is absent."""
+        rows = self._show_schema_tables(database, schema)
+        if rows is None:
+            return {}
+        if len(rows) >= SHOW_COMMAND_ROW_LIMIT:
+            raise TableFormatDiscoveryError(
+                f'Snowflake listed {len(rows)} tables in {quote_identifier(database)}.'
+                f'{quote_identifier(schema)}; SHOW TABLES may be truncated at '
+                f'{SHOW_COMMAND_ROW_LIMIT} rows'
+            )
+        tables = {}
+        for row in rows:
+            name = _row_value(row, 'name')
+            if name in tables:
+                raise TableFormatDiscoveryError(
+                    f'Snowflake returned multiple exact matches for {name!r}'
+                )
+            tables[name] = row
+        return tables
+
     def discover_table_row(
         self,
         target: SnowflakeObjectName,
     ) -> Optional[Dict[str, Any]]:
         """Return the one exact SHOW TABLES row for a target."""
-        schema_fqtn = '.'.join(
-            quote_identifier(value) for value in (target.database, target.schema)
-        )
-        show_tables_sql = (
-            f'SHOW TABLES IN SCHEMA {schema_fqtn} '
-            f'STARTS WITH {sql_string_literal(target.table)}'
-        )
-        try:
-            rows = self.snowflake.query(show_tables_sql)
-        except snowflake.connector.errors.ProgrammingError as exc:
-            if exc.errno != 2043:  # Object does not exist, or operation cannot be performed.
-                raise
-            schema_rows = self.snowflake.query(
-                f'SHOW SCHEMAS IN DATABASE {quote_identifier(target.database)} '
-                f'STARTS WITH {sql_string_literal(target.schema)}'
-            )
-            exact_schemas = [
-                row for row in schema_rows if _row_value(row, 'name') == target.schema
-            ]
-            if not exact_schemas:
-                return None
-            # Another table worker may have created the schema after the first lookup.
-            rows = self.snowflake.query(show_tables_sql)
+        rows = self._show_schema_tables(target.database, target.schema, target.table)
+        if rows is None:
+            return None
         exact_rows = exact_named_table_rows(rows, (target.table,))
         if not exact_rows:
             return None

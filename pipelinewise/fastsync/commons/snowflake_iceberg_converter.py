@@ -2,7 +2,7 @@
 
 import logging
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 from pipelinewise.fastsync.commons.snowflake_iceberg import (
     PHASE_FINALIZED,
@@ -29,6 +29,9 @@ from pipelinewise.fastsync.commons.snowflake_iceberg_inspection import (
 )
 from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_evidence import (
     SnowflakeConversionEvidenceService,
+)
+from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_plan import (
+    text_variant_blockers,
 )
 from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_recovery import (
     SnowflakeConversionFinalizationValidator,
@@ -195,7 +198,11 @@ class SnowflakeNativeToIcebergConverter:
             }
             self._run_attempt(table, manifest, resumed=resumed)
 
-    def preflight(self, fqtn: str) -> Tuple[str, ...]:
+    def preflight(
+        self,
+        fqtn: str,
+        writer_types: Optional[Mapping[str, str]] = None,
+    ) -> Tuple[str, ...]:
         """Return every reason one native table cannot convert, without changing anything."""
         table = SnowflakeTableName.parse(fqtn)
         self._query_tag_context = {}
@@ -205,7 +212,10 @@ class SnowflakeNativeToIcebergConverter:
             metadata = self._inspect_source(table)
         except NativeToIcebergConversionError as exc:
             return (str(exc),)
-        return tuple(self._conversion_blockers(table, metadata))
+        blockers = self._conversion_blockers(table, metadata)
+        if writer_types:
+            blockers.extend(text_variant_blockers(metadata.columns, writer_types))
+        return tuple(blockers)
 
     def _conversion_blockers(
         self,

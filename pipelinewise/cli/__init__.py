@@ -202,21 +202,28 @@ def _validate_tap_info(args):
         raise CommandSpecificArgumentsException('You must specify a source name using the argument --tap')
 
 
+def _is_named(value):
+    return isinstance(value, str) and bool(value.strip()) and value != '*'
+
+
 def _validate_iceberg_copy_arguments(args):
-    """Require one explicit Snowflake destination, table, and Iceberg version."""
-    if (
-        not isinstance(args.target, str)
-        or not args.target.strip()
-        or args.target == '*'
-    ):
+    """Require one Snowflake destination, an Iceberg version, and a table or report scope."""
+    if not _is_named(args.target):
         raise CommandSpecificArgumentsException(
             'You must specify a destination name using the argument --target'
         )
-    if (
-        not isinstance(args.table, str)
-        or not args.table.strip()
-        or args.table == '*'
-    ):
+    if getattr(args, 'preflight_only', False):
+        if _is_named(args.tap) == _is_named(args.table):
+            raise CommandSpecificArgumentsException(
+                'With --preflight-only, specify either a source name using --tap '
+                'or a fully qualified Snowflake table using --table'
+            )
+    elif _is_named(args.tap):
+        raise CommandSpecificArgumentsException(
+            '--tap requires --preflight-only; run_tap converts a tap\'s tables when '
+            'native_to_iceberg_conversion is enabled'
+        )
+    elif not _is_named(args.table):
         raise CommandSpecificArgumentsException(
             'You must specify a fully qualified Snowflake table using the argument --table'
         )
@@ -344,6 +351,15 @@ def main():
         type=int,
         default=None,
         help='Managed Iceberg version for native-to-Iceberg conversion',
+    )
+    parser.add_argument(
+        '--preflight-only',
+        default=False,
+        action='store_true',
+        help=(
+            'Report whether native-to-Iceberg conversion can run for a tap or table '
+            'without changing anything'
+        ),
     )
     parser.add_argument('--column', type=str, default='*', help='Name of the column to use as sync key in partial sync')
     parser.add_argument('--start_value', type=str, default='*', help='Start value of the column to partial sync')

@@ -55,6 +55,16 @@ def test_core_preserves_shared_decimal_dimensions():
         assert column.columns[0].data_type == case['canonical_type']
 
 
+def test_core_classifies_singer_text_variant_cases():
+    """Conversion preflight predicts the connector's level-0 TEXT and VARIANT columns."""
+    from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_plan import (
+        singer_text_variant_class,
+    )
+
+    for case in _v3_behavior_cases()['singer_text_variant_classes']:
+        assert singer_text_variant_class(case['schema']) == case['expected_class'], case
+
+
 def test_core_matches_contract():
     """Core exposes exactly the shared supported-version declaration."""
     expected_contract = _contract_fixture()['declarative_contract']

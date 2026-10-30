@@ -988,6 +988,14 @@ class IcebergRecoveryStore:
         with self.locked():
             return self._load()
 
+    def peek(self) -> Tuple[Optional[IcebergPublicationAttempt], Optional[IcebergTargetAttemptPointer]]:
+        """Read the manifest and FastSync pointer without a lock, for checks that never act."""
+        # Saves replace files atomically, so each read is complete even while a writer runs.
+        pointer = None
+        if self.fastsync_target_pointer_path is not None:
+            pointer = self._load_fastsync_target_pointer()
+        return self._load(), pointer
+
     def save(self, attempt: IcebergPublicationAttempt) -> None:
         """Atomically persist an attempt under the table lock."""
         with self.locked():

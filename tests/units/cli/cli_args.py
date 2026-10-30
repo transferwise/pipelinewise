@@ -33,6 +33,7 @@ class CliArgs:
         end_value=None,
         eventual='native',
         iceberg_version=None,
+        preflight_only=False,
         command=None,
     ):
         self.target = target
@@ -60,6 +61,7 @@ class CliArgs:
         self.end_value = end_value
         self.eventual = eventual
         self.iceberg_version = iceberg_version
+        self.preflight_only = preflight_only
         self.command = command
 
     # "log" Getters and setters
