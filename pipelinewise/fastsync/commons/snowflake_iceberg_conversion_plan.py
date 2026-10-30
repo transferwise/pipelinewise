@@ -176,15 +176,14 @@ def singer_target_table(
 
 
 def fastsync_target_table(
-    stream_id: str,
+    source_table: str,
     target_config: Mapping[str, Any],
 ) -> SnowflakeObjectName:
-    """Return the table FullSync and PartialSync publish for one stream."""
-    table = stream_id.replace('-', '.', 1)
+    """Return the table FullSync and PartialSync publish for one schema.table selection."""
     return SnowflakeObjectName(
         _configured_database(target_config),
-        fastsync_utils.get_target_schema(target_config, table).upper(),
-        fastsync_utils.tablename_to_dict(table)['table_name'].upper(),
+        fastsync_utils.get_target_schema(target_config, source_table).upper(),
+        fastsync_utils.tablename_to_dict(source_table)['table_name'].upper(),
     )
 
 
@@ -210,7 +209,8 @@ def plan_conversion_targets(
         try:
             table = singer_target_table(stream_id, target_config)
             fastsync_table = (
-                fastsync_target_table(stream_id, target_config) if fastsync_capable else table
+                fastsync_target_table(stream_id.replace('-', '.', 1), target_config)
+                if fastsync_capable else table
             )
         except Exception as exc:  # get_target_schema raises a bare Exception
             targets.append(ConversionTarget(stream_id, None, blockers=(str(exc),)))
