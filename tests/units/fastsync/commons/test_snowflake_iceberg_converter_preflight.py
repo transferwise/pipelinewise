@@ -227,3 +227,35 @@ def test_convertible_temporal_column_is_probed_then_converted(tmp_path):
     create = next(index for index, statement in enumerate(sql) if statement.startswith('CREATE'))
     assert probe < create
     assert 'CAST("UPDATED_AT" AS TIMESTAMP_NTZ(6)) AS "UPDATED_AT"' in sql[create]
+
+
+def _submitted_attempt_over_temporal_column(tmp_path):
+    """Leave a SUBMITTED manifest beside a validated companion, as a rejected promotion does."""
+    snowflake = FakeSnowflake()
+    snowflake.native_extra_columns = [_native_column('UPDATED_AT', 'TIMESTAMP_NTZ')]
+    snowflake.companion_extra_columns = [
+        _native_column('UPDATED_AT', 'TIMESTAMP_NTZ', DATETIME_PRECISION=6),
+    ]
+    snowflake.fail_promotion = RuntimeError('promotion rejected')
+    with pytest.raises(RuntimeError, match='promotion rejected'):
+        _converter(tmp_path, snowflake).convert(TABLE, eventual=EVENTUAL_ICEBERG)
+    assert snowflake.formats == {'TABLE': 'native', 'TABLE_ICEBERG': 'iceberg'}
+    snowflake.fail_promotion = None
+    return snowflake
+
+
+@pytest.mark.parametrize('companion', ['kept', 'dropped'])
+def test_resumed_submitted_attempt_rechecks_before_cutover(tmp_path, companion):
+    """A resumed attempt past staging is checked again, because its evidence is projected."""
+    snowflake = _submitted_attempt_over_temporal_column(tmp_path)
+    if companion == 'dropped':
+        del snowflake.formats['TABLE_ICEBERG']
+    snowflake.sub_microsecond_counts = {'UPDATED_AT': 2}
+    query_count = len(snowflake.queries)
+
+    with pytest.raises(NativeToIcebergConversionError, match='would truncate'):
+        _converter(tmp_path, snowflake).convert(TABLE, eventual=EVENTUAL_ICEBERG)
+
+    assert len(_manifest_files(tmp_path)) == 1
+    assert not _mutations(snowflake, query_count)
+    assert snowflake.formats.get('TABLE') == 'native'

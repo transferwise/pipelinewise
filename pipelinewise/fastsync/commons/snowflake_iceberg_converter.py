@@ -203,7 +203,7 @@ class SnowflakeNativeToIcebergConverter:
         fqtn: str,
         writer_types: Optional[Mapping[str, str]] = None,
     ) -> Tuple[str, ...]:
-        """Return every reason one native table cannot convert, without changing anything."""
+        """Return the first metadata refusal, or every conversion blocker, without changing anything."""
         table = SnowflakeTableName.parse(fqtn)
         self._query_tag_context = {}
         try:
@@ -518,8 +518,8 @@ class SnowflakeNativeToIcebergConverter:
             raise NativeToIcebergConversionError(
                 f'The schema of {table.quoted} changed after conversion started'
             )
-        if resumed and manifest.phase in (PHASE_PREPARED, PHASE_STAGING_CREATED):
-            # An attempt resumed before its evidence was staged may predate these checks.
+        if resumed:
+            # A resumed attempt may predate these checks; its projected evidence cannot prove exactness.
             self._assert_convertible(table, metadata)
 
         if state.staging == TABLE_FORMAT_MISSING:

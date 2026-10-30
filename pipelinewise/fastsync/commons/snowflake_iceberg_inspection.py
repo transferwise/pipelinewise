@@ -140,12 +140,15 @@ class SnowflakeTableInspector:
         database: str,
         schema: str,
         starts_with: Optional[str] = None,
+        limit: Optional[int] = None,
     ) -> Optional[Sequence[Dict[str, Any]]]:
         """Return SHOW TABLES rows, or None when the schema does not exist."""
         schema_fqtn = '.'.join(quote_identifier(value) for value in (database, schema))
         show_tables_sql = f'SHOW TABLES IN SCHEMA {schema_fqtn}'
         if starts_with is not None:
             show_tables_sql += f' STARTS WITH {sql_string_literal(starts_with)}'
+        if limit is not None:
+            show_tables_sql += f' LIMIT {int(limit)}'
         try:
             return self.snowflake.query(show_tables_sql)
         except snowflake.connector.errors.ProgrammingError as exc:
@@ -167,17 +170,14 @@ class SnowflakeTableInspector:
         self,
         database: str,
         schema: str,
-    ) -> Dict[str, Dict[str, Any]]:
-        """Return every SHOW TABLES row in one schema by exact name; empty when it is absent."""
-        rows = self._show_schema_tables(database, schema)
+        starts_with: Optional[str] = None,
+    ) -> Optional[Dict[str, Dict[str, Any]]]:
+        """Return SHOW TABLES rows by exact name, empty for a missing schema, None if truncated."""
+        rows = self._show_schema_tables(database, schema, starts_with, SHOW_COMMAND_ROW_LIMIT)
         if rows is None:
             return {}
         if len(rows) >= SHOW_COMMAND_ROW_LIMIT:
-            raise TableFormatDiscoveryError(
-                f'Snowflake listed {len(rows)} tables in {quote_identifier(database)}.'
-                f'{quote_identifier(schema)}; SHOW TABLES may be truncated at '
-                f'{SHOW_COMMAND_ROW_LIMIT} rows'
-            )
+            return None
         tables = {}
         for row in rows:
             name = _row_value(row, 'name')

@@ -121,6 +121,7 @@ def test_render_table_and_json():
         ({'TABLE': 'native', 'TABLE_NATIVE': 'native'}, 'DATABASE.SCHEMA.TABLE is blocked'),
         ({'TABLE': 'iceberg'}, None),
         ({}, None),
+        ({'TABLE_NATIVE': 'native', 'TABLE_ICEBERG': 'iceberg'}, None),
     ],
 )
 def test_fastsync_readiness_refuses_native_targets(tmp_path, formats, message):
@@ -137,8 +138,24 @@ def test_fastsync_readiness_refuses_native_targets(tmp_path, formats, message):
                     FASTSYNC_CONFIG, str(tmp_path), ['schema.table'],
                 )
 
-    assert [sql for sql, _, _ in snowflake.queries] == ['SHOW TABLES IN SCHEMA "DATABASE"."SCHEMA"']
+    assert [sql for sql, _, _ in snowflake.queries] == ['SHOW TABLES IN SCHEMA "DATABASE"."SCHEMA" LIMIT 10000']
     assert not list(tmp_path.iterdir())
+
+
+def test_fastsync_readiness_bounds_its_message():
+    """A refusal over many tables names a bounded number and logs every one."""
+    targets = [_classified(f'T{index:02d}', STATE_NATIVE) for index in range(25)]
+
+    with patch.object(native_to_iceberg, 'SnowflakeQueryAdapter'), patch.object(
+        native_to_iceberg, 'classify', return_value=targets,
+    ), patch.object(native_to_iceberg.LOGGER, 'error') as log_error:
+        with pytest.raises(PreRunChecksException) as error:
+            native_to_iceberg.assert_fastsync_targets_ready(FASTSYNC_CONFIG, '/runtime', ['schema.t'])
+
+    assert 'DATABASE.SCHEMA.T19 is native' in str(error.value)
+    assert 'DATABASE.SCHEMA.T20' not in str(error.value)
+    assert 'and 5 more tables listed in the log' in str(error.value)
+    assert log_error.call_count == 25
 
 
 def _classified(table, state, bytes_=None, reasons=(), stream=None):
@@ -184,6 +201,57 @@ def test_gate_resumes_pending_first_then_converts_smallest_first():
         _quoted(table) for table in ('SMALL', 'BIG', 'UNKNOWN')
     ]
     assert classify.call_count == 2
+
+
+def test_gate_resumes_pending_conversions_before_refusing_blocked_tables():
+    """An unrelated blocker never keeps an interrupted cutover's table name missing."""
+    first = [
+        _classified('USERS', STATE_BLOCKED, reasons=('"USERS_NATIVE" already exists',)),
+        _classified('HALF', STATE_PENDING),
+    ]
+
+    with _gate(first) as (converter, _, _):
+        with pytest.raises(NativeToIcebergConversionException, match='USERS .*needs an operator'):
+            native_to_iceberg.convert_tap_tables({}, '/runtime', [])
+
+    assert converter.convert.call_args_list == [call(_quoted('HALF'), eventual='iceberg')]
+
+
+def test_gate_skips_the_post_check_when_nothing_changed():
+    """Once every table is Iceberg, a run lists each schema once."""
+    first = [_classified('DONE', STATE_ICEBERG), _classified('LATER', STATE_NEW)]
+
+    with _gate(first) as (converter, _, classify):
+        native_to_iceberg.convert_tap_tables({}, '/runtime', [])
+
+    assert classify.call_count == 1
+    converter.convert.assert_not_called()
+
+
+def test_gate_names_the_exact_report_command_and_bounds_its_message():
+    """The stop message points to the full report command and names at most 20 tables."""
+    first = [_classified(f'T{index:02d}', STATE_BLOCKED, reasons=('reason',)) for index in range(23)]
+
+    with _gate(first):
+        with pytest.raises(NativeToIcebergConversionException) as error:
+            native_to_iceberg.convert_tap_tables({}, '/runtime', [], target_id='snowflake', tap_id='orders')
+
+    message = str(error.value)
+    assert 'pipelinewise copy_native_to_iceberg --target snowflake --tap orders --preflight-only' in message
+    assert '--iceberg-version 3' in message
+    assert 'T19' in message and 'T20' not in message
+    assert 'and 3 more tables listed in the log' in message
+
+
+def test_gate_logs_unexpected_conversion_errors_with_traceback():
+    """An unexpected converter error keeps its traceback in the tap log."""
+    with _gate([_classified('A', STATE_NATIVE, 1)], convert_error=KeyError('owner_role_type')), patch.object(
+        native_to_iceberg.LOGGER, 'exception',
+    ) as log_exception:
+        with pytest.raises(NativeToIcebergConversionException, match="failed: 'owner_role_type'"):
+            native_to_iceberg.convert_tap_tables({}, '/runtime', [])
+
+    log_exception.assert_called_once_with('Unexpected error while converting %s', 'DATABASE.SCHEMA.A')
 
 
 def test_gate_stops_on_blocked_tables_before_any_change():
@@ -276,8 +344,40 @@ def test_gate_drives_the_real_converter(tmp_path):
 
 def test_tap_blockers_require_flattening_level_zero():
     """Automatic conversion needs the level-0 column mapping the preflight assumes."""
-    assert native_to_iceberg.tap_blockers({'data_flattening_max_level': 0}) == []
-    assert native_to_iceberg.tap_blockers({}) == []
-    assert native_to_iceberg.tap_blockers({'data_flattening_max_level': 10}) == [
+    iceberg = {'target_table_format': 'iceberg'}
+    assert native_to_iceberg.tap_blockers({**iceberg, 'data_flattening_max_level': 0}) == []
+    assert native_to_iceberg.tap_blockers(iceberg) == []
+    assert native_to_iceberg.tap_blockers({**iceberg, 'data_flattening_max_level': 10}) == [
         'data_flattening_max_level is 10; native_to_iceberg_conversion requires 0'
     ]
+
+
+def test_tap_blockers_wait_for_the_imported_iceberg_catalog():
+    """A report on a catalog discovered with native settings can never claim ready."""
+    blockers = native_to_iceberg.tap_blockers({'data_flattening_max_level': 0})
+
+    assert len(blockers) == 1
+    assert 'not imported with target_table_format: iceberg yet' in blockers[0]
+    assert 'native_to_iceberg_conversion enabled: false' in blockers[0]
+
+
+def test_report_preflights_blocked_native_tables_too():
+    """A blocked native table also shows its conversion blockers in the same report."""
+    snowflake = FakeSnowflake()
+    snowflake.formats = {'TABLE': 'native', 'TABLE_NATIVE': 'native'}
+    snowflake.native_extra_columns = [{
+        'COLUMN_NAME': 'CREATED_AT',
+        'DATA_TYPE': 'TIMESTAMP_TZ',
+        'IS_NULLABLE': 'YES',
+        'COMMENT': None,
+        'COLUMN_DEFAULT': None,
+        'IS_IDENTITY': 'NO',
+    }]
+
+    with patch.object(native_to_iceberg, 'SnowflakeConversionQueryAdapter', return_value=snowflake):
+        reports = native_to_iceberg.preflight_report({'dbname': 'database'}, '/runtime', [_target('TABLE')])
+
+    assert reports[0].state == STATE_BLOCKED
+    assert len(reports[0].blockers) == 2
+    assert 'TABLE_NATIVE" already exists' in reports[0].blockers[0]
+    assert 'Column CREATED_AT is TIMESTAMP_TZ' in reports[0].blockers[1]
