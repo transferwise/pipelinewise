@@ -410,12 +410,27 @@ column comments, explicit non-ownership grants to account roles and qualified
 database roles, grant options, and direct table tags. The current account role
 must own the native source; database-role ownership is not supported.
 
+Ownership, comments, and direct table tags must match exactly. Every native
+grant must also be present on the Iceberg table, so no reader loses access.
+Extra grants on the Iceberg table, for example from future grants or scheduled
+grant automation, are logged and accepted.
+
 Conversion fails before copying when the table has visible dependent streams,
 policies, direct column tags, secondary constraints, inbound foreign keys,
 defaults, identity columns, a clustering key, NULL primary-key values, or an
 unsupported Iceberg type. Account-wide stream inspection is limited to objects
-visible to the current role. Time and timestamp precision is normalized to
-microseconds. Snowflake ``VARIANT`` remains ``VARIANT``.
+visible to the current role. It also fails before copying when Iceberg v3
+cannot hold the data exactly or the grants cannot be replayed:
+
+* a ``TIMESTAMP_TZ`` column, because managed Iceberg stores ``TIMESTAMP_LTZ``
+  and would drop each value's offset;
+* a ``TIME``, ``TIMESTAMP_NTZ``, or ``TIMESTAMP_LTZ`` value with sub-microsecond
+  digits, because Iceberg columns hold microseconds. The command counts such
+  values with one aggregate scan and reports only the count;
+* a grant of a privilege that Iceberg tables do not accept, or a grant to
+  anything other than an account role or a qualified database role.
+
+Snowflake ``VARIANT`` remains ``VARIANT``.
 
 Writes during the copy or cutover can be absent from the Iceberg result. The
 local manifest lock does not replace the required external writer exclusion.
@@ -463,6 +478,8 @@ the Iceberg table settings and metadata:
    * - Columns and rows match, but the Iceberg table settings or metadata differ
      - PipelineWise records rollback intent, restores the native table name, and
        keeps the manifest. A retry cuts over again once the difference is fixed.
+       An extra grant on the promoted table is not a difference; a missing native
+       grant is.
    * - A connection or other unexpected error
      - The promoted table stays live and the manifest is kept. Retry the identical
        command to finish validation.

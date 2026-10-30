@@ -162,3 +162,7 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
   conversion manifest must load. Copy/validate the whole row multiset,
   including duplicate keys and representable flaws, without filtering, repair,
   or deduplication; fail before cutover if v3 cannot represent it exactly.
+  Evidence hashes projected values, so refuse `TIMESTAMP_TZ`, sub-microsecond
+  values, and unreplayable grants before any manifest or DDL. Ownership,
+  comments, and tags match exactly; source grants are a required subset, and
+  extra Iceberg grants are logged, never rolled back.
