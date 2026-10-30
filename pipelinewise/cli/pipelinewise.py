@@ -1,6 +1,7 @@
 """
 PipelineWise CLI - Pipelinewise class
 """
+import atexit
 import logging
 import os
 import shutil
@@ -115,6 +116,8 @@ class PipelineWise:
         )
         self.config_path = os.path.join(self.config_dir, 'config.json')
         self.config = {}
+        self._rendered_connector_configs = {}
+        atexit.register(self._remove_rendered_connector_configs)
         self.load_config()
         self.alert_sender = AlertSender(self.config.get('alert_handlers'))
 
@@ -429,7 +432,7 @@ class PipelineWise:
         Load ppw main configuration at ~/.pipelinewise/config.json
         """
         self.logger.debug('Loading main config at %s', self.config_path)
-        config = utils.load_json(self.config_path)
+        config = utils.load_json_with_env_vars(self.config_path)
 
         if config:
             self.config = config
@@ -497,7 +500,7 @@ class PipelineWise:
 
         target_dir = self.get_target_dir(target_id)
         if os.path.isdir(target_dir):
-            target['files'] = Config.get_connector_files(target_dir)
+            target['files'] = self._with_rendered_config(Config.get_connector_files(target_dir))
         else:
             raise Exception(f'Cannot find target at {target_dir}')
 
@@ -536,7 +539,7 @@ class PipelineWise:
 
         tap_dir = self.get_tap_dir(target_id, tap_id)
         if os.path.isdir(tap_dir):
-            tap['files'] = Config.get_connector_files(tap_dir)
+            tap['files'] = self._with_rendered_config(Config.get_connector_files(tap_dir))
         else:
             raise Exception(f'Cannot find tap at {tap_dir}')
 
@@ -545,6 +548,48 @@ class PipelineWise:
         tap['status'] = self.detect_tap_status(target_id, tap_id)
 
         return tap
+
+    def _with_rendered_config(self, files: Dict) -> Dict:
+        """
+        Point files['config'] at a rendered copy when the connector config holds env_var lookups.
+
+        Connectors read the config file themselves, so they need the values written out. The copy
+        holds secrets: mkstemp makes it readable by its owner only, and it is removed on exit.
+        """
+        source = files['config']
+        if source not in self._rendered_connector_configs:
+            self._rendered_connector_configs[source] = self._render_connector_config(source)
+        return {**files, 'config': self._rendered_connector_configs[source]}
+
+    def _render_connector_config(self, source: str) -> str:
+        """
+        Path of the rendered copy of a connector config, or the config itself if it has no lookups
+        """
+        if not os.path.isfile(source):
+            return source
+        with open(source, encoding='utf-8') as config_file:
+            text = config_file.read()
+        if not utils.ENV_VAR_LOOKUP.search(text):
+            return source
+        try:
+            rendered = utils.render_env_var_lookups(text)
+            json.loads(rendered)
+        except Exception as exc:
+            raise Exception(f'Cannot render env_var lookups in {source}: {exc}') from exc
+        file_descriptor, path = utils.create_temp_file(
+            dir=self.get_temp_dir(), prefix='connector_config_', suffix='.json'
+        )
+        with os.fdopen(file_descriptor, 'w', encoding='utf-8') as rendered_file:
+            rendered_file.write(rendered)
+        return path
+
+    def _remove_rendered_connector_configs(self):
+        """
+        Delete the rendered connector config copies
+        """
+        for source, rendered in self._rendered_connector_configs.items():
+            if rendered != source:
+                utils.silentremove(rendered)
 
     # TODO: This method is too complex! make its complexity less than 15!
 
@@ -2460,7 +2505,7 @@ class PipelineWise:
         tap_dir = self.get_tap_dir(target_id, tap_id)
         tap_config_path = os.path.join(tap_dir, 'config.json')
         with open(tap_config_path, encoding='utf-8') as tap_config_file:
-            tap_config = json.load(tap_config_file)
+            tap_config = json.loads(utils.render_env_var_lookups(tap_config_file.read()))
 
         with open(os.path.join(tap_dir, 'selection.json'), encoding='utf-8') as selection_file:
             selection = json.load(selection_file)

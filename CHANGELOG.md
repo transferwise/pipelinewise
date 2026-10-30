@@ -1,3 +1,13 @@
+0.98.0 (2026-10-26)
+-------------------
+
+- Render `{{ env_var['NAME'] }}` lookups in the generated main, target, and tap
+  `config.json` when a command loads them. Configuration generated outside
+  `import_config` can keep secrets in environment variables instead of files.
+  Files without lookups are used as they are. A missing variable fails the
+  command. See
+  [Secrets and validation](docs/user_guide/yaml_config.rst#secrets-and-validation)
+
 0.97.0 (2026-10-23)
 -------------------
 - Fix Dcocker-compose for dev environment.
