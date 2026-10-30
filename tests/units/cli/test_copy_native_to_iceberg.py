@@ -87,7 +87,7 @@ def test_rejects_invalid_conversion_args(override, message):
     'pipelinewise.fastsync.commons.snowflake_iceberg_converter.'
     'SnowflakeNativeToIcebergConverter'
 )
-@patch('pipelinewise.fastsync.commons.snowflake_iceberg.SnowflakeQueryAdapter')
+@patch('pipelinewise.fastsync.commons.snowflake_iceberg.SnowflakeConversionQueryAdapter')
 def test_dispatches_target_only_conversion(mock_adapter, mock_converter):
     """The root command uses generated target credentials without resolving a tap."""
     args = _args(target='target_one', eventual='iceberg')
@@ -190,8 +190,9 @@ def test_tap_scoped_report_plans_selected_streams(mock_report, capsys):
 
     pipelinewise.copy_native_to_iceberg()
 
-    target_config, runtime_dir, targets = mock_report.call_args.args
+    target_config, runtime_dir, targets, warehouse = mock_report.call_args.args
     assert runtime_dir == f'{CONFIG_DIR}/target_one'
+    assert warehouse is None
     assert target_config['dbname'] == 'my_db'
     assert target_config['data_flattening_max_level'] == 0
     assert [(target.stream_id, target.table.key, target.blockers) for target in targets] == [
@@ -212,7 +213,8 @@ def test_table_scoped_report_uses_the_named_table(mock_report, capsys):
 
     pipelinewise.copy_native_to_iceberg()
 
-    _, _, targets = mock_report.call_args.args
+    _, _, targets, warehouse = mock_report.call_args.args
+    assert warehouse is None
     assert [target.table.key for target in targets] == ['DATABASE.SCHEMA.TABLE']
     assert capsys.readouterr().out.strip().endswith('Ready: no blockers found.')
 

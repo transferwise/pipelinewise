@@ -1,17 +1,20 @@
 """Tap-scoped native-to-Iceberg conversion reports."""
 
 import json
-from unittest.mock import patch
+from contextlib import contextmanager
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
 from pipelinewise.cli import native_to_iceberg
-from pipelinewise.cli.errors import PreRunChecksException
+from pipelinewise.cli.errors import NativeToIcebergConversionException, PreRunChecksException
 from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_plan import (
     STATE_BLOCKED,
     STATE_ICEBERG,
     STATE_NATIVE,
     STATE_NEW,
+    STATE_PENDING,
+    ClassifiedTarget,
     ConversionTarget,
 )
 from pipelinewise.fastsync.commons.snowflake_iceberg_model import SnowflakeObjectName
@@ -30,7 +33,7 @@ def _target(table, writer_types=None):
 
 
 def _report(tmp_path, snowflake, targets):
-    with patch.object(native_to_iceberg, 'SnowflakeQueryAdapter', return_value=snowflake):
+    with patch.object(native_to_iceberg, 'SnowflakeConversionQueryAdapter', return_value=snowflake):
         return native_to_iceberg.preflight_report({'dbname': 'database'}, str(tmp_path), targets)
 
 
@@ -136,6 +139,139 @@ def test_fastsync_readiness_refuses_native_targets(tmp_path, formats, message):
 
     assert [sql for sql, _, _ in snowflake.queries] == ['SHOW TABLES IN SCHEMA "DATABASE"."SCHEMA"']
     assert not list(tmp_path.iterdir())
+
+
+def _classified(table, state, bytes_=None, reasons=(), stream=None):
+    target = ConversionTarget(stream or f'public-{table.lower()}', SnowflakeObjectName('DATABASE', 'SCHEMA', table))
+    return ClassifiedTarget(target, state, reasons, None, bytes_)
+
+
+@contextmanager
+def _gate(first, final=(), preflight=None, convert_error=None):
+    converter = MagicMock()
+    converter.preflight.side_effect = preflight or (lambda fqtn, writer_types: ())
+    converter.convert.side_effect = convert_error
+    with patch.object(native_to_iceberg, 'SnowflakeConversionQueryAdapter') as adapter, patch.object(
+        native_to_iceberg, 'SnowflakeNativeToIcebergConverter', return_value=converter,
+    ), patch.object(native_to_iceberg, 'classify', side_effect=[list(first), list(final)]) as classify:
+        yield converter, adapter, classify
+
+
+def _quoted(table):
+    return f'"DATABASE"."SCHEMA"."{table}"'
+
+
+def test_gate_resumes_pending_first_then_converts_smallest_first():
+    """Interrupted cutovers close first; native tables convert from smallest to unknown size."""
+    first = [
+        _classified('DONE', STATE_ICEBERG),
+        _classified('BIG', STATE_NATIVE, 900),
+        _classified('HALF', STATE_PENDING),
+        _classified('UNKNOWN', STATE_NATIVE),
+        _classified('SMALL', STATE_NATIVE, 10),
+        _classified('LATER', STATE_NEW),
+    ]
+    final = [_classified(name, STATE_ICEBERG) for name in ('DONE', 'BIG', 'HALF', 'UNKNOWN', 'SMALL')]
+
+    with _gate(first, final) as (converter, adapter, classify):
+        native_to_iceberg.convert_tap_tables({'dbname': 'database'}, '/runtime', ['targets'], 'WH')
+
+    adapter.assert_called_once_with({'dbname': 'database'}, 'WH')
+    assert converter.convert.call_args_list == [
+        call(_quoted(table), eventual='iceberg') for table in ('HALF', 'SMALL', 'BIG', 'UNKNOWN')
+    ]
+    assert [entry.args[0] for entry in converter.preflight.call_args_list] == [
+        _quoted(table) for table in ('SMALL', 'BIG', 'UNKNOWN')
+    ]
+    assert classify.call_count == 2
+
+
+def test_gate_stops_on_blocked_tables_before_any_change():
+    """A table that needs an operator stops the whole tap before anything converts."""
+    first = [
+        _classified('ORDERS', STATE_NATIVE, 10),
+        _classified('USERS', STATE_BLOCKED, reasons=('"USERS_NATIVE" already exists',)),
+    ]
+
+    with _gate(first) as (converter, _, _):
+        with pytest.raises(NativeToIcebergConversionException) as error:
+            native_to_iceberg.convert_tap_tables({}, '/runtime', [])
+
+    message = str(error.value)
+    assert 'DATABASE.SCHEMA.USERS (stream public-users) needs an operator' in message
+    assert '"USERS_NATIVE" already exists' in message
+    assert 'Replication did not start' in message
+    converter.preflight.assert_not_called()
+    converter.convert.assert_not_called()
+
+
+def test_gate_preflights_every_table_before_converting_any():
+    """One unconvertible table stops the run before even the clean tables change."""
+    first = [_classified('CLEAN', STATE_NATIVE, 1), _classified('LOSSY', STATE_NATIVE, 2)]
+
+    def preflight(fqtn, writer_types):
+        return ('Column TS is TIMESTAMP_TZ',) if 'LOSSY' in fqtn else ()
+
+    with _gate(first, preflight=preflight) as (converter, _, _):
+        with pytest.raises(NativeToIcebergConversionException, match='LOSSY.*cannot be converted.*TIMESTAMP_TZ'):
+            native_to_iceberg.convert_tap_tables({}, '/runtime', [])
+
+    converter.convert.assert_not_called()
+
+
+def test_gate_stops_at_the_first_failed_conversion():
+    """A failed conversion names its table, keeps earlier conversions, and skips later ones."""
+    first = [_classified('A', STATE_NATIVE, 1), _classified('B', STATE_NATIVE, 2), _classified('C', STATE_NATIVE, 3)]
+
+    with _gate(first, convert_error=[None, RuntimeError('copy failed')]) as (converter, _, classify):
+        with pytest.raises(
+            NativeToIcebergConversionException,
+            match=r'conversion of DATABASE.SCHEMA.B \(stream public-b\) failed: copy failed',
+        ):
+            native_to_iceberg.convert_tap_tables({}, '/runtime', [])
+
+    assert converter.convert.call_count == 2
+    assert classify.call_count == 1
+
+
+def test_gate_post_check_requires_every_table_to_be_iceberg():
+    """Replication starts only when every planned table is new or Iceberg."""
+    with _gate([_classified('A', STATE_NATIVE, 1)], [_classified('A', STATE_PENDING)]):
+        with pytest.raises(NativeToIcebergConversionException, match='A .*is still not Iceberg'):
+            native_to_iceberg.convert_tap_tables({}, '/runtime', [])
+
+
+def test_gate_converts_a_shared_table_once():
+    """Two streams that write the same table convert it once."""
+    first = [
+        _classified('T', STATE_NATIVE, 1, stream='a-t'),
+        _classified('T', STATE_NATIVE, 1, stream='b-t'),
+    ]
+
+    with _gate(first, [_classified('T', STATE_ICEBERG)]) as (converter, _, _):
+        native_to_iceberg.convert_tap_tables({}, '/runtime', [])
+
+    assert converter.convert.call_count == 1
+
+
+def test_gate_wraps_unexpected_errors():
+    """Discovery failures stop the tap with the same next action."""
+    with patch.object(native_to_iceberg, 'SnowflakeConversionQueryAdapter'), patch.object(
+        native_to_iceberg, 'classify', side_effect=RuntimeError('listing may be truncated'),
+    ):
+        with pytest.raises(NativeToIcebergConversionException, match='stopped: listing may be truncated'):
+            native_to_iceberg.convert_tap_tables({}, '/runtime', [])
+
+
+def test_gate_drives_the_real_converter(tmp_path):
+    """A native table is preflighted, converted, and verified through the real converter."""
+    snowflake = FakeSnowflake()
+
+    with patch.object(native_to_iceberg, 'SnowflakeConversionQueryAdapter', return_value=snowflake):
+        native_to_iceberg.convert_tap_tables({'dbname': 'database'}, str(tmp_path), [_target('TABLE')])
+
+    assert snowflake.formats == {'TABLE_NATIVE': 'native', 'TABLE': 'iceberg'}
+    assert not list(tmp_path.glob('iceberg-recovery-*.json'))
 
 
 def test_tap_blockers_require_flattening_level_zero():

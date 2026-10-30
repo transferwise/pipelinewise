@@ -150,6 +150,7 @@ __all__ = (
     'QueryHistoryVisibilityTimeoutError',
     'RecoveryManifestError',
     'RecoveryOutcome',
+    'SnowflakeConversionQueryAdapter',
     'SnowflakeIcebergPublisher',
     'SnowflakeObjectName',
     'SnowflakeQueryAdapter',
@@ -188,6 +189,23 @@ class SnowflakeQueryAdapter(SnowflakeSqlClient):
     @staticmethod
     def _monotonic():
         return time.monotonic()
+
+
+class SnowflakeConversionQueryAdapter(SnowflakeQueryAdapter):
+    """Conversion executor, optionally on its own warehouse, whose orphaned statements stop."""
+
+    def __init__(self, connection_config, warehouse: Optional[str] = None):
+        if warehouse:
+            connection_config = {**connection_config, 'warehouse': warehouse}
+        super().__init__(connection_config)
+
+    def _connect(self, **kwargs):
+        # A killed run must not leave a long copy running unattended on the warehouse.
+        kwargs['session_parameters'] = {
+            **kwargs.get('session_parameters', {}),
+            'ABORT_DETACHED_QUERY': 'TRUE',
+        }
+        return super()._connect(**kwargs)
 
 
 class SnowflakeIcebergPublisher:
