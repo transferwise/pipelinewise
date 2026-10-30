@@ -1,3 +1,4 @@
+import json
 import signal
 
 from unittest.mock import call, patch
@@ -129,6 +130,91 @@ def test_target_only_signal_exits(mock_signal):
 
     assert error.value.code == 1
     stop_tap.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    'scope',
+    [{'tap': 'tap_one', 'table': '*'}, {'tap': '*', 'table': 'DATABASE.SCHEMA.TABLE'}],
+)
+def test_accepts_preflight_scopes(scope):
+    """A feasibility report covers either one tap or one table."""
+    cli._validate_command_specific_arguments(_args(preflight_only=True, **scope))
+
+
+@pytest.mark.parametrize(
+    ('override', 'message'),
+    [
+        ({'preflight_only': True, 'tap': 'tap_one'}, 'either a source name using --tap'),
+        ({'preflight_only': True, 'table': '*'}, 'either a source name using --tap'),
+        ({'preflight_only': True, 'table': '*', 'iceberg_version': None}, 'either a source name'),
+        ({'tap': 'tap_one'}, '--tap requires --preflight-only'),
+        ({'preflight_only': True, 'iceberg_version': None}, '--iceberg-version 3'),
+    ],
+)
+def test_rejects_invalid_preflight_scopes(override, message):
+    """A report needs exactly one scope, and only reports accept a tap."""
+    with pytest.raises(CommandSpecificArgumentsException, match=message):
+        cli._validate_command_specific_arguments(_args(**override))
+
+
+@patch('pipelinewise.cli.pipelinewise.signal.signal')
+def test_tap_scoped_report_never_stops_the_tap(mock_signal):
+    """A report beside a running tap exits on SIGTERM without touching its pidfile."""
+    pipelinewise = PipelineWise(
+        _args(target='target_one', tap='tap_one', table='*', preflight_only=True),
+        CONFIG_DIR,
+        VIRTUALENVS_DIR,
+    )
+    handler = pipelinewise._stop_command_on_signal
+
+    assert mock_signal.call_args_list == [
+        call(signal.SIGINT, handler),
+        call(signal.SIGTERM, handler),
+    ]
+
+
+@patch('pipelinewise.cli.native_to_iceberg.preflight_report', return_value=[])
+def test_tap_scoped_report_plans_selected_streams(mock_report, capsys):
+    """A tap report plans the selected streams with the tap's schema mapping."""
+    pipelinewise = PipelineWise(
+        _args(
+            target='target_one',
+            tap='tap_one',
+            table='*',
+            preflight_only=True,
+            output_format='json',
+        ),
+        CONFIG_DIR,
+        VIRTUALENVS_DIR,
+    )
+
+    pipelinewise.copy_native_to_iceberg()
+
+    target_config, runtime_dir, targets = mock_report.call_args.args
+    assert runtime_dir == f'{CONFIG_DIR}/target_one'
+    assert target_config['dbname'] == 'my_db'
+    assert target_config['data_flattening_max_level'] == 0
+    assert [(target.stream_id, target.table.key, target.blockers) for target in targets] == [
+        ('db_test_mysql-table_one', 'MY_DB.DB_TEST_MYSQL.TABLE_ONE', ()),
+        ('db_test_mysql-table_two', 'MY_DB.DB_TEST_MYSQL.TABLE_TWO', ()),
+    ]
+    assert json.loads(capsys.readouterr().out) == {'ready': True, 'blockers': [], 'tables': []}
+
+
+@patch('pipelinewise.cli.native_to_iceberg.preflight_report', return_value=[])
+def test_table_scoped_report_uses_the_named_table(mock_report, capsys):
+    """A table report needs no tap and plans exactly the named table."""
+    pipelinewise = PipelineWise(
+        _args(target='target_one', preflight_only=True),
+        CONFIG_DIR,
+        VIRTUALENVS_DIR,
+    )
+
+    pipelinewise.copy_native_to_iceberg()
+
+    _, _, targets = mock_report.call_args.args
+    assert [target.table.key for target in targets] == ['DATABASE.SCHEMA.TABLE']
+    assert capsys.readouterr().out.strip().endswith('Ready: no blockers found.')
 
 
 @patch(

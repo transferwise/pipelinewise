@@ -53,8 +53,9 @@ Command summary
      - Repair one bounded source range.
      - Merges target data; can update state.
    * - ``copy_native_to_iceberg``
-     - Build or promote one managed Iceberg v3 copy.
-     - Creates companion tables; can rename the live table.
+     - Build or promote one managed Iceberg v3 copy, or report feasibility.
+     - Creates companion tables; can rename the live table. ``--preflight-only``
+       changes nothing.
    * - ``reset_state``
      - Move CDC state after a controlled switchover.
      - Changes bookmarks without copying data.
@@ -346,6 +347,26 @@ native table name before it validates anything. A rerun after a completed
 ``--eventual iceberg`` conversion changes nothing. Do not delete its recovery manifest or companion tables. See
 :ref:`snowflake_iceberg` for preflight, unsupported metadata, and rollback
 behaviour.
+
+Check feasibility first with ``--preflight-only``:
+
+.. code-block:: bash
+
+   pipelinewise copy_native_to_iceberg \
+     --target <target_id> \
+     --tap <tap_id> \
+     --preflight-only \
+     --iceberg-version 3 \
+     --output-format table
+
+The report changes nothing. It takes no lock, writes no manifest, and runs no
+DDL, so it can run while the tap replicates. ``--tap`` reports every table that
+the tap's selected streams write; ``--table`` reports one table instead. Each
+row shows the table's state, the action conversion would take, Snowflake's row
+and byte counts, and every blocker. ``--output-format json`` returns the same
+report with a top-level ``ready`` flag. The command exits 0 whenever it produces
+a report, so check ``ready`` or the final line. ``--tap`` is accepted only with
+``--preflight-only``. See :ref:`snowflake_iceberg_conversion_report`.
 
 
 Data-diff

@@ -355,8 +355,9 @@ using an imported Snowflake target:
      --eventual native \
      --iceberg-version 3
 
-``--eventual`` defaults to ``native``. The command has no tap argument and only
-accepts a table in the target's configured database.
+``--eventual`` defaults to ``native``. The command converts one table in the
+target's configured database. ``--tap`` is accepted only by the feasibility
+report below.
 
 .. list-table:: Conversion outcomes
    :header-rows: 1
@@ -387,6 +388,45 @@ command is the only supported native-to-Iceberg converter; the old connector-loc
    environment during deployment; a source-only update can leave a stale
    generated console wrapper that no longer has a Python implementation.
 
+
+.. _snowflake_iceberg_conversion_report:
+
+Conversion feasibility report
+-----------------------------
+
+Run ``copy_native_to_iceberg --preflight-only`` with ``--tap`` or ``--table``
+before converting anything. It takes no lock, writes no manifest, and runs no
+DDL, so it is safe while the tap replicates. It uses the same table planning and
+checks as conversion. Each table gets one state:
+
+.. list-table:: Feasibility states
+   :header-rows: 1
+   :widths: 20 80
+   :width: 100%
+
+   * - State
+     - Meaning
+   * - ``new``
+     - The table does not exist; the writers create it as Iceberg.
+   * - ``iceberg``
+     - The table is already Iceberg; nothing to convert.
+   * - ``native``
+     - The table would be converted. Any preflight blockers are listed.
+   * - ``pending``
+     - An ``--eventual iceberg`` conversion manifest exists and would be resumed.
+   * - ``blocked``
+     - The table needs an operator first, for example a leftover ``_NATIVE``
+       table, a companion without a manifest, or unreadable recovery state.
+
+For ``--tap``, PipelineWise derives each table name the way target-snowflake
+does, from the stream ID and the tap's schema mapping. For MariaDB, MySQL, and
+PostgreSQL taps it also derives the FastSync name, and blocks a stream whose two
+names differ. A native ``TEXT`` column that the tap catalog now maps to
+``VARIANT``, or the reverse, is a blocker because both Iceberg writers refuse
+that mismatch. Run the report after the tap is imported with its Iceberg
+settings: MariaDB JSON aliases are only discovered as ``VARIANT`` then. The
+report also requires ``data_flattening_max_level: 0``. Row and byte counts come
+from ``SHOW TABLES`` and help estimate the copy time and warehouse cost.
 
 Conversion preflight and metadata
 ---------------------------------
