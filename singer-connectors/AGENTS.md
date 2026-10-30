@@ -143,7 +143,10 @@ invariants. Connector-specific rules follow:
   and literal escapes; require the documented comma/LF, escape, enclosure,
   whitespace, empty-field, multiline, UTF-8, header, and empty `NULL_IF` options.
 - Conversion stays in the PipelineWise command; do not restore a connector
-  executable or duplicate its type, metadata, or recovery policy.
+  executable or duplicate its type, metadata, or recovery policy. Core
+  conversion preflight predicts level-0 TEXT/VARIANT columns; change the
+  fixture's `singer_text_variant_classes` with any flattening or type-mapping
+  change so both suites keep executing the same cases.
 - Detect MariaDB JSON aliases only from the exact generated `JSON_VALID`
   constraint and explicit v3. Advertise object, array, string, number, Boolean,
   and null roots. Carry non-SQL-null values as validated serialized JSON so

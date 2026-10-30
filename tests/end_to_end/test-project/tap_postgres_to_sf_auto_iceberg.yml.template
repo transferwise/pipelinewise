@@ -1,0 +1,30 @@
+---
+
+id: "postgres_to_sf_auto_iceberg"
+name: "PostgreSQL native-to-Iceberg conversion test source"
+type: "tap-postgres"
+owner: "test-runner"
+
+db_conn:
+  host: "${TAP_POSTGRES_HOST}"
+  port: ${TAP_POSTGRES_PORT}
+  user: "${TAP_POSTGRES_USER}"
+  password: "${TAP_POSTGRES_PASSWORD}"
+  dbname: "${TAP_POSTGRES_DB}"
+  limit: 1000
+
+target: "snowflake"
+data_flattening_max_level: 0
+batch_size_rows: 1000
+stream_buffer_size: 0
+
+schemas:
+  - source_schema: "public"
+    target_schema: "ppw_e2e_tap_postgres${TARGET_SNOWFLAKE_SCHEMA_POSTFIX}"
+    tables:
+      - table_name: "edgydata"
+        replication_method: "INCREMENTAL"
+        replication_key: "cid"
+
+      - table_name: "country"
+        replication_method: "FULL_TABLE"
