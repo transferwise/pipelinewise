@@ -1,3 +1,34 @@
+0.98.1 (2026-10-30)
+-------------------
+
+- Stop `copy_native_to_iceberg --eventual iceberg` from changing a table that it
+  already converted. Before this fix, a rerun could restore the old native backup
+  in place of the live Iceberg table. It could also save a recovery manifest that
+  no later command could read, which blocked Iceberg FastSync for that table.
+  Upgrade before you rerun the command. To repair a table affected earlier, see
+  [unreadable conversion manifest](docs/user_guide/troubleshooting.rst#native-to-iceberg-manifest-cannot-be-read)
+- Refuse to save a conversion manifest that a retry could not read.
+- Keep the promoted Iceberg table when a connection error interrupts the
+  validation after cutover. Retry the same command to finish.
+- Keep the promoted Iceberg table and its manifest when its rows or columns no
+  longer match the native backup after cutover. Iceberg FastSync refuses the
+  table until you resolve it. See
+  [contents changed after cutover](docs/user_guide/troubleshooting.rst#native-to-iceberg-contents-changed-after-cutover)
+- Restore the native table after cutover only for an Iceberg table settings or
+  metadata difference over matching rows and columns. See
+  [interrupted conversion](docs/connectors/targets/snowflake_iceberg.rst#interrupted-conversion)
+- Restore the native table name first when retrying an interrupted cutover.
+  Before this fix, the name stayed absent while the retry scanned both tables.
+- Recreate a dropped `<table>_ICEBERG` companion on retry instead of failing.
+- Leave no recovery manifest when a companion from an earlier run fails the
+  metadata check.
+- Finish a rollback left by an earlier release's rerun, then convert the table
+  again.
+- Stop with a recovery error, without renaming or changing any table, when a
+  published conversion's Iceberg table is missing or was reversed by hand.
+  The native backup can be older than the promoted table.
+- Refuse a table that was created as Iceberg with a clear message.
+
 0.98.0 (2026-10-26)
 -------------------
 
