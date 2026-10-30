@@ -1,9 +1,12 @@
 import json
+import re
 from dataclasses import replace
 from decimal import Decimal
+from unittest.mock import patch
 
 import pytest
 
+from pipelinewise.fastsync.commons import snowflake_iceberg_validation as validation
 from pipelinewise.fastsync.commons.snowflake_iceberg import RecoveryManifestError
 from pipelinewise.fastsync.commons.snowflake_iceberg_converter import (
     EVENTUAL_ICEBERG,
@@ -163,6 +166,18 @@ AUTOMATED_REFERENCES_GRANT = {
     'grantee_name': 'EXTERNAL_READER',
     'grant_option': 'false',
 }
+READER_GRANT = {
+    'privilege': 'SELECT',
+    'granted_to': 'ROLE',
+    'grantee_name': 'READER',
+    'grant_option': 'false',
+}
+
+
+def revoke_reader_grant_after_promotion(snowflake):
+    """Make the promoted table lose a source grant, which forces a contract rollback."""
+    snowflake.grants = [READER_GRANT]
+    snowflake.post_promotion_companion_grants = []
 
 
 class FakeSnowflake:
@@ -195,6 +210,8 @@ class FakeSnowflake:
         self.companion_column_comment = None
         self.companion_column_overrides = {}
         self.companion_extra_columns = []
+        self.native_extra_columns = []
+        self.sub_microsecond_counts = {}
         self.companion_primary_key = ('ID',)
         self.clustering_key = None
         self.owner = 'OWNER_ROLE'
@@ -271,7 +288,13 @@ class FakeSnowflake:
             if is_companion:
                 row.update(self.companion_column_overrides)
                 return [row, *self.companion_extra_columns]
-            return [row]
+            return [row, *self.native_extra_columns]
+        if sql.startswith('SELECT COUNT_IF(MOD(DATE_PART(NANOSECOND'):
+            columns = re.findall(r'DATE_PART\(NANOSECOND, "([^"]+)"\)', sql)
+            return [{
+                f'SUB_MICROSECOND_{index}': self.sub_microsecond_counts.get(column, 0)
+                for index, column in enumerate(columns)
+            }]
         if sql.startswith('SHOW PRIMARY KEYS'):
             is_companion = any(
                 f'"{name}"' in sql and table_format == 'iceberg'
@@ -564,12 +587,8 @@ def test_rejects_stale_companion_metadata(tmp_path, metadata_kind):
         snowflake.column_comment = None
         snowflake.companion_column_comment = 'identifier'
     elif metadata_kind == 'grant':
-        snowflake.companion_grants = [{
-            'privilege': 'SELECT',
-            'granted_to': 'ROLE',
-            'grantee_name': 'REVOKED_ROLE',
-            'grant_option': 'false',
-        }]
+        snowflake.grants = [READER_GRANT]
+        snowflake.companion_grants = []
     else:
         snowflake.companion_tags = [{
             'TAG_DATABASE': 'DATABASE',
@@ -720,10 +739,46 @@ def test_lost_promotion_response_reconciles(tmp_path):
     assert not _manifest_files(tmp_path)
 
 
+def test_extra_iceberg_grants_do_not_block_conversion(tmp_path):
+    """Grants that automation adds to the Iceberg table are logged, not treated as drift."""
+    snowflake = FakeSnowflake()
+    snowflake.grants = [READER_GRANT]
+    snowflake.companion_grants = [READER_GRANT, AUTOMATED_REFERENCES_GRANT]
+
+    with patch.object(validation.LOGGER, 'info') as info:
+        _converter(tmp_path, snowflake).convert(
+            'database.schema.table',
+            eventual=EVENTUAL_ICEBERG,
+        )
+
+    assert snowflake.formats == {'TABLE_NATIVE': 'native', 'TABLE': 'iceberg'}
+    assert not _manifest_files(tmp_path)
+    info.assert_any_call(
+        '%s has grants that its native source does not: %s',
+        '"DATABASE"."SCHEMA"."TABLE_ICEBERG"',
+        'REFERENCES to ROLE EXTERNAL_READER',
+    )
+
+
+def test_automated_grant_after_promotion_finalizes(tmp_path):
+    """A grant added to the promoted table during validation never rolls the cutover back."""
+    snowflake = FakeSnowflake()
+    snowflake.post_promotion_companion_grants = [AUTOMATED_REFERENCES_GRANT]
+
+    _converter(tmp_path, snowflake).convert(
+        'database.schema.table',
+        eventual=EVENTUAL_ICEBERG,
+    )
+
+    assert snowflake.formats == {'TABLE_NATIVE': 'native', 'TABLE': 'iceberg'}
+    assert not _manifest_files(tmp_path)
+    assert len([sql for sql, _, _ in snowflake.queries if ' RENAME TO ' in sql]) == 2
+
+
 def test_final_metadata_failure_restores_native(tmp_path):
     """A metadata mismatch over equal contents restores the native live name."""
     snowflake = FakeSnowflake()
-    snowflake.post_promotion_companion_grants = [AUTOMATED_REFERENCES_GRANT]
+    revoke_reader_grant_after_promotion(snowflake)
 
     with pytest.raises(NativeToIcebergConversionError, match='comments, grants, or tags'):
         _converter(tmp_path, snowflake).convert(
@@ -752,7 +807,7 @@ def test_final_metadata_failure_restores_native(tmp_path):
 def test_restart_finishes_required_rollback(tmp_path):
     """Recovery completes a rollback interrupted between its two renames."""
     snowflake = FakeSnowflake()
-    snowflake.post_promotion_companion_grants = [AUTOMATED_REFERENCES_GRANT]
+    revoke_reader_grant_after_promotion(snowflake)
     snowflake.interrupt_native_restore = True
 
     with pytest.raises(SystemExit, match='rollback interruption'):
@@ -788,7 +843,7 @@ def test_first_rename_rollback_recovery(
 ):
     """Recovery uses the durable marker after either first-rename outcome."""
     snowflake = FakeSnowflake()
-    snowflake.post_promotion_companion_grants = [AUTOMATED_REFERENCES_GRANT]
+    revoke_reader_grant_after_promotion(snowflake)
     snowflake.interrupt_iceberg_rollback = True
     snowflake.rollback_commits = committed_before_interrupt
 
