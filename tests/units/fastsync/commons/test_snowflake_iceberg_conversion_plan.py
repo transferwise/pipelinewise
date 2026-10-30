@@ -172,20 +172,37 @@ def test_classification_uses_one_listing_per_schema(tmp_path):
 
     snowflake, classified = _classify(tmp_path, targets, listing)
 
-    assert [query for query, _, _ in snowflake.queries] == ['SHOW TABLES IN SCHEMA "DATABASE"."SCHEMA"']
-    assert [(item.target.table.table, item.state) for item in classified] == [
-        ('ORDERS', plan.STATE_NATIVE),
-        ('USERS', plan.STATE_ICEBERG),
-        ('NEW_TABLE', plan.STATE_NEW),
-        ('STAGED', plan.STATE_NATIVE),
-        ('BACKED', plan.STATE_BLOCKED),
-        ('GHOST', plan.STATE_BLOCKED),
+    assert [query for query, _, _ in snowflake.queries] == [
+        'SHOW TABLES IN SCHEMA "DATABASE"."SCHEMA" LIMIT 10000'
+    ]
+    assert [(item.target.table.table, item.state, item.primary) for item in classified] == [
+        ('ORDERS', plan.STATE_NATIVE, 'native'),
+        ('USERS', plan.STATE_ICEBERG, 'iceberg'),
+        ('NEW_TABLE', plan.STATE_NEW, 'missing'),
+        ('STAGED', plan.STATE_BLOCKED, 'native'),
+        ('BACKED', plan.STATE_BLOCKED, 'native'),
+        ('GHOST', plan.STATE_BLOCKED, 'missing'),
     ]
     assert (classified[1].rows, classified[1].bytes) == (5, 1024)
     assert (classified[2].rows, classified[2].bytes) == (None, None)
+    assert 'STAGED_ICEBERG" already exists without a conversion manifest' in classified[3].reasons[0]
     assert 'BACKED_NATIVE" already exists' in classified[4].reasons[0]
     assert 'companion exists without a conversion manifest' in classified[5].reasons[0]
     assert not list(tmp_path.iterdir())
+
+
+def test_fastsync_rebuilds_a_missing_table_beside_leftover_companions(tmp_path):
+    """FastSync reloads a missing table from its source, so companions do not block it."""
+    snowflake = ScriptedSnowflake([[_row('GHOST_NATIVE'), _row('GHOST_ICEBERG', is_iceberg=True)]])
+
+    classified = plan.classify_conversion_targets(
+        [_target('GHOST')],
+        SnowflakeTableInspector(snowflake),
+        RecoveryCoordinator(str(tmp_path)),
+        fastsync_rebuild=True,
+    )
+
+    assert classified[0].state == plan.STATE_NEW
 
 
 def test_missing_schema_classifies_every_table_as_new(tmp_path):
@@ -251,13 +268,32 @@ def test_fastsync_pointer_on_native_table_blocks(tmp_path):
     assert 'FastSync Iceberg attempt is pending' in classified[0].reasons[0]
 
 
-def test_schema_listing_rejects_possible_truncation():
-    """A listing at Snowflake's SHOW limit may be incomplete, so classification fails."""
-    rows = [{'name': f'T{index}'} for index in range(SHOW_COMMAND_ROW_LIMIT)]
-    inspector = SnowflakeTableInspector(ScriptedSnowflake([rows]))
+def test_truncated_schema_listing_falls_back_to_each_table(tmp_path):
+    """A schema at Snowflake's SHOW limit is read per table, including its companions."""
+    truncated = [{'name': f'T{index}', 'is_iceberg': 'N'} for index in range(SHOW_COMMAND_ROW_LIMIT)]
+    snowflake = ScriptedSnowflake([truncated, [_row('ORDERS'), _row('ORDERS_ICEBERG', is_iceberg=True)], []])
 
-    with pytest.raises(TableFormatDiscoveryError, match='may be truncated'):
-        inspector.discover_schema_table_rows('DATABASE', 'SCHEMA')
+    classified = plan.classify_conversion_targets(
+        [_target('ORDERS'), _target('USERS')],
+        SnowflakeTableInspector(snowflake),
+        RecoveryCoordinator(str(tmp_path)),
+    )
+
+    assert [query for query, _, _ in snowflake.queries] == [
+        'SHOW TABLES IN SCHEMA "DATABASE"."SCHEMA" LIMIT 10000',
+        'SHOW TABLES IN SCHEMA "DATABASE"."SCHEMA" STARTS WITH \'ORDERS\' LIMIT 10000',
+        'SHOW TABLES IN SCHEMA "DATABASE"."SCHEMA" STARTS WITH \'USERS\' LIMIT 10000',
+    ]
+    assert [item.state for item in classified] == [plan.STATE_BLOCKED, plan.STATE_NEW]
+
+
+def test_truncated_table_listing_fails_closed(tmp_path):
+    """A table whose own prefix listing is truncated cannot be classified safely."""
+    truncated = [{'name': f'T{index}', 'is_iceberg': 'N'} for index in range(SHOW_COMMAND_ROW_LIMIT)]
+    inspector = SnowflakeTableInspector(ScriptedSnowflake([truncated, truncated]))
+
+    with pytest.raises(TableFormatDiscoveryError, match='too many tables starting with'):
+        plan.classify_conversion_targets([_target('T')], inspector, RecoveryCoordinator(str(tmp_path)))
 
 
 def test_peek_reads_recovery_state_without_a_lock(tmp_path):

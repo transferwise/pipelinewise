@@ -1,7 +1,10 @@
 """Iceberg FastSync refuses native targets before any source or state change."""
 
+import json
 import os
 import signal
+import threading
+from pathlib import Path
 from unittest.mock import MagicMock, call, patch
 
 import pytest
@@ -38,9 +41,12 @@ def _pipelinewise(tmp_path):
     return instance
 
 
-def test_native_target_stops_slot_reset_before_any_change(pipelinewise):
+def test_native_target_stops_slot_reset_before_any_change(pipelinewise, tmp_path):
     """An unfiltered PostgreSQL resync keeps its slot and bookmarks when a target is native."""
     selected = {'full_sync': ['public.orders'], 'partial_sync': {'public.events': {'column': 'id'}}}
+    state = {'bookmarks': {'public-orders': {'lsn': 42}, 'public-events': {'id': 7}}, 'currently_syncing': None}
+    state_path = Path(pipelinewise.tap['files']['state'])
+    state_path.write_text(json.dumps(state), encoding='utf-8')
     with patch.object(
         pipelinewise, '_get_sync_tables_setting_from_selection_file', return_value=selected,
     ), patch.object(
@@ -65,7 +71,8 @@ def test_native_target_stops_slot_reset_before_any_change(pipelinewise):
     slot_preflight.assert_not_called()
     reset_slot.assert_not_called()
     process.assert_not_called()
-    assert not os.path.exists(pipelinewise.tap['files']['state'])
+    assert json.loads(state_path.read_text(encoding='utf-8')) == state
+    assert sorted(path.name for path in tmp_path.iterdir()) == ['state.json']
 
 
 @pytest.mark.parametrize(
@@ -89,12 +96,28 @@ def test_child_process_errors_are_raised_in_the_parent(pipelinewise):
         pipelinewise._run_in_child_process(_raise_pre_run_checks, 'child refused')
 
 
-def test_child_process_exit_status_is_preserved(pipelinewise):
-    """A child that exits without an exception still fails the parent."""
-    with pytest.raises(SystemExit) as error:
+def test_child_process_exit_without_a_result_fails_the_parent(pipelinewise):
+    """A child that dies without reporting still fails the parent with its exit status."""
+    with pytest.raises(ChildProcessError, match='exited with status 3 before reporting a result'):
         pipelinewise._run_in_child_process(_exit_with, 3)
 
-    assert error.value.code == 3
+
+def test_large_child_errors_do_not_deadlock(pipelinewise):
+    """An error larger than the pipe buffer is read while the parent waits for the child."""
+    outcome = {}
+
+    def run():
+        try:
+            pipelinewise._run_in_child_process(_raise_pre_run_checks, 'x' * 2_000_000)
+        except PreRunChecksException as error:
+            outcome['length'] = len(str(error))
+
+    waiter = threading.Thread(target=run, daemon=True)
+    waiter.start()
+    waiter.join(timeout=60)
+
+    assert not waiter.is_alive(), 'the parent deadlocked waiting for a child blocked on the pipe'
+    assert outcome == {'length': 2_000_000}
 
 
 def test_child_installs_command_signal_handlers(pipelinewise):

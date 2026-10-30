@@ -751,11 +751,21 @@ message names each table and the reason:
 
 1. Keep the tap stopped; it never replicates into native tables. Tables that
    converted earlier in the run stay converted.
-2. Run ``copy_native_to_iceberg --preflight-only --tap <tap_id>`` to list every
-   remaining blocker.
+2. List the remaining blockers with the feasibility report, and rerun it after
+   each fix until it is ready:
+
+   .. code-block:: bash
+
+       pipelinewise copy_native_to_iceberg --target <target_id> --tap <tap_id> \
+         --preflight-only --iceberg-version 3
+
 3. Fix each blocker. For a failed conversion, the manifest records the attempt,
    and the next ``run_tap`` resumes it. For an interrupted cutover, see
-   :ref:`troubleshooting_iceberg_conversion_missing_primary`.
+   :ref:`troubleshooting_iceberg_conversion_missing_primary`. A pending attempt
+   that a conversion check now refuses, for example one started by an earlier
+   release over a ``TIMESTAMP_TZ`` column, keeps its manifest and companion
+   table. Fix the column, or remove that manifest and ``<table>_ICEBERG`` as
+   described in :ref:`troubleshooting_iceberg_conversion_contents_changed`.
 4. Rerun ``run_tap``. Watch PostgreSQL WAL and MySQL binlog retention while the
    tap is stopped.
 

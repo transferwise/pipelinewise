@@ -1,5 +1,8 @@
 import json
+import logging
+import os
 import signal
+import sys
 
 from unittest.mock import call, patch
 
@@ -157,6 +160,43 @@ def test_rejects_invalid_preflight_scopes(override, message):
         cli._validate_command_specific_arguments(_args(**override))
 
 
+@pytest.mark.parametrize('command', ['run_tap', 'fast_sync', 'import_config', 'status'])
+def test_other_commands_reject_preflight_only(command):
+    """Only the conversion command has a dry-run report, so no other command may ignore the flag."""
+    args = CliArgs(command=command, target='target_one', tap='tap_one', dir='dir', preflight_only=True)
+
+    with pytest.raises(CommandSpecificArgumentsException, match='only valid with copy_native_to_iceberg'):
+        cli._validate_command_specific_arguments(args)
+
+
+@pytest.mark.parametrize(
+    ('overrides', 'expected'),
+    [
+        ({'preflight_only': True, 'output_format': 'json'}, True),
+        ({'preflight_only': True, 'output_format': 'table'}, False),
+        ({'preflight_only': False, 'output_format': 'json'}, False),
+        ({'command': 'list_data_diff_checks', 'preflight_only': True, 'output_format': 'json'}, False),
+    ],
+)
+def test_json_report_detection(overrides, expected):
+    """Only a JSON feasibility report claims stdout for itself."""
+    assert cli._prints_json_report(_args(**overrides)) is expected
+
+
+def test_json_report_logs_to_stderr():
+    """Console logging moves to stderr so stdout carries only the JSON report."""
+    logger = logging.getLogger('pipelinewise-json-report-test')
+    console = logging.StreamHandler(sys.stdout)
+    log_file = logging.FileHandler(os.devnull)
+    logger.handlers = [console, log_file]
+
+    cli._log_to_stderr(logger)
+
+    assert console.stream is sys.stderr
+    assert log_file.stream is not sys.stderr
+    log_file.close()
+
+
 @patch('pipelinewise.cli.pipelinewise.signal.signal')
 def test_tap_scoped_report_never_stops_the_tap(mock_signal):
     """A report beside a running tap exits on SIGTERM without touching its pidfile."""
@@ -199,7 +239,11 @@ def test_tap_scoped_report_plans_selected_streams(mock_report, capsys):
         ('db_test_mysql-table_one', 'MY_DB.DB_TEST_MYSQL.TABLE_ONE', ()),
         ('db_test_mysql-table_two', 'MY_DB.DB_TEST_MYSQL.TABLE_TWO', ()),
     ]
-    assert json.loads(capsys.readouterr().out) == {'ready': True, 'blockers': [], 'tables': []}
+    report = json.loads(capsys.readouterr().out)
+    assert report['ready'] is False
+    assert report['tables'] == []
+    assert len(report['blockers']) == 1
+    assert 'not imported with target_table_format: iceberg yet' in report['blockers'][0]
 
 
 @patch('pipelinewise.cli.native_to_iceberg.preflight_report', return_value=[])

@@ -1628,15 +1628,23 @@ class PipelineWise:
 
     def _convert_native_tables_to_iceberg(self, stream_ids) -> None:
         """Convert the tap's native Snowflake tables before any writer runs, or stop the tap."""
+        from pipelinewise.cli import native_to_iceberg
+
         conversion = self.tap.get(Config.NATIVE_TO_ICEBERG_CONVERSION) or {}
         if conversion.get('enabled') is not True or not stream_ids:
             return
         self.logger.info('Checking %s selected streams for native Snowflake tables', len(stream_ids))
-        self._run_in_child_process(
-            self._run_native_to_iceberg_conversion,
-            list(stream_ids),
-            conversion.get('warehouse'),
-        )
+        try:
+            self._run_in_child_process(
+                self._run_native_to_iceberg_conversion,
+                list(stream_ids),
+                conversion.get('warehouse'),
+            )
+        except ChildProcessError as exc:
+            raise NativeToIcebergConversionException(
+                f'Automatic native-to-Iceberg conversion stopped: {exc}. '
+                f'{native_to_iceberg.next_action(self.target["id"], self.tap["id"])}'
+            ) from exc
 
     def _run_native_to_iceberg_conversion(self, stream_ids, warehouse) -> None:
         from pipelinewise.cli import native_to_iceberg
@@ -1651,6 +1659,8 @@ class PipelineWise:
             self.get_target_dir(self.target['id']),
             native_to_iceberg.tap_targets(catalog, target_config, fastsync_capable, stream_ids),
             warehouse,
+            target_id=self.target['id'],
+            tap_id=self.tap['id'],
         )
 
     def _iceberg_target_config(self) -> Dict:
@@ -1665,12 +1675,15 @@ class PipelineWise:
         """Run Snowflake work in a child so later FastSync forks inherit no connector state."""
         process = Process(target=self._run_with_command_signals, args=(target, *args))
         process.start()
-        process.join()
-        if process.exception:
-            error, _ = process.exception
+        result = process.join_with_result()
+        if result:
+            error, traceback_text = result
+            self.logger.debug('Child process traceback:\n%s', traceback_text)
             raise error
         if process.exitcode != 0:
-            raise SystemExit(process.exitcode)
+            raise ChildProcessError(
+                f'The child process exited with status {process.exitcode} before reporting a result'
+            )
 
     def _run_with_command_signals(self, target, *args) -> None:
         # The inherited stop_tap handler would delete the pidfile that the parent still holds.

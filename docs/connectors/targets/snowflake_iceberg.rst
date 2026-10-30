@@ -347,10 +347,17 @@ the evidence and fails for operator inspection.
 Convert a tap's tables automatically
 ------------------------------------
 
-To move a tap that already replicates into native tables, first run the
-:ref:`feasibility report <snowflake_iceberg_conversion_report>` and resolve its
-blockers. Then set the Iceberg format and enable conversion on the tap, and
-run ``import_config``:
+To move a tap that already replicates into native tables:
+
+1. Run the :ref:`feasibility report <snowflake_iceberg_conversion_report>`
+   while the tap still replicates natively, and resolve the blockers it shows.
+2. Pause the tap's schedule. Set the Iceberg format, add the setting with
+   ``enabled: false``, and run ``import_config``. Run the report again: this
+   catalog is the one conversion uses, and MariaDB JSON aliases appear as
+   ``VARIANT`` only now. Keep the tap paused in this state, because both writers
+   refuse native tables under the Iceberg format.
+3. When the report is ready, set ``enabled: true``, run ``import_config``, and
+   resume the schedule.
 
 .. code-block:: yaml
 
@@ -367,15 +374,17 @@ pidfile, before FastSync or Singer writes anything:
 1. It plans each selected stream's Snowflake table and classifies them all with
    one ``SHOW TABLES`` per schema and the target's recovery manifests.
 2. It resumes any pending ``--eventual iceberg`` conversion first, so an
-   interrupted cutover gets its table name back before anything else runs.
-3. It preflights every native table and stops before changing anything if any
-   table is blocked.
+   interrupted cutover gets its table name back before any other check can stop
+   the run.
+3. It stops if any table needs an operator, then preflights every native table
+   and stops before converting anything if any table is blocked.
 4. It converts the native tables one at a time, smallest first, with the
    same converter as ``copy_native_to_iceberg --eventual iceberg``.
-5. It checks that every planned table is new or Iceberg with no pending
-   manifest, then replication starts.
+5. When it resumed or converted anything, it checks that every planned table is
+   now new or Iceberg with no pending manifest. Then replication starts.
 
-After the last table converts, each run costs one ``SHOW TABLES`` per schema.
+After the last table converts, each run costs one ``SHOW TABLES`` per schema,
+and runs with FastSync work list those schemas once more before FastSync starts.
 The setting accepts any tap that can write managed Iceberg v3 through
 ``target-snowflake``. It requires ``data_flattening_max_level: 0``, because
 conversion compares native columns with the tap catalog's top-level properties.
@@ -461,8 +470,9 @@ Conversion feasibility report
 
 Run ``copy_native_to_iceberg --preflight-only`` with ``--tap`` or ``--table``
 before converting anything. It takes no lock, writes no manifest, and runs no
-DDL, so it is safe while the tap replicates. It uses the same table planning and
-checks as conversion. Each table gets one state:
+DDL, so it is safe to run beside the tap. Its read queries include one aggregate
+scan of each native table's time and timestamp columns. It uses the same table
+planning and checks as conversion. Each table gets one state:
 
 .. list-table:: Feasibility states
    :header-rows: 1
@@ -481,16 +491,27 @@ checks as conversion. Each table gets one state:
      - An ``--eventual iceberg`` conversion manifest exists and would be resumed.
    * - ``blocked``
      - The table needs an operator first, for example a leftover ``_NATIVE``
-       table, a companion without a manifest, or unreadable recovery state.
+       table, an ``_ICEBERG`` companion without a manifest, or unreadable
+       recovery state. A companion without a manifest may be stale: drop it, or
+       promote it with ``copy_native_to_iceberg --eventual iceberg`` while the
+       tap is stopped.
 
 For ``--tap``, PipelineWise derives each table name the way target-snowflake
 does, from the stream ID and the tap's schema mapping. For MariaDB, MySQL, and
 PostgreSQL taps it also derives the FastSync name, and blocks a stream whose two
 names differ. A native ``TEXT`` column that the tap catalog now maps to
 ``VARIANT``, or the reverse, is a blocker because both Iceberg writers refuse
-that mismatch. Run the report after the tap is imported with its Iceberg
-settings: MariaDB JSON aliases are only discovered as ``VARIANT`` then. The
-report also requires ``data_flattening_max_level: 0``. Row and byte counts come
+that mismatch. MariaDB JSON aliases are discovered as ``VARIANT`` only after the
+tap is imported with its Iceberg settings, so the report is not ready until then;
+follow the order in :ref:`snowflake_iceberg_auto_conversion`. The report also
+requires ``data_flattening_max_level: 0``. ``--table`` checks one table without
+a tap catalog, so it skips the ``TEXT``/``VARIANT`` comparison and the tap-wide
+checks.
+
+For each table, the report lists the first metadata refusal, such as a policy or
+a stream, and every conversion blocker, such as a ``TIMESTAMP_TZ`` column or a
+grant that cannot be replayed. After fixing a metadata refusal, run the report
+again, because the next one may be hidden behind it. Row and byte counts come
 from ``SHOW TABLES`` and help estimate the copy time and warehouse cost.
 
 Conversion preflight and metadata

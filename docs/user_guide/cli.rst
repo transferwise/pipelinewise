@@ -363,13 +363,15 @@ Check feasibility first with ``--preflight-only``:
      --output-format table
 
 The report changes nothing. It takes no lock, writes no manifest, and runs no
-DDL, so it can run while the tap replicates. ``--tap`` reports every table that
-the tap's selected streams write; ``--table`` reports one table instead. Each
-row shows the table's state, the action conversion would take, Snowflake's row
-and byte counts, and every blocker. ``--output-format json`` returns the same
-report with a top-level ``ready`` flag. The command exits 0 whenever it produces
-a report, so check ``ready`` or the final line. ``--tap`` is accepted only with
-``--preflight-only``. See :ref:`snowflake_iceberg_conversion_report`.
+DDL, so it can run beside the tap. ``--tap`` reports every table that the tap's
+selected streams write; ``--table`` reports one table without the tap's catalog
+checks. Each row shows the table's state, the action conversion would take,
+Snowflake's row and byte counts, the first metadata refusal, and every
+conversion blocker. ``--output-format json`` prints only the report on stdout,
+with a top-level ``ready`` flag; log messages go to stderr. The command exits 0
+whenever it produces a report, so check ``ready`` or the final line. Other
+commands reject ``--preflight-only``, and this command accepts ``--tap`` only
+with ``--preflight-only``. See :ref:`snowflake_iceberg_conversion_report`.
 
 
 Data-diff

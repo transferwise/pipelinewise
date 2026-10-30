@@ -189,11 +189,31 @@ def _validate_command_specific_arguments(args):
 
     if args.command == 'copy_native_to_iceberg':
         _validate_iceberg_copy_arguments(args)
+    elif getattr(args, 'preflight_only', False):
+        raise CommandSpecificArgumentsException(
+            '--preflight-only is only valid with copy_native_to_iceberg'
+        )
 
     if args.command == 'tap_info':
         _validate_tap_info(args)
 
     _validate_data_diff_arguments(args)
+
+
+def _prints_json_report(args):
+    """Return whether stdout must carry only a JSON feasibility report."""
+    return (
+        args.command == 'copy_native_to_iceberg'
+        and getattr(args, 'preflight_only', False)
+        and args.output_format == 'json'
+    )
+
+
+def _log_to_stderr(logger):
+    """Keep stdout machine-readable by moving console log output to stderr."""
+    for handler in logger.handlers:
+        if isinstance(handler, logging.StreamHandler) and handler.stream is sys.stdout:
+            handler.setStream(sys.stderr)
 
 
 def _validate_tap_info(args):
@@ -405,6 +425,8 @@ def main():
         sys.exit(1)
 
     logger = __init_logger(args.log, args.debug)
+    if _prints_json_report(args):
+        _log_to_stderr(logger)
 
     profiler, profiling_dir = __init_profiler(args.profiler, logger)
 

@@ -16,7 +16,10 @@ from pipelinewise.fastsync.commons.snowflake_iceberg_model import (
     _row_value,
     _snowflake_boolean,
 )
-from pipelinewise.fastsync.commons.snowflake_iceberg_recovery import RecoveryManifestError
+from pipelinewise.fastsync.commons.snowflake_iceberg_recovery import (
+    RecoveryManifestError,
+    TableFormatDiscoveryError,
+)
 from pipelinewise.fastsync.commons.snowflake_iceberg_versions import parse_exact_integer_metadata
 
 
@@ -55,6 +58,7 @@ class ClassifiedTarget:
     reasons: Tuple[str, ...] = ()
     rows: Optional[int] = None
     bytes: Optional[int] = None
+    primary: str = 'missing'
 
 
 def selected_stream_ids(catalog: Mapping[str, Any]) -> List[str]:
@@ -256,6 +260,7 @@ def _classify(
     target: ConversionTarget,
     rows: Mapping[str, Mapping[str, Any]],
     coordinator: RecoveryCoordinator,
+    fastsync_rebuild: bool,
 ) -> ClassifiedTarget:
     table = target.table
     primary, staging, backup = (
@@ -264,45 +269,62 @@ def _classify(
     )
     size = _size(rows.get(table.table))
 
-    def blocked(reason: str) -> ClassifiedTarget:
-        return ClassifiedTarget(target, STATE_BLOCKED, (reason,), *size)
+    def classified(state: str, reason: Optional[str] = None) -> ClassifiedTarget:
+        return ClassifiedTarget(target, state, (reason,) if reason else (), *size, primary)
 
     try:
         manifest, pointer = coordinator.recovery_store(table).peek()
     except RecoveryManifestError as exc:
-        return blocked(str(exc))
+        return classified(STATE_BLOCKED, str(exc))
     if manifest is not None:
         if pointer is not None or manifest.kind != 'manual_conversion':
-            return blocked(f'{table.quoted} has conflicting recovery state; inspect it before replicating')
+            return classified(
+                STATE_BLOCKED,
+                f'{table.quoted} has conflicting recovery state; inspect it before replicating',
+            )
         if manifest.manifest_payload.eventual != STATE_ICEBERG:
-            return blocked(
+            return classified(
+                STATE_BLOCKED,
                 f'A conversion of {table.quoted} with --eventual native is pending; finish it '
-                'with copy_native_to_iceberg --eventual native first'
+                'with copy_native_to_iceberg --eventual native first',
             )
-        return ClassifiedTarget(target, STATE_PENDING, (), *size)
+        return classified(STATE_PENDING)
     if pointer is not None and primary == STATE_NATIVE:
-        return blocked(f'A FastSync Iceberg attempt is pending for native table {table.quoted}')
-    if primary == _MISSING:
-        if staging != _MISSING or backup != _MISSING:
-            return blocked(
-                f'{table.quoted} is missing but its _ICEBERG or _NATIVE companion exists '
-                'without a conversion manifest; inspect them before replicating'
-            )
-        return ClassifiedTarget(target, STATE_NEW, (), *size)
-    if primary == STATE_ICEBERG:
-        return ClassifiedTarget(target, STATE_ICEBERG, (), *size)
-    if backup != _MISSING:
-        return blocked(
-            f'{table.with_suffix("_NATIVE").quoted} already exists; rename or drop it '
-            'before converting'
+        return classified(
+            STATE_BLOCKED, f'A FastSync Iceberg attempt is pending for native table {table.quoted}'
         )
-    return ClassifiedTarget(target, STATE_NATIVE, (), *size)
+    if primary == _MISSING:
+        # FastSync rebuilds a missing table from its source, so leftover companions cannot hide rows.
+        if not fastsync_rebuild and (staging != _MISSING or backup != _MISSING):
+            return classified(
+                STATE_BLOCKED,
+                f'{table.quoted} is missing but its _ICEBERG or _NATIVE companion exists '
+                'without a conversion manifest; inspect them before replicating',
+            )
+        return classified(STATE_NEW)
+    if primary == STATE_ICEBERG:
+        return classified(STATE_ICEBERG)
+    if backup != _MISSING:
+        return classified(
+            STATE_BLOCKED,
+            f'{table.with_suffix("_NATIVE").quoted} already exists; rename or drop it '
+            'before converting',
+        )
+    if staging != _MISSING:
+        return classified(
+            STATE_BLOCKED,
+            f'{table.with_suffix("_ICEBERG").quoted} already exists without a conversion '
+            'manifest and may be stale. Drop it so conversion can rebuild it, or promote it '
+            'while the tap is stopped with copy_native_to_iceberg --eventual iceberg',
+        )
+    return classified(STATE_NATIVE)
 
 
 def classify_conversion_targets(
     targets: Sequence[ConversionTarget],
     inspector: SnowflakeTableInspector,
     coordinator: RecoveryCoordinator,
+    fastsync_rebuild: bool = False,
 ) -> List[ClassifiedTarget]:
     """Classify planned tables with one SHOW TABLES per schema and lock-free manifest reads."""
     listings = {}
@@ -314,5 +336,14 @@ def classify_conversion_targets(
         schema = (target.table.database, target.table.schema)
         if schema not in listings:
             listings[schema] = inspector.discover_schema_table_rows(*schema)
-        classified.append(_classify(target, listings[schema], coordinator))
+        rows = listings[schema]
+        if rows is None:
+            # A schema too large for one listing is read per table, companions included.
+            rows = inspector.discover_schema_table_rows(*schema, starts_with=target.table.table)
+            if rows is None:
+                raise TableFormatDiscoveryError(
+                    f'Snowflake lists too many tables starting with {target.table.quoted} '
+                    'to classify it safely'
+                )
+        classified.append(_classify(target, rows, coordinator, fastsync_rebuild))
     return classified
