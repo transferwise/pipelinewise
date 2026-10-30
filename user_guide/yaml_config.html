@@ -813,6 +813,21 @@ ambiguous FastSync Iceberg publication response.</p>
 </pre></div>
 </div>
 <p>Ansible Vault values are also supported; see <a class="reference internal" href="encrypting_passwords.html#encrypting-passwords"><span class="std std-ref">Encrypt configuration values</span></a>.</p>
+<p>Generated connector configuration can use environment lookups too. Commands
+that load a tap or target, such as <code class="docutils literal notranslate"><span class="pre">run_tap</span></code>, <code class="docutils literal notranslate"><span class="pre">discover_tap</span></code>, <code class="docutils literal notranslate"><span class="pre">fast_sync</span></code>,
+<code class="docutils literal notranslate"><span class="pre">partial_sync_table</span></code>, <code class="docutils literal notranslate"><span class="pre">test_tap_connection</span></code>, and <code class="docutils literal notranslate"><span class="pre">tap_info</span></code>, render
+<code class="docutils literal notranslate"><span class="pre">{{</span> <span class="pre">env_var['NAME']</span> <span class="pre">}}</span></code> lookups in the main, target, and tap <code class="docutils literal notranslate"><span class="pre">config.json</span></code>.
+Use them when another tool generates these files and secrets must stay out of
+them:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>"password": {{ env_var['POSTGRES_PASSWORD'] | tojson }}
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">tojson</span></code> quotes and escapes the value, so any secret renders to valid JSON. A
+missing variable fails the command. Connectors read a rendered copy in the
+<code class="docutils literal notranslate"><span class="pre">tmp</span></code> directory of the configuration directory. Only its owner can read it,
+and it is removed when the command exits. Files without lookups are used as
+they are, so <code class="docutils literal notranslate"><span class="pre">import_config</span></code> output is unaffected. Data-diff commands do not
+render lookups.</p>
 <p>After every change:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pipelinewise<span class="w"> </span>validate<span class="w"> </span>--dir<span class="w"> </span>&lt;project&gt;
 pipelinewise<span class="w"> </span>import_config<span class="w"> </span>--dir<span class="w"> </span>&lt;project&gt;
