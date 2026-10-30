@@ -656,15 +656,15 @@ table that was converted earlier. Singer runs for the table can also fail with
 ``Table <schema>."<TABLE>" is native, but target_table_format requires
 managed_iceberg_v3``.
 
-Before 0.97.1, rerunning ``copy_native_to_iceberg --eventual iceberg`` after a
+Before 0.98.1, rerunning ``copy_native_to_iceberg --eventual iceberg`` after a
 completed conversion could rename the live Iceberg table to ``<table>_ICEBERG``.
 It then restored the old ``<table>_NATIVE`` table as ``<table>`` and saved a
-manifest that no command can read. PipelineWise 0.97.1 and later never save such
+manifest that no command can read. PipelineWise 0.98.1 and later never save such
 a manifest, and a rerun after a completed conversion changes nothing.
 
 To recover:
 
-1. Upgrade to 0.97.1 or later. Keep every reader and writer of the table stopped.
+1. Upgrade to 0.98.1 or later. Keep every reader and writer of the table stopped.
 2. In ``$PIPELINEWISE_CONFIG_DIRECTORY/<target_id>/``, find the
    ``iceberg-recovery-<hash>.json`` file whose ``kind`` is ``manual_conversion``
    and whose ``target`` names this table. If there is no such file, this entry

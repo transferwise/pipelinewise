@@ -1,4 +1,4 @@
-0.97.1 (2026-10-29)
+0.98.1 (2026-10-30)
 -------------------
 
 - Stop `copy_native_to_iceberg --eventual iceberg` from changing a table that it
@@ -28,6 +28,16 @@
   published conversion's Iceberg table is missing or was reversed by hand.
   The native backup can be older than the promoted table.
 - Refuse a table that was created as Iceberg with a clear message.
+
+0.98.0 (2026-10-26)
+-------------------
+
+- Render `{{ env_var['NAME'] }}` lookups in the generated main, target, and tap
+  `config.json` when a command loads them. Configuration generated outside
+  `import_config` can keep secrets in environment variables instead of files.
+  Files without lookups are used as they are. A missing variable fails the
+  command. See
+  [Secrets and validation](docs/user_guide/yaml_config.rst#secrets-and-validation)
 
 0.97.0 (2026-10-23)
 -------------------
