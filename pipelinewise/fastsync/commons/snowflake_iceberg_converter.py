@@ -127,6 +127,7 @@ class SnowflakeNativeToIcebergConverter:
         self.recovery_coordinator = RecoveryCoordinator(runtime_dir)
         self.evidence_service = SnowflakeConversionEvidenceService(self)
         self._query_tag_context = {}
+        self._writer_types = {}
         self.finalization_validator = SnowflakeConversionFinalizationValidator(
             self._query,
             self._inspect_source,
@@ -146,6 +147,7 @@ class SnowflakeNativeToIcebergConverter:
         fqtn: str,
         eventual: str = EVENTUAL_NATIVE,
         iceberg_version: int = ICEBERG_V3,
+        writer_types: Optional[Mapping[str, str]] = None,
     ) -> None:
         """Convert one target table while retaining a native rollback point."""
         if eventual not in (EVENTUAL_NATIVE, EVENTUAL_ICEBERG):
@@ -157,6 +159,8 @@ class SnowflakeNativeToIcebergConverter:
         self._validate_companion_names(table)
         self._validate_database(table)
         self._query_tag_context = {}
+        # A tap's catalog classes join every pre-cutover check, including resumed attempts.
+        self._writer_types = dict(writer_types or {})
         recovery_identity = _manual_recovery_identity(
             self.snowflake.connection_config
         )
@@ -206,16 +210,14 @@ class SnowflakeNativeToIcebergConverter:
         """Return the first metadata refusal, or every conversion blocker, without changing anything."""
         table = SnowflakeTableName.parse(fqtn)
         self._query_tag_context = {}
+        self._writer_types = dict(writer_types or {})
         try:
             self._validate_companion_names(table)
             self._validate_database(table)
             metadata = self._inspect_source(table)
         except NativeToIcebergConversionError as exc:
             return (str(exc),)
-        blockers = self._conversion_blockers(table, metadata)
-        if writer_types:
-            blockers.extend(text_variant_blockers(metadata.columns, writer_types))
-        return tuple(blockers)
+        return tuple(self._conversion_blockers(table, metadata))
 
     def _conversion_blockers(
         self,
@@ -225,6 +227,7 @@ class SnowflakeNativeToIcebergConverter:
         blockers = representation_blockers(metadata.columns)
         blockers.extend(grant_replay_blockers(metadata.grants))
         blockers.extend(self._sub_microsecond_blockers(table, metadata.columns))
+        blockers.extend(text_variant_blockers(metadata.columns, self._writer_types))
         return blockers
 
     def _assert_convertible(
@@ -247,8 +250,9 @@ class SnowflakeNativeToIcebergConverter:
         temporal = [column for column in columns if column.data_type in SUB_MICROSECOND_TYPES]
         if not temporal:
             return []
+        # COUNT_IF returns NULL for an empty table, where no value can be truncated.
         probes = ', '.join(
-            f'COUNT_IF(MOD(DATE_PART(NANOSECOND, {quote_identifier(column.name)}), 1000) <> 0) '
+            f'COALESCE(COUNT_IF(MOD(DATE_PART(NANOSECOND, {quote_identifier(column.name)}), 1000) <> 0), 0) '
             f'AS "SUB_MICROSECOND_{index}"'
             for index, column in enumerate(temporal)
         )

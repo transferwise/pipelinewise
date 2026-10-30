@@ -172,8 +172,10 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
   naming and blocks FastSync/Singer name disagreement, classifies with one
   `SHOW TABLES` per schema plus lock-free manifest peeks, resumes pending
   `eventual=iceberg` attempts first, preflights every native table (including
-  catalog TEXT/VARIANT classes), converts smallest first, then requires every
-  table new or Iceberg; any failure stops the tap. Never call `convert()` for a
+  catalog TEXT/VARIANT classes merged across a table's streams, also checked
+  for resumed attempts before cutover), converts smallest first, then requires
+  every table new or Iceberg; any failure stops the tap. De-duplicate only the
+  physical work, never another stream's blockers. Never call `convert()` for a
   table classified `iceberg` without a manifest; resume every pending
   `eventual=iceberg` manifest whatever the primary's format. Block a native
   primary with an unmanifested `_ICEBERG` companion. `--preflight-only` takes no

@@ -375,9 +375,12 @@ pidfile, before FastSync or Singer writes anything:
    one ``SHOW TABLES`` per schema and the target's recovery manifests.
 2. It resumes any pending ``--eventual iceberg`` conversion first, so an
    interrupted cutover gets its table name back before any other check can stop
-   the run.
+   the run. A resumed attempt passes the same checks as a new one, including the
+   tap catalog's column classes, before its cutover.
 3. It stops if any table needs an operator, then preflights every native table
-   and stops before converting anything if any table is blocked.
+   and stops before converting anything if any table is blocked. When several
+   streams write one table, every stream's blockers and column classes count,
+   and streams that disagree on a column's class block the table.
 4. It converts the native tables one at a time, smallest first, with the
    same converter as ``copy_native_to_iceberg --eventual iceberg``.
 5. When it resumed or converted anything, it checks that every planned table is
@@ -489,6 +492,7 @@ planning and checks as conversion. Each table gets one state:
      - The table would be converted. Any preflight blockers are listed.
    * - ``pending``
      - An ``--eventual iceberg`` conversion manifest exists and would be resumed.
+       If the table is still native, its preflight blockers are listed.
    * - ``blocked``
      - The table needs an operator first, for example a leftover ``_NATIVE``
        table, an ``_ICEBERG`` companion without a manifest, or unreadable

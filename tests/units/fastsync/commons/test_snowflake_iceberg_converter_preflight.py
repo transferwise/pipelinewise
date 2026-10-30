@@ -19,7 +19,7 @@ from tests.units.fastsync.commons.test_snowflake_iceberg_converter import (
 
 
 TABLE = 'database.schema.table'
-PROBE = 'SELECT COUNT_IF(MOD(DATE_PART(NANOSECOND'
+PROBE = 'SELECT COALESCE(COUNT_IF(MOD(DATE_PART(NANOSECOND'
 MUTATIONS = ('CREATE', 'ALTER', 'GRANT', 'DROP')
 
 
@@ -102,8 +102,10 @@ def test_preflight_collects_every_conversion_blocker(tmp_path):
     )
     probes = [sql for sql, _, _ in snowflake.queries if sql.startswith(PROBE)]
     assert probes == [
-        'SELECT COUNT_IF(MOD(DATE_PART(NANOSECOND, "UPDATED_AT"), 1000) <> 0) AS "SUB_MICROSECOND_0", '
-        'COUNT_IF(MOD(DATE_PART(NANOSECOND, "OPENS_AT"), 1000) <> 0) AS "SUB_MICROSECOND_1" '
+        'SELECT COALESCE(COUNT_IF(MOD(DATE_PART(NANOSECOND, "UPDATED_AT"), 1000) <> 0), 0) '
+        'AS "SUB_MICROSECOND_0", '
+        'COALESCE(COUNT_IF(MOD(DATE_PART(NANOSECOND, "OPENS_AT"), 1000) <> 0), 0) '
+        'AS "SUB_MICROSECOND_1" '
         'FROM "DATABASE"."SCHEMA"."TABLE"'
     ]
     assert not list(tmp_path.iterdir())
@@ -259,3 +261,64 @@ def test_resumed_submitted_attempt_rechecks_before_cutover(tmp_path, companion):
     assert len(_manifest_files(tmp_path)) == 1
     assert not _mutations(snowflake, query_count)
     assert snowflake.formats.get('TABLE') == 'native'
+
+
+def _text_column(name, **overrides):
+    return _native_column(name, 'TEXT', DATETIME_PRECISION=None, CHARACTER_MAXIMUM_LENGTH=134217728, **overrides)
+
+
+def test_empty_temporal_table_is_convertible(tmp_path):
+    """COUNT_IF is NULL over an empty table, which has no value to truncate."""
+    snowflake = FakeSnowflake()
+    snowflake.source_rows = 0
+    snowflake.source_evidence = (0, 0)
+    snowflake.staging_evidence = (0, 0)
+    snowflake.native_extra_columns = [_native_column('UPDATED_AT', 'TIMESTAMP_NTZ')]
+    snowflake.companion_extra_columns = [
+        _native_column('UPDATED_AT', 'TIMESTAMP_NTZ', DATETIME_PRECISION=6),
+    ]
+
+    assert _converter(tmp_path, snowflake).preflight(TABLE) == ()
+    _converter(tmp_path, snowflake).convert(TABLE, eventual=EVENTUAL_ICEBERG)
+
+    assert snowflake.formats == {'TABLE_NATIVE': 'native', 'TABLE': 'iceberg'}
+
+
+def test_convert_refuses_catalog_class_mismatch_before_any_change(tmp_path):
+    """A column the tap catalog now maps to VARIANT is refused before any manifest or copy."""
+    snowflake = FakeSnowflake()
+    snowflake.native_extra_columns = [_text_column('ATTRIBUTES')]
+
+    with pytest.raises(NativeToIcebergConversionError, match='catalog maps it to VARIANT'):
+        _converter(tmp_path, snowflake).convert(
+            TABLE, eventual=EVENTUAL_ICEBERG, writer_types={'ATTRIBUTES': 'VARIANT'},
+        )
+
+    assert not _manifest_files(tmp_path)
+    assert not _mutations(snowflake)
+
+
+def test_resumed_attempt_checks_catalog_classes_before_cutover(tmp_path):
+    """A pending attempt started without the tap catalog is checked against it before cutover."""
+    snowflake = FakeSnowflake()
+    snowflake.native_extra_columns = [_text_column('ATTRIBUTES')]
+    snowflake.companion_extra_columns = [_text_column('ATTRIBUTES')]
+    snowflake.fail_promotion = RuntimeError('promotion rejected')
+    with pytest.raises(RuntimeError, match='promotion rejected'):
+        _converter(tmp_path, snowflake).convert(TABLE, eventual=EVENTUAL_ICEBERG)
+    snowflake.fail_promotion = None
+    query_count = len(snowflake.queries)
+
+    with pytest.raises(NativeToIcebergConversionError, match='catalog maps it to VARIANT'):
+        _converter(tmp_path, snowflake).convert(
+            TABLE, eventual=EVENTUAL_ICEBERG, writer_types={'ATTRIBUTES': 'VARIANT'},
+        )
+
+    assert snowflake.formats == {'TABLE': 'native', 'TABLE_ICEBERG': 'iceberg'}
+    assert len(_manifest_files(tmp_path)) == 1
+    assert not _mutations(snowflake, query_count)
+
+    _converter(tmp_path, snowflake).convert(
+        TABLE, eventual=EVENTUAL_ICEBERG, writer_types={'ATTRIBUTES': 'TEXT'},
+    )
+    assert snowflake.formats == {'TABLE_NATIVE': 'native', 'TABLE': 'iceberg'}

@@ -212,6 +212,7 @@ class FakeSnowflake:
         self.companion_extra_columns = []
         self.native_extra_columns = []
         self.sub_microsecond_counts = {}
+        self.source_rows = 2
         self.companion_primary_key = ('ID',)
         self.clustering_key = None
         self.owner = 'OWNER_ROLE'
@@ -289,10 +290,14 @@ class FakeSnowflake:
                 row.update(self.companion_column_overrides)
                 return [row, *self.companion_extra_columns]
             return [row, *self.native_extra_columns]
-        if sql.startswith('SELECT COUNT_IF(MOD(DATE_PART(NANOSECOND'):
+        if 'COUNT_IF(MOD(DATE_PART(NANOSECOND' in sql:
             columns = re.findall(r'DATE_PART\(NANOSECOND, "([^"]+)"\)', sql)
+            # Like Snowflake, COUNT_IF over an empty table is NULL unless the query coalesces it.
+            empty_count = 0 if 'COALESCE(COUNT_IF' in sql else None
             return [{
-                f'SUB_MICROSECOND_{index}': self.sub_microsecond_counts.get(column, 0)
+                f'SUB_MICROSECOND_{index}': (
+                    self.sub_microsecond_counts.get(column, 0) if self.source_rows else empty_count
+                )
                 for index, column in enumerate(columns)
             }]
         if sql.startswith('SHOW PRIMARY KEYS'):
