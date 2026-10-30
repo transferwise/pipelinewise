@@ -299,6 +299,8 @@
 <li class="toctree-l4"><a class="reference internal" href="#snowflake-varchar-width-is-incompatible">Snowflake VARCHAR width is incompatible</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#iceberg-publication-remains-ambiguous">Iceberg publication remains ambiguous</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#native-to-iceberg-primary-name-is-absent">Native-to-Iceberg primary name is absent</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#native-to-iceberg-manifest-cannot-be-read">Native-to-Iceberg manifest cannot be read</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#native-to-iceberg-contents-changed-after-cutover">Native-to-Iceberg contents changed after cutover</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#table-not-found">Table not found</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#failure-to-import-tap-0-tables-discovered">Failure to import tap (0 tables discovered)</a></li>
 </ul>
@@ -451,6 +453,14 @@ state until the unavailable boundary has been identified.</p>
 <tr class="row-even"><td><p><a class="reference internal" href="#troubleshooting-iceberg-conversion-missing-primary"><span class="std std-ref">Native-to-Iceberg primary name is absent</span></a></p></td>
 <td><p>Snowflake conversion</p></td>
 <td><p>Conversion manifest and <code class="docutils literal notranslate"><span class="pre">_NATIVE</span></code> / <code class="docutils literal notranslate"><span class="pre">_ICEBERG</span></code> companions.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#troubleshooting-iceberg-conversion-unreadable-manifest"><span class="std std-ref">Native-to-Iceberg manifest cannot be read</span></a></p></td>
+<td><p>Snowflake conversion</p></td>
+<td><p>Conversion manifest and physical format of the primary and <code class="docutils literal notranslate"><span class="pre">_ICEBERG</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#troubleshooting-iceberg-conversion-contents-changed"><span class="std std-ref">Native-to-Iceberg contents changed after cutover</span></a></p></td>
+<td><p>Snowflake conversion</p></td>
+<td><p>Promoted table, <code class="docutils literal notranslate"><span class="pre">_NATIVE</span></code> backup, and conversion manifest.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#troubleshooting-logging"><span class="std std-ref">Stale running log</span></a></p></td>
 <td><p>Process lifecycle</p></td>
@@ -890,10 +900,79 @@ absent between them, and an interruption can extend that reader outage until
 recovery runs.</p>
 <p>Keep every reader and writer stopped. Retry the identical command from the same
 imported target runtime directory with the same table, <code class="docutils literal notranslate"><span class="pre">--eventual</span></code> value,
-target identity, and account role. Do not rename or drop companion tables and do
-not delete or edit the recovery manifest. If PipelineWise cannot prove one safe
-table state, inspect the primary, <code class="docutils literal notranslate"><span class="pre">_NATIVE</span></code>, <code class="docutils literal notranslate"><span class="pre">_ICEBERG</span></code>, and manifest before
-making a manual change. See <a class="reference internal" href="../connectors/targets/snowflake_iceberg.html#snowflake-iceberg"><span class="std std-ref">Snowflake Iceberg tables</span></a>.</p>
+target identity, and account role. The retry restores <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_NATIVE</span></code> to the
+primary name before it validates anything, then repeats the cutover. Do not
+rename or drop companion tables and do not delete or edit the recovery manifest.
+If PipelineWise cannot prove one safe table state, inspect the primary,
+<code class="docutils literal notranslate"><span class="pre">_NATIVE</span></code>, <code class="docutils literal notranslate"><span class="pre">_ICEBERG</span></code>, and manifest before making a manual change. See
+<a class="reference internal" href="../connectors/targets/snowflake_iceberg.html#snowflake-iceberg"><span class="std std-ref">Snowflake Iceberg tables</span></a>.</p>
+</section>
+<section id="native-to-iceberg-manifest-cannot-be-read">
+<span id="troubleshooting-iceberg-conversion-unreadable-manifest"></span><h4>Native-to-Iceberg manifest cannot be read<a class="headerlink" href="#native-to-iceberg-manifest-cannot-be-read" title="Link to this heading"></a></h4>
+<p><code class="docutils literal notranslate"><span class="pre">copy_native_to_iceberg</span></code>, Snowflake Iceberg FastSync, or a PostgreSQL slot reset
+fails with <code class="docutils literal notranslate"><span class="pre">Iceberg</span> <span class="pre">publication</span> <span class="pre">requires</span> <span class="pre">a</span> <span class="pre">row</span> <span class="pre">count</span> <span class="pre">and</span> <span class="pre">row</span> <span class="pre">fingerprint</span></code> for a
+table that was converted earlier. Singer runs for the table can also fail with
+<code class="docutils literal notranslate"><span class="pre">Table</span> <span class="pre">&lt;schema&gt;.&quot;&lt;TABLE&gt;&quot;</span> <span class="pre">is</span> <span class="pre">native,</span> <span class="pre">but</span> <span class="pre">target_table_format</span> <span class="pre">requires</span>
+<span class="pre">managed_iceberg_v3</span></code>.</p>
+<p>Before 0.98.1, rerunning <code class="docutils literal notranslate"><span class="pre">copy_native_to_iceberg</span> <span class="pre">--eventual</span> <span class="pre">iceberg</span></code> after a
+completed conversion could rename the live Iceberg table to <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_ICEBERG</span></code>.
+It then restored the old <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_NATIVE</span></code> table as <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;</span></code> and saved a
+manifest that no command can read. PipelineWise 0.98.1 and later never save such
+a manifest, and a rerun after a completed conversion changes nothing.</p>
+<p>To recover:</p>
+<ol class="arabic">
+<li><p>Upgrade to 0.98.1 or later. Keep every reader and writer of the table stopped.</p></li>
+<li><p>In <code class="docutils literal notranslate"><span class="pre">$PIPELINEWISE_CONFIG_DIRECTORY/&lt;target_id&gt;/</span></code>, find the
+<code class="docutils literal notranslate"><span class="pre">iceberg-recovery-&lt;hash&gt;.json</span></code> file whose <code class="docutils literal notranslate"><span class="pre">kind</span></code> is <code class="docutils literal notranslate"><span class="pre">manual_conversion</span></code>
+and whose <code class="docutils literal notranslate"><span class="pre">target</span></code> names this table. If there is no such file, this entry
+does not apply. A completed <code class="docutils literal notranslate"><span class="pre">--eventual</span> <span class="pre">native</span></code> conversion leaves the same
+tables without a manifest.</p></li>
+<li><p>Confirm that <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;</span></code> is native and <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_ICEBERG</span></code> is Iceberg, for
+example from the <code class="docutils literal notranslate"><span class="pre">is_iceberg</span></code> column of <code class="docutils literal notranslate"><span class="pre">SHOW</span> <span class="pre">TABLES</span></code>. Confirm that no
+writer changed <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;</span></code> after the failed rerun; otherwise reconcile those
+rows first.</p></li>
+<li><p>Rename the tables back to their converted state:</p>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">ALTER</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="o">&lt;</span><span class="k">database</span><span class="o">&gt;</span><span class="p">.</span><span class="o">&lt;</span><span class="k">schema</span><span class="o">&gt;</span><span class="p">.</span><span class="o">&lt;</span><span class="k">table</span><span class="o">&gt;</span>
+<span class="w">  </span><span class="k">RENAME</span><span class="w"> </span><span class="k">TO</span><span class="w"> </span><span class="o">&lt;</span><span class="k">database</span><span class="o">&gt;</span><span class="p">.</span><span class="o">&lt;</span><span class="k">schema</span><span class="o">&gt;</span><span class="p">.</span><span class="o">&lt;</span><span class="k">table</span><span class="o">&gt;</span><span class="n">_NATIVE</span><span class="p">;</span>
+
+<span class="k">ALTER</span><span class="w"> </span><span class="n">ICEBERG</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="o">&lt;</span><span class="k">database</span><span class="o">&gt;</span><span class="p">.</span><span class="o">&lt;</span><span class="k">schema</span><span class="o">&gt;</span><span class="p">.</span><span class="o">&lt;</span><span class="k">table</span><span class="o">&gt;</span><span class="n">_ICEBERG</span>
+<span class="w">  </span><span class="k">RENAME</span><span class="w"> </span><span class="k">TO</span><span class="w"> </span><span class="o">&lt;</span><span class="k">database</span><span class="o">&gt;</span><span class="p">.</span><span class="o">&lt;</span><span class="k">schema</span><span class="o">&gt;</span><span class="p">.</span><span class="o">&lt;</span><span class="k">table</span><span class="o">&gt;</span><span class="p">;</span>
+</pre></div>
+</div>
+</li>
+<li><p>Remove only the manifest file found in step 2. Keep every other recovery file.</p></li>
+<li><p>Rerun <code class="docutils literal notranslate"><span class="pre">copy_native_to_iceberg</span> <span class="pre">--eventual</span> <span class="pre">iceberg</span></code> for the table. It confirms
+the completed conversion and changes nothing.</p></li>
+</ol>
+</section>
+<section id="native-to-iceberg-contents-changed-after-cutover">
+<span id="troubleshooting-iceberg-conversion-contents-changed"></span><h4>Native-to-Iceberg contents changed after cutover<a class="headerlink" href="#native-to-iceberg-contents-changed-after-cutover" title="Link to this heading"></a></h4>
+<p><code class="docutils literal notranslate"><span class="pre">copy_native_to_iceberg</span> <span class="pre">--eventual</span> <span class="pre">iceberg</span></code> fails after promotion with
+<code class="docutils literal notranslate"><span class="pre">does</span> <span class="pre">not</span> <span class="pre">match</span> <span class="pre">the</span> <span class="pre">projected</span> <span class="pre">contents</span></code>, <code class="docutils literal notranslate"><span class="pre">Promoted</span> <span class="pre">Iceberg</span> <span class="pre">contents</span> <span class="pre">do</span> <span class="pre">not</span>
+<span class="pre">match</span> <span class="pre">staged</span> <span class="pre">conversion</span> <span class="pre">evidence</span></code>, <code class="docutils literal notranslate"><span class="pre">schema</span> <span class="pre">or</span> <span class="pre">primary</span> <span class="pre">key</span> <span class="pre">does</span> <span class="pre">not</span> <span class="pre">match</span> <span class="pre">the</span>
+<span class="pre">conversion</span> <span class="pre">source</span></code>, or <code class="docutils literal notranslate"><span class="pre">Native</span> <span class="pre">backup</span> <span class="pre">schema</span> <span class="pre">no</span> <span class="pre">longer</span> <span class="pre">matches</span> <span class="pre">the</span> <span class="pre">conversion</span>
+<span class="pre">manifest</span></code>. Every retry fails the same way. While the manifest exists, Iceberg
+FastSync refuses the table, and an Iceberg PostgreSQL tap cannot reset its
+replication slot.</p>
+<p>A writer changed the rows or columns of the promoted table, or its native backup,
+after the cutover.
+PipelineWise keeps the promoted table live, because renaming it away could hide
+those writes. Keep every reader and writer of the table stopped, compare
+<code class="docutils literal notranslate"><span class="pre">&lt;table&gt;</span></code> with <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_NATIVE</span></code>, and decide which copy is correct:</p>
+<ul class="simple">
+<li><p><strong>The promoted Iceberg table is correct</strong>, for example because replication
+restarted early and loaded new rows. Validate it as described in
+<a class="reference internal" href="../connectors/targets/snowflake_iceberg.html#snowflake-iceberg"><span class="std std-ref">Snowflake Iceberg tables</span></a>. Then remove only the <code class="docutils literal notranslate"><span class="pre">iceberg-recovery-&lt;hash&gt;.json</span></code>
+file in <code class="docutils literal notranslate"><span class="pre">$PIPELINEWISE_CONFIG_DIRECTORY/&lt;target_id&gt;/</span></code> whose <code class="docutils literal notranslate"><span class="pre">kind</span></code> is
+<code class="docutils literal notranslate"><span class="pre">manual_conversion</span></code> and whose <code class="docutils literal notranslate"><span class="pre">target</span></code> names this table. The conversion is
+complete, and <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_NATIVE</span></code> stays as the rollback point.</p></li>
+<li><p><strong>The native backup is correct.</strong> Rename <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;</span></code> to <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_ICEBERG</span></code> with
+<code class="docutils literal notranslate"><span class="pre">ALTER</span> <span class="pre">ICEBERG</span> <span class="pre">TABLE</span></code>, then <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_NATIVE</span></code> to <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;</span></code> with
+<code class="docutils literal notranslate"><span class="pre">ALTER</span> <span class="pre">TABLE</span></code>. Reconcile any rows written to the Iceberg table. Rename
+<code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_ICEBERG</span></code> aside or drop it, because a retry refuses a stale
+companion. Remove the manifest as described above and run the conversion
+again.</p></li>
+</ul>
 </section>
 <section id="table-not-found">
 <span id="troubleshooting-fastsync-table-not-found"></span><h4>Table not found<a class="headerlink" href="#table-not-found" title="Link to this heading"></a></h4>

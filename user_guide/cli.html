@@ -299,6 +299,8 @@
 <li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#snowflake-varchar-width-is-incompatible">Snowflake VARCHAR width is incompatible</a></li>
 <li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#iceberg-publication-remains-ambiguous">Iceberg publication remains ambiguous</a></li>
 <li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#native-to-iceberg-primary-name-is-absent">Native-to-Iceberg primary name is absent</a></li>
+<li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#native-to-iceberg-manifest-cannot-be-read">Native-to-Iceberg manifest cannot be read</a></li>
+<li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#native-to-iceberg-contents-changed-after-cutover">Native-to-Iceberg contents changed after cutover</a></li>
 <li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#table-not-found">Table not found</a></li>
 <li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#failure-to-import-tap-0-tables-discovered">Failure to import tap (0 tables discovered)</a></li>
 </ul>
@@ -691,9 +693,11 @@ rollback statements. An interruption can leave it absent until the identical
 command completes recovery.</p>
 <p>Retry from the same imported target runtime directory with the same table,
 <code class="docutils literal notranslate"><span class="pre">--eventual</span></code> value, target account/database/user, and account role before
-resuming readers or writers. Do not delete its recovery manifest or companion
-tables. See <a class="reference internal" href="../connectors/targets/snowflake_iceberg.html#snowflake-iceberg"><span class="std std-ref">Snowflake Iceberg tables</span></a> for preflight, unsupported metadata, and
-rollback behaviour.</p>
+resuming readers or writers. After an interrupted cutover, a retry restores the
+native table name before it validates anything. A rerun after a completed
+<code class="docutils literal notranslate"><span class="pre">--eventual</span> <span class="pre">iceberg</span></code> conversion changes nothing. Do not delete its recovery manifest or companion tables. See
+<a class="reference internal" href="../connectors/targets/snowflake_iceberg.html#snowflake-iceberg"><span class="std std-ref">Snowflake Iceberg tables</span></a> for preflight, unsupported metadata, and rollback
+behaviour.</p>
 </section>
 </section>
 <section id="data-diff">

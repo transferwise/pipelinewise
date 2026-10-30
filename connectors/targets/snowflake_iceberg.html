@@ -299,6 +299,8 @@
 <li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#snowflake-varchar-width-is-incompatible">Snowflake VARCHAR width is incompatible</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#iceberg-publication-remains-ambiguous">Iceberg publication remains ambiguous</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#native-to-iceberg-primary-name-is-absent">Native-to-Iceberg primary name is absent</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#native-to-iceberg-manifest-cannot-be-read">Native-to-Iceberg manifest cannot be read</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#native-to-iceberg-contents-changed-after-cutover">Native-to-Iceberg contents changed after cutover</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#table-not-found">Table not found</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#failure-to-import-tap-0-tables-discovered">Failure to import tap (0 tables discovered)</a></li>
 </ul>
@@ -789,13 +791,57 @@ reverse. Use <code class="docutils literal notranslate"><span class="pre">eventu
 <p>Retry from the same imported target runtime directory with the same table,
 <code class="docutils literal notranslate"><span class="pre">--eventual</span></code> value, target account/database/user, and account role. The command
 reuses its durable manifest, verifies companion-table state and contents, and
-resumes a committed rename. If validation or Iceberg promotion fails, PipelineWise
-records rollback intent before renaming and restores the native table name across
-retries. It never deletes the <code class="docutils literal notranslate"><span class="pre">_NATIVE</span></code> rollback table.</p>
+finishes a committed promotion or rollback. It never deletes the <code class="docutils literal notranslate"><span class="pre">_NATIVE</span></code>
+rollback table.</p>
 <p>An interruption after the first promotion or rollback rename can leave the
-primary name absent until recovery runs. Keep the reader-and-writer outage in
-place and retry the identical command immediately. Do not resume readers merely
-because writers are stopped.</p>
+primary name absent until recovery runs. A retry first renames
+<code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_NATIVE</span></code> back to <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;</span></code>, so the name returns before any
+validation scan. It then validates the companion again and repeats the cutover.
+Keep the reader-and-writer outage in place and retry the identical command
+immediately. Do not resume readers merely because writers are stopped.</p>
+<p>After promotion, PipelineWise first proves that the promoted table’s columns and
+rows still match the <code class="docutils literal notranslate"><span class="pre">_NATIVE</span></code> backup and the staged evidence. Then it checks
+the Iceberg table settings and metadata:</p>
+<table class="docutils align-default" id="id4" style="width: 100%">
+<caption><span class="caption-text">Validation after promotion</span><a class="headerlink" href="#id4" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 35.0%" />
+<col style="width: 65.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Result</p></th>
+<th class="head"><p>Outcome</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Columns, rows, and metadata match</p></td>
+<td><p>The conversion finishes and the manifest is removed.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Columns or rows differ</p></td>
+<td><p>The promoted table stays live and the manifest is kept. The command fails
+for inspection. PipelineWise never renames away a table that may have
+received writes. Iceberg FastSync refuses the table until you resolve it;
+see <a class="reference internal" href="../../user_guide/troubleshooting.html#troubleshooting-iceberg-conversion-contents-changed"><span class="std std-ref">Native-to-Iceberg contents changed after cutover</span></a>.</p></td>
+</tr>
+<tr class="row-even"><td><p>Columns and rows match, but the Iceberg table settings or metadata differ</p></td>
+<td><p>PipelineWise records rollback intent, restores the native table name, and
+keeps the manifest. A retry cuts over again once the difference is fixed.</p></td>
+</tr>
+<tr class="row-odd"><td><p>A connection or other unexpected error</p></td>
+<td><p>The promoted table stays live and the manifest is kept. Retry the identical
+command to finish validation.</p></td>
+</tr>
+</tbody>
+</table>
+<p>A pending rollback also proves that the promoted columns and rows still match
+before it renames anything. If they differ, it stops in the same way as the
+“Columns or rows differ” row. After promotion, PipelineWise never restores
+<code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_NATIVE</span></code> on its own: if the promoted table is missing, the command stops
+for manual recovery, because the backup may be older than the promoted table.</p>
+<p>A rerun after a completed <code class="docutils literal notranslate"><span class="pre">--eventual</span> <span class="pre">iceberg</span></code> conversion changes nothing. It
+confirms that <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;</span></code> is a managed Iceberg v3 table and keeps
+<code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_NATIVE</span></code>. A table that was created as Iceberg has no native table to
+convert, so the command refuses it.</p>
 <p>If the primary and companion names cannot prove one safe state, the command fails.
 Inspect all three tables and the manifest before changing anything manually.</p>
 </section>
