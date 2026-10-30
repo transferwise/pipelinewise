@@ -131,12 +131,36 @@ def classify(
     )
 
 
+def _merge_writer_types(
+    classified: Sequence[ClassifiedTarget],
+) -> Tuple[Dict[str, Dict[str, str]], Dict[str, List[str]]]:
+    """Combine the column classes of every stream writing a table, and their conflicts."""
+    merged: Dict[str, Dict[str, str]] = {}
+    sources: Dict[Tuple[str, str], str] = {}
+    conflicts: Dict[str, List[str]] = {}
+    for item in classified:
+        if item.target.table is None:
+            continue
+        key = item.target.table.key
+        columns = merged.setdefault(key, {})
+        for column, column_class in item.target.writer_types.items():
+            expected = columns.setdefault(column, column_class)
+            sources.setdefault((key, column), item.target.stream_id)
+            if expected != column_class:
+                conflicts.setdefault(key, []).append(
+                    f'Column {column} is {expected} for stream {sources[(key, column)]} but '
+                    f'{column_class} for stream {item.target.stream_id}'
+                )
+    return merged, conflicts
+
+
 def _preflight_blockers(
     converter: SnowflakeNativeToIcebergConverter,
     item: ClassifiedTarget,
+    writer_types: Mapping[str, str],
 ) -> Tuple[str, ...]:
     try:
-        return tuple(converter.preflight(item.target.table.quoted, item.target.writer_types))
+        return tuple(converter.preflight(item.target.table.quoted, writer_types))
     except Exception as exc:  # report the failure and keep checking other tables
         return (f'Cannot inspect the table: {exc}',)
 
@@ -151,11 +175,14 @@ def preflight_report(
     snowflake = SnowflakeConversionQueryAdapter(dict(target_config), warehouse)
     converter = SnowflakeNativeToIcebergConverter(snowflake, runtime_dir)
     reports = []
-    for item in classify(targets, snowflake, runtime_dir):
-        blockers = tuple(item.reasons)
-        if item.primary == STATE_NATIVE and item.state in (STATE_NATIVE, STATE_BLOCKED):
-            # A blocked native table is preflighted too, so its other blockers show at once.
-            blockers += _preflight_blockers(converter, item)
+    classified = classify(targets, snowflake, runtime_dir)
+    writer_types, conflicts = _merge_writer_types(classified)
+    for item in classified:
+        key = item.target.table.key if item.target.table else None
+        blockers = tuple(item.reasons) + tuple(conflicts.get(key, ()))
+        if item.primary == STATE_NATIVE and item.state != STATE_ICEBERG:
+            # Blocked and pending native tables are preflighted too, so every blocker shows.
+            blockers += _preflight_blockers(converter, item, writer_types.get(key, {}))
         reports.append(TableReport(
             item.target.stream_id,
             item.target.table.key if item.target.table else '',
@@ -203,6 +230,7 @@ def _unique_tables(classified: Sequence[ClassifiedTarget]) -> List[ClassifiedTar
 def _convert(
     converter: SnowflakeNativeToIcebergConverter,
     item: ClassifiedTarget,
+    writer_types: Mapping[str, str],
     verb: str,
     action: str,
 ) -> None:
@@ -210,7 +238,7 @@ def _convert(
     LOGGER.info('%s %s (%s rows, %s bytes)', verb, table.key, item.rows, item.bytes)
     started = time.monotonic()
     try:
-        converter.convert(table.quoted, eventual=EVENTUAL_ICEBERG)
+        converter.convert(table.quoted, eventual=EVENTUAL_ICEBERG, writer_types=writer_types)
     except Exception as exc:
         if not isinstance(exc, NativeToIcebergConversionError):
             LOGGER.exception('Unexpected error while converting %s', table.key)
@@ -229,31 +257,47 @@ def _convert_tap_tables(
 ) -> None:
     snowflake = SnowflakeConversionQueryAdapter(dict(target_config), warehouse)
     converter = SnowflakeNativeToIcebergConverter(snowflake, runtime_dir)
-    classified = _unique_tables(classify(targets, snowflake, runtime_dir))
-    pending = [item for item in classified if item.state == STATE_PENDING]
+    classified = classify(targets, snowflake, runtime_dir)
+    # Every stream's blockers and column classes count; only physical work is de-duplicated.
+    writer_types, conflicts = _merge_writer_types(classified)
+    unique = _unique_tables(classified)
+    pending = [
+        item for item in unique
+        if item.state == STATE_PENDING and item.target.table.key not in conflicts
+    ]
     for item in pending:
         # Interrupted cutovers are closed first, so no other refusal leaves a name missing.
-        _convert(converter, item, 'Resuming the pending conversion of', action)
+        _convert(
+            converter, item, writer_types.get(item.target.table.key, {}),
+            'Resuming the pending conversion of', action,
+        )
     _raise_if_any(
-        [(item, item.reasons) for item in classified if item.state == STATE_BLOCKED],
+        [(item, item.reasons) for item in classified if item.state == STATE_BLOCKED]
+        + [(item, tuple(conflicts[item.target.table.key])) for item in unique
+           if item.target.table and item.target.table.key in conflicts],
         'needs an operator',
         action,
     )
     candidates = sorted(
-        (item for item in classified if item.state == STATE_NATIVE),
+        (item for item in unique if item.state == STATE_NATIVE),
         key=lambda item: (item.bytes is None, item.bytes or 0, item.target.table.key),
     )
     _raise_if_any(
         [
             (item, blockers)
             for item in candidates
-            if (blockers := converter.preflight(item.target.table.quoted, item.target.writer_types))
+            if (blockers := converter.preflight(
+                item.target.table.quoted, writer_types.get(item.target.table.key, {}),
+            ))
         ],
         'cannot be converted',
         action,
     )
     for index, item in enumerate(candidates, start=1):
-        _convert(converter, item, f'Converting table {index} of {len(candidates)}:', action)
+        _convert(
+            converter, item, writer_types.get(item.target.table.key, {}),
+            f'Converting table {index} of {len(candidates)}:', action,
+        )
     if pending or candidates:
         _raise_if_any(
             [

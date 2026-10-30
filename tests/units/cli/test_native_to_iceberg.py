@@ -19,6 +19,9 @@ from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_plan import (
 )
 from pipelinewise.fastsync.commons.snowflake_iceberg_model import SnowflakeObjectName
 from tests.units.fastsync.commons.test_snowflake_iceberg_converter import FakeSnowflake
+from tests.units.fastsync.commons.test_snowflake_iceberg_converter_preflight import (
+    _submitted_attempt_over_temporal_column,
+)
 
 
 FASTSYNC_CONFIG = {'dbname': 'database', 'default_target_schema': 'schema'}
@@ -158,9 +161,13 @@ def test_fastsync_readiness_bounds_its_message():
     assert log_error.call_count == 25
 
 
-def _classified(table, state, bytes_=None, reasons=(), stream=None):
-    target = ConversionTarget(stream or f'public-{table.lower()}', SnowflakeObjectName('DATABASE', 'SCHEMA', table))
-    return ClassifiedTarget(target, state, reasons, None, bytes_)
+def _classified(table, state, bytes_=None, reasons=(), stream=None, writer_types=None, primary='native'):
+    target = ConversionTarget(
+        stream or f'public-{table.lower()}',
+        SnowflakeObjectName('DATABASE', 'SCHEMA', table),
+        writer_types or {},
+    )
+    return ClassifiedTarget(target, state, reasons, None, bytes_, primary)
 
 
 @contextmanager
@@ -195,7 +202,8 @@ def test_gate_resumes_pending_first_then_converts_smallest_first():
 
     adapter.assert_called_once_with({'dbname': 'database'}, 'WH')
     assert converter.convert.call_args_list == [
-        call(_quoted(table), eventual='iceberg') for table in ('HALF', 'SMALL', 'BIG', 'UNKNOWN')
+        call(_quoted(table), eventual='iceberg', writer_types={})
+        for table in ('HALF', 'SMALL', 'BIG', 'UNKNOWN')
     ]
     assert [entry.args[0] for entry in converter.preflight.call_args_list] == [
         _quoted(table) for table in ('SMALL', 'BIG', 'UNKNOWN')
@@ -214,7 +222,7 @@ def test_gate_resumes_pending_conversions_before_refusing_blocked_tables():
         with pytest.raises(NativeToIcebergConversionException, match='USERS .*needs an operator'):
             native_to_iceberg.convert_tap_tables({}, '/runtime', [])
 
-    assert converter.convert.call_args_list == [call(_quoted('HALF'), eventual='iceberg')]
+    assert converter.convert.call_args_list == [call(_quoted('HALF'), eventual='iceberg', writer_types={})]
 
 
 def test_gate_skips_the_post_check_when_nothing_changed():
@@ -309,6 +317,53 @@ def test_gate_post_check_requires_every_table_to_be_iceberg():
             native_to_iceberg.convert_tap_tables({}, '/runtime', [])
 
 
+def test_gate_checks_every_stream_of_a_shared_table():
+    """A second stream's blocker on a shared table is never hidden by de-duplication."""
+    first = [
+        _classified('T', STATE_NATIVE, 1, stream='a-t'),
+        _classified('T', STATE_BLOCKED, 1, reasons=('FastSync writes another table',), stream='b-t'),
+    ]
+
+    with _gate(first) as (converter, _, _):
+        with pytest.raises(NativeToIcebergConversionException, match=r'T \(stream b-t\) needs an operator'):
+            native_to_iceberg.convert_tap_tables({}, '/runtime', [])
+
+    converter.preflight.assert_not_called()
+    converter.convert.assert_not_called()
+
+
+def test_gate_refuses_streams_that_disagree_on_a_column_class():
+    """Two streams expecting TEXT and VARIANT in one column would make a writer refuse it."""
+    first = [
+        _classified('T', STATE_NATIVE, 1, stream='a-t', writer_types={'DOC': 'TEXT'}),
+        _classified('T', STATE_NATIVE, 1, stream='b-t', writer_types={'DOC': 'VARIANT'}),
+    ]
+
+    with _gate(first) as (converter, _, _):
+        with pytest.raises(
+            NativeToIcebergConversionException,
+            match='Column DOC is TEXT for stream a-t but VARIANT for stream b-t',
+        ):
+            native_to_iceberg.convert_tap_tables({}, '/runtime', [])
+
+    converter.convert.assert_not_called()
+
+
+def test_gate_passes_every_stream_class_to_preflight_and_conversion():
+    """Preflight and conversion of a shared table use the classes of all of its streams."""
+    first = [
+        _classified('T', STATE_NATIVE, 1, stream='a-t', writer_types={'DOC': 'VARIANT'}),
+        _classified('T', STATE_NATIVE, 1, stream='b-t', writer_types={'NOTE': 'TEXT'}),
+    ]
+    merged = {'DOC': 'VARIANT', 'NOTE': 'TEXT'}
+
+    with _gate(first, [_classified('T', STATE_ICEBERG)]) as (converter, _, _):
+        native_to_iceberg.convert_tap_tables({}, '/runtime', [])
+
+    converter.preflight.assert_called_once_with(_quoted('T'), merged)
+    converter.convert.assert_called_once_with(_quoted('T'), eventual='iceberg', writer_types=merged)
+
+
 def test_gate_converts_a_shared_table_once():
     """Two streams that write the same table convert it once."""
     first = [
@@ -359,6 +414,34 @@ def test_tap_blockers_wait_for_the_imported_iceberg_catalog():
     assert len(blockers) == 1
     assert 'not imported with target_table_format: iceberg yet' in blockers[0]
     assert 'native_to_iceberg_conversion enabled: false' in blockers[0]
+
+
+def test_report_preflights_pending_native_tables(tmp_path):
+    """A pending attempt that resuming would refuse is shown as blocked, not ready."""
+    snowflake = _submitted_attempt_over_temporal_column(tmp_path)
+    snowflake.sub_microsecond_counts = {'UPDATED_AT': 2}
+
+    reports = _report(tmp_path, snowflake, [_target('TABLE')])
+
+    assert reports[0].state == STATE_PENDING
+    assert reports[0].action == 'resolve the blockers'
+    assert 'would truncate' in reports[0].blockers[0]
+    assert native_to_iceberg.render_preflight_report(reports, [], 'json').count('"ready": false') == 1
+
+
+def test_report_shows_column_class_conflicts_between_streams(tmp_path):
+    """Streams that disagree on a shared table's column class make the report not ready."""
+    snowflake = FakeSnowflake()
+    targets = [
+        ConversionTarget('a-table', SnowflakeObjectName('DATABASE', 'SCHEMA', 'TABLE'), {'ID': 'TEXT'}),
+        ConversionTarget('b-table', SnowflakeObjectName('DATABASE', 'SCHEMA', 'TABLE'), {'ID': 'VARIANT'}),
+    ]
+
+    reports = _report(tmp_path, snowflake, targets)
+
+    assert [report.blockers for report in reports] == [
+        ('Column ID is TEXT for stream a-table but VARIANT for stream b-table',),
+    ] * 2
 
 
 def test_report_preflights_blocked_native_tables_too():

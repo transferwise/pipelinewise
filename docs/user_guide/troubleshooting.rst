@@ -740,8 +740,9 @@ selected table new or Iceberg, so ``run_tap`` stopped before replication. The
 message names each table and the reason:
 
 * ``needs an operator``: for example a leftover ``<table>_NATIVE``, a companion
-  table without a manifest, an unreadable manifest, or a pending
-  ``--eventual native`` conversion;
+  table without a manifest, an unreadable manifest, a pending
+  ``--eventual native`` conversion, or two streams that write the same table
+  but map one column to ``TEXT`` and ``VARIANT``;
 * ``cannot be converted``: a preflight blocker, such as a policy, a stream, a
   ``TIMESTAMP_TZ`` column, sub-microsecond values, a grant that Iceberg cannot
   carry, or a ``TEXT``/``VARIANT`` mismatch with the tap catalog;
