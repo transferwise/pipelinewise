@@ -1,13 +1,18 @@
-"""Tap-scoped native-to-Iceberg conversion checks and feasibility reports."""
+"""Tap-scoped native-to-Iceberg conversion, its checks, and feasibility reports."""
 
 import json
+import logging
+import time
 from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from tabulate import tabulate
 
-from pipelinewise.cli.errors import PreRunChecksException
-from pipelinewise.fastsync.commons.snowflake_iceberg import SnowflakeQueryAdapter
+from pipelinewise.cli.errors import NativeToIcebergConversionException, PreRunChecksException
+from pipelinewise.fastsync.commons.snowflake_iceberg import (
+    SnowflakeConversionQueryAdapter,
+    SnowflakeQueryAdapter,
+)
 from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_plan import (
     STATE_BLOCKED,
     STATE_ICEBERG,
@@ -22,6 +27,7 @@ from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_plan import (
     selected_stream_ids,
 )
 from pipelinewise.fastsync.commons.snowflake_iceberg_converter import (
+    EVENTUAL_ICEBERG,
     SnowflakeNativeToIcebergConverter,
 )
 from pipelinewise.fastsync.commons.snowflake_iceberg_coordination import RecoveryCoordinator
@@ -36,6 +42,12 @@ ACTIONS = {
     STATE_PENDING: 'resume the pending conversion',
     STATE_BLOCKED: 'resolve the blockers',
 }
+NEXT_ACTION = (
+    'Replication did not start, and tables converted earlier stay converted. Fix the cause, '
+    'then rerun run_tap, which resumes any pending conversion. Check the remaining tables '
+    'with copy_native_to_iceberg --preflight-only.'
+)
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -96,9 +108,10 @@ def preflight_report(
     target_config: Mapping[str, Any],
     runtime_dir: str,
     targets: Sequence[ConversionTarget],
+    warehouse: Optional[str] = None,
 ) -> List[TableReport]:
     """Classify and preflight planned tables without locks, manifests, or DDL."""
-    snowflake = SnowflakeQueryAdapter(dict(target_config))
+    snowflake = SnowflakeConversionQueryAdapter(dict(target_config), warehouse)
     converter = SnowflakeNativeToIcebergConverter(snowflake, runtime_dir)
     reports = []
     for item in classify(targets, snowflake, runtime_dir):
@@ -118,6 +131,105 @@ def preflight_report(
             tuple(blockers),
         ))
     return reports
+
+
+def _label(item: ClassifiedTarget) -> str:
+    table = item.target.table.key if item.target.table else 'an unplanned table'
+    return f'{table} (stream {item.target.stream_id})' if item.target.stream_id else table
+
+
+def _raise_if_any(failures: Sequence[Tuple[ClassifiedTarget, Sequence[str]]], problem: str) -> None:
+    if failures:
+        details = '; '.join(
+            f'{_label(item)} {problem}: {" | ".join(reasons) or item.state}'
+            for item, reasons in failures
+        )
+        raise NativeToIcebergConversionException(
+            f'Automatic native-to-Iceberg conversion stopped. {details}. {NEXT_ACTION}'
+        )
+
+
+def _unique_tables(classified: Sequence[ClassifiedTarget]) -> List[ClassifiedTarget]:
+    """Keep one entry per physical table when several streams map to it."""
+    seen = set()
+    unique = []
+    for item in classified:
+        key = item.target.table.key if item.target.table else None
+        if key is None or key not in seen:
+            unique.append(item)
+            seen.add(key)
+    return unique
+
+
+def _convert(converter: SnowflakeNativeToIcebergConverter, item: ClassifiedTarget, action: str) -> None:
+    table = item.target.table
+    LOGGER.info('%s %s (%s rows, %s bytes)', action, table.key, item.rows, item.bytes)
+    started = time.monotonic()
+    try:
+        converter.convert(table.quoted, eventual=EVENTUAL_ICEBERG)
+    except Exception as exc:
+        raise NativeToIcebergConversionException(
+            f'Automatic native-to-Iceberg conversion of {_label(item)} failed: {exc}. {NEXT_ACTION}'
+        ) from exc
+    LOGGER.info('Converted %s in %.0f seconds', table.key, time.monotonic() - started)
+
+
+def _convert_tap_tables(
+    target_config: Mapping[str, Any],
+    runtime_dir: str,
+    targets: Sequence[ConversionTarget],
+    warehouse: Optional[str],
+) -> None:
+    snowflake = SnowflakeConversionQueryAdapter(dict(target_config), warehouse)
+    converter = SnowflakeNativeToIcebergConverter(snowflake, runtime_dir)
+    classified = _unique_tables(classify(targets, snowflake, runtime_dir))
+    _raise_if_any(
+        [(item, item.reasons) for item in classified if item.state == STATE_BLOCKED],
+        'needs an operator',
+    )
+    for item in classified:
+        if item.state == STATE_PENDING:
+            # Interrupted cutovers are closed first, so no later failure leaves a name missing.
+            _convert(converter, item, 'Resuming the pending conversion of')
+    candidates = sorted(
+        (item for item in classified if item.state == STATE_NATIVE),
+        key=lambda item: (item.bytes is None, item.bytes or 0, item.target.table.key),
+    )
+    _raise_if_any(
+        [
+            (item, blockers)
+            for item in candidates
+            if (blockers := converter.preflight(item.target.table.quoted, item.target.writer_types))
+        ],
+        'cannot be converted',
+    )
+    for index, item in enumerate(candidates, start=1):
+        _convert(converter, item, f'Converting table {index} of {len(candidates)}:')
+    _raise_if_any(
+        [
+            (item, item.reasons)
+            for item in classify(targets, snowflake, runtime_dir)
+            if item.state not in (STATE_NEW, STATE_ICEBERG)
+        ],
+        'is still not Iceberg after conversion',
+    )
+
+
+def convert_tap_tables(
+    target_config: Mapping[str, Any],
+    runtime_dir: str,
+    targets: Sequence[ConversionTarget],
+    warehouse: Optional[str] = None,
+) -> None:
+    """Leave every planned table new or managed Iceberg, or stop before any writer runs."""
+    try:
+        _convert_tap_tables(target_config, runtime_dir, targets, warehouse)
+    except NativeToIcebergConversionException:
+        raise
+    except Exception as exc:
+        raise NativeToIcebergConversionException(
+            f'Automatic native-to-Iceberg conversion stopped: {exc}. {NEXT_ACTION}'
+        ) from exc
 
 
 def assert_fastsync_targets_ready(

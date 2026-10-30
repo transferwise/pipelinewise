@@ -36,8 +36,8 @@ from .alert_sender import AlertSender
 from .alert_handlers.base_alert_handler import BaseAlertHandler
 from .errors import (
     InvalidTransformationException, DuplicateConfigException,
-    InvalidConfigException, PartialSyncNotSupportedTypeException,
-    PreRunChecksException
+    InvalidConfigException, NativeToIcebergConversionException,
+    PartialSyncNotSupportedTypeException, PreRunChecksException
 )
 
 from pipelinewise.fastsync.commons.tap_postgres import FastSyncTapPostgres
@@ -1381,6 +1381,8 @@ class PipelineWise:
                     target_id=target_id,
                 )
 
+                self._convert_native_tables_to_iceberg(fastsync_stream_ids + singer_stream_ids)
+
                 # Run fastsync for FULL_TABLE replication method
                 if len(fastsync_stream_ids) > 0:
                     self.logger.info(
@@ -1442,6 +1444,11 @@ class PipelineWise:
             self.logger.exception(exc)
             self._print_tap_run_summary(self.STATUS_FAILED, start_time, datetime.now())
             self.send_alert(message=f'{tap_id} tap failed', exc=exc)
+            sys.exit(1)
+        except NativeToIcebergConversionException as exc:
+            self.logger.error('%s', exc)
+            self._print_tap_run_summary(self.STATUS_FAILED, start_time, datetime.now())
+            self.send_alert(message=f'{tap_id} tap failed: native-to-Iceberg conversion stopped', exc=exc)
             sys.exit(1)
         except Exception as exc:
             self._print_tap_run_summary(self.STATUS_FAILED, start_time, datetime.now())
@@ -1617,6 +1624,33 @@ class PipelineWise:
             self._iceberg_target_config(),
             self.get_target_dir(self.target['id']),
             source_tables,
+        )
+
+    def _convert_native_tables_to_iceberg(self, stream_ids) -> None:
+        """Convert the tap's native Snowflake tables before any writer runs, or stop the tap."""
+        conversion = self.tap.get(Config.NATIVE_TO_ICEBERG_CONVERSION) or {}
+        if conversion.get('enabled') is not True or not stream_ids:
+            return
+        self.logger.info('Checking %s selected streams for native Snowflake tables', len(stream_ids))
+        self._run_in_child_process(
+            self._run_native_to_iceberg_conversion,
+            list(stream_ids),
+            conversion.get('warehouse'),
+        )
+
+    def _run_native_to_iceberg_conversion(self, stream_ids, warehouse) -> None:
+        from pipelinewise.cli import native_to_iceberg
+
+        target_config = self._iceberg_target_config()
+        catalog = self._load_required_json_object(self.tap['files']['properties'], 'tap catalog')
+        fastsync_capable = resolve_fastsync_capabilities(
+            self.tap['type'], self.target['type'], Config.TABLE_FORMAT_ICEBERG,
+        ).full_sync
+        native_to_iceberg.convert_tap_tables(
+            target_config,
+            self.get_target_dir(self.target['id']),
+            native_to_iceberg.tap_targets(catalog, target_config, fastsync_capable, stream_ids),
+            warehouse,
         )
 
     def _iceberg_target_config(self) -> Dict:
@@ -2358,7 +2392,7 @@ class PipelineWise:
         # Local imports avoid a cycle through FastSync state helpers and the CLI package.
 
         from pipelinewise.fastsync.commons.snowflake_iceberg import (
-            SnowflakeQueryAdapter,
+            SnowflakeConversionQueryAdapter,
         )
         from pipelinewise.fastsync.commons.snowflake_iceberg_converter import (
             SnowflakeNativeToIcebergConverter,
@@ -2374,7 +2408,7 @@ class PipelineWise:
             print(self._native_to_iceberg_preflight(target_config))
             return
         converter = SnowflakeNativeToIcebergConverter(
-            SnowflakeQueryAdapter(target_config),
+            SnowflakeConversionQueryAdapter(target_config),
             runtime_dir=self.get_target_dir(self.target['id']),
         )
         converter.convert(
@@ -2388,7 +2422,9 @@ class PipelineWise:
         from pipelinewise.cli import native_to_iceberg
 
         blockers = []
+        warehouse = None
         if hasattr(self, 'tap'):
+            warehouse = (self.tap.get(Config.NATIVE_TO_ICEBERG_CONVERSION) or {}).get('warehouse')
             target_config = self._iceberg_target_config()
             catalog = utils.load_json(self.tap['files']['properties'])
             self._validate_tap_catalog(catalog, self.tap['files']['properties'])
@@ -2403,6 +2439,7 @@ class PipelineWise:
             target_config,
             self.get_target_dir(self.target['id']),
             targets,
+            warehouse,
         )
         return native_to_iceberg.render_preflight_report(
             reports, blockers, self.args.output_format,

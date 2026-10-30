@@ -216,7 +216,10 @@ Replication
 
 Runs eligible initial FastSync work, then Singer replication in the same
 invocation. ``--extra_log`` mirrors connector output to the PipelineWise logger.
-See :ref:`running_pipelines` for preflight and recovery.
+See :ref:`running_pipelines` for preflight and recovery. When the tap enables
+``native_to_iceberg_conversion``, the command first converts the tap's native
+Snowflake tables and stops before replication if it cannot; see
+:ref:`snowflake_iceberg_auto_conversion`.
 
 
 .. _cli_stop_tap:

@@ -127,8 +127,9 @@ MariaDB, MySQL, and PostgreSQL taps require ``data_flattening_max_level: 0`` bec
 their initial load can use FastSync before handing the stream to Singer.
 Singer-only sources retain their normal flattening setting; for example,
 Salesforce's default level ``10`` is valid. A physical format mismatch fails
-before mutation. PipelineWise does not upgrade or automatically convert tables;
-use the manual command below during a controlled outage.
+before mutation. To move a tap's existing native tables to Iceberg, enable
+:ref:`automatic conversion <snowflake_iceberg_auto_conversion>` or use the
+manual command below during a controlled outage. Writers never convert tables.
 
 With flattening disabled, nested objects and arrays use ``VARIANT`` only with
 explicit v3 configuration. A Singer-only tap with a non-zero flattening level
@@ -340,6 +341,70 @@ The polling budget is not part of recovery identity, so it can be increased for
 that unchanged retry. If the result remains ambiguous, PipelineWise preserves
 the evidence and fails for operator inspection.
 
+
+.. _snowflake_iceberg_auto_conversion:
+
+Convert a tap's tables automatically
+------------------------------------
+
+To move a tap that already replicates into native tables, first run the
+:ref:`feasibility report <snowflake_iceberg_conversion_report>` and resolve its
+blockers. Then set the Iceberg format and enable conversion on the tap, and
+run ``import_config``:
+
+.. code-block:: yaml
+
+   target: "snowflake"
+   target_table_format: iceberg
+   iceberg_version: 3
+   native_to_iceberg_conversion:
+     enabled: true
+     warehouse: CONVERSION_WH  # optional; defaults to the target's warehouse
+
+Every ``run_tap`` for the tap then runs a conversion step inside the tap's
+pidfile, before FastSync or Singer writes anything:
+
+1. It plans each selected stream's Snowflake table and classifies them all with
+   one ``SHOW TABLES`` per schema and the target's recovery manifests.
+2. It resumes any pending ``--eventual iceberg`` conversion first, so an
+   interrupted cutover gets its table name back before anything else runs.
+3. It preflights every native table and stops before changing anything if any
+   table is blocked.
+4. It converts the native tables one at a time, smallest first, with the
+   same converter as ``copy_native_to_iceberg --eventual iceberg``.
+5. It checks that every planned table is new or Iceberg with no pending
+   manifest, then replication starts.
+
+After the last table converts, each run costs one ``SHOW TABLES`` per schema.
+The setting accepts any tap that can write managed Iceberg v3 through
+``target-snowflake``. It requires ``data_flattening_max_level: 0``, because
+conversion compares native columns with the tap catalog's top-level properties.
+``warehouse`` runs only the conversion queries on another warehouse, which the
+target role must be able to use. It is not part of the recovery identity, so a
+manual ``copy_native_to_iceberg`` on the target's warehouse can resume an
+automatic attempt.
+
+Enabling the setting accepts the cutover gap described below: each table's name
+is briefly absent between its two renames, so readers of that table fail for
+that moment. A large table converts within the scheduled run and holds the tap
+for the copy; use the report's row and byte counts to pick when to enable it.
+
+If any table cannot convert, the run fails before replication starts, sends the
+tap's alert, and exits 1. It never falls back to native tables. Tables converted
+earlier in the run stay converted, each validated with its native backup kept
+as ``<table>_NATIVE``. The next ``run_tap`` resumes a pending conversion, so fix
+the cause and rerun; see :ref:`troubleshooting_iceberg_auto_conversion`. While
+the tap is stopped, its source keeps accumulating changes, so watch PostgreSQL
+WAL and MySQL binlog retention.
+
+.. warning::
+
+   Finish or recover every pending conversion before removing
+   ``native_to_iceberg_conversion`` or changing the tap's format. Without the
+   setting, ``run_tap`` does not resume a conversion, and a writer could create
+   an empty table under a primary name that an interrupted cutover left absent.
+   Once a table has converted, the tap cannot return to ``native``: the native
+   contract refuses Iceberg tables.
 
 Convert a native table
 ----------------------

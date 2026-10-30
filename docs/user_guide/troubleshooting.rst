@@ -720,6 +720,47 @@ those writes. Keep every reader and writer of the table stopped, compare
   companion. Remove the manifest as described above and run the conversion
   again.
 
+.. _troubleshooting_iceberg_auto_conversion:
+
+Automatic native-to-Iceberg conversion stopped
+""""""""""""""""""""""""""""""""""""""""""""""
+
+*Log message:*
+
+.. code-block:: text
+
+    Automatic native-to-Iceberg conversion stopped. <database>.<schema>.<TABLE> (stream <stream>) ...
+
+or ``Automatic native-to-Iceberg conversion of <table> (stream <stream>) failed``.
+The tap's alert reads ``<tap_id> tap failed: native-to-Iceberg conversion stopped``.
+
+*Why it happens:*
+A tap with ``native_to_iceberg_conversion`` enabled could not leave every
+selected table new or Iceberg, so ``run_tap`` stopped before replication. The
+message names each table and the reason:
+
+* ``needs an operator``: for example a leftover ``<table>_NATIVE``, a companion
+  table without a manifest, an unreadable manifest, or a pending
+  ``--eventual native`` conversion;
+* ``cannot be converted``: a preflight blocker, such as a policy, a stream, a
+  ``TIMESTAMP_TZ`` column, sub-microsecond values, a grant that Iceberg cannot
+  carry, or a ``TEXT``/``VARIANT`` mismatch with the tap catalog;
+* ``failed``: the conversion itself raised an error.
+
+*How to fix:*
+
+1. Keep the tap stopped; it never replicates into native tables. Tables that
+   converted earlier in the run stay converted.
+2. Run ``copy_native_to_iceberg --preflight-only --tap <tap_id>`` to list every
+   remaining blocker.
+3. Fix each blocker. For a failed conversion, the manifest records the attempt,
+   and the next ``run_tap`` resumes it. For an interrupted cutover, see
+   :ref:`troubleshooting_iceberg_conversion_missing_primary`.
+4. Rerun ``run_tap``. Watch PostgreSQL WAL and MySQL binlog retention while the
+   tap is stopped.
+
+See :ref:`snowflake_iceberg_auto_conversion`.
+
 .. _troubleshooting_fastsync_table_not_found:
 
 Table not found

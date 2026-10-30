@@ -586,6 +586,17 @@
       "type": "integer",
       "enum": [3]
     },
+    "native_to_iceberg_conversion": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "warehouse": {
+          "type": "string"
+        }
+      }
+    },
     "version_legacy_float_columns": {
       "type": "boolean",
       "default": false
