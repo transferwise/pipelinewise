@@ -196,3 +196,22 @@ class TestSplitGzipFile(TestCase):
         # Last chunk should be smaller
         with gzip.open(f'{self.filename}.part00006', 'rb') as f_read:
             self.assertEqual(f_read.read(), DATA_WITH_100_BYTES)
+
+    def test_close_marks_stream_closed_after_write(self):
+        gzip_splitter = split_gzip.SplitGzipFile(self.filename, 'wb', max_chunks=0)
+        gzip_splitter.write(b'payload')
+
+        gzip_splitter.close()
+
+        self.assertTrue(gzip_splitter.closed)
+        with self.assertRaises(ValueError):
+            gzip_splitter.write(b'more data')
+
+    def test_close_without_write_marks_stream_closed(self):
+        gzip_splitter = split_gzip.SplitGzipFile(self.filename, 'wb', max_chunks=0)
+
+        gzip_splitter.close()
+
+        self.assertTrue(gzip_splitter.closed)
+        with self.assertRaises(ValueError):
+            gzip_splitter.write(b'payload')

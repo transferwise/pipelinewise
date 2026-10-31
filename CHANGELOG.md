@@ -1,6 +1,7 @@
-0.98.1 (2026-10-30)
+0.98.1 (2026-11-01)
 -------------------
 
+- Mark split gzip streams closed after close, including when no data was written.
 - Stop `copy_native_to_iceberg --eventual iceberg` from changing a table that it
   already converted. Before this fix, a rerun could restore the old native backup
   in place of the live Iceberg table. It could also save a recovery manifest that
