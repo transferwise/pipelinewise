@@ -1,3 +1,37 @@
+0.99.0 (2026-10-31)
+-------------------
+
+- Add opt-in automatic native-to-Iceberg conversion. With
+  `native_to_iceberg_conversion: {enabled: true}` on a tap that sets
+  `target_table_format: iceberg` and `iceberg_version: 3`, `run_tap` converts the
+  tap's native Snowflake tables before FastSync or Singer writes anything. It
+  converts one table at a time, smallest first, and stops the tap with an alert
+  if any table cannot convert; it never replicates into native tables. An
+  optional `warehouse` runs only the conversion queries on another warehouse. See
+  [automatic conversion](docs/connectors/targets/snowflake_iceberg.rst#snowflake-iceberg-auto-conversion)
+- Add `copy_native_to_iceberg --preflight-only` with `--tap` or `--table`. It
+  reports each table's state, size, and conversion blockers without taking a
+  lock, writing a manifest, or running DDL. With `--output-format json`, stdout
+  carries only the report and log lines go to stderr. See
+  [feasibility report](docs/connectors/targets/snowflake_iceberg.rst#snowflake-iceberg-conversion-report)
+- Refuse a conversion before copying when Iceberg v3 cannot hold the data
+  exactly: `TIMESTAMP_TZ` columns, and time or timestamp values with
+  sub-microsecond digits. Before this fix, the copy truncated them and still
+  passed validation. Also refuse grants that an Iceberg table cannot carry, and a
+  `TEXT`/`VARIANT` column that an imported tap writing the table now maps to the
+  other class. A pending `--eventual iceberg` attempt from an earlier release is
+  checked again before its cutover and can be refused; see
+  [conversion stopped](docs/user_guide/troubleshooting.rst#troubleshooting-iceberg-auto-conversion)
+- Accept extra grants on the converted Iceberg table, for example from scheduled
+  grant automation, instead of failing the copy or rolling back a promoted table.
+  Every native grant must still be present.
+- Stop an Iceberg `fast_sync` before it resets the PostgreSQL replication slot or
+  clears bookmarks when a selected table is still native or has a pending
+  conversion. Before this fix, the slot position and bookmarks were lost, and
+  then FastSync refused to load the native tables.
+- Abort conversion queries in Snowflake when the PipelineWise client disconnects,
+  so a killed conversion does not keep copying.
+
 0.98.1 (2026-10-30)
 -------------------
 

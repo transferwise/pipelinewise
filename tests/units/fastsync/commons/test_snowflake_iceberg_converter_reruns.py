@@ -24,6 +24,7 @@ from tests.units.fastsync.commons.test_snowflake_iceberg_converter import (
     FakeSnowflake,
     _converter,
     _manifest_files,
+    revoke_reader_grant_after_promotion,
 )
 
 
@@ -151,7 +152,7 @@ def test_combined_drift_never_rolls_back(tmp_path):
     """Content drift wins over a metadata mismatch, so changed rows are never renamed away."""
     snowflake = FakeSnowflake()
     snowflake.post_promotion_staging_evidence = (2, 54321)
-    snowflake.post_promotion_companion_grants = [AUTOMATED_REFERENCES_GRANT]
+    revoke_reader_grant_after_promotion(snowflake)
 
     with pytest.raises(NativeToIcebergConversionError, match='does not match'):
         _convert(tmp_path, snowflake)
@@ -269,7 +270,7 @@ def test_post_cutover_column_change_keeps_promoted_table(tmp_path):
 def test_rollback_resume_refuses_changed_columns(tmp_path):
     """A pending rollback never renames away a promoted table whose columns changed."""
     snowflake = FakeSnowflake()
-    snowflake.post_promotion_companion_grants = [AUTOMATED_REFERENCES_GRANT]
+    revoke_reader_grant_after_promotion(snowflake)
     snowflake.interrupt_iceberg_rollback = True
     with pytest.raises(SystemExit, match='first rollback interruption'):
         _convert(tmp_path, snowflake)
@@ -288,7 +289,7 @@ def test_rollback_resume_refuses_changed_columns(tmp_path):
 def test_rollback_resume_refuses_changed_promoted_table(tmp_path):
     """A pending rollback never renames away a promoted table whose contents changed."""
     snowflake = FakeSnowflake()
-    snowflake.post_promotion_companion_grants = [AUTOMATED_REFERENCES_GRANT]
+    revoke_reader_grant_after_promotion(snowflake)
     snowflake.interrupt_iceberg_rollback = True
 
     with pytest.raises(SystemExit, match='first rollback interruption'):

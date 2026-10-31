@@ -236,6 +236,17 @@ Tap configuration
      - Managed-Iceberg version discriminator. Its only supported value is integer
        ``3``; it is required with ``target_table_format: iceberg`` and invalid
        otherwise.
+   * - ``native_to_iceberg_conversion``
+     - Omitted
+     - Object with a Boolean ``enabled`` and an optional ``warehouse``. With
+       ``enabled: true``, ``run_tap`` converts the tap's existing native
+       Snowflake tables to managed Iceberg v3 before it replicates. Valid only
+       with ``target_table_format: iceberg``, ``iceberg_version: 3``, a
+       ``target-snowflake`` target, and an effective
+       ``data_flattening_max_level`` of ``0``. ``warehouse`` runs only the
+       conversion work on another Snowflake warehouse. Configure it at the tap
+       root, not in ``db_conn`` or the target. See
+       :ref:`snowflake_iceberg_auto_conversion`.
    * - ``version_legacy_float_columns``
      - ``false``
      - For MariaDB/MySQL or PostgreSQL taps writing to Snowflake, set ``true``
@@ -283,8 +294,9 @@ wait for the corresponding loads to finish before acknowledging their state.
    FastSync-capable taps require ``data_flattening_max_level: 0``. Singer-only
    sources retain their normal flattening setting, including Salesforce's
    default level ``10``.
-   Native remains the default, and PipelineWise does not convert an existing
-   table when the requested format conflicts. Every managed Iceberg version
+   Native remains the default. PipelineWise converts an existing native table
+   only when the tap enables ``native_to_iceberg_conversion``; otherwise a
+   conflicting format fails before mutation. Every managed Iceberg version
    other than v3 is rejected before mutation. See :ref:`snowflake_iceberg`.
 
    Managed Iceberg selection is tap-level. Target YAML rejects these keys and

@@ -1383,7 +1383,9 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
 
         with patch.object(
             pipelinewise, '_reset_state_file_for_partial_sync'
-        ) as reset_state, patch(
+        ) as reset_state, patch.object(
+            pipelinewise, '_check_fastsync_targets_are_iceberg'
+        ) as check_targets, patch(
             'pipelinewise.cli.pipelinewise.Process'
         ) as process:
             process.return_value.exception = None
@@ -1391,6 +1393,7 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
             pipelinewise.do_sync_tables()
 
         reset_state.assert_called_once()
+        check_targets.assert_called_once()
         assert process.call_count == 2
 
     @pytest.mark.parametrize(

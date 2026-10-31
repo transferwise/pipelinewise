@@ -31,6 +31,7 @@ class Config:
         'iceberg_version',
         'target_table_format',
     }
+    NATIVE_TO_ICEBERG_CONVERSION = 'native_to_iceberg_conversion'
 
     def __init__(self, config_dir):
         """
@@ -79,6 +80,7 @@ class Config:
                 os.path.join(yaml_dir, yaml_file), vault_secret
             )
             cls.validate_target_table_format_placement(target_data)
+            cls.validate_native_to_iceberg_conversion_placement(target_data, 'Target')
             cls.validate_snowflake_decimal_versioning_placement(target_data)
             cls.validate_snowflake_query_history_poll_timeout(target_data)
             utils.validate(instance=target_data, schema=target_schema)
@@ -105,6 +107,7 @@ class Config:
             config.logger.info('LOADING TAP: %s', yaml_file)
             tap_data = utils.load_yaml(os.path.join(yaml_dir, yaml_file), vault_secret)
             cls.validate_tap_table_format_placement(tap_data)
+            cls.validate_native_to_iceberg_conversion_placement(tap_data, 'Tap')
             cls._validate_tap_query_history_poll_timeout_placement(tap_data)
             utils.validate(instance=tap_data, schema=tap_schema)
 
@@ -126,6 +129,7 @@ class Config:
                 sys.exit(1)
 
             cls.validate_target_table_format(tap_data, targets[target_id])
+            cls.validate_native_to_iceberg_conversion(tap_data, targets[target_id])
             cls.validate_snowflake_decimal_versioning(tap_data, targets[target_id])
             cls.validate_source_transformations(tap_data, targets[target_id])
 
@@ -256,6 +260,7 @@ class Config:
                     'target_table_format',
                     'iceberg_version',
                     self.VERSION_LEGACY_FLOAT_COLUMNS_SETTING,
+                    self.NATIVE_TO_ICEBERG_CONVERSION,
                 ):
                     if key in tap:
                         tap_setting[key] = tap[key]
@@ -778,6 +783,69 @@ class Config:
             cls._validate_iceberg_tap_settings(tap, target)
 
     @classmethod
+    def validate_native_to_iceberg_conversion_placement(cls, connector: Dict, kind: str) -> None:
+        """Keep automatic conversion on the tap whose tables it converts, away from targets."""
+        if not isinstance(connector, dict):
+            return
+        setting = cls.NATIVE_TO_ICEBERG_CONVERSION
+        placements = []
+        if kind == 'Target' and setting in connector:
+            placements.append('target root')
+        connection = connector.get('db_conn')
+        if isinstance(connection, dict) and setting in connection:
+            placements.append(f'{kind.lower()} db_conn')
+        if placements:
+            raise InvalidConfigException(
+                f'{kind} "{connector.get("id")}" cannot set {setting} at '
+                f'{" or ".join(placements)}. Configure it at the root of each Iceberg tap.'
+            )
+
+    @classmethod
+    def validate_native_to_iceberg_conversion(cls, tap: Dict, target: Dict) -> None:
+        """Allow automatic conversion only where both writers accept the converted tables."""
+        setting = cls.NATIVE_TO_ICEBERG_CONVERSION
+        if setting not in tap:
+            return
+        conversion = tap[setting]
+        if (
+            not isinstance(conversion, dict)
+            or not isinstance(conversion.get('enabled'), bool)
+            or set(conversion) - {'enabled', 'warehouse'}
+        ):
+            raise InvalidConfigException(
+                f'Tap "{tap.get("id")}" {setting} must be an object with a Boolean '
+                '"enabled" and an optional "warehouse".'
+            )
+        warehouse = conversion.get('warehouse')
+        if 'warehouse' in conversion and (not isinstance(warehouse, str) or not warehouse.strip()):
+            raise InvalidConfigException(
+                f'Tap "{tap.get("id")}" {setting} warehouse must be a non-empty string.'
+            )
+        if not conversion['enabled']:
+            return
+        if (
+            target.get('type') != 'target-snowflake'
+            or tap.get('target_table_format') != cls.TABLE_FORMAT_ICEBERG
+        ):
+            raise InvalidConfigException(
+                f'Tap "{tap.get("id")}" enables {setting}, which requires '
+                'target_table_format "iceberg", iceberg_version 3, and a '
+                'target-snowflake target.'
+            )
+        if cls._effective_flattening_level(tap) != 0:
+            raise InvalidConfigException(
+                f'Tap "{tap.get("id")}" enables {setting}, which requires '
+                'data_flattening_max_level: 0.'
+            )
+
+    @staticmethod
+    def _effective_flattening_level(tap: Dict):
+        level = tap.get('data_flattening_max_level')
+        if level is None:
+            level = utils.get_tap_property(tap, 'default_data_flattening_max_level') or 0
+        return None if isinstance(level, bool) else level
+
+    @classmethod
     def _validate_iceberg_tap_settings(cls, tap: Dict, target: Dict) -> None:
         """Validate tap settings supported by explicit Singer and FastSync Iceberg routes."""
         capabilities = fastsync_capabilities.resolve_fastsync_capabilities(
@@ -788,12 +856,7 @@ class Config:
         if not capabilities.available:
             return
 
-        flattening_level = tap.get('data_flattening_max_level')
-        if flattening_level is None:
-            flattening_level = (
-                utils.get_tap_property(tap, 'default_data_flattening_max_level') or 0
-            )
-        if flattening_level != 0 or isinstance(flattening_level, bool):
+        if cls._effective_flattening_level(tap) != 0:
             raise InvalidConfigException(
                 f'Tap "{tap.get("id")}" must use data_flattening_max_level: 0 '
                 'with target_table_format "iceberg".'

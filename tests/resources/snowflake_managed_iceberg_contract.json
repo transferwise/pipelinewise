@@ -354,7 +354,39 @@
           false,
           null
         ]
-      }
+      },
+      "singer_text_variant_classes": [
+        {"schema": {"type": ["null", "object"], "properties": {}}, "expected_class": "VARIANT"},
+        {
+          "schema": {
+            "type": ["null", "object", "array", "string", "number", "boolean"],
+            "format": "mariadb-json"
+          },
+          "expected_class": "VARIANT"
+        },
+        {"schema": {"type": ["null", "array"], "items": {}}, "expected_class": "VARIANT"},
+        {"schema": {"type": "object"}, "expected_class": "VARIANT"},
+        {"schema": {"anyOf": [{"type": "array", "items": {}}, {"type": "null"}]}, "expected_class": "VARIANT"},
+        {"schema": {"oneOf": [{"type": "object"}, {"type": "string"}]}, "expected_class": "VARIANT"},
+        {"schema": {"type": ["null", "string"]}, "expected_class": "TEXT"},
+        {"schema": {"type": ["null", "integer", "string"]}, "expected_class": "TEXT"},
+        {"schema": {"anyOf": [{"type": "integer"}, {"type": "null"}]}, "expected_class": "TEXT"},
+        {"schema": {}, "expected_class": "TEXT"},
+        {"schema": {"type": ["null", "string"], "format": "date-time"}, "expected_class": null},
+        {"schema": {"type": ["null", "string"], "format": "binary"}, "expected_class": null},
+        {"schema": {"type": ["null", "integer"]}, "expected_class": null},
+        {"schema": {"type": ["null", "number"]}, "expected_class": null},
+        {"schema": {"type": ["null", "boolean"]}, "expected_class": null},
+        {"schema": {"type": ["null", "integer"], "format": "singer.year"}, "expected_class": null},
+        {
+          "schema": {
+            "type": ["null", "string"],
+            "format": "singer.decimal",
+            "decimal": {"precision": 10, "scale": 2}
+          },
+          "expected_class": null
+        }
+      ]
     }
   }
 }

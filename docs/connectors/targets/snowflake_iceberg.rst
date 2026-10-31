@@ -127,8 +127,9 @@ MariaDB, MySQL, and PostgreSQL taps require ``data_flattening_max_level: 0`` bec
 their initial load can use FastSync before handing the stream to Singer.
 Singer-only sources retain their normal flattening setting; for example,
 Salesforce's default level ``10`` is valid. A physical format mismatch fails
-before mutation. PipelineWise does not upgrade or automatically convert tables;
-use the manual command below during a controlled outage.
+before mutation. To move a tap's existing native tables to Iceberg, enable
+:ref:`automatic conversion <snowflake_iceberg_auto_conversion>` or use the
+manual command below during a controlled outage. Writers never convert tables.
 
 With flattening disabled, nested objects and arrays use ``VARIANT`` only with
 explicit v3 configuration. A Singer-only tap with a non-zero flattening level
@@ -341,6 +342,82 @@ that unchanged retry. If the result remains ambiguous, PipelineWise preserves
 the evidence and fails for operator inspection.
 
 
+.. _snowflake_iceberg_auto_conversion:
+
+Convert a tap's tables automatically
+------------------------------------
+
+To move a tap that already replicates into native tables:
+
+1. Run the :ref:`feasibility report <snowflake_iceberg_conversion_report>`
+   while the tap still replicates natively, and resolve the blockers it shows.
+2. Pause the tap's schedule. Set the Iceberg format, add the setting with
+   ``enabled: false``, and run ``import_config``. Run the report again: this
+   catalog is the one conversion uses, and MariaDB JSON aliases appear as
+   ``VARIANT`` only now. Keep the tap paused in this state, because both writers
+   refuse native tables under the Iceberg format.
+3. When the report is ready, set ``enabled: true``, run ``import_config``, and
+   resume the schedule.
+
+.. code-block:: yaml
+
+   target: "snowflake"
+   target_table_format: iceberg
+   iceberg_version: 3
+   native_to_iceberg_conversion:
+     enabled: true
+     warehouse: CONVERSION_WH  # optional; defaults to the target's warehouse
+
+Every ``run_tap`` for the tap then runs a conversion step inside the tap's
+pidfile, before FastSync or Singer writes anything:
+
+1. It plans each selected stream's Snowflake table and classifies them all with
+   one ``SHOW TABLES`` per schema and the target's recovery manifests.
+2. It resumes any pending ``--eventual iceberg`` conversion first, so an
+   interrupted cutover gets its table name back before any other check can stop
+   the run. A resumed attempt passes the same checks as a new one, including the
+   tap catalog's column classes, before its cutover.
+3. It stops if any table needs an operator, then preflights every native table
+   and stops before converting anything if any table is blocked. When several
+   streams write one table, every stream's blockers and column classes count,
+   and streams that disagree on a column's class block the table.
+4. It converts the native tables one at a time, smallest first, with the
+   same converter as ``copy_native_to_iceberg --eventual iceberg``.
+5. When it resumed or converted anything, it checks that every planned table is
+   now new or Iceberg with no pending manifest. Then replication starts.
+
+After the last table converts, each run costs one ``SHOW TABLES`` per schema,
+and runs with FastSync work list those schemas once more before FastSync starts.
+The setting accepts any tap that can write managed Iceberg v3 through
+``target-snowflake``. It requires ``data_flattening_max_level: 0``, because
+conversion compares native columns with the tap catalog's top-level properties.
+``warehouse`` runs only the conversion queries on another warehouse, which the
+target role must be able to use. It is not part of the recovery identity, so a
+manual ``copy_native_to_iceberg`` on the target's warehouse can resume an
+automatic attempt.
+
+Enabling the setting accepts the cutover gap described below: each table's name
+is briefly absent between its two renames, so readers of that table fail for
+that moment. A large table converts within the scheduled run and holds the tap
+for the copy; use the report's row and byte counts to pick when to enable it.
+
+If any table cannot convert, the run fails before replication starts, sends the
+tap's alert, and exits 1. It never falls back to native tables. Tables converted
+earlier in the run stay converted, each validated with its native backup kept
+as ``<table>_NATIVE``. The next ``run_tap`` resumes a pending conversion, so fix
+the cause and rerun; see :ref:`troubleshooting_iceberg_auto_conversion`. While
+the tap is stopped, its source keeps accumulating changes, so watch PostgreSQL
+WAL and MySQL binlog retention.
+
+.. warning::
+
+   Finish or recover every pending conversion before removing
+   ``native_to_iceberg_conversion`` or changing the tap's format. Without the
+   setting, ``run_tap`` does not resume a conversion, and a writer could create
+   an empty table under a primary name that an interrupted cutover left absent.
+   Once a table has converted, the tap cannot return to ``native``: the native
+   contract refuses Iceberg tables.
+
 Convert a native table
 ----------------------
 
@@ -355,8 +432,9 @@ using an imported Snowflake target:
      --eventual native \
      --iceberg-version 3
 
-``--eventual`` defaults to ``native``. The command has no tap argument and only
-accepts a table in the target's configured database.
+``--eventual`` defaults to ``native``. The command converts one table in the
+target's configured database. ``--tap`` is accepted only by the feasibility
+report below.
 
 .. list-table:: Conversion outcomes
    :header-rows: 1
@@ -374,7 +452,9 @@ accepts a table in the target's configured database.
      - Original ``<table>_NATIVE`` rollback point
 
 The ``_NATIVE`` and ``_ICEBERG`` suffixes are reserved. Rename independently
-managed objects with those names before conversion. The PipelineWise-owned
+managed objects with those names before conversion. Automatic conversion blocks a
+table whose companion name is another selected stream's table, or whose own name
+ends with ``_NATIVE`` or ``_ICEBERG`` while the base table exists. The PipelineWise-owned
 command is the only supported native-to-Iceberg converter; the old connector-local
 ``copy-native-to-iceberg`` executable has been removed.
 
@@ -387,6 +467,59 @@ command is the only supported native-to-Iceberg converter; the old connector-loc
    environment during deployment; a source-only update can leave a stale
    generated console wrapper that no longer has a Python implementation.
 
+
+.. _snowflake_iceberg_conversion_report:
+
+Conversion feasibility report
+-----------------------------
+
+Run ``copy_native_to_iceberg --preflight-only`` with ``--tap`` or ``--table``
+before converting anything. It takes no lock, writes no manifest, and runs no
+DDL, so it is safe to run beside the tap. Its read queries include one aggregate
+scan of each native table's time and timestamp columns. It uses the same table
+planning and checks as conversion. Each table gets one state:
+
+.. list-table:: Feasibility states
+   :header-rows: 1
+   :widths: 20 80
+   :width: 100%
+
+   * - State
+     - Meaning
+   * - ``new``
+     - The table does not exist; the writers create it as Iceberg.
+   * - ``iceberg``
+     - The table is already Iceberg; nothing to convert.
+   * - ``native``
+     - The table would be converted. Any preflight blockers are listed.
+   * - ``pending``
+     - An ``--eventual iceberg`` conversion manifest exists and would be resumed.
+       If the table is still native, its preflight blockers are listed.
+   * - ``blocked``
+     - The table needs an operator first, for example a leftover ``_NATIVE``
+       table, an ``_ICEBERG`` companion without a manifest, or unreadable
+       recovery state. A companion without a manifest may be stale: drop it, or
+       promote it with ``copy_native_to_iceberg --eventual iceberg`` while the
+       tap is stopped.
+
+For ``--tap``, PipelineWise derives each table name the way target-snowflake
+does, from the stream ID and the tap's schema mapping. For MariaDB, MySQL, and
+PostgreSQL taps it also derives the FastSync name, and blocks a stream whose two
+names differ. A native ``TEXT`` column that the tap catalog now maps to
+``VARIANT``, or the reverse, is a blocker because both Iceberg writers refuse
+that mismatch. MariaDB JSON aliases are discovered as ``VARIANT`` only after the
+tap is imported with its Iceberg settings, so the report is not ready until then;
+follow the order in :ref:`snowflake_iceberg_auto_conversion`. The report also
+requires ``data_flattening_max_level: 0``. ``--table`` checks one table against
+the catalogs of the imported taps that write it, but skips the tap-wide checks. A
+manual ``copy_native_to_iceberg`` conversion applies the same catalogs and
+refuses a ``TEXT``/``VARIANT`` mismatch before copying.
+
+For each table, the report lists the first metadata refusal, such as a policy or
+a stream, and every conversion blocker, such as a ``TIMESTAMP_TZ`` column or a
+grant that cannot be replayed. After fixing a metadata refusal, run the report
+again, because the next one may be hidden behind it. Row and byte counts come
+from ``SHOW TABLES`` and help estimate the copy time and warehouse cost.
 
 Conversion preflight and metadata
 ---------------------------------
@@ -410,12 +543,27 @@ column comments, explicit non-ownership grants to account roles and qualified
 database roles, grant options, and direct table tags. The current account role
 must own the native source; database-role ownership is not supported.
 
+Ownership, comments, and direct table tags must match exactly. Every native
+grant must also be present on the Iceberg table, so no reader loses access.
+Extra grants on the Iceberg table, for example from future grants or scheduled
+grant automation, are logged and accepted.
+
 Conversion fails before copying when the table has visible dependent streams,
 policies, direct column tags, secondary constraints, inbound foreign keys,
 defaults, identity columns, a clustering key, NULL primary-key values, or an
 unsupported Iceberg type. Account-wide stream inspection is limited to objects
-visible to the current role. Time and timestamp precision is normalized to
-microseconds. Snowflake ``VARIANT`` remains ``VARIANT``.
+visible to the current role. It also fails before copying when Iceberg v3
+cannot hold the data exactly or the grants cannot be replayed:
+
+* a ``TIMESTAMP_TZ`` column, because managed Iceberg stores ``TIMESTAMP_LTZ``
+  and would drop each value's offset;
+* a ``TIME``, ``TIMESTAMP_NTZ``, or ``TIMESTAMP_LTZ`` value with sub-microsecond
+  digits, because Iceberg columns hold microseconds. The command counts such
+  values with one aggregate scan and reports only the count;
+* a grant of a privilege that Iceberg tables do not accept, or a grant to
+  anything other than an account role or a qualified database role.
+
+Snowflake ``VARIANT`` remains ``VARIANT``.
 
 Writes during the copy or cutover can be absent from the Iceberg result. The
 local manifest lock does not replace the required external writer exclusion.
@@ -463,6 +611,8 @@ the Iceberg table settings and metadata:
    * - Columns and rows match, but the Iceberg table settings or metadata differ
      - PipelineWise records rollback intent, restores the native table name, and
        keeps the manifest. A retry cuts over again once the difference is fixed.
+       An extra grant on the promoted table is not a difference; a missing native
+       grant is.
    * - A connection or other unexpected error
      - The promoted table stays live and the manifest is kept. Retry the identical
        command to finish validation.

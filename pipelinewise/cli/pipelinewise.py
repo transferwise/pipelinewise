@@ -36,8 +36,8 @@ from .alert_sender import AlertSender
 from .alert_handlers.base_alert_handler import BaseAlertHandler
 from .errors import (
     InvalidTransformationException, DuplicateConfigException,
-    InvalidConfigException, PartialSyncNotSupportedTypeException,
-    PreRunChecksException
+    InvalidConfigException, NativeToIcebergConversionException,
+    PartialSyncNotSupportedTypeException, PreRunChecksException
 )
 
 from pipelinewise.fastsync.commons.tap_postgres import FastSyncTapPostgres
@@ -149,8 +149,10 @@ class PipelineWise:
 
         # Catch SIGINT and SIGTERM to exit gracefully
         if not is_data_diff_command:
+            # A feasibility report can run beside the tap, so it must never remove its pidfile.
             signal_handler = (
-                self.stop_tap if hasattr(self, 'tap')
+                self.stop_tap
+                if hasattr(self, 'tap') and args.command != 'copy_native_to_iceberg'
                 else self._stop_command_on_signal
             )
             for sig in [signal.SIGINT, signal.SIGTERM]:
@@ -1379,6 +1381,8 @@ class PipelineWise:
                     target_id=target_id,
                 )
 
+                self._convert_native_tables_to_iceberg(fastsync_stream_ids + singer_stream_ids)
+
                 # Run fastsync for FULL_TABLE replication method
                 if len(fastsync_stream_ids) > 0:
                     self.logger.info(
@@ -1440,6 +1444,11 @@ class PipelineWise:
             self.logger.exception(exc)
             self._print_tap_run_summary(self.STATUS_FAILED, start_time, datetime.now())
             self.send_alert(message=f'{tap_id} tap failed', exc=exc)
+            sys.exit(1)
+        except NativeToIcebergConversionException as exc:
+            self.logger.error('%s', exc)
+            self._print_tap_run_summary(self.STATUS_FAILED, start_time, datetime.now())
+            self.send_alert(message=f'{tap_id} tap failed: native-to-Iceberg conversion stopped', exc=exc)
             sys.exit(1)
         except Exception as exc:
             self._print_tap_run_summary(self.STATUS_FAILED, start_time, datetime.now())
@@ -1565,6 +1574,8 @@ class PipelineWise:
             self._check_target_table_format_supports_fastsync('partial_sync')
         if selected_tables['full_sync']:
             self._check_target_table_format_supports_fastsync('full_sync')
+        # A native target would be refused only after the slot reset and bookmark clearing.
+        self._check_fastsync_targets_are_iceberg(selected_tables)
 
         if reset_postgres_slot:
             tap_config, target_config = self._preflight_postgres_slot_reset(selected_tables)
@@ -1595,6 +1606,90 @@ class PipelineWise:
                 raise Exception(error)
             if process.exitcode != 0:
                 raise SystemExit(process.exitcode)
+
+    def _check_fastsync_targets_are_iceberg(self, selected_tables) -> None:
+        """Refuse an Iceberg FastSync before any source or state change while a target is native."""
+        if (
+            self.target['type'] != ConnectorType.TARGET_SNOWFLAKE.value
+            or self.tap.get('target_table_format') != Config.TABLE_FORMAT_ICEBERG
+        ):
+            return
+        source_tables = sorted(set(selected_tables['full_sync']) | set(selected_tables['partial_sync']))
+        self._run_in_child_process(self._assert_fastsync_targets_are_iceberg, source_tables)
+
+    def _assert_fastsync_targets_are_iceberg(self, source_tables) -> None:
+        from pipelinewise.cli import native_to_iceberg
+
+        native_to_iceberg.assert_fastsync_targets_ready(
+            self._iceberg_target_config(),
+            self.get_target_dir(self.target['id']),
+            source_tables,
+        )
+
+    def _convert_native_tables_to_iceberg(self, stream_ids) -> None:
+        """Convert the tap's native Snowflake tables before any writer runs, or stop the tap."""
+        from pipelinewise.cli import native_to_iceberg
+
+        conversion = self.tap.get(Config.NATIVE_TO_ICEBERG_CONVERSION) or {}
+        if conversion.get('enabled') is not True or not stream_ids:
+            return
+        self.logger.info('Checking %s selected streams for native Snowflake tables', len(stream_ids))
+        try:
+            self._run_in_child_process(
+                self._run_native_to_iceberg_conversion,
+                list(stream_ids),
+                conversion.get('warehouse'),
+            )
+        except ChildProcessError as exc:
+            raise NativeToIcebergConversionException(
+                f'Automatic native-to-Iceberg conversion stopped: {exc}. '
+                f'{native_to_iceberg.next_action(self.target["id"], self.tap["id"])}'
+            ) from exc
+
+    def _run_native_to_iceberg_conversion(self, stream_ids, warehouse) -> None:
+        from pipelinewise.cli import native_to_iceberg
+
+        target_config = self._iceberg_target_config()
+        catalog = self._load_required_json_object(self.tap['files']['properties'], 'tap catalog')
+        fastsync_capable = resolve_fastsync_capabilities(
+            self.tap['type'], self.target['type'], Config.TABLE_FORMAT_ICEBERG,
+        ).full_sync
+        native_to_iceberg.convert_tap_tables(
+            target_config,
+            self.get_target_dir(self.target['id']),
+            native_to_iceberg.tap_targets(catalog, target_config, fastsync_capable, stream_ids),
+            warehouse,
+            target_id=self.target['id'],
+            tap_id=self.tap['id'],
+        )
+
+    def _iceberg_target_config(self) -> Dict:
+        """Return the target config with the tap's inheritable overrides, like the writers see it."""
+        target_config = self._load_required_json_object(self.target['files']['config'], 'target configuration')
+        target_config.update(self._load_required_json_object(
+            self.tap['files']['inheritable_config'], 'tap inheritable configuration',
+        ))
+        return target_config
+
+    def _run_in_child_process(self, target, *args) -> None:
+        """Run Snowflake work in a child so later FastSync forks inherit no connector state."""
+        process = Process(target=self._run_with_command_signals, args=(target, *args))
+        process.start()
+        result = process.join_with_result()
+        if result:
+            error, traceback_text = result
+            self.logger.debug('Child process traceback:\n%s', traceback_text)
+            raise error
+        if process.exitcode != 0:
+            raise ChildProcessError(
+                f'The child process exited with status {process.exitcode} before reporting a result'
+            )
+
+    def _run_with_command_signals(self, target, *args) -> None:
+        # The inherited stop_tap handler would delete the pidfile that the parent still holds.
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            signal.signal(sig, self._stop_command_on_signal)
+        target(*args)
 
     def _preflight_postgres_slot_reset(self, selected_tables):
         """Validate every local reset dependency before changing source or state."""
@@ -2306,11 +2401,12 @@ class PipelineWise:
         print('Encryption successful')
 
     def copy_native_to_iceberg(self):
-        """Create or promote a managed Iceberg v3 copy of one native table."""
+        """Create or promote a managed Iceberg v3 copy of one native table, or report feasibility."""
         # Local imports avoid a cycle through FastSync state helpers and the CLI package.
 
+        from pipelinewise.cli import native_to_iceberg
         from pipelinewise.fastsync.commons.snowflake_iceberg import (
-            SnowflakeQueryAdapter,
+            SnowflakeConversionQueryAdapter,
         )
         from pipelinewise.fastsync.commons.snowflake_iceberg_converter import (
             SnowflakeNativeToIcebergConverter,
@@ -2322,14 +2418,71 @@ class PipelineWise:
             )
 
         target_config = utils.load_json(self.target['files']['config'])
+        if getattr(self.args, 'preflight_only', False):
+            print(self._native_to_iceberg_preflight(target_config))
+            return
+        # The writers refuse a TEXT/VARIANT change, so every imported tap's classes apply here too.
+        writer_types = native_to_iceberg.writer_types_for_table(
+            self.args.table, self._imported_tap_targets(target_config),
+        )
         converter = SnowflakeNativeToIcebergConverter(
-            SnowflakeQueryAdapter(target_config),
+            SnowflakeConversionQueryAdapter(target_config),
             runtime_dir=self.get_target_dir(self.target['id']),
         )
         converter.convert(
             self.args.table,
             eventual=self.args.eventual,
             iceberg_version=self.args.iceberg_version,
+            writer_types=writer_types,
+        )
+
+    def _imported_tap_targets(self, target_config: Dict) -> List:
+        """Plan the selected streams of every imported tap that writes to this target."""
+        from pipelinewise.cli import native_to_iceberg
+
+        targets = []
+        for tap in self.target.get('taps', []):
+            files = Config.get_connector_files(self.get_tap_dir(self.target['id'], tap['id']))
+            catalog = utils.load_json(files['properties'])
+            inheritable_config = utils.load_json(files['inheritable_config'])
+            if not isinstance(catalog, dict) or not isinstance(inheritable_config, dict):
+                continue  # a tap that was never imported writes nothing yet
+            fastsync_capable = resolve_fastsync_capabilities(
+                tap['type'], self.target['type'], Config.TABLE_FORMAT_ICEBERG,
+            ).full_sync
+            targets.extend(native_to_iceberg.tap_targets(
+                catalog, {**target_config, **inheritable_config}, fastsync_capable,
+            ))
+        return targets
+
+    def _native_to_iceberg_preflight(self, target_config: Dict) -> str:
+        """Render a read-only conversion report for one tap or one table."""
+        from pipelinewise.cli import native_to_iceberg
+
+        blockers = []
+        warehouse = None
+        if hasattr(self, 'tap'):
+            warehouse = (self.tap.get(Config.NATIVE_TO_ICEBERG_CONVERSION) or {}).get('warehouse')
+            target_config = self._iceberg_target_config()
+            catalog = utils.load_json(self.tap['files']['properties'])
+            self._validate_tap_catalog(catalog, self.tap['files']['properties'])
+            fastsync_capable = resolve_fastsync_capabilities(
+                self.tap['type'], self.target['type'], Config.TABLE_FORMAT_ICEBERG,
+            ).full_sync
+            targets = native_to_iceberg.tap_targets(catalog, target_config, fastsync_capable)
+            blockers = native_to_iceberg.tap_blockers(target_config)
+        else:
+            targets = native_to_iceberg.table_targets(
+                self.args.table, self._imported_tap_targets(target_config),
+            )
+        reports = native_to_iceberg.preflight_report(
+            target_config,
+            self.get_target_dir(self.target['id']),
+            targets,
+            warehouse,
+        )
+        return native_to_iceberg.render_preflight_report(
+            reports, blockers, self.args.output_format,
         )
 
     def partial_sync_table(self):

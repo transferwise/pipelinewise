@@ -52,6 +52,8 @@ run_e2e \
 
 run_e2e \
   tests/end_to_end/target_snowflake/test_native_to_iceberg_converter.py \
+  tests/end_to_end/target_snowflake/tap_postgres/test_auto_native_to_iceberg_pg_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_mongodb/test_auto_native_to_iceberg_mongodb_to_sf.py \
   tests/end_to_end/data_diff/test_mysql_to_snowflake.py
 
 run_e2e \

@@ -7,7 +7,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from target_snowflake import db_sync, managed_iceberg
+from target_snowflake import db_sync, flattening, managed_iceberg
 from target_snowflake.exceptions import (
     TableFormatDiscoveryException,
     TableFormatMismatchException,
@@ -309,6 +309,27 @@ def test_connector_emits_shared_create_and_add_column_cases():
         assert tuple(value.upper() for value in change_plan.additions) == (
             case['expected_definition'],
         )
+
+
+def test_connector_matches_shared_text_variant_classes():
+    for case in _v3_behavior_cases()['singer_text_variant_classes']:
+        flattened = flattening.flatten_schema(
+            {'properties': {'VALUE': case['schema']}},
+            max_level=0,
+        )
+        physical_type = managed_iceberg.column_type(
+            flattened['VALUE'],
+            is_iceberg_table=True,
+            iceberg_version=3,
+        ).upper()
+        if physical_type == 'VARIANT':
+            column_class = 'VARIANT'
+        elif physical_type.startswith('VARCHAR'):
+            column_class = 'TEXT'
+        else:
+            column_class = None
+
+        assert column_class == case['expected_class'], case
 
 
 def test_connector_executes_shared_mariadb_json_transport_case():
