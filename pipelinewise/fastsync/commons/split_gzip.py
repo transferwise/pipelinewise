@@ -155,6 +155,7 @@ class SplitGzipFile(io.BufferedIOBase):
         Args:
             _bytes: Bytes to write
         """
+        self._checkClosed()
         self._activate_chunk_file()
 
         self.chunk_file.write(_bytes)
@@ -163,15 +164,17 @@ class SplitGzipFile(io.BufferedIOBase):
         )
 
     def close(self):
-        """
-        Close the active chunk file
-        """
-        if self.chunk_file is None:
+        """Close the wrapper and its active chunk file."""
+        if self.closed:
             return
-        self.chunk_file.close()
+        try:
+            super().close()
+        finally:
+            if self.chunk_file is not None:
+                self.chunk_file.close()
 
     def flush(self):
-        """
-        Flush the active chunk write buffers
-        """
-        self.chunk_file.flush()
+        """Flush the active chunk write buffers."""
+        self._checkClosed()
+        if self.chunk_file is not None:
+            self.chunk_file.flush()
