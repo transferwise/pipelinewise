@@ -1,4 +1,4 @@
-0.99.0 (2026-10-30)
+0.99.0 (2026-10-31)
 -------------------
 
 - Add opt-in automatic native-to-Iceberg conversion. With
@@ -8,16 +8,20 @@
   converts one table at a time, smallest first, and stops the tap with an alert
   if any table cannot convert; it never replicates into native tables. An
   optional `warehouse` runs only the conversion queries on another warehouse. See
-  [automatic conversion](docs/connectors/targets/snowflake_iceberg.rst#convert-a-taps-tables-automatically)
+  [automatic conversion](docs/connectors/targets/snowflake_iceberg.rst#snowflake-iceberg-auto-conversion)
 - Add `copy_native_to_iceberg --preflight-only` with `--tap` or `--table`. It
   reports each table's state, size, and conversion blockers without taking a
   lock, writing a manifest, or running DDL. With `--output-format json`, stdout
   carries only the report and log lines go to stderr. See
-  [feasibility report](docs/connectors/targets/snowflake_iceberg.rst#conversion-feasibility-report)
+  [feasibility report](docs/connectors/targets/snowflake_iceberg.rst#snowflake-iceberg-conversion-report)
 - Refuse a conversion before copying when Iceberg v3 cannot hold the data
   exactly: `TIMESTAMP_TZ` columns, and time or timestamp values with
   sub-microsecond digits. Before this fix, the copy truncated them and still
-  passed validation. Also refuse grants that an Iceberg table cannot carry.
+  passed validation. Also refuse grants that an Iceberg table cannot carry, and a
+  `TEXT`/`VARIANT` column that an imported tap writing the table now maps to the
+  other class. A pending `--eventual iceberg` attempt from an earlier release is
+  checked again before its cutover and can be refused; see
+  [conversion stopped](docs/user_guide/troubleshooting.rst#troubleshooting-iceberg-auto-conversion)
 - Accept extra grants on the converted Iceberg table, for example from scheduled
   grant automation, instead of failing the copy or rolling back a promoted table.
   Every native grant must still be present.

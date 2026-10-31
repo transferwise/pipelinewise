@@ -93,9 +93,19 @@ def tap_targets(
     return plan_conversion_targets(catalog, target_config, stream_ids, fastsync_capable)
 
 
-def table_target(fqtn: str) -> ConversionTarget:
-    """Plan one explicitly named table without a tap catalog."""
-    return ConversionTarget('', SnowflakeObjectName.parse(fqtn))
+def table_targets(fqtn: str, imported: Sequence[ConversionTarget]) -> List[ConversionTarget]:
+    """Plan one named table as the imported streams that write it, or bare without a catalog."""
+    table = SnowflakeObjectName.parse(fqtn)
+    return [target for target in imported if target.table == table] or [ConversionTarget('', table)]
+
+
+def writer_types_for_table(fqtn: str, imported: Sequence[ConversionTarget]) -> Dict[str, str]:
+    """Return the TEXT/VARIANT classes every imported stream writing one table expects."""
+    table = SnowflakeObjectName.parse(fqtn)
+    merged, conflicts = _merge_writer_types([target for target in imported if target.table == table])
+    if conflicts.get(table.key):
+        raise PreRunChecksException(f'Cannot convert {table.key}: ' + '; '.join(conflicts[table.key]))
+    return merged.get(table.key, {})
 
 
 def tap_blockers(target_config: Mapping[str, Any]) -> List[str]:
@@ -132,24 +142,24 @@ def classify(
 
 
 def _merge_writer_types(
-    classified: Sequence[ClassifiedTarget],
+    targets: Sequence[ConversionTarget],
 ) -> Tuple[Dict[str, Dict[str, str]], Dict[str, List[str]]]:
     """Combine the column classes of every stream writing a table, and their conflicts."""
     merged: Dict[str, Dict[str, str]] = {}
     sources: Dict[Tuple[str, str], str] = {}
     conflicts: Dict[str, List[str]] = {}
-    for item in classified:
-        if item.target.table is None:
+    for target in targets:
+        if target.table is None:
             continue
-        key = item.target.table.key
+        key = target.table.key
         columns = merged.setdefault(key, {})
-        for column, column_class in item.target.writer_types.items():
+        for column, column_class in target.writer_types.items():
             expected = columns.setdefault(column, column_class)
-            sources.setdefault((key, column), item.target.stream_id)
+            sources.setdefault((key, column), target.stream_id)
             if expected != column_class:
                 conflicts.setdefault(key, []).append(
                     f'Column {column} is {expected} for stream {sources[(key, column)]} but '
-                    f'{column_class} for stream {item.target.stream_id}'
+                    f'{column_class} for stream {target.stream_id}'
                 )
     return merged, conflicts
 
@@ -176,7 +186,7 @@ def preflight_report(
     converter = SnowflakeNativeToIcebergConverter(snowflake, runtime_dir)
     reports = []
     classified = classify(targets, snowflake, runtime_dir)
-    writer_types, conflicts = _merge_writer_types(classified)
+    writer_types, conflicts = _merge_writer_types([item.target for item in classified])
     for item in classified:
         key = item.target.table.key if item.target.table else None
         blockers = tuple(item.reasons) + tuple(conflicts.get(key, ()))
@@ -259,7 +269,7 @@ def _convert_tap_tables(
     converter = SnowflakeNativeToIcebergConverter(snowflake, runtime_dir)
     classified = classify(targets, snowflake, runtime_dir)
     # Every stream's blockers and column classes count; only physical work is de-duplicated.
-    writer_types, conflicts = _merge_writer_types(classified)
+    writer_types, conflicts = _merge_writer_types([item.target for item in classified])
     unique = _unique_tables(classified)
     pending = [
         item for item in unique

@@ -452,7 +452,9 @@ report below.
      - Original ``<table>_NATIVE`` rollback point
 
 The ``_NATIVE`` and ``_ICEBERG`` suffixes are reserved. Rename independently
-managed objects with those names before conversion. The PipelineWise-owned
+managed objects with those names before conversion. Automatic conversion blocks a
+table whose companion name is another selected stream's table, or whose own name
+ends with ``_NATIVE`` or ``_ICEBERG`` while the base table exists. The PipelineWise-owned
 command is the only supported native-to-Iceberg converter; the old connector-local
 ``copy-native-to-iceberg`` executable has been removed.
 
@@ -508,9 +510,10 @@ names differ. A native ``TEXT`` column that the tap catalog now maps to
 that mismatch. MariaDB JSON aliases are discovered as ``VARIANT`` only after the
 tap is imported with its Iceberg settings, so the report is not ready until then;
 follow the order in :ref:`snowflake_iceberg_auto_conversion`. The report also
-requires ``data_flattening_max_level: 0``. ``--table`` checks one table without
-a tap catalog, so it skips the ``TEXT``/``VARIANT`` comparison and the tap-wide
-checks.
+requires ``data_flattening_max_level: 0``. ``--table`` checks one table against
+the catalogs of the imported taps that write it, but skips the tap-wide checks. A
+manual ``copy_native_to_iceberg`` conversion applies the same catalogs and
+refuses a ``TEXT``/``VARIANT`` mismatch before copying.
 
 For each table, the report lists the first metadata refusal, such as a policy or
 a stream, and every conversion blocker, such as a ``TIMESTAMP_TZ`` column or a

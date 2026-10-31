@@ -13,12 +13,17 @@ from pipelinewise.fastsync.commons.snowflake_iceberg_inspection import (
     SHOW_COMMAND_ROW_LIMIT,
     SnowflakeTableInspector,
 )
-from pipelinewise.fastsync.commons.snowflake_iceberg_model import SnowflakeObjectName
+from pipelinewise.fastsync.commons.snowflake_iceberg_model import (
+    IcebergColumn,
+    IcebergTableSpec,
+    SnowflakeObjectName,
+)
 from pipelinewise.fastsync.commons.snowflake_iceberg_recovery import (
     TableFormatDiscoveryError,
 )
 from tests.units.fastsync.commons.snowflake_iceberg_test_helpers import (
     FakeSnowflake as ScriptedSnowflake,
+    make_attempt,
 )
 from tests.units.fastsync.commons.test_snowflake_iceberg_converter import (
     FakeSnowflake,
@@ -311,3 +316,69 @@ def test_peek_reads_recovery_state_without_a_lock(tmp_path):
     assert manifest.kind == 'manual_conversion'
     assert pointer is None
     assert not list(tmp_path.glob('*.lock'))
+
+
+def test_companion_names_of_planned_tables_block_conversion(tmp_path):
+    """Two streams whose tables are T and T_NATIVE can never convert into each other."""
+    _, classified = _classify(
+        tmp_path,
+        [_target('ADS'), _target('ADS_NATIVE')],
+        [_row('ADS'), _row('ADS_NATIVE')],
+    )
+
+    assert [item.state for item in classified] == [plan.STATE_BLOCKED, plan.STATE_BLOCKED]
+    assert classified[0].reasons[0].startswith(
+        '"DATABASE"."SCHEMA"."ADS_NATIVE" is the table of stream public-ads_native'
+    )
+    assert classified[1].reasons[0].startswith(
+        '"DATABASE"."SCHEMA"."ADS_NATIVE" uses the _NATIVE name that conversion reserves'
+    )
+
+
+def test_a_retained_backup_selected_later_is_never_converted(tmp_path):
+    """A new stream that maps onto another table's native backup is blocked, not converted."""
+    _, classified = _classify(
+        tmp_path,
+        [_target('ADS_NATIVE')],
+        [_row('ADS', is_iceberg=True), _row('ADS_NATIVE')],
+    )
+
+    assert classified[0].state == plan.STATE_BLOCKED
+    assert 'reserves for "DATABASE"."SCHEMA"."ADS"' in classified[0].reasons[0]
+
+
+def test_a_native_iceberg_named_table_is_never_called_stale(tmp_path):
+    """A native table at the _ICEBERG name is not a conversion copy, so it is never dropped."""
+    _, classified = _classify(tmp_path, [_target('EVENTS')], [_row('EVENTS'), _row('EVENTS_ICEBERG')])
+
+    assert classified[0].state == plan.STATE_BLOCKED
+    assert classified[0].reasons == (
+        '"DATABASE"."SCHEMA"."EVENTS_ICEBERG" is a native table, and conversion needs that name '
+        'for its Iceberg copy. Find out what it holds before renaming it',
+    )
+
+
+@pytest.mark.parametrize(
+    ('listing', 'expected'),
+    [([_row('TABLE', is_iceberg=True)], plan.STATE_ICEBERG), ([], plan.STATE_NEW)],
+)
+@pytest.mark.parametrize('fastsync_rebuild', [True, False])
+def test_interrupted_fastsync_publication_can_resume(tmp_path, listing, expected, fastsync_rebuild):
+    """A FastSync pointer beside a missing or Iceberg primary never blocks its own resume."""
+    spec = IcebergTableSpec(
+        SnowflakeObjectName('DATABASE', 'SCHEMA', 'TABLE'),
+        (IcebergColumn('ID', 'NUMBER(38,0)', False),),
+        ('ID',),
+    )
+    RecoveryCoordinator(str(tmp_path)).persist_new_attempt(make_attempt(spec))
+    store = RecoveryCoordinator(str(tmp_path)).recovery_store(spec.name)
+    assert store.peek()[1] is not None
+
+    classified = plan.classify_conversion_targets(
+        [_target('TABLE')],
+        SnowflakeTableInspector(ScriptedSnowflake([listing])),
+        RecoveryCoordinator(str(tmp_path)),
+        fastsync_rebuild=fastsync_rebuild,
+    )
+
+    assert classified[0].state == expected

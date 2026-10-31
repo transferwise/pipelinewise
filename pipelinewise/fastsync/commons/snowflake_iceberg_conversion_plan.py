@@ -1,6 +1,6 @@
 """Plan and classify a tap's Snowflake tables for native-to-Iceberg conversion."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from singer.decimal_support import is_decimal_schema
@@ -307,8 +307,14 @@ def _classify(
     if backup != _MISSING:
         return classified(
             STATE_BLOCKED,
-            f'{table.with_suffix("_NATIVE").quoted} already exists; rename or drop it '
-            'before converting',
+            f'{table.with_suffix("_NATIVE").quoted} already exists, and conversion needs that '
+            'name for the native backup. Find out what it holds before renaming or dropping it',
+        )
+    if staging == STATE_NATIVE:
+        return classified(
+            STATE_BLOCKED,
+            f'{table.with_suffix("_ICEBERG").quoted} is a native table, and conversion needs '
+            'that name for its Iceberg copy. Find out what it holds before renaming it',
         )
     if staging != _MISSING:
         return classified(
@@ -320,6 +326,32 @@ def _classify(
     return classified(STATE_NATIVE)
 
 
+def _companion_collision(
+    target: ConversionTarget,
+    planned: Mapping[str, ConversionTarget],
+    rows: Mapping[str, Mapping[str, Any]],
+) -> Optional[str]:
+    """Return why a table's reserved companion names collide with another table."""
+    table = target.table
+    for suffix in ('_ICEBERG', '_NATIVE'):
+        companion = planned.get(table.with_suffix(suffix).key)
+        if companion is not None:
+            return (
+                f'{table.with_suffix(suffix).quoted} is the table of stream {companion.stream_id}, '
+                f'so it cannot hold the conversion companion of {table.quoted}; change one '
+                "stream's schema mapping or deselect it"
+            )
+    for suffix in ('_ICEBERG', '_NATIVE'):
+        if table.table.endswith(suffix) and len(table.table) > len(suffix):
+            base = table.with_table(table.table[:-len(suffix)])
+            if base.key in planned or base.table in rows:
+                return (
+                    f'{table.quoted} uses the {suffix} name that conversion reserves for '
+                    f"{base.quoted}; change the stream's schema mapping or deselect it"
+                )
+    return None
+
+
 def classify_conversion_targets(
     targets: Sequence[ConversionTarget],
     inspector: SnowflakeTableInspector,
@@ -329,6 +361,7 @@ def classify_conversion_targets(
     """Classify planned tables with one SHOW TABLES per schema and lock-free manifest reads."""
     listings = {}
     classified = []
+    planned = {target.table.key: target for target in targets if target.table is not None}
     for target in targets:
         if target.blockers:
             classified.append(ClassifiedTarget(target, STATE_BLOCKED, target.blockers))
@@ -345,5 +378,11 @@ def classify_conversion_targets(
                     f'Snowflake lists too many tables starting with {target.table.quoted} '
                     'to classify it safely'
                 )
-        classified.append(_classify(target, rows, coordinator, fastsync_rebuild))
+        item = _classify(target, rows, coordinator, fastsync_rebuild)
+        if not fastsync_rebuild and item.state in (STATE_NATIVE, STATE_PENDING, STATE_BLOCKED):
+            # Conversion renames into the reserved names, so they must not be another table's.
+            collision = _companion_collision(target, planned, rows)
+            if collision is not None:
+                item = replace(item, state=STATE_BLOCKED, reasons=(collision, *item.reasons))
+        classified.append(item)
     return classified

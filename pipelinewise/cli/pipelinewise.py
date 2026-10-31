@@ -2404,6 +2404,7 @@ class PipelineWise:
         """Create or promote a managed Iceberg v3 copy of one native table, or report feasibility."""
         # Local imports avoid a cycle through FastSync state helpers and the CLI package.
 
+        from pipelinewise.cli import native_to_iceberg
         from pipelinewise.fastsync.commons.snowflake_iceberg import (
             SnowflakeConversionQueryAdapter,
         )
@@ -2420,6 +2421,10 @@ class PipelineWise:
         if getattr(self.args, 'preflight_only', False):
             print(self._native_to_iceberg_preflight(target_config))
             return
+        # The writers refuse a TEXT/VARIANT change, so every imported tap's classes apply here too.
+        writer_types = native_to_iceberg.writer_types_for_table(
+            self.args.table, self._imported_tap_targets(target_config),
+        )
         converter = SnowflakeNativeToIcebergConverter(
             SnowflakeConversionQueryAdapter(target_config),
             runtime_dir=self.get_target_dir(self.target['id']),
@@ -2428,7 +2433,27 @@ class PipelineWise:
             self.args.table,
             eventual=self.args.eventual,
             iceberg_version=self.args.iceberg_version,
+            writer_types=writer_types,
         )
+
+    def _imported_tap_targets(self, target_config: Dict) -> List:
+        """Plan the selected streams of every imported tap that writes to this target."""
+        from pipelinewise.cli import native_to_iceberg
+
+        targets = []
+        for tap in self.target.get('taps', []):
+            files = Config.get_connector_files(self.get_tap_dir(self.target['id'], tap['id']))
+            catalog = utils.load_json(files['properties'])
+            inheritable_config = utils.load_json(files['inheritable_config'])
+            if not isinstance(catalog, dict) or not isinstance(inheritable_config, dict):
+                continue  # a tap that was never imported writes nothing yet
+            fastsync_capable = resolve_fastsync_capabilities(
+                tap['type'], self.target['type'], Config.TABLE_FORMAT_ICEBERG,
+            ).full_sync
+            targets.extend(native_to_iceberg.tap_targets(
+                catalog, {**target_config, **inheritable_config}, fastsync_capable,
+            ))
+        return targets
 
     def _native_to_iceberg_preflight(self, target_config: Dict) -> str:
         """Render a read-only conversion report for one tap or one table."""
@@ -2447,7 +2472,9 @@ class PipelineWise:
             targets = native_to_iceberg.tap_targets(catalog, target_config, fastsync_capable)
             blockers = native_to_iceberg.tap_blockers(target_config)
         else:
-            targets = [native_to_iceberg.table_target(self.args.table)]
+            targets = native_to_iceberg.table_targets(
+                self.args.table, self._imported_tap_targets(target_config),
+            )
         reports = native_to_iceberg.preflight_report(
             target_config,
             self.get_target_dir(self.target['id']),

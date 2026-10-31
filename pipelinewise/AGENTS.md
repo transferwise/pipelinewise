@@ -178,6 +178,8 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
   physical work, never another stream's blockers. Never call `convert()` for a
   table classified `iceberg` without a manifest; resume every pending
   `eventual=iceberg` manifest whatever the primary's format. Block a native
-  primary with an unmanifested `_ICEBERG` companion. `--preflight-only` takes no
+  primary with an unmanifested `_ICEBERG` companion, and any table whose reserved
+  companion names collide with another planned or existing table. Manual
+  conversion applies the classes of every imported tap writing the table. `--preflight-only` takes no
   lock, manifest, or DDL. `fast_sync` never converts and refuses native targets
   before a slot reset; it may rebuild a missing primary beside leftover companions.

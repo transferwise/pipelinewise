@@ -364,8 +364,8 @@ Check feasibility first with ``--preflight-only``:
 
 The report changes nothing. It takes no lock, writes no manifest, and runs no
 DDL, so it can run beside the tap. ``--tap`` reports every table that the tap's
-selected streams write; ``--table`` reports one table without the tap's catalog
-checks. Each row shows the table's state, the action conversion would take,
+selected streams write; ``--table`` reports one table, checked against the
+catalogs of the imported taps that write it. Each row shows the table's state, the action conversion would take,
 Snowflake's row and byte counts, the first metadata refusal, and every
 conversion blocker. ``--output-format json`` prints only the report on stdout,
 with a top-level ``ready`` flag; log messages go to stderr. The command exits 0
