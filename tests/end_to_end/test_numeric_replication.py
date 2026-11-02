@@ -11,12 +11,17 @@ from uuid import uuid4
 import pytest
 
 from pipelinewise.cli.config import Config
-from pipelinewise.fastsync import mysql_to_postgres, mysql_to_snowflake, postgres_to_postgres, postgres_to_snowflake
+from pipelinewise.fastsync import (
+    mysql_to_postgres, mysql_to_snowflake, postgres_to_postgres, postgres_to_snowflake, yugabyte_to_postgres,
+    yugabyte_to_snowflake,
+)
 from pipelinewise.fastsync.commons.target_postgres import FastSyncTargetPostgres
 from pipelinewise.fastsync.commons.target_snowflake import FastSyncTargetSnowflake
 from pipelinewise.fastsync.commons.source_numeric import postgres_float_expression
 from pipelinewise.fastsync.partialsync import mysql_to_snowflake as partial_mysql
 from pipelinewise.fastsync.partialsync import postgres_to_snowflake as partial_postgres
+from pipelinewise.fastsync.partialsync import yugabyte_to_snowflake as partial_yugabyte
+from tests.end_to_end.target_snowflake.test_source_transformation_exports import SOURCE_MODES
 from tests.end_to_end.target_snowflake.test_source_transformation_exports import source_export as source_export
 from tests.end_to_end.target_snowflake.test_source_transformation_publication import (
     _connector_python, _remove_s3_prefix, _target_config,
@@ -25,6 +30,9 @@ from tests.end_to_end.target_snowflake.test_source_transformation_publication im
 
 EXACT = '12345678901234567890.123456789012345678'
 NEXT = '98765432109876543210.987654321098765432'
+SNOWFLAKE_FULL = {'postgres': postgres_to_snowflake, 'yugabyte': yugabyte_to_snowflake}
+SNOWFLAKE_PARTIAL = {'postgres': partial_postgres, 'yugabyte': partial_yugabyte}
+POSTGRES_FULL = {'postgres': postgres_to_postgres, 'yugabyte': yugabyte_to_postgres}
 
 
 @pytest.mark.parametrize('source_export', [('postgres', False)], indirect=True)
@@ -70,10 +78,10 @@ def _args(source, config, tmp_path, namespace, replication_key='amount'):
 
 def _tap_extract(source, target_type, args, *, dimensions=(38, 18), start=EXACT, end=NEXT):
     """Discover and run the installed SQL tap from FastSync's saved bookmark."""
-    tap_type = 'tap-postgres' if source.engine == 'postgres' else 'tap-mysql'
+    tap_type = {'postgres': 'tap-postgres', 'yugabyte': 'tap-yugabyte'}.get(source.engine, 'tap-mysql')
     tap = {'type': tap_type, 'db_conn': source.source.connection_config}
     config = Config.generate_tap_connection_config(tap, {}, f'target-{target_type}')
-    config['filter_schemas' if source.engine == 'postgres' else 'filter_dbs'] = source.schema
+    config['filter_schemas' if source.postgres_dialect else 'filter_dbs'] = source.schema
     assert config['decimal_target'] == target_type
     config_path = Path(args.state).with_name('tap_config.json')
     catalog_path = Path(args.state).with_name('tap_catalog.json')
@@ -146,6 +154,10 @@ persist_lines(payload['config'], payload['lines'])
     })
 
 
+@pytest.mark.parametrize(
+    'source_export', [*SOURCE_MODES, ('yugabyte', False)], indirect=True,
+    ids=lambda mode: f'{mode[0]}-{"v3" if mode[1] else "native"}',
+)
 def test_decimal_fastsync_snowflake(source_export, tmp_path):
     """Native/v3 FullSync, PartialSync versioning and Singer keep all 38 digits."""
     source = source_export
@@ -159,8 +171,8 @@ def test_decimal_fastsync_snowflake(source_export, tmp_path):
         ('id', 'INTEGER PRIMARY KEY'), ('amount', 'NUMERIC(18,2)'), ('exact_amount', 'NUMERIC(38,18)'),
     ], [(1, '12.34', '1.000000000000000001'), (2, '56.78', EXACT)])
     args = _args(source, config, tmp_path, namespace, replication_key='exact_amount')
-    full = postgres_to_snowflake if source.engine == 'postgres' else mysql_to_snowflake
-    partial = partial_postgres if source.engine == 'postgres' else partial_mysql
+    full = SNOWFLAKE_FULL.get(source.engine, mysql_to_snowflake)
+    partial = SNOWFLAKE_PARTIAL.get(source.engine, partial_mysql)
     table = f'"{schema}"."{source.table_name.upper()}"'
     try:
         result = full.sync_table(source.table, args)
@@ -168,7 +180,7 @@ def test_decimal_fastsync_snowflake(source_export, tmp_path):
         assert Decimal(target.query(
             f'SELECT TO_VARCHAR("EXACT_AMOUNT") AS AMOUNT FROM {table} WHERE "ID" = 2',
         )[0]['AMOUNT']) == Decimal(EXACT)
-        alter = 'ALTER COLUMN amount TYPE' if source.engine == 'postgres' else 'MODIFY COLUMN amount'
+        alter = 'ALTER COLUMN amount TYPE' if source.postgres_dialect else 'MODIFY COLUMN amount'
         source.execute(f'ALTER TABLE {source.quoted_table} {alter} NUMERIC(38,18)')
         source.execute(f'UPDATE {source.quoted_table} SET amount = %s WHERE id = 2', (EXACT,))
         source.execute(f'INSERT INTO {source.quoted_table} VALUES (%s,%s,%s)', (3, NEXT, NEXT))
@@ -222,8 +234,8 @@ def test_legacy_decimal_float_migration_requires_opt_in(source_export, tmp_path)
         [(1, '12.34', 1), (2, '56.78', 2)],
     )
     args = _args(source, config, tmp_path, namespace, replication_key='position')
-    full = postgres_to_snowflake if source.engine == 'postgres' else mysql_to_snowflake
-    partial = partial_postgres if source.engine == 'postgres' else partial_mysql
+    full = SNOWFLAKE_FULL.get(source.engine, mysql_to_snowflake)
+    partial = SNOWFLAKE_PARTIAL.get(source.engine, partial_mysql)
     table = f'"{schema}"."{source.table_name.upper()}"'
     request = (source.table, {
         'column': 'position', 'start_value': '<S>1', 'end_value': '<S>2', 'drop_target_table': False,
@@ -243,7 +255,7 @@ def test_legacy_decimal_float_migration_requires_opt_in(source_export, tmp_path)
         assert columns[0]['COLUMN_NAME'] == 'AMOUNT'
         assert columns[0]['DATA_TYPE'] == 'FLOAT'
 
-        alter = 'ALTER COLUMN amount TYPE' if source.engine == 'postgres' else 'MODIFY COLUMN amount'
+        alter = 'ALTER COLUMN amount TYPE' if source.postgres_dialect else 'MODIFY COLUMN amount'
         source.execute(f'ALTER TABLE {source.quoted_table} {alter} DECIMAL(18,2)')
         result = partial.partial_sync_table(request, args)
         assert result is True, result
@@ -326,6 +338,62 @@ def test_postgres_bounded_numeric_key_snowflake(source_export, tmp_path):
 
         _delete_from_singer(config, source, messages, 'NaN', key_column='id')
         assert_rows({'1': (202, 4)})
+    finally:
+        try:
+            target.query(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
+        finally:
+            _remove_s3_prefix(target, config['s3_key_prefix'])
+
+
+@pytest.mark.parametrize('source_export', [('yugabyte', False)], indirect=True)
+def test_yugabyte_bounded_numeric_key_snowflake(source_export, tmp_path):
+    """Keep YSQL numeric keys exact and NUMERIC through bulk, partial and Singer loads."""
+    source = source_export
+    namespace = f'ppw_decimal_key_{uuid4().hex[:12]}'
+    schema = namespace.upper()
+    config = {**_target_config(schema, namespace), 'archive_load_files': False}
+    target = FastSyncTargetSnowflake(config)
+    # The keys differ only past float precision, so any float round-trip collapses them.
+    first, second = '12345678901234567891', '12345678901234567892'
+    source.create([
+        ('id', 'NUMERIC(20,0) PRIMARY KEY'), ('amount', 'INTEGER'), ('position', 'INTEGER'),
+    ], [(first, 10, 1), (second, 20, 2)])
+    args = _args(source, config, tmp_path, namespace, replication_key='position')
+    table = f'"{schema}"."{source.table_name.upper()}"'
+
+    def assert_rows(expected):
+        rows = target.query(f'SELECT TO_VARCHAR("ID") AS ID, "AMOUNT", "POSITION" FROM {table}')
+        assert len(rows) == len(expected)
+        assert {row['ID']: (row['AMOUNT'], row['POSITION']) for row in rows} == expected
+
+    try:
+        result = yugabyte_to_snowflake.sync_table(source.table, args)
+        assert result is True, result
+        assert_rows({first: (10, 1), second: (20, 2)})
+        original_columns = _fallback_columns(target, schema, source.table_name)
+        assert next(column for column in original_columns if column['COLUMN_NAME'] == 'ID') == {
+            'COLUMN_NAME': 'ID', 'DATA_TYPE': 'NUMBER', 'NUMERIC_PRECISION': 20, 'NUMERIC_SCALE': 0,
+        }
+
+        request = (source.table, {
+            'column': 'position', 'start_value': '<S>1', 'end_value': '<S>2', 'drop_target_table': False,
+        })
+        for _ in range(2):
+            result = partial_yugabyte.partial_sync_table(request, args)
+            assert result is True, result
+            assert_rows({first: (10, 1), second: (20, 2)})
+            assert _fallback_columns(target, schema, source.table_name) == original_columns
+
+        source.execute(f'UPDATE {source.quoted_table} SET amount=%s, position=%s WHERE id=%s', (101, 3, first))
+        source.execute(f'UPDATE {source.quoted_table} SET amount=%s, position=%s WHERE id=%s', (202, 4, second))
+        messages = _tap_extract(source, 'snowflake', args, dimensions=None, start=2, end=4)
+        assert {message['record']['id'] for message in messages if message['type'] == 'RECORD'} == {first, second}
+        _load_singer(config, 'snowflake', messages)
+        assert_rows({first: (101, 3), second: (202, 4)})
+        assert _fallback_columns(target, schema, source.table_name) == original_columns
+
+        _delete_from_singer(config, source, messages, first, key_column='id')
+        assert_rows({second: (202, 4)})
     finally:
         try:
             target.query(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
@@ -525,7 +593,9 @@ def test_mysql_legacy_binary_width_partial_sync_snowflake(source_export, tmp_pat
             _remove_s3_prefix(target, config['s3_key_prefix'])
 
 
-@pytest.mark.parametrize('source_export', [('postgres', False), ('mysql', False), ('mariadb', False)], indirect=True)
+@pytest.mark.parametrize('source_export', [
+    ('postgres', False), ('mysql', False), ('mariadb', False), ('yugabyte', False),
+], indirect=True)
 def test_decimal_fastsync_postgres(source_export, tmp_path):
     """Each SQL source bulk-loads exact decimals and hands over to Singer PostgreSQL."""
     source = source_export
@@ -537,12 +607,12 @@ def test_decimal_fastsync_postgres(source_export, tmp_path):
     target = FastSyncTargetPostgres(config)
     columns = [('id', 'INTEGER PRIMARY KEY'), ('amount', 'NUMERIC(38,18)')]
     rows = [(1, EXACT), (2, None)]
-    if source.engine == 'postgres':
+    if source.postgres_dialect:
         columns.append(('rounded', 'NUMERIC(10,-2)'))
         rows = [(1, EXACT, '12300'), (2, None, None)]
     source.create(columns, rows)
     args = _args(source, config, tmp_path, schema)
-    full = postgres_to_postgres if source.engine == 'postgres' else mysql_to_postgres
+    full = POSTGRES_FULL.get(source.engine, mysql_to_postgres)
     target.create_schema(schema)
     table = f'{schema}."{source.table_name}"'
     try:
@@ -551,7 +621,7 @@ def test_decimal_fastsync_postgres(source_export, tmp_path):
         assert [tuple(row) for row in target.query(f'SELECT id, amount FROM {table} ORDER BY id')] == [
             (1, Decimal(EXACT)), (2, None),
         ]
-        if source.engine == 'postgres':
+        if source.postgres_dialect:
             assert target.query(f'SELECT rounded FROM {table} WHERE id = 1')[0][0] == Decimal('12300')
             source.execute(f'UPDATE {source.quoted_table} SET rounded = %s WHERE id = 1', ('12345678',))
         source.execute(f'UPDATE {source.quoted_table} SET amount = %s WHERE id = 1', (NEXT,))
@@ -565,7 +635,7 @@ def test_decimal_fastsync_postgres(source_export, tmp_path):
             (schema, source.table_name, 'amount'),
         )
         assert tuple(rows[0]) == (38, 18)
-        if source.engine == 'postgres':
+        if source.postgres_dialect:
             _load_singer(config, 'postgres', messages)
             assert target.query(f'SELECT rounded FROM {table} WHERE id = 1')[0][0] == Decimal('12345700')
             rounded_columns = target.query(

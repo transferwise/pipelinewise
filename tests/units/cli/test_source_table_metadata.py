@@ -102,6 +102,28 @@ class SourceTableMetadataTestCase(TestCase):
         connect.assert_called_once_with('tap-postgres', {})
         connection.close.assert_called_once()
 
+    def test_yugabyte_uses_postgres_catalog_readers_over_one_connection(self):
+        connection = mock.MagicMock()
+        keys = {**metadata._keys_result(), 'primary_key': {'name': 'city_pkey', 'columns': ['id']}}
+        with (
+            mock.patch.object(metadata, 'open_source_connection', return_value=connection) as connect,
+            mock.patch.object(metadata, 'read_source_table_size', side_effect=[1048576, None]) as size,
+            mock.patch.object(metadata, '_postgres_indexes', return_value=[]) as indexes,
+            mock.patch.object(metadata, '_postgres_keys', return_value=keys),
+            mock.patch.object(metadata, '_mysql_indexes') as mysql_indexes,
+        ):
+            details = metadata.get_source_table_details(
+                'tap-yugabyte', {}, [('public', 'city'), ('public', 'colocated')]
+            )
+        connect.assert_called_once_with('tap-yugabyte', {})
+        self.assertEqual(size.call_args_list[1].args[1:], ('tap-yugabyte', 'public', 'colocated'))
+        self.assertEqual(details[('public', 'city')]['size_bytes'], 1048576)
+        self.assertIsNone(details[('public', 'colocated')]['size_bytes'])
+        self.assertEqual(indexes.call_count, 2)
+        mysql_indexes.assert_not_called()
+        self.assertEqual(details[('public', 'city')]['primary_key']['columns'], ['id'])
+        connection.close.assert_called_once()
+
     def test_mysql_view_skips_show_index(self):
         connection = mock.MagicMock()
         with (

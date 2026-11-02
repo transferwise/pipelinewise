@@ -216,6 +216,74 @@ class TapInfoTestCase(TestCase):
             }},
         })
 
+    def test_tap_info_reports_yugabyte_tables_with_null_colocated_size(self):
+        """Read YugabyteDB taps through the YSQL reader and keep unknown colocated sizes null."""
+        instance = cli.PipelineWise.__new__(cli.PipelineWise)
+        instance.args = SimpleNamespace(tap='tap_yb', target='*')
+        instance.config_dir = '/unused'
+        tap_config = {'host': 'yb-host', 'port': 5433, 'dbname': 'source_db', 'load_balance': 'true'}
+        catalog = {'streams': [
+            {
+                'tap_stream_id': f'public-{table}',
+                'table_name': table,
+                'metadata': [{
+                    'breadcrumb': [],
+                    'metadata': {
+                        'schema-name': 'public', 'database-name': 'source_db', 'replication-method': 'LOG_BASED',
+                    },
+                }],
+            }
+            for table in ['city', 'colocated']
+        ]}
+        selection = {'selection': [
+            {'tap_stream_id': 'public-city', 'replication_method': 'INCREMENTAL'},
+            {'tap_stream_id': 'public-colocated'},
+        ]}
+        with (
+            mock.patch('pipelinewise.cli.pipelinewise.get_source_table_details', return_value={
+                ('public', 'city'): {
+                    'size_bytes': 1048576,
+                    'indexes': [{'name': 'city_pkey', 'type': 'lsm', 'columns': [{'name': 'id', 'order': None}]}],
+                    'primary_key': {'name': 'city_pkey', 'columns': ['id'], 'is_validated': True},
+                    'unique_constraints': [], 'foreign_keys': [],
+                },
+                ('public', 'colocated'): {
+                    'size_bytes': None, 'indexes': [], 'primary_key': None,
+                    'unique_constraints': [], 'foreign_keys': [],
+                },
+            }) as get_details,
+            mock.patch.object(instance, 'get_targets', return_value=[{
+                'id': 'target_one', 'taps': [{'id': 'tap_yb', 'type': 'tap-yugabyte'}],
+            }]),
+            mock.patch('builtins.open', side_effect=[
+                StringIO(json.dumps(tap_config)),
+                StringIO(json.dumps(selection)),
+                StringIO(json.dumps(catalog)),
+            ]),
+            mock.patch('sys.stdout', new_callable=StringIO) as stdout,
+        ):
+            instance.tap_info()
+
+        get_details.assert_called_once_with(
+            'tap-yugabyte', tap_config, [('public', 'city'), ('public', 'colocated')]
+        )
+        self.assertEqual(json.loads(stdout.getvalue()), {'tap_information': {
+            'tap_id': 'tap_yb',
+            'target_id': 'target_one',
+            'tap_type': 'tap-yugabyte',
+            'source_database': 'yb-host',
+            'selected_tables': {'public': {
+                'city': {
+                    'replication_method': 'INCREMENTAL', 'size_bytes': 1048576,
+                    'indexes': [{'name': 'city_pkey', 'columns': ['id']}],
+                    'primary_key': {'name': 'city_pkey', 'columns': ['id']},
+                },
+                'colocated': {
+                    'replication_method': 'LOG_BASED', 'size_bytes': None, 'indexes': [], 'primary_key': None,
+                },
+            }},
+        }})
+
     def test_tap_info_with_missing_selected_stream_exits_with_error(self):
         """Reject a stale selection without printing incomplete table information."""
         instance = cli.PipelineWise.__new__(cli.PipelineWise)
@@ -270,5 +338,5 @@ class TapInfoTestCase(TestCase):
                 self.assertEqual(stdout.getvalue(), '')
                 open_file.assert_not_called()
                 instance.logger.error.assert_called_once_with(
-                    'This command only supports mysql and postgres taps'
+                    'This command only supports mysql, postgres and yugabyte taps'
                 )

@@ -6,6 +6,8 @@ must agree numerically across every dialect, since a source and target are compa
 by their sums: see ``checksum_integer`` and ``normalize_checksum_value``.
 """
 
+import re
+
 from dataclasses import dataclass
 from datetime import date, datetime, time, timezone
 from decimal import Decimal
@@ -40,6 +42,9 @@ TIMESTAMP_TYPES = (
     "timestamp_ntz",
     "timestamp_tz",
 )
+# YugabyteDB adds this pg_index.indoption bit to a hash-sharded key column.
+YB_INDOPTION_HASH = 4
+YB_BUCKET_EXPRESSION = re.compile(r"^\(yb_hash_code\((?P<columns>[^()]*)\) % (?P<modulus>[1-9]\d*)\)$")
 
 
 class DataDiffExecutionError(RuntimeError):
@@ -183,6 +188,10 @@ class DatabaseAdapter:
         """Return ordered index-column metadata for the table."""
         raise NotImplementedError
 
+    def window_predicates(self, schema: str, table: str, timestamp_column: str) -> list:
+        """Return result-neutral source predicates that let a window scan use an index."""
+        return []
+
     def count_rows_up_to(self, schema: str, table: str, limit: int) -> int:
         """Count source-visible rows up to a limit under the connection timeout.
 
@@ -206,10 +215,11 @@ class DatabaseAdapter:
     def minimum_timestamp(self, schema: str, table: str, column: dict, cutoff: datetime):
         """Read the earliest non-NULL timestamp before the settled cutoff in UTC."""
         timestamp = self.quote(column["name"])
+        predicates = [f"{timestamp} < %s", *self.window_predicates(schema, table, column["name"])]
         with self.connection.cursor() as cursor:
             cursor.execute(
                 f"SELECT MIN({timestamp}) FROM {self.qualified_table(schema, table)} "
-                f"WHERE {timestamp} < %s",
+                f"WHERE {' AND '.join(predicates)}",
                 (_utc_boundary(cutoff, column["data_type"]),),
             )
             row = cursor.fetchone()
@@ -305,6 +315,173 @@ class PostgresAdapter(DatabaseAdapter):
                 (schema, table),
             )
             return [dict(row) for row in cursor.fetchall()]
+
+
+def _unquote_identifier(identifier: str) -> str:
+    identifier = identifier.strip()
+    if len(identifier) > 1 and identifier[0] == identifier[-1] == '"':
+        return identifier[1:-1].replace('""', '"')
+    return identifier
+
+
+def _yugabyte_bucket(expression: str):
+    """Parse a tap-yugabyte keyset bucket key, ``(yb_hash_code(<columns>) % N)``."""
+    match = YB_BUCKET_EXPRESSION.match(expression or "")
+    if not match:
+        return None
+    return {
+        "columns": [_unquote_identifier(column) for column in match.group("columns").split(",")],
+        "modulus": int(match.group("modulus")),
+    }
+
+
+class YugabyteAdapter(PostgresAdapter):
+    """YugabyteDB YSQL metadata, plan, and aggregate operations.
+
+    YSQL shares PostgreSQL's SQL, so only index eligibility differs: every index uses
+    the ``lsm`` access method, and a hash-sharded key column cannot answer a range.
+    """
+
+    def __init__(self, connection, statement_timeout_seconds: int):
+        super().__init__(connection, statement_timeout_seconds)
+        # A failed read is cached too: the aborted transaction would mask it on a re-read.
+        self._indexes = {}
+
+    def indexes(self, schema, table):
+        """Return index metadata, marking which indexes can serve a window scan.
+
+        ``is_usable`` requires a valid, ready, non-partial ``lsm`` index whose leading
+        key column is range-sharded (``ASC`` or ``DESC``, not ``HASH``). An index led
+        by the tap-yugabyte keyset bucket ``(yb_hash_code(<primary key>) % N)`` is
+        described by ``bucket``, and its ``columns`` start after the bucket; it is
+        usable when the bucket hashes exactly the primary key and both the bucket and
+        the next key column are range-sharded plain keys.
+        """
+        key = (schema, table)
+        if key not in self._indexes:
+            try:
+                self._indexes[key] = [
+                    self._index_entry(row) for row in self._index_rows(schema, table)
+                ]
+            except Exception as exc:
+                self._indexes[key] = exc
+        if isinstance(self._indexes[key], Exception):
+            raise self._indexes[key]
+        return self._indexes[key]
+
+    def window_predicates(self, schema, table, timestamp_column):
+        """Constrain the bucket so a bucket-led index can serve wide windows.
+
+        ``yb_hash_code`` is never negative and primary-key columns are never NULL, so
+        the predicate matches every row; without it YugabyteDB seq-scans wide windows.
+        """
+        try:
+            indexes = self.indexes(schema, table)
+        except Exception:
+            # Preflight reads the same cached failure and records it as ERROR.
+            return []
+        leading = [
+            index for index in indexes
+            if index["is_usable"] and index["columns"][0].lower() == timestamp_column.lower()
+        ]
+        if not leading or any(index["bucket"] is None for index in leading):
+            return []
+        bucket = leading[0]["bucket"]
+        columns = ", ".join(self.quote(column) for column in bucket["columns"])
+        values = ", ".join(str(value) for value in range(bucket["modulus"]))
+        # Doubled because every caller binds the window boundaries as parameters.
+        return [f"(yb_hash_code({columns}) %% {bucket['modulus']}) IN ({values})"]
+
+    def _index_rows(self, schema, table):
+        with self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+            cursor.execute(
+                """
+                SELECT index_class.relname AS index_name,
+                       access_method.amname AS access_method,
+                       index_meta.indisunique AS is_unique,
+                       index_meta.indpred IS NOT NULL AS is_partial,
+                       index_meta.indexprs IS NOT NULL AS is_expression,
+                       index_meta.indisvalid AS is_valid,
+                       index_meta.indisready AS is_ready,
+                       index_meta.indkey::int2[] AS key_attnums,
+                       index_meta.indoption::int2[] AS key_options,
+                       ARRAY(
+                           SELECT CASE
+                                      WHEN key_part.attnum = 0 THEN pg_get_indexdef(
+                                          index_meta.indexrelid, key_part.ordinality::int, true
+                                      )
+                                      ELSE attribute.attname
+                                  END
+                             FROM unnest(index_meta.indkey::int2[])
+                                  WITH ORDINALITY key_part(attnum, ordinality)
+                             LEFT JOIN pg_attribute attribute
+                               ON attribute.attrelid = index_meta.indrelid
+                              AND attribute.attnum = key_part.attnum
+                            WHERE key_part.ordinality <= index_meta.indnkeyatts
+                            ORDER BY key_part.ordinality
+                       ) AS key_columns,
+                       ARRAY(
+                           SELECT attribute.attname
+                             FROM pg_index primary_meta
+                             JOIN LATERAL unnest(primary_meta.indkey::int2[])
+                                  WITH ORDINALITY key_part(attnum, ordinality) ON TRUE
+                             JOIN pg_attribute attribute
+                               ON attribute.attrelid = primary_meta.indrelid
+                              AND attribute.attnum = key_part.attnum
+                            WHERE primary_meta.indrelid = index_meta.indrelid
+                              AND primary_meta.indisprimary
+                            ORDER BY key_part.ordinality
+                       ) AS primary_key
+                  FROM pg_index index_meta
+                  JOIN pg_class table_class ON table_class.oid = index_meta.indrelid
+                  JOIN pg_namespace namespace ON namespace.oid = table_class.relnamespace
+                  JOIN pg_class index_class ON index_class.oid = index_meta.indexrelid
+                  JOIN pg_am access_method ON access_method.oid = index_class.relam
+                 WHERE namespace.nspname = %s AND table_class.relname = %s
+                 ORDER BY index_class.relname
+                """,
+                (schema, table),
+            )
+            return cursor.fetchall()
+
+    @staticmethod
+    def _index_entry(row) -> dict:
+        columns = list(row["key_columns"])
+        is_expression = [attnum == 0 for attnum in row["key_attnums"][:len(columns)]]
+        is_ordered = [
+            option & YB_INDOPTION_HASH == 0 for option in row["key_options"][:len(columns)]
+        ]
+        is_healthy = (
+            row["access_method"] == "lsm"
+            and not row["is_partial"]
+            and row["is_valid"]
+            and row["is_ready"]
+        )
+        bucket = _yugabyte_bucket(columns[0]) if is_expression[0] else None
+        if bucket is None:
+            is_usable = is_healthy and not is_expression[0] and is_ordered[0]
+        else:
+            is_usable = (
+                is_healthy
+                and bucket["columns"] == list(row["primary_key"])
+                and len(columns) > 1
+                and is_ordered[0]
+                and not is_expression[1]
+                and is_ordered[1]
+            )
+            columns = columns[1:]
+        return {
+            "index_name": row["index_name"],
+            "columns": columns,
+            "is_unique": row["is_unique"],
+            "access_method": row["access_method"],
+            "is_partial": row["is_partial"],
+            "is_expression": row["is_expression"],
+            "is_valid": row["is_valid"],
+            "is_ready": row["is_ready"],
+            "is_usable": is_usable,
+            "bucket": bucket,
+        }
 
 
 class MySQLAdapter(DatabaseAdapter):

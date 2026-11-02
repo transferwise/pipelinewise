@@ -17,10 +17,12 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
 - `fastsync/`: native bulk sync. FullSync replaces tables for initial loads,
   FULL_TABLE, and explicit `fast_sync`; PartialSync merges filtered ranges for
   `partial_sync_table`/`sync_start_from`. FullSync supports `tap-mysql`
-  (MariaDB/MySQL), `tap-postgres`, and `tap-mongodb` to PostgreSQL/Snowflake;
-  PartialSync supports `tap-mysql`/`tap-postgres` to Snowflake. S3 CSV remains
-  Singer-only. Keep MySQL/PostgreSQL→Snowflake lifecycle in
-  `commons/rdbms_to_snowflake.py` and `partialsync/rdbms_to_snowflake.py`;
+  (MariaDB/MySQL), `tap-postgres`, `tap-yugabyte`, and `tap-mongodb` to
+  PostgreSQL/Snowflake; PartialSync supports `tap-mysql`/`tap-postgres`/
+  `tap-yugabyte` to Snowflake. S3 CSV remains Singer-only, so `validate`
+  rejects YugabyteDB LOG_BASED there; YugabyteDB has no managed Iceberg route.
+  Keep MySQL/PostgreSQL→Snowflake lifecycle in `commons/rdbms_to_snowflake.py`
+  and `partialsync/rdbms_to_snowflake.py`;
   source modules only adapt source construction, mapping, and ordering. Put
   other shared primitives in `commons/`, imported by `partialsync/`, and align
   `docs/concept/fastsync.rst`.
@@ -28,13 +30,14 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
   `ddl_user`/`ddl_password` may equal app credentials. It cannot depend on
   data-diff or replication orchestration; an AST test enforces this.
 - `data_diff/`: may use backend-db, never Singer/FastSync execution. Supports
-  MySQL/MariaDB or PostgreSQL → PostgreSQL/Snowflake. Ownership: `adapters.py`
-  dialects; `engine.py` execution; `repository.py` persistence; `runner.py`
-  scheduling/remediation; `config.py`, `comparison.py`, `coverage.py` their
-  named concerns; `runtime.py` generated connector JSON; `credentials.py`
-  private keys. `import_config` persists definitions only after connector
-  generation/discovery. Add database types at the adapter boundary and AST
-  coverage for new dependency seams.
+  MySQL/MariaDB, PostgreSQL, or YugabyteDB → PostgreSQL/Snowflake; YugabyteDB
+  uses stock psycopg2 in the main venv.
+  Ownership: `adapters.py` dialects; `engine.py` execution; `repository.py`
+  persistence; `runner.py` scheduling/remediation; `config.py`,
+  `comparison.py`, `coverage.py` their named concerns; `runtime.py` generated
+  connector JSON; `credentials.py` private keys. `import_config` persists
+  definitions only after connector generation/discovery. Add database types at
+  the adapter boundary and AST coverage for new dependency seams.
 
 ## Backend schema
 

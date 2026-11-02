@@ -35,6 +35,11 @@ def postgres_decimal_type(precision, scale, target, *, is_key=False, postgres_ve
     )
 
 
+def yugabyte_decimal_type(precision, scale, target, *, is_key=False):
+    """YSQL rejects NaN decimals, so keys keep the bounded mapping Singer targets use for this source."""
+    return decimal_sql_type(decimal_schema(precision, postgres_numeric_scale(scale)), target, is_key=is_key)
+
+
 def decimal_text_expression(expression, dialect):
     """Canonicalize decimal text keys without stripping significant integer zeroes."""
     cast = f'CAST({expression} AS {"TEXT" if dialect == "postgres" else "CHAR"})'

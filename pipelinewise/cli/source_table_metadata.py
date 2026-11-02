@@ -159,6 +159,7 @@ def get_source_table_details(tap_type, config, tables):
     """Return storage, indexes, and keys per (schema, table) using one source connection."""
     if not tables:
         return {}
+    # YugabyteDB's YSQL exposes the same pg_catalog index and constraint views as PostgreSQL.
     index_reader, key_reader = (
         (_mysql_indexes, _mysql_keys) if tap_type == 'tap-mysql' else (_postgres_indexes, _postgres_keys)
     )

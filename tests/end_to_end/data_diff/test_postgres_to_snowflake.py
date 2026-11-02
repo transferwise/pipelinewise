@@ -37,7 +37,7 @@ EXPECTED_CHECKS = {
 }
 
 
-@pytest.fixture(params=['postgres', 'mysql', 'mariadb'])
+@pytest.fixture(params=['postgres', 'yugabyte', 'mysql', 'mariadb'])
 def overlap_source(request):
     """Create an isolated timestamp fixture without resetting replication data."""
     e2e = E2EEnv(PROJECT_DIR)
@@ -46,6 +46,7 @@ def overlap_source(request):
     source_engine = request.param
     connector, query = {
         'postgres': ('TAP_POSTGRES', e2e.run_query_tap_postgres),
+        'yugabyte': ('TAP_YUGABYTE', e2e.run_query_tap_yugabyte),
         'mysql': ('TAP_ORACLE_MYSQL', e2e.run_query_tap_oracle_mysql),
         'mariadb': ('TAP_MYSQL', e2e.run_query_tap_mysql),
     }[source_engine]
@@ -53,14 +54,17 @@ def overlap_source(request):
         pytest.skip(f'{connector} credentials are not configured')
     config = {key.lower(): e2e.get_conn_env_var(connector, key) for key in ('HOST', 'PORT', 'USER', 'PASSWORD')}
     config.update(dbname=e2e.get_conn_env_var(connector, 'DB'), engine=source_engine)
-    schema = 'public' if source_engine == 'postgres' else config['dbname']
+    postgres_protocol = source_engine in ('postgres', 'yugabyte')
+    schema = 'public' if postgres_protocol else config['dbname']
     table = f'ppw_dd_overlap_{uuid4().hex[:12]}'
-    quote = '"' if source_engine == 'postgres' else '`'
+    quote = '"' if postgres_protocol else '`'
     qualified_table = f'{quote}{schema}{quote}.{quote}{table}{quote}'
-    timestamp_type = 'TIMESTAMP(6)' if source_engine == 'postgres' else 'DATETIME(6)'
+    timestamp_type = 'TIMESTAMP(6)' if postgres_protocol else 'DATETIME(6)'
+    # A YugabyteDB index column is HASH-sharded unless declared ASC or DESC.
+    index_order = ' ASC' if source_engine == 'yugabyte' else ''
     query(f'CREATE TABLE {qualified_table} (id INTEGER PRIMARY KEY, updated_at {timestamp_type}, payload VARCHAR(30))')
     try:
-        query(f'CREATE INDEX {table}_updated_at_idx ON {qualified_table} (updated_at)')
+        query(f'CREATE INDEX {table}_updated_at_idx ON {qualified_table} (updated_at{index_order})')
         rows = [
             (row_id, datetime(2026, 1, day) if day else None, f'value-{row_id}')
             for row_id, day in ((1, 1), (2, 2), (3, 3), (4, 9), (5, 10), (6, None))
@@ -109,7 +113,7 @@ def test_historical_overlap_on_snowflake(overlap_source, table_format):
         )
         check = {
             'check_id': str(uuid4()),
-            'source_type': 'tap-postgres' if source_engine == 'postgres' else 'tap-mysql',
+            'source_type': {'postgres': 'tap-postgres', 'yugabyte': 'tap-yugabyte'}.get(source_engine, 'tap-mysql'),
             'target_type': 'target-snowflake',
             'source_schema': source_schema, 'source_table': source_table,
             'target_schema': target_schema, 'target_table': 'OVERLAP',

@@ -7,9 +7,11 @@ A table's replication method controls how its tap finds records after the
 initial load. FastSync is a transfer optimisation, not a replication method.
 
 MariaDB/MySQL and PostgreSQL preserve supported decimal precision and scale when
-replicating to Snowflake native, managed Iceberg v3, or PostgreSQL. This applies
-to every replication method; see :ref:`exact_decimal_mapping` for numeric fallback
-and column versioning after an upgrade.
+replicating to Snowflake native, managed Iceberg v3, or PostgreSQL. YugabyteDB
+does the same for Snowflake native and PostgreSQL; it does not support managed
+Iceberg targets yet. This applies to every replication method; see
+:ref:`exact_decimal_mapping` for numeric fallback and column versioning after an
+upgrade.
 
 
 Choose a method
@@ -52,8 +54,10 @@ Log-based replication
 ---------------------
 
 LOG_BASED reads inserts, updates, and deletes from a database change log.
-PipelineWise supports it for MariaDB/MySQL, PostgreSQL, and MongoDB connectors.
-Experimental connector status still applies.
+PipelineWise supports it for MariaDB/MySQL, PostgreSQL, YugabyteDB, and MongoDB
+connectors. Experimental connector status still applies. YugabyteDB LOG_BASED
+needs a target with FastSync, which creates its replication slot; see
+:ref:`tap-yugabyte`.
 
 PostgreSQL and Snowflake targets physically remove source-deleted rows before
 acknowledging Singer state. See :ref:`metadata_columns` for deletion markers

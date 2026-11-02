@@ -56,7 +56,7 @@ def _run(tmp_path, engine, kind, rule):
             'target_table_format': 'iceberg', 'iceberg_version': 3,
         },
         transform={'transformations': [dict(rule, tap_stream_name='source-orders')]},
-        properties={}, table=TABLE, temp_dir=str(tmp_path), drop_target_table=False,
+        properties={}, table=TABLE, temp_dir=str(tmp_path), drop_target_table=False, end_value=None,
     )
     source.source_transformations = args.transform
     adapter = Mock()
