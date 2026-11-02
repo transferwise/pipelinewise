@@ -245,8 +245,10 @@ Tap configuration
        it replicates. Valid only with ``target_table_format: iceberg``,
        ``iceberg_version: 3``, a ``target-snowflake`` target, and an effective
        ``data_flattening_max_level`` of ``0``. ``conversion_warehouse`` runs
-       only the conversion work on another Snowflake warehouse. Configure it at
-       the tap root, not in ``db_conn`` or the target. See
+       only the conversion work on another Snowflake warehouse. With
+       ``enabled: false``, ``run_tap`` neither converts nor resumes a pending
+       conversion. Configure it at the tap root, not in ``db_conn`` or the
+       target. See
        :ref:`snowflake_iceberg_auto_conversion`.
    * - ``version_legacy_float_columns``
      - ``false``

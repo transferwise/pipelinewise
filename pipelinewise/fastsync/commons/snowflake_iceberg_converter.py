@@ -28,6 +28,7 @@ from pipelinewise.fastsync.commons.snowflake_iceberg_inspection import (
     physical_table_format,
 )
 from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_evidence import (
+    ContentEvidenceMismatchError,
     SnowflakeConversionEvidenceService,
 )
 from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_plan import (
@@ -533,11 +534,7 @@ class SnowflakeNativeToIcebergConverter:
         staging = table.with_suffix('_ICEBERG')
         assert_iceberg_table_spec(self._query, staging, manifest.table_spec)
 
-        row_count, row_hash = self._assert_equal_contents(
-            table,
-            staging,
-            metadata.columns,
-        )
+        row_count, row_hash = self._assert_staging_contents(table, staging, metadata.columns)
         manifest.expected_row_count = row_count
         manifest.expected_row_fingerprint = str(row_hash)
 
@@ -554,6 +551,23 @@ class SnowflakeNativeToIcebergConverter:
             return
 
         self._cut_over(table, manifest)
+
+    def _assert_staging_contents(
+        self,
+        table: SnowflakeTableName,
+        staging: SnowflakeTableName,
+        columns: Tuple[NativeColumn, ...],
+    ) -> Tuple[int, int]:
+        """Compare the copy with the native primary, and name the fix when they differ."""
+        try:
+            return self._assert_equal_contents(table, staging, columns)
+        except ContentEvidenceMismatchError as exc:
+            # Before cutover the native primary holds every row, so a fresh copy is always safe.
+            raise NativeToIcebergConversionError(
+                f'{exc}. If {table.quoted} changed after {staging.quoted} was copied, stop every '
+                f'writer to it, drop {staging.quoted}, and rerun; the manifest stays, and the '
+                'next attempt copies the table again'
+            ) from exc
 
     def _create_staging(
         self,

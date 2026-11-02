@@ -356,9 +356,17 @@ To move a tap that already replicates into native tables:
    ``enabled: false``, and run ``import_config``. Run the report again: this
    catalog is the one conversion uses, and MariaDB JSON aliases appear as
    ``VARIANT`` only now. Keep the tap paused in this state, because both writers
-   refuse native tables under the Iceberg format.
+   refuse native tables under the Iceberg format. Keep the pause short: the
+   source keeps accumulating changes.
 3. When the report is ready, set ``enabled: true``, run ``import_config``, and
    resume the schedule.
+
+If the report in step 2 is not ready and you cannot fix it during the pause,
+return the tap to native. Remove ``target_table_format``, ``iceberg_version``,
+and ``native_to_iceberg_conversion``, run ``import_config``, and resume the
+schedule. This is safe while no table has converted and no conversion is
+pending. To clear a ``TEXT``/``VARIANT`` blocker, see
+:ref:`snowflake_iceberg_text_variant_blocker`.
 
 .. code-block:: yaml
 
@@ -392,10 +400,37 @@ and runs with FastSync work list those schemas once more before FastSync starts.
 The setting accepts any tap that can write managed Iceberg v3 through
 ``target-snowflake``. It requires ``data_flattening_max_level: 0``, because
 conversion compares native columns with the tap catalog's top-level properties.
+``run_tap`` also stops before any Snowflake work if the tap's generated
+configuration is not imported with these settings, for example after an
+``import_config --taps`` run that did not include the tap.
 ``conversion_warehouse`` runs only the conversion queries on another warehouse,
 which the target role must be able to use. It is not part of the recovery
 identity, so a manual ``copy_native_to_iceberg`` on the target's warehouse can
 resume an automatic attempt.
+
+Conversion refuses a native table that another imported tap also writes,
+unless that tap writes managed Iceberg v3 under the same target. A native tap
+would fail on the converted table, and nothing would stop it writing during the
+copy. Taps under other targets with the same ``account`` and ``dbname`` count
+too. Such a tap must not also convert the table, because two targets cannot
+coordinate a conversion. Move every tap that writes a table to Iceberg v3
+together, or stop the other taps writing it. Writers outside PipelineWise are
+not visible: stop them before you enable the setting.
+
+Check each table before you enable the setting, because conversion runs
+unattended:
+
+* Preflight sees only the policies, tags, and streams that the target role can
+  see. Make sure that role can see all of them on the tap's tables, and that no
+  masking or row access policy hides rows from it.
+* Replaying grants and tags needs ``APPLY`` on each direct table tag and, in a
+  managed-access schema, ownership of the schema or ``MANAGE GRANTS``. A missing
+  privilege fails after the copy, and every run stops at the same statement until
+  it is granted.
+* Conversion does not carry over search optimization or data metric functions.
+  The Iceberg table keeps one day of data retention. Dynamic tables and
+  materialized views that read the table are not recreated; check them after
+  the conversion.
 
 Enabling the setting accepts the cutover gap described below: each table's name
 is briefly absent between its two renames, so readers of that table fail for
@@ -412,10 +447,11 @@ WAL and MySQL binlog retention.
 
 .. warning::
 
-   Finish or recover every pending conversion before removing
-   ``native_to_iceberg_conversion`` or changing the tap's format. Without the
-   setting, ``run_tap`` does not resume a conversion, and a writer could create
-   an empty table under a primary name that an interrupted cutover left absent.
+   Finish or recover every pending conversion before you set
+   ``enabled: false``, remove ``native_to_iceberg_conversion``, or change the
+   tap's format. Unless the setting is enabled, ``run_tap`` does not resume a
+   conversion, and a writer could create an empty table under a primary name
+   that an interrupted cutover left absent.
    Once a table has converted, the tap cannot return to ``native``: the native
    contract refuses Iceberg tables.
 
@@ -520,7 +556,37 @@ For each table, the report lists the first metadata refusal, such as a policy or
 a stream, and every conversion blocker, such as a ``TIMESTAMP_TZ`` column or a
 grant that cannot be replayed. After fixing a metadata refusal, run the report
 again, because the next one may be hidden behind it. Row and byte counts come
-from ``SHOW TABLES`` and help estimate the copy time and warehouse cost.
+from ``SHOW TABLES`` and help estimate the copy time and warehouse cost. The
+``--tap`` report also blocks a table that another imported tap writes, by the
+same rules as automatic conversion.
+
+.. _snowflake_iceberg_text_variant_blocker:
+
+Clear a TEXT/VARIANT blocker
+----------------------------
+
+Conversion cannot change a column's class, so a native ``TEXT`` column that the
+tap catalog maps to ``VARIANT``, or the reverse, blocks the table. The usual
+cause is a MariaDB JSON alias: native routes load it as text, and the Iceberg
+catalog maps it to ``VARIANT``. With the tap paused and its Iceberg settings
+imported, fix the native table in one of two ways:
+
+* Rebuild the column as ``VARIANT``:
+
+  .. code-block:: sql
+
+     ALTER TABLE <table> ADD COLUMN <column>__variant VARIANT;
+     UPDATE <table> SET <column>__variant = PARSE_JSON(<column>);
+     ALTER TABLE <table> DROP COLUMN <column>;
+     ALTER TABLE <table> RENAME COLUMN <column>__variant TO <column>;
+
+  Use ``PARSE_JSON``, not ``TRY_PARSE_JSON`` or ``TO_VARIANT``. Invalid text then
+  fails instead of becoming ``NULL``, and a JSON ``null`` stays distinct from SQL
+  ``NULL``. Restore the column comment if it had one, then run the report again.
+* Rename the native table to a name without the reserved ``_NATIVE`` and
+  ``_ICEBERG`` suffixes, then reload it with
+  ``fast_sync --tables <schema.table>``. FastSync creates the table as Iceberg,
+  but it does not carry over explicit grants, tags, or comments.
 
 Conversion preflight and metadata
 ---------------------------------

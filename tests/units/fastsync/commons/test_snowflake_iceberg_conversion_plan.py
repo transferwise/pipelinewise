@@ -119,6 +119,42 @@ def test_writer_name_disagreement_blocks_only_fastsync_taps(fastsync_capable):
         assert targets[0].blockers == ()
 
 
+@pytest.mark.parametrize('fastsync_capable', [True, False])
+def test_written_tables_cover_every_name_another_tap_writes(fastsync_capable):
+    """Another tap writes both its FastSync and Singer tables; an unnamed stream writes nothing."""
+    targets = plan.plan_written_tables(
+        {'streams': [_stream('public-my.table', {'doc': {'type': ['null', 'object']}})]},
+        {**TARGET_CONFIG, 'default_target_schema': 'fallback'},
+        ['public-my.table', 'public-my.table'],
+        fastsync_capable,
+    )
+    unnamed = plan.plan_written_tables({}, {'dbname': 'database'}, ['other-orders'], fastsync_capable)
+
+    expected = ['DATABASE.FALLBACK.TABLE', 'DATABASE.SCHEMA.MY_TABLE'] if fastsync_capable else [
+        'DATABASE.SCHEMA.MY_TABLE'
+    ]
+    assert [(target.stream_id, target.table.key) for target in targets] == [
+        ('public-my.table', key) for key in expected
+    ]
+    assert all(target.writer_types == {'DOC': 'VARIANT'} for target in targets)
+    assert unnamed == []
+
+
+@pytest.mark.parametrize(
+    ('second', 'expected'),
+    [
+        ({'account': 'ACC', 'dbname': 'analytics'}, True),
+        ({'account': 'acc', 'dbname': '"ANALYTICS"'}, True),
+        ({'account': 'acc', 'dbname': '"analytics"'}, False),
+        ({'account': 'other', 'dbname': 'analytics'}, False),
+        ({'account': 'acc'}, False),
+    ],
+)
+def test_same_snowflake_database_compares_account_and_database(second, expected):
+    """Targets share a database when the account and the resolved database name match."""
+    assert plan.same_snowflake_database({'account': 'acc', 'dbname': 'ANALYTICS'}, second) is expected
+
+
 def test_plan_records_catalog_text_and_variant_columns():
     """Level-0 catalog properties become the TEXT/VARIANT classes the writers expect."""
     catalog = {'streams': [_stream('public-orders', {

@@ -1687,6 +1687,8 @@ class PipelineWise:
         conversion = self.tap.get(Config.NATIVE_TO_ICEBERG_CONVERSION) or {}
         if conversion.get('enabled') is not True or not stream_ids:
             return
+        # The main config enables conversion, but the writers and the catalog follow the tap's own files.
+        native_to_iceberg.assert_imported_for_conversion(self._iceberg_target_config(), self.tap['id'])
         self.logger.info('Checking %s selected streams for native Snowflake tables', len(stream_ids))
         try:
             self._run_in_child_process(
@@ -1708,14 +1710,109 @@ class PipelineWise:
         fastsync_capable = resolve_fastsync_capabilities(
             self.tap['type'], self.target['type'], Config.TABLE_FORMAT_ICEBERG,
         ).full_sync
+        targets = native_to_iceberg.tap_targets(catalog, target_config, fastsync_capable, stream_ids)
         native_to_iceberg.convert_tap_tables(
             target_config,
             self.get_target_dir(self.target['id']),
-            native_to_iceberg.tap_targets(catalog, target_config, fastsync_capable, stream_ids),
+            targets,
             conversion_warehouse,
+            other_writers=self._other_writers(target_config, targets),
             target_id=self.target['id'],
             tap_id=self.tap['id'],
         )
+
+    def _other_writers(self, target_config: Dict, targets: List) -> List:
+        """Find the streams of other imported taps that write one of the planned tables."""
+        writers = []
+        for target, base_config in self._snowflake_targets_sharing_database(target_config):
+            for tap in target.get('taps', []):
+                if (target['id'], tap['id']) != (self.target['id'], self.tap['id']):
+                    writers.extend(self._tap_writers(target, tap, base_config, targets))
+        return writers
+
+    def _snowflake_targets_sharing_database(self, target_config: Dict) -> List[Tuple[Dict, Dict]]:
+        """Return each imported Snowflake target, with its config, that writes the same database."""
+        from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_plan import same_snowflake_database
+
+        sharing = []
+        for target in self.get_targets():
+            if target.get('type') != ConnectorType.TARGET_SNOWFLAKE.value:
+                continue
+            config_path = Config.get_connector_files(self.get_target_dir(target['id']))['config']
+            try:
+                config = self._load_rendered_json(config_path)
+            except Exception as exc:  # another target's env_var lookups may not render in this process
+                self.logger.warning('Cannot read target %s to look for other writers: %s', target['id'], exc)
+                continue
+            if isinstance(config, dict) and same_snowflake_database(config, target_config):
+                sharing.append((target, config))
+        return sharing
+
+    @staticmethod
+    def _load_rendered_json(path: str) -> Any:
+        """Load a connector config with its env_var lookups rendered in memory, never in a copy."""
+        if not os.path.isfile(path):
+            return None
+        with open(path, encoding='utf-8') as config_file:
+            text = config_file.read()
+        if utils.ENV_VAR_LOOKUP.search(text):
+            # A forked child skips atexit, so a rendered copy holding secrets would stay behind.
+            text = utils.render_env_var_lookups(text)
+        return json.loads(text)
+
+    def _tap_writers(self, target: Dict, tap: Dict, base_config: Dict, targets: List) -> List:
+        """Describe one other tap's streams that write a planned table, and whether they block it."""
+        from pipelinewise.cli import native_to_iceberg
+        from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_plan import plan_written_tables
+
+        files = Config.get_connector_files(self.get_tap_dir(target['id'], tap['id']))
+        selection = utils.load_json(files['selection'])
+        inheritable_config = utils.load_json(files['inheritable_config'])
+        if not isinstance(selection, dict) or not isinstance(inheritable_config, dict):
+            return []  # a tap that was never imported writes nothing yet
+        stream_ids = [
+            item['tap_stream_id'] for item in selection.get('selection') or []
+            if isinstance(item, dict) and isinstance(item.get('tap_stream_id'), str)
+        ]
+        config = {**base_config, **inheritable_config}
+        capabilities = resolve_fastsync_capabilities(
+            tap['type'], target['type'], inheritable_config.get('target_table_format'),
+        )
+        fastsync_capable = capabilities.full_sync or capabilities.partial_sync
+        label = tap['id'] if target['id'] == self.target['id'] else f'{tap["id"]} of target {target["id"]}'
+        refusal = self._other_writer_refusal(target, tap, inheritable_config)
+        writers = native_to_iceberg.other_tap_writers(
+            label, plan_written_tables({}, config, stream_ids, fastsync_capable), targets, refusal,
+        )
+        if writers and refusal is None:
+            # Only a compatible writer's column classes matter, so only its catalog is read.
+            catalog = utils.load_json(files['properties'])
+            catalog = catalog if isinstance(catalog, dict) else {}
+            writers = native_to_iceberg.other_tap_writers(
+                label, plan_written_tables(catalog, config, stream_ids, fastsync_capable), targets,
+            )
+        return writers
+
+    def _other_writer_refusal(self, target: Dict, tap: Dict, inheritable_config: Dict) -> Optional[str]:
+        """Return why converting a table that another tap writes would break it, if it would."""
+        version = inheritable_config.get('iceberg_version')
+        if (
+            inheritable_config.get('target_table_format') != Config.TABLE_FORMAT_ICEBERG
+            or version != Config.ICEBERG_VERSION
+            or isinstance(version, bool)
+        ):
+            return (
+                'does not write managed Iceberg v3 and would fail on the converted table; import it '
+                'with target_table_format: iceberg and iceberg_version: 3 as well, or stop it writing the table'
+            )
+        converts = (tap.get(Config.NATIVE_TO_ICEBERG_CONVERSION) or {}).get('enabled') is True
+        if converts and target['id'] != self.target['id']:
+            # Each target keeps its own recovery locks, so conversions under two targets could collide.
+            return (
+                'converts tables under another target, and two targets cannot coordinate a conversion; '
+                'enable native_to_iceberg_conversion for the table under one target only'
+            )
+        return None
 
     def _iceberg_target_config(self) -> Dict:
         """Return the target config with the tap's inheritable overrides, like the writers see it."""
@@ -2537,15 +2634,18 @@ class PipelineWise:
             ).full_sync
             targets = native_to_iceberg.tap_targets(catalog, target_config, fastsync_capable)
             blockers = native_to_iceberg.tap_blockers(target_config)
+            other_writers = self._other_writers(target_config, targets)
         else:
             targets = native_to_iceberg.table_targets(
                 self.args.table, self._imported_tap_targets(target_config),
             )
+            other_writers = []
         reports = native_to_iceberg.preflight_report(
             target_config,
             self.get_target_dir(self.target['id']),
             targets,
             conversion_warehouse,
+            other_writers=other_writers,
         )
         return native_to_iceberg.render_preflight_report(
             reports, blockers, self.args.output_format,

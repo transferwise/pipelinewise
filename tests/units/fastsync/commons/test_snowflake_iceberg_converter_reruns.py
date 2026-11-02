@@ -363,6 +363,24 @@ def test_recreates_dropped_companion(tmp_path, interrupted_phase):
     assert len([sql for sql, _, _ in snowflake.queries if sql.startswith('CREATE')]) == 2
 
 
+def test_stale_companion_names_the_drop_and_rerun_fix(tmp_path):
+    """A copy that no longer matches the native rows says how to rebuild it, before any cutover."""
+    snowflake = FakeSnowflake()
+    snowflake.staging_evidence = (2, 54321)
+
+    with pytest.raises(NativeToIcebergConversionError) as error:
+        _convert(tmp_path, snowflake)
+    with pytest.raises(NativeToIcebergConversionError) as resumed:
+        _convert(tmp_path, snowflake)
+
+    for message in (str(error.value), str(resumed.value)):
+        assert 'does not match the projected contents' in message
+        assert 'stop every writer to it, drop "DATABASE"."SCHEMA"."TABLE_ICEBERG", and rerun' in message
+    assert _manifest(tmp_path)['phase'] == 'staging_created'
+    assert snowflake.formats == {'TABLE': 'native', 'TABLE_ICEBERG': 'iceberg'}
+    assert not _renames(snowflake.queries)
+
+
 def test_query_tags_reset_between_calls(tmp_path):
     """A reused converter never tags new queries with an earlier attempt."""
     snowflake = FakeSnowflake()

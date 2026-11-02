@@ -454,12 +454,48 @@ def test_fastsync_readiness_lets_an_interrupted_publication_resume(tmp_path):
 
 def test_tap_blockers_require_flattening_level_zero():
     """Automatic conversion needs the level-0 column mapping the preflight assumes."""
-    iceberg = {'target_table_format': 'iceberg'}
+    iceberg = {'target_table_format': 'iceberg', 'iceberg_version': 3}
     assert native_to_iceberg.tap_blockers({**iceberg, 'data_flattening_max_level': 0}) == []
     assert native_to_iceberg.tap_blockers(iceberg) == []
     assert native_to_iceberg.tap_blockers({**iceberg, 'data_flattening_max_level': 10}) == [
         'data_flattening_max_level is 10; native_to_iceberg_conversion requires 0'
     ]
+
+
+@pytest.mark.parametrize('version', [None, 2, True, '3'])
+def test_tap_blockers_require_iceberg_version_three(version):
+    """An Iceberg tap imported without exactly iceberg_version 3 is not ready."""
+    settings = {'target_table_format': 'iceberg', 'iceberg_version': version, 'data_flattening_max_level': 0}
+
+    assert native_to_iceberg.tap_blockers(settings) == [
+        f'iceberg_version is {version!r}; native_to_iceberg_conversion requires 3'
+    ]
+
+
+@pytest.mark.parametrize(
+    'settings',
+    [
+        {'data_flattening_max_level': 0},
+        {'target_table_format': 'iceberg', 'iceberg_version': 2},
+        {'target_table_format': 'iceberg', 'iceberg_version': 3, 'data_flattening_max_level': 10},
+    ],
+)
+def test_run_tap_refuses_a_tap_whose_files_are_not_imported_for_conversion(settings):
+    """The main config alone never converts; the generated files must carry the Iceberg settings."""
+    with pytest.raises(NativeToIcebergConversionException) as error:
+        native_to_iceberg.assert_imported_for_conversion(settings, 'orders')
+
+    message = str(error.value)
+    assert 'stopped before any Snowflake work' in message
+    assert 'imported configuration of tap orders is not ready' in message
+    assert 'Run import_config for the tap' in message
+
+
+def test_run_tap_accepts_a_tap_imported_for_conversion():
+    """An Iceberg v3 tap with level-0 columns passes the import check."""
+    native_to_iceberg.assert_imported_for_conversion(
+        {'target_table_format': 'iceberg', 'iceberg_version': 3, 'data_flattening_max_level': 0}, 'orders',
+    )
 
 
 def test_tap_blockers_wait_for_the_imported_iceberg_catalog():
@@ -519,3 +555,106 @@ def test_report_preflights_blocked_native_tables_too():
     assert len(reports[0].blockers) == 2
     assert 'TABLE_NATIVE" already exists' in reports[0].blockers[0]
     assert 'Column CREATED_AT is TIMESTAMP_TZ' in reports[0].blockers[1]
+
+
+SHARED = SnowflakeObjectName('DATABASE', 'SCHEMA', 'T')
+LEGACY_REFUSAL = '"DATABASE"."SCHEMA"."T" is also written by tap legacy, which does not write managed Iceberg v3'
+
+
+def _other_writer(refusal=None, writer_types=None, tap='legacy'):
+    return native_to_iceberg.OtherWriter(
+        ConversionTarget(f'public-t of tap {tap}', SHARED, writer_types or {}),
+        refusal,
+    )
+
+
+def test_other_tap_writers_keep_only_planned_tables():
+    """Another tap's streams count only for this tap's tables, labelled with that tap."""
+    planned = [ConversionTarget('public-t', SHARED)]
+    written = [
+        ConversionTarget('public-t', SHARED, {'DOC': 'VARIANT'}),
+        ConversionTarget('public-u', SnowflakeObjectName('DATABASE', 'SCHEMA', 'U')),
+    ]
+
+    writers = native_to_iceberg.other_tap_writers('legacy', written, planned, 'does not write managed Iceberg v3')
+
+    assert writers == [_other_writer(LEGACY_REFUSAL)]
+    assert writers[0].target.writer_types == {'DOC': 'VARIANT'}
+    assert native_to_iceberg.other_tap_writers('mirror', written, planned)[0].refusal is None
+
+
+def test_gate_refuses_a_native_table_that_another_tap_writes():
+    """A table shared with a tap that would fail on Iceberg is never converted."""
+    with _gate([_classified('T', STATE_NATIVE, 1)]) as (converter, _, _):
+        with pytest.raises(NativeToIcebergConversionException, match='T .*needs an operator.*tap legacy'):
+            native_to_iceberg.convert_tap_tables({}, '/runtime', [], other_writers=[_other_writer(LEGACY_REFUSAL)])
+
+    converter.preflight.assert_not_called()
+    converter.convert.assert_not_called()
+
+
+def test_gate_holds_back_a_pending_attempt_that_has_not_cut_over():
+    """A pending attempt whose primary is still native waits for the shared writer too."""
+    first = [_classified('T', STATE_PENDING, 1)]
+
+    with _gate(first) as (converter, _, _):
+        with pytest.raises(NativeToIcebergConversionException, match='also written by tap legacy'):
+            native_to_iceberg.convert_tap_tables({}, '/runtime', [], other_writers=[_other_writer(LEGACY_REFUSAL)])
+
+    converter.convert.assert_not_called()
+
+
+def test_gate_still_closes_an_interrupted_cutover_of_a_shared_table():
+    """A missing primary gets its name back first, whoever else writes the table."""
+    first = [_classified('T', STATE_PENDING, 1, primary='missing')]
+
+    with _gate(first, [_classified('T', STATE_ICEBERG)]) as (converter, _, _):
+        native_to_iceberg.convert_tap_tables({}, '/runtime', [], other_writers=[_other_writer(LEGACY_REFUSAL)])
+
+    converter.convert.assert_called_once_with(_quoted('T'), eventual='iceberg', writer_types={})
+
+
+def test_gate_refuses_column_classes_that_another_iceberg_tap_disagrees_with():
+    """An Iceberg tap writing the same table must map each column to the same class."""
+    first = [_classified('T', STATE_NATIVE, 1, stream='public-t', writer_types={'DOC': 'TEXT'})]
+    writer = _other_writer(writer_types={'DOC': 'VARIANT'}, tap='mirror')
+
+    with _gate(first) as (converter, _, _):
+        with pytest.raises(
+            NativeToIcebergConversionException,
+            match='Column DOC is TEXT for stream public-t but VARIANT for stream public-t of tap mirror',
+        ):
+            native_to_iceberg.convert_tap_tables({}, '/runtime', [], other_writers=[writer])
+
+    converter.convert.assert_not_called()
+
+
+def test_gate_applies_the_column_classes_of_other_iceberg_taps():
+    """Preflight and conversion use the classes every Iceberg writer of the table expects."""
+    first = [_classified('T', STATE_NATIVE, 1, writer_types={'DOC': 'VARIANT'})]
+    writer = _other_writer(writer_types={'NOTE': 'TEXT'}, tap='mirror')
+    merged = {'DOC': 'VARIANT', 'NOTE': 'TEXT'}
+
+    with _gate(first, [_classified('T', STATE_ICEBERG)]) as (converter, _, _):
+        native_to_iceberg.convert_tap_tables({}, '/runtime', [], other_writers=[writer])
+
+    converter.preflight.assert_called_once_with(_quoted('T'), merged)
+    converter.convert.assert_called_once_with(_quoted('T'), eventual='iceberg', writer_types=merged)
+
+
+def test_report_lists_other_writers_that_block_a_table(tmp_path):
+    """The report is not ready while another tap would fail on the converted table."""
+    snowflake = FakeSnowflake()
+    target = ConversionTarget('public-t', SnowflakeObjectName('DATABASE', 'SCHEMA', 'TABLE'))
+    writer = native_to_iceberg.OtherWriter(
+        ConversionTarget('public-t of tap legacy', target.table), 'also written by tap legacy',
+    )
+
+    with patch.object(native_to_iceberg, 'SnowflakeConversionQueryAdapter', return_value=snowflake):
+        reports = native_to_iceberg.preflight_report(
+            {'dbname': 'database'}, str(tmp_path), [target], other_writers=[writer],
+        )
+
+    assert reports[0].state == STATE_BLOCKED
+    assert reports[0].blockers == ('also written by tap legacy',)
+    assert json.loads(native_to_iceberg.render_preflight_report(reports, [], 'json'))['ready'] is False

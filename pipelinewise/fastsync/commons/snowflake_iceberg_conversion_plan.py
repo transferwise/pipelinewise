@@ -163,6 +163,17 @@ def _configured_database(target_config: Mapping[str, Any]) -> str:
     return database.upper()
 
 
+def same_snowflake_database(first: Mapping[str, Any], second: Mapping[str, Any]) -> bool:
+    """Return whether two target configurations write the same account and database."""
+    try:
+        return (
+            str(first.get('account') or '').lower() == str(second.get('account') or '').lower()
+            and _configured_database(first) == _configured_database(second)
+        )
+    except ValueError:
+        return False
+
+
 def singer_target_table(
     stream_id: str,
     target_config: Mapping[str, Any],
@@ -241,6 +252,30 @@ def plan_conversion_targets(
             _writer_types(streams.get(stream_id) or {}),
             blockers,
         ))
+    return targets
+
+
+def plan_written_tables(
+    catalog: Mapping[str, Any],
+    target_config: Mapping[str, Any],
+    stream_ids: Iterable[str],
+    fastsync_capable: bool,
+) -> List[ConversionTarget]:
+    """Map another tap's streams to every table its writers use, FastSync names included."""
+    streams = {stream.get('tap_stream_id'): stream for stream in catalog.get('streams', [])}
+    targets = []
+    for stream_id in dict.fromkeys(stream_ids):
+        try:
+            tables = {singer_target_table(stream_id, target_config)}
+            if fastsync_capable:
+                tables.add(fastsync_target_table(stream_id.replace('-', '.', 1), target_config))
+        except Exception:  # get_target_schema raises a bare Exception; such a stream writes nothing
+            continue
+        writer_types = _writer_types(streams.get(stream_id) or {})
+        targets.extend(
+            ConversionTarget(stream_id, table, writer_types)
+            for table in sorted(tables, key=lambda table: table.key)
+        )
     return targets
 
 

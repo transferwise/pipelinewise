@@ -3,7 +3,7 @@
 import json
 import logging
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from tabulate import tabulate
@@ -52,7 +52,8 @@ def next_action(target_id: str = '<target_id>', tap_id: str = '<tap_id>') -> str
     """Return the operator guidance shared by every stopped conversion."""
     return (
         'Replication did not start, and tables converted earlier stay converted. Fix the cause, '
-        'then rerun run_tap, which resumes any pending conversion. Check the remaining tables '
+        'keep native_to_iceberg_conversion enabled, and rerun run_tap, which resumes any pending '
+        'conversion. Check the remaining tables '
         f'with pipelinewise copy_native_to_iceberg --target {target_id} --tap {tap_id} '
         '--preflight-only --iceberg-version 3.'
     )
@@ -66,6 +67,14 @@ def _listed(details: Sequence[str]) -> str:
     if len(details) > MAX_LISTED_TABLES:
         summary += f'; and {len(details) - MAX_LISTED_TABLES} more tables listed in the log'
     return summary
+
+
+@dataclass(frozen=True)
+class OtherWriter:
+    """A stream of another imported tap that writes one of the planned tables."""
+
+    target: ConversionTarget
+    refusal: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -111,12 +120,15 @@ def writer_types_for_table(fqtn: str, imported: Sequence[ConversionTarget]) -> D
 def tap_blockers(target_config: Mapping[str, Any]) -> List[str]:
     """Return tap-wide reasons that automatic conversion cannot be enabled yet."""
     blockers = []
+    version = target_config.get('iceberg_version')
     if target_config.get('target_table_format') != STATE_ICEBERG:
         blockers.append(
             'The tap is not imported with target_table_format: iceberg yet, so its catalog '
             'may still map MariaDB JSON aliases to TEXT. Pause the tap, import the Iceberg '
             'settings with native_to_iceberg_conversion enabled: false, and run this report again'
         )
+    elif version != 3 or isinstance(version, bool):
+        blockers.append(f'iceberg_version is {version!r}; native_to_iceberg_conversion requires 3')
     level = target_config.get('data_flattening_max_level') or 0
     if level != 0 or isinstance(level, bool):
         blockers.append(
@@ -124,6 +136,65 @@ def tap_blockers(target_config: Mapping[str, Any]) -> List[str]:
             'requires 0'
         )
     return blockers
+
+
+def assert_imported_for_conversion(target_config: Mapping[str, Any], tap_id: str) -> None:
+    """Stop before any Snowflake work unless the tap's generated files carry its Iceberg settings."""
+    if blockers := tap_blockers(target_config):
+        raise NativeToIcebergConversionException(
+            'Automatic native-to-Iceberg conversion stopped before any Snowflake work: the '
+            f'imported configuration of tap {tap_id} is not ready for it. {_listed(blockers)}. '
+            'Run import_config for the tap, then rerun run_tap. Replication did not start, and '
+            'no table was changed.'
+        )
+
+
+def other_tap_writers(
+    tap_label: str,
+    written: Sequence[ConversionTarget],
+    planned: Sequence[ConversionTarget],
+    refusal: Optional[str] = None,
+) -> List[OtherWriter]:
+    """Keep another tap's streams that write a planned table; a refusal blocks converting it."""
+    keys = {target.table.key for target in planned if target.table is not None}
+    return [
+        OtherWriter(
+            replace(target, stream_id=f'{target.stream_id} of tap {tap_label}'),
+            f'{target.table.quoted} is also written by tap {tap_label}, which {refusal}' if refusal else None,
+        )
+        for target in written
+        if target.table is not None and target.table.key in keys
+    ]
+
+
+def _with_other_writers(
+    classified: Sequence[ClassifiedTarget],
+    writers: Sequence[OtherWriter],
+) -> List[ClassifiedTarget]:
+    """Block every native table that another tap writes in a form the converted table breaks."""
+    refusals: Dict[str, List[str]] = {}
+    for writer in writers:
+        if writer.refusal:
+            refusals.setdefault(writer.target.table.key, []).append(writer.refusal)
+    result = []
+    for item in classified:
+        reasons = refusals.get(item.target.table.key) if item.target.table else None
+        # An interrupted cutover is still closed first; only a native primary is held back.
+        if reasons and item.primary == STATE_NATIVE:
+            item = replace(item, state=STATE_BLOCKED, reasons=(*item.reasons, *dict.fromkeys(reasons)))
+        result.append(item)
+    return result
+
+
+def _writer_classes(
+    classified: Sequence[ClassifiedTarget],
+    writers: Sequence[OtherWriter],
+) -> Tuple[Dict[str, Dict[str, str]], Dict[str, List[str]]]:
+    """Merge the column classes of this tap's streams and of other Iceberg taps writing its tables."""
+    return _merge_writer_types(
+        [item.target for item in classified]
+        + [writer.target for writer in writers if writer.refusal is None]
+    )
 
 
 def classify(
@@ -180,13 +251,14 @@ def preflight_report(
     runtime_dir: str,
     targets: Sequence[ConversionTarget],
     conversion_warehouse: Optional[str] = None,
+    other_writers: Sequence[OtherWriter] = (),
 ) -> List[TableReport]:
     """Classify and preflight planned tables without locks, manifests, or DDL."""
     snowflake = SnowflakeConversionQueryAdapter(dict(target_config), conversion_warehouse)
     converter = SnowflakeNativeToIcebergConverter(snowflake, runtime_dir)
     reports = []
-    classified = classify(targets, snowflake, runtime_dir)
-    writer_types, conflicts = _merge_writer_types([item.target for item in classified])
+    classified = _with_other_writers(classify(targets, snowflake, runtime_dir), other_writers)
+    writer_types, conflicts = _writer_classes(classified, other_writers)
     for item in classified:
         key = item.target.table.key if item.target.table else None
         blockers = tuple(item.reasons) + tuple(conflicts.get(key, ()))
@@ -264,12 +336,13 @@ def _convert_tap_tables(
     targets: Sequence[ConversionTarget],
     conversion_warehouse: Optional[str],
     action: str,
+    writers: Sequence[OtherWriter],
 ) -> None:
     snowflake = SnowflakeConversionQueryAdapter(dict(target_config), conversion_warehouse)
     converter = SnowflakeNativeToIcebergConverter(snowflake, runtime_dir)
-    classified = classify(targets, snowflake, runtime_dir)
+    classified = _with_other_writers(classify(targets, snowflake, runtime_dir), writers)
     # Every stream's blockers and column classes count; only physical work is de-duplicated.
-    writer_types, conflicts = _merge_writer_types([item.target for item in classified])
+    writer_types, conflicts = _writer_classes(classified, writers)
     unique = _unique_tables(classified)
     # Filter before de-duplicating, so a blocked sibling stream cannot hide a table's state.
     pending = _unique_tables([
@@ -327,13 +400,14 @@ def convert_tap_tables(
     targets: Sequence[ConversionTarget],
     conversion_warehouse: Optional[str] = None,
     *,
+    other_writers: Sequence[OtherWriter] = (),
     target_id: str = '<target_id>',
     tap_id: str = '<tap_id>',
 ) -> None:
     """Leave every planned table new or managed Iceberg, or stop before any writer runs."""
     action = next_action(target_id, tap_id)
     try:
-        _convert_tap_tables(target_config, runtime_dir, targets, conversion_warehouse, action)
+        _convert_tap_tables(target_config, runtime_dir, targets, conversion_warehouse, action, other_writers)
     except NativeToIcebergConversionException:
         raise
     except Exception as exc:

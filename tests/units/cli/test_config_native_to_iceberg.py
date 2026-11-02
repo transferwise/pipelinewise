@@ -1,5 +1,7 @@
 """Validation and placement of the tap-level native-to-Iceberg conversion setting."""
 
+import json
+
 import pytest
 
 from pipelinewise import cli
@@ -91,6 +93,18 @@ def test_rejects_unsupported_conversion_settings(settings, message):
 
     with pytest.raises(InvalidConfigException, match=message):
         Config.validate_native_to_iceberg_conversion(tap, _table_format_target())
+
+
+def test_import_and_validate_reject_conversion_on_a_native_tap(tmp_path):
+    """Both commands load YAML through from_yamls, so no generated config enables a bad setting."""
+    yaml_dir = tmp_path / 'yaml'
+    yaml_dir.mkdir()
+    tap = _tap(native_to_iceberg_conversion={'enabled': True})
+    (yaml_dir / 'tap_test.yml').write_text(json.dumps(tap), encoding='utf-8')
+    (yaml_dir / 'target_test.yml').write_text(json.dumps(_table_format_target()), encoding='utf-8')
+
+    with pytest.raises(InvalidConfigException, match='requires target_table_format "iceberg"'):
+        Config.from_yamls(str(tmp_path / 'runtime'), str(yaml_dir))
 
 
 def test_rejects_conversion_for_non_snowflake_target():

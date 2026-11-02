@@ -14,6 +14,10 @@ from pipelinewise.fastsync.commons.snowflake_iceberg_validation import (
 )
 
 
+class ContentEvidenceMismatchError(NativeToIcebergConversionError):
+    """The destination's rows differ from the projected source rows."""
+
+
 class SnowflakeConversionEvidenceService:
     """Compare projected native rows with their Iceberg destination."""
 
@@ -60,7 +64,7 @@ class SnowflakeConversionEvidenceService:
                 f'{destination.quoted} does not match the projected contents of '
                 f'{source.quoted}'
             )
-            raise NativeToIcebergConversionError(
+            raise ContentEvidenceMismatchError(
                 content_evidence_mismatch(prefix, source_evidence, target_evidence)
             )
         return source_evidence

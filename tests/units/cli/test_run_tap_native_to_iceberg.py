@@ -1,5 +1,6 @@
 """run_tap converts a tap's native Snowflake tables before any writer runs."""
 
+import json
 from unittest.mock import MagicMock, call, patch
 
 import pidfile
@@ -7,6 +8,8 @@ import pytest
 
 from pipelinewise.cli.errors import NativeToIcebergConversionException
 from pipelinewise.cli.pipelinewise import PipelineWise
+from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_plan import ConversionTarget
+from pipelinewise.fastsync.commons.snowflake_iceberg_model import SnowflakeObjectName
 from tests.units.cli.cli_args import CliArgs
 
 
@@ -21,6 +24,9 @@ def _pipelinewise():
     instance.tap['target_table_format'] = 'iceberg'
     instance.tap['iceberg_version'] = 3
     instance.tap['native_to_iceberg_conversion'] = {'enabled': True, 'conversion_warehouse': 'CONVERSION_WH'}
+    # The sample tap's generated files are native; this fixture models a tap imported as Iceberg v3.
+    imported = instance._iceberg_target_config
+    instance._iceberg_target_config = lambda: {**imported(), 'target_table_format': 'iceberg', 'iceberg_version': 3}
     return instance
 
 
@@ -50,13 +56,27 @@ def test_enabled_conversion_runs_in_a_child_process(pipelinewise):
     )
 
 
+def test_main_config_alone_never_converts_a_tap_imported_as_native():
+    """A tap whose generated files lack its Iceberg settings stops before any Snowflake work."""
+    instance = PipelineWise(CliArgs(target='target_one', tap='tap_one'), CONFIG_DIR, VIRTUALENVS_DIR)
+    instance.tap['native_to_iceberg_conversion'] = {'enabled': True}
+
+    with patch.object(instance, '_run_in_child_process') as run_child:
+        with pytest.raises(NativeToIcebergConversionException, match='imported configuration of tap tap_one'):
+            instance._convert_native_tables_to_iceberg(STREAMS)
+
+    run_child.assert_not_called()
+
+
 def test_conversion_plans_the_selected_streams(pipelinewise):
     """The child plans the run's streams with the tap's schema mapping and conversion warehouse."""
     with patch('pipelinewise.cli.native_to_iceberg.convert_tap_tables') as convert_tables:
         pipelinewise._run_native_to_iceberg_conversion(STREAMS[:1], 'CONVERSION_WH')
 
     target_config, runtime_dir, targets, conversion_warehouse = convert_tables.call_args.args
-    assert convert_tables.call_args.kwargs == {'target_id': 'target_one', 'tap_id': 'tap_one'}
+    assert convert_tables.call_args.kwargs == {
+        'other_writers': [], 'target_id': 'target_one', 'tap_id': 'tap_one',
+    }
     assert target_config['dbname'] == 'my_db'
     assert target_config['schema_mapping']['db_test_mysql']['target_schema'] == 'db_test_mysql'
     assert runtime_dir == f'{CONFIG_DIR}/target_one'
@@ -190,3 +210,93 @@ def test_failed_conversion_stops_the_tap_and_alerts(pipelinewise, tmp_path):
         exc=error,
     )
     assert summary.call_args.args[0] == PipelineWise.STATUS_FAILED
+
+
+def _write_json(path, payload):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload), encoding='utf-8')
+
+
+ICEBERG_FILES = {'target_table_format': 'iceberg', 'iceberg_version': 3}
+CONVERTS = {'native_to_iceberg_conversion': {'enabled': True}}
+
+
+def _project(tmp_path):
+    """Write a config dir where orders converts and other taps write some of its tables."""
+    taps = {
+        'snow': [
+            ('orders', ICEBERG_FILES, ['public-orders', 'public-items'], CONVERTS),
+            ('legacy', {}, ['public-orders'], {}),
+            ('mirror', ICEBERG_FILES, ['public-items'], {}),
+            ('unrelated', {}, ['public-users'], {}),
+        ],
+        'snow_too': [('twin', ICEBERG_FILES, ['public-items'], CONVERTS)],
+        'elsewhere': [('far', {}, ['public-orders'], {})],
+        'csv': [('dump', {}, ['public-orders'], {})],
+    }
+    targets = {
+        'snow': ('target-snowflake', {'account': 'ACC', 'dbname': 'analytics', 'user': 'loader'}),
+        'snow_too': ('target-snowflake', {'account': 'acc', 'dbname': 'ANALYTICS', 'user': 'loader'}),
+        'elsewhere': ('target-snowflake', {'account': 'acc', 'dbname': 'other_db', 'user': 'loader'}),
+        'csv': ('target-s3-csv', {'s3_bucket': 'bucket'}),
+    }
+    main = {'targets': []}
+    for target_id, (target_type, target_config) in targets.items():
+        _write_json(tmp_path / target_id / 'config.json', target_config)
+        entries = []
+        for tap_id, files_format, streams, settings in taps[target_id]:
+            entries.append({'id': tap_id, 'name': tap_id, 'type': 'tap-postgres', **files_format, **settings})
+            tap_dir = tmp_path / target_id / tap_id
+            _write_json(tap_dir / 'config.json', {})
+            _write_json(tap_dir / 'inheritable_config.json', {
+                'schema_mapping': {'public': {'target_schema': 'sales'}}, **files_format,
+            })
+            _write_json(tap_dir / 'selection.json', {
+                'selection': [{'tap_stream_id': stream, 'replication_method': 'LOG_BASED'} for stream in streams],
+            })
+            _write_json(tap_dir / 'properties.json', {'streams': [
+                {'tap_stream_id': stream, 'schema': {'properties': {'doc': {'type': ['null', 'object']}}}}
+                for stream in streams
+            ]})
+        main['targets'].append({'id': target_id, 'name': target_id, 'type': target_type, 'taps': entries})
+    _write_json(tmp_path / 'config.json', main)
+    return PipelineWise(CliArgs(target='snow', tap='orders'), str(tmp_path), VIRTUALENVS_DIR)
+
+
+PLANNED = [
+    ConversionTarget(stream, SnowflakeObjectName('ANALYTICS', 'SALES', table))
+    for stream, table in (('public-orders', 'ORDERS'), ('public-items', 'ITEMS'))
+]
+
+
+def test_other_writers_cover_every_tap_writing_a_planned_table(tmp_path):
+    """Taps under any target on the same database count, refused unless they write Iceberg safely."""
+    instance = _project(tmp_path)
+
+    writers = instance._other_writers({'account': 'ACC', 'dbname': 'analytics'}, PLANNED)
+
+    assert sorted((writer.target.stream_id, writer.target.table.key) for writer in writers) == [
+        ('public-items of tap mirror', 'ANALYTICS.SALES.ITEMS'),
+        ('public-items of tap twin of target snow_too', 'ANALYTICS.SALES.ITEMS'),
+        ('public-orders of tap legacy', 'ANALYTICS.SALES.ORDERS'),
+    ]
+    refusals = {writer.target.stream_id: writer.refusal for writer in writers}
+    assert refusals['public-items of tap mirror'] is None
+    assert 'does not write managed Iceberg v3' in refusals['public-orders of tap legacy']
+    assert 'two targets cannot coordinate a conversion' in refusals['public-items of tap twin of target snow_too']
+    mirror = next(writer for writer in writers if writer.refusal is None)
+    assert mirror.target.writer_types == {'DOC': 'VARIANT'}
+
+
+def test_other_writers_skip_a_target_that_cannot_be_read(tmp_path):
+    """An unreadable target config is logged and skipped instead of stopping the tap."""
+    instance = _project(tmp_path)
+    (tmp_path / 'snow_too' / 'config.json').write_text(
+        '{"account": "{{ env_var[\'MISSING_VAR_FOR_THIS_TEST\'] }}"}', encoding='utf-8',
+    )
+
+    with patch.object(instance.logger, 'warning') as warning:
+        writers = instance._other_writers({'account': 'ACC', 'dbname': 'analytics'}, PLANNED[1:])
+
+    assert [writer.target.stream_id for writer in writers] == ['public-items of tap mirror']
+    assert warning.call_args.args[1] == 'snow_too'

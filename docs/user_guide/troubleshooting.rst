@@ -741,17 +741,25 @@ message names each table and the reason:
 
 * ``needs an operator``: for example a leftover ``<table>_NATIVE``, a companion
   table without a manifest, an unreadable manifest, a pending
-  ``--eventual native`` conversion, or two streams that write the same table
-  but map one column to ``TEXT`` and ``VARIANT``;
+  ``--eventual native`` conversion, two streams that write the same table but
+  map one column to ``TEXT`` and ``VARIANT``, or a table that
+  ``is also written by tap <tap_id>``, which does not write managed Iceberg v3
+  or converts it from another target;
 * ``cannot be converted``: a preflight blocker, such as a policy, a stream, a
   ``TIMESTAMP_TZ`` column, sub-microsecond values, a grant that Iceberg cannot
   carry, or a ``TEXT``/``VARIANT`` mismatch with the tap catalog;
-* ``failed``: the conversion itself raised an error.
+* ``failed``: the conversion itself raised an error;
+* ``stopped before any Snowflake work``: the main configuration enables
+  conversion, but the tap's generated configuration is not imported with its
+  Iceberg settings, for example after ``import_config --taps`` without this
+  tap. Run ``import_config`` for the tap.
 
 *How to fix:*
 
 1. Keep the tap stopped; it never replicates into native tables. Tables that
-   converted earlier in the run stay converted.
+   converted earlier in the run stay converted. Keep
+   ``native_to_iceberg_conversion`` enabled while you recover: with
+   ``enabled: false``, ``run_tap`` does not resume a pending conversion.
 2. List the remaining blockers with the feasibility report, and rerun it after
    each fix until it is ready:
 
@@ -762,7 +770,14 @@ message names each table and the reason:
 
 3. Fix each blocker. For a failed conversion, the manifest records the attempt,
    and the next ``run_tap`` resumes it. For an interrupted cutover, see
-   :ref:`troubleshooting_iceberg_conversion_missing_primary`.
+   :ref:`troubleshooting_iceberg_conversion_missing_primary`. For a table that
+   another tap writes, import that tap with ``target_table_format: iceberg`` and
+   ``iceberg_version: 3`` too, or stop it writing the table.
+
+   If a failed conversion says ``<table>_ICEBERG does not match the projected
+   contents of <table>`` before any cutover, ``<table>`` changed after the copy.
+   Stop every writer to it and drop ``<table>_ICEBERG``. Keep the manifest: the
+   next ``run_tap`` copies the table again.
 
    A pending attempt that a conversion check now refuses, for example one
    started by an earlier release, keeps its manifest and companion table. A grant
