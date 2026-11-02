@@ -270,9 +270,9 @@ def test_tap_scoped_report_plans_selected_streams(mock_report, capsys):
 
     pipelinewise.copy_native_to_iceberg()
 
-    target_config, runtime_dir, targets, warehouse = mock_report.call_args.args
+    target_config, runtime_dir, targets, conversion_warehouse = mock_report.call_args.args
     assert runtime_dir == f'{CONFIG_DIR}/target_one'
-    assert warehouse is None
+    assert conversion_warehouse is None
     assert target_config['dbname'] == 'my_db'
     assert target_config['data_flattening_max_level'] == 0
     assert [(target.stream_id, target.table.key, target.blockers) for target in targets] == [
@@ -297,8 +297,8 @@ def test_table_scoped_report_uses_the_named_table(mock_report, capsys):
 
     pipelinewise.copy_native_to_iceberg()
 
-    _, _, targets, warehouse = mock_report.call_args.args
-    assert warehouse is None
+    _, _, targets, conversion_warehouse = mock_report.call_args.args
+    assert conversion_warehouse is None
     assert [target.table.key for target in targets] == ['DATABASE.SCHEMA.TABLE']
     assert capsys.readouterr().out.strip().endswith('Ready: no blockers found.')
 

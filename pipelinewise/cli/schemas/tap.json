@@ -593,7 +593,7 @@
         "enabled": {
           "type": "boolean"
         },
-        "warehouse": {
+        "conversion_warehouse": {
           "type": "string"
         }
       }

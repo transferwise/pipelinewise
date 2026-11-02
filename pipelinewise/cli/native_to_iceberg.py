@@ -179,10 +179,10 @@ def preflight_report(
     target_config: Mapping[str, Any],
     runtime_dir: str,
     targets: Sequence[ConversionTarget],
-    warehouse: Optional[str] = None,
+    conversion_warehouse: Optional[str] = None,
 ) -> List[TableReport]:
     """Classify and preflight planned tables without locks, manifests, or DDL."""
-    snowflake = SnowflakeConversionQueryAdapter(dict(target_config), warehouse)
+    snowflake = SnowflakeConversionQueryAdapter(dict(target_config), conversion_warehouse)
     converter = SnowflakeNativeToIcebergConverter(snowflake, runtime_dir)
     reports = []
     classified = classify(targets, snowflake, runtime_dir)
@@ -262,10 +262,10 @@ def _convert_tap_tables(
     target_config: Mapping[str, Any],
     runtime_dir: str,
     targets: Sequence[ConversionTarget],
-    warehouse: Optional[str],
+    conversion_warehouse: Optional[str],
     action: str,
 ) -> None:
-    snowflake = SnowflakeConversionQueryAdapter(dict(target_config), warehouse)
+    snowflake = SnowflakeConversionQueryAdapter(dict(target_config), conversion_warehouse)
     converter = SnowflakeNativeToIcebergConverter(snowflake, runtime_dir)
     classified = classify(targets, snowflake, runtime_dir)
     # Every stream's blockers and column classes count; only physical work is de-duplicated.
@@ -325,7 +325,7 @@ def convert_tap_tables(
     target_config: Mapping[str, Any],
     runtime_dir: str,
     targets: Sequence[ConversionTarget],
-    warehouse: Optional[str] = None,
+    conversion_warehouse: Optional[str] = None,
     *,
     target_id: str = '<target_id>',
     tap_id: str = '<tap_id>',
@@ -333,7 +333,7 @@ def convert_tap_tables(
     """Leave every planned table new or managed Iceberg, or stop before any writer runs."""
     action = next_action(target_id, tap_id)
     try:
-        _convert_tap_tables(target_config, runtime_dir, targets, warehouse, action)
+        _convert_tap_tables(target_config, runtime_dir, targets, conversion_warehouse, action)
     except NativeToIcebergConversionException:
         raise
     except Exception as exc:

@@ -870,16 +870,18 @@ class Config:
         if (
             not isinstance(conversion, dict)
             or not isinstance(conversion.get('enabled'), bool)
-            or set(conversion) - {'enabled', 'warehouse'}
+            or set(conversion) - {'enabled', 'conversion_warehouse'}
         ):
             raise InvalidConfigException(
                 f'Tap "{tap.get("id")}" {setting} must be an object with a Boolean '
-                '"enabled" and an optional "warehouse".'
+                '"enabled" and an optional "conversion_warehouse".'
             )
-        warehouse = conversion.get('warehouse')
-        if 'warehouse' in conversion and (not isinstance(warehouse, str) or not warehouse.strip()):
+        conversion_warehouse = conversion.get('conversion_warehouse')
+        if 'conversion_warehouse' in conversion and (
+            not isinstance(conversion_warehouse, str) or not conversion_warehouse.strip()
+        ):
             raise InvalidConfigException(
-                f'Tap "{tap.get("id")}" {setting} warehouse must be a non-empty string.'
+                f'Tap "{tap.get("id")}" {setting} conversion_warehouse must be a non-empty string.'
             )
         if not conversion['enabled']:
             return

@@ -27,7 +27,7 @@ def _tap(**settings):
     'settings',
     [
         {**ICEBERG, 'native_to_iceberg_conversion': {'enabled': True}},
-        {**ICEBERG, 'native_to_iceberg_conversion': {'enabled': True, 'warehouse': 'CONVERSION_WH'}},
+        {**ICEBERG, 'native_to_iceberg_conversion': {'enabled': True, 'conversion_warehouse': 'CONVERSION_WH'}},
         {**ICEBERG, 'type': 'tap-mysql', 'native_to_iceberg_conversion': {'enabled': True}},
         {
             **ICEBERG,
@@ -72,12 +72,16 @@ def test_accepts_supported_conversion_settings(settings):
             'must be an object',
         ),
         (
-            {**ICEBERG, 'native_to_iceberg_conversion': {'enabled': True, 'warehouse': ' '}},
-            'warehouse must be a non-empty string',
+            {**ICEBERG, 'native_to_iceberg_conversion': {'enabled': True, 'warehouse': 'CONVERSION_WH'}},
+            'an optional "conversion_warehouse"',
         ),
         (
-            {**ICEBERG, 'native_to_iceberg_conversion': {'enabled': True, 'warehouse': 7}},
-            'warehouse must be a non-empty string',
+            {**ICEBERG, 'native_to_iceberg_conversion': {'enabled': True, 'conversion_warehouse': ' '}},
+            'conversion_warehouse must be a non-empty string',
+        ),
+        (
+            {**ICEBERG, 'native_to_iceberg_conversion': {'enabled': True, 'conversion_warehouse': 7}},
+            'conversion_warehouse must be a non-empty string',
         ),
     ],
 )
@@ -141,7 +145,7 @@ def test_schema_rejects_wrongly_typed_settings():
 def test_setting_reaches_main_config_but_not_the_target(tmp_path):
     """run_tap reads the setting from the main config; target-snowflake never sees it."""
     config = Config(str(tmp_path))
-    conversion = {'enabled': True, 'warehouse': 'CONVERSION_WH'}
+    conversion = {'enabled': True, 'conversion_warehouse': 'CONVERSION_WH'}
     tap = _tap(**ICEBERG, native_to_iceberg_conversion=conversion)
     target = _table_format_target()
     target['taps'] = [tap]

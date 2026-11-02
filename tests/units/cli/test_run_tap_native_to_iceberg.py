@@ -20,7 +20,7 @@ def _pipelinewise():
     instance = PipelineWise(CliArgs(target='target_one', tap='tap_one'), CONFIG_DIR, VIRTUALENVS_DIR)
     instance.tap['target_table_format'] = 'iceberg'
     instance.tap['iceberg_version'] = 3
-    instance.tap['native_to_iceberg_conversion'] = {'enabled': True, 'warehouse': 'CONVERSION_WH'}
+    instance.tap['native_to_iceberg_conversion'] = {'enabled': True, 'conversion_warehouse': 'CONVERSION_WH'}
     return instance
 
 
@@ -51,11 +51,11 @@ def test_enabled_conversion_runs_in_a_child_process(pipelinewise):
 
 
 def test_conversion_plans_the_selected_streams(pipelinewise):
-    """The child plans the run's streams with the tap's schema mapping and warehouse."""
+    """The child plans the run's streams with the tap's schema mapping and conversion warehouse."""
     with patch('pipelinewise.cli.native_to_iceberg.convert_tap_tables') as convert_tables:
         pipelinewise._run_native_to_iceberg_conversion(STREAMS[:1], 'CONVERSION_WH')
 
-    target_config, runtime_dir, targets, warehouse = convert_tables.call_args.args
+    target_config, runtime_dir, targets, conversion_warehouse = convert_tables.call_args.args
     assert convert_tables.call_args.kwargs == {'target_id': 'target_one', 'tap_id': 'tap_one'}
     assert target_config['dbname'] == 'my_db'
     assert target_config['schema_mapping']['db_test_mysql']['target_schema'] == 'db_test_mysql'
@@ -63,7 +63,7 @@ def test_conversion_plans_the_selected_streams(pipelinewise):
     assert [(target.stream_id, target.table.key, target.blockers) for target in targets] == [
         ('db_test_mysql-table_one', 'MY_DB.DB_TEST_MYSQL.TABLE_ONE', ()),
     ]
-    assert warehouse == 'CONVERSION_WH'
+    assert conversion_warehouse == 'CONVERSION_WH'
 
 
 def test_dead_conversion_child_still_alerts(pipelinewise):

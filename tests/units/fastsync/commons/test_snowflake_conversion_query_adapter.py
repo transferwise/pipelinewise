@@ -18,13 +18,15 @@ CONFIG = {
 }
 
 
-@pytest.mark.parametrize(('warehouse', 'expected'), [(None, 'TARGET_WH'), ('CONVERSION_WH', 'CONVERSION_WH')])
+@pytest.mark.parametrize(
+    ('conversion_warehouse', 'expected'), [(None, 'TARGET_WH'), ('CONVERSION_WH', 'CONVERSION_WH')],
+)
 @patch('pipelinewise.fastsync.commons.snowflake_iceberg.pem2der', return_value=b'key')
 @patch('pipelinewise.fastsync.commons.snowflake_iceberg.snowflake.connector.connect')
-def test_conversion_sessions_abort_detached_queries(mock_connect, _mock_pem2der, warehouse, expected):
+def test_conversion_sessions_abort_detached_queries(mock_connect, _mock_pem2der, conversion_warehouse, expected):
     """Every conversion session stops orphaned statements and can use its own warehouse."""
     config = dict(CONFIG)
-    adapter = SnowflakeConversionQueryAdapter(config, warehouse)
+    adapter = SnowflakeConversionQueryAdapter(config, conversion_warehouse)
 
     adapter.open_connection({'attempt_id': 'one'})
 

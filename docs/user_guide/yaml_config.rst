@@ -239,14 +239,14 @@ Tap configuration
        otherwise.
    * - ``native_to_iceberg_conversion``
      - Omitted
-     - Object with a Boolean ``enabled`` and an optional ``warehouse``. With
-       ``enabled: true``, ``run_tap`` converts the tap's existing native
-       Snowflake tables to managed Iceberg v3 before it replicates. Valid only
-       with ``target_table_format: iceberg``, ``iceberg_version: 3``, a
-       ``target-snowflake`` target, and an effective
-       ``data_flattening_max_level`` of ``0``. ``warehouse`` runs only the
-       conversion work on another Snowflake warehouse. Configure it at the tap
-       root, not in ``db_conn`` or the target. See
+     - Object with a Boolean ``enabled`` and an optional
+       ``conversion_warehouse``. With ``enabled: true``, ``run_tap`` converts
+       the tap's existing native Snowflake tables to managed Iceberg v3 before
+       it replicates. Valid only with ``target_table_format: iceberg``,
+       ``iceberg_version: 3``, a ``target-snowflake`` target, and an effective
+       ``data_flattening_max_level`` of ``0``. ``conversion_warehouse`` runs
+       only the conversion work on another Snowflake warehouse. Configure it at
+       the tap root, not in ``db_conn`` or the target. See
        :ref:`snowflake_iceberg_auto_conversion`.
    * - ``version_legacy_float_columns``
      - ``false``

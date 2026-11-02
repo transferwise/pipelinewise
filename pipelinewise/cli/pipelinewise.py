@@ -1692,7 +1692,7 @@ class PipelineWise:
             self._run_in_child_process(
                 self._run_native_to_iceberg_conversion,
                 list(stream_ids),
-                conversion.get('warehouse'),
+                conversion.get('conversion_warehouse'),
             )
         except ChildProcessError as exc:
             raise NativeToIcebergConversionException(
@@ -1700,7 +1700,7 @@ class PipelineWise:
                 f'{native_to_iceberg.next_action(self.target["id"], self.tap["id"])}'
             ) from exc
 
-    def _run_native_to_iceberg_conversion(self, stream_ids, warehouse) -> None:
+    def _run_native_to_iceberg_conversion(self, stream_ids, conversion_warehouse) -> None:
         from pipelinewise.cli import native_to_iceberg
 
         target_config = self._iceberg_target_config()
@@ -1712,7 +1712,7 @@ class PipelineWise:
             target_config,
             self.get_target_dir(self.target['id']),
             native_to_iceberg.tap_targets(catalog, target_config, fastsync_capable, stream_ids),
-            warehouse,
+            conversion_warehouse,
             target_id=self.target['id'],
             tap_id=self.tap['id'],
         )
@@ -2525,9 +2525,10 @@ class PipelineWise:
         from pipelinewise.cli import native_to_iceberg
 
         blockers = []
-        warehouse = None
+        conversion_warehouse = None
         if hasattr(self, 'tap'):
-            warehouse = (self.tap.get(Config.NATIVE_TO_ICEBERG_CONVERSION) or {}).get('warehouse')
+            conversion = self.tap.get(Config.NATIVE_TO_ICEBERG_CONVERSION) or {}
+            conversion_warehouse = conversion.get('conversion_warehouse')
             target_config = self._iceberg_target_config()
             catalog = utils.load_json(self.tap['files']['properties'])
             self._validate_tap_catalog(catalog, self.tap['files']['properties'])
@@ -2544,7 +2545,7 @@ class PipelineWise:
             target_config,
             self.get_target_dir(self.target['id']),
             targets,
-            warehouse,
+            conversion_warehouse,
         )
         return native_to_iceberg.render_preflight_report(
             reports, blockers, self.args.output_format,

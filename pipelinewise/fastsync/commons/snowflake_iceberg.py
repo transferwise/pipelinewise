@@ -194,9 +194,9 @@ class SnowflakeQueryAdapter(SnowflakeSqlClient):
 class SnowflakeConversionQueryAdapter(SnowflakeQueryAdapter):
     """Conversion executor, optionally on its own warehouse, whose orphaned statements stop."""
 
-    def __init__(self, connection_config, warehouse: Optional[str] = None):
-        if warehouse:
-            connection_config = {**connection_config, 'warehouse': warehouse}
+    def __init__(self, connection_config, conversion_warehouse: Optional[str] = None):
+        if conversion_warehouse:
+            connection_config = {**connection_config, 'warehouse': conversion_warehouse}
         super().__init__(connection_config)
 
     def _connect(self, **kwargs):

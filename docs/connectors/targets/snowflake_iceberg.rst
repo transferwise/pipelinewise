@@ -367,7 +367,7 @@ To move a tap that already replicates into native tables:
    iceberg_version: 3
    native_to_iceberg_conversion:
      enabled: true
-     warehouse: CONVERSION_WH  # optional; defaults to the target's warehouse
+     conversion_warehouse: CONVERSION_WH  # optional; defaults to the target's warehouse
 
 Every ``run_tap`` for the tap then runs a conversion step inside the tap's
 pidfile, before FastSync or Singer writes anything:
@@ -392,10 +392,10 @@ and runs with FastSync work list those schemas once more before FastSync starts.
 The setting accepts any tap that can write managed Iceberg v3 through
 ``target-snowflake``. It requires ``data_flattening_max_level: 0``, because
 conversion compares native columns with the tap catalog's top-level properties.
-``warehouse`` runs only the conversion queries on another warehouse, which the
-target role must be able to use. It is not part of the recovery identity, so a
-manual ``copy_native_to_iceberg`` on the target's warehouse can resume an
-automatic attempt.
+``conversion_warehouse`` runs only the conversion queries on another warehouse,
+which the target role must be able to use. It is not part of the recovery
+identity, so a manual ``copy_native_to_iceberg`` on the target's warehouse can
+resume an automatic attempt.
 
 Enabling the setting accepts the cutover gap described below: each table's name
 is briefly absent between its two renames, so readers of that table fail for
