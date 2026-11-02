@@ -228,7 +228,7 @@
 <li class="toctree-l2"><a class="reference internal" href="resync.html#choose-an-operation">Choose an operation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="resync.html#preflight">Preflight</a></li>
 <li class="toctree-l2"><a class="reference internal" href="resync.html#full-resync">Full resync</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="resync.html#postgresql-source-slot-reset">PostgreSQL source-slot reset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="resync.html#postgresql-and-yugabytedb-source-slot-reset">PostgreSQL and YugabyteDB source-slot reset</a></li>
 <li class="toctree-l3"><a class="reference internal" href="resync.html#configured-partialsync-and-replicas">Configured PartialSync and replicas</a></li>
 </ul>
 </li>
@@ -329,6 +329,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../connectors/taps/mixpanel.html">Mixpanel source</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../connectors/taps/salesforce.html">Salesforce source</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../connectors/taps/twilio.html">Twilio source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/yugabyte.html">YugabyteDB source</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../connectors/targets.html">Targets</a><ul>
@@ -414,6 +415,12 @@ its results.</p>
 <td><p>PostgreSQL</p></td>
 </tr>
 <tr class="row-odd"><td><p>MySQL / MariaDB</p></td>
+<td><p>Snowflake</p></td>
+</tr>
+<tr class="row-even"><td><p>YugabyteDB</p></td>
+<td><p>PostgreSQL</p></td>
+</tr>
+<tr class="row-odd"><td><p>YugabyteDB</p></td>
 <td><p>Snowflake</p></td>
 </tr>
 </tbody>
@@ -567,6 +574,8 @@ For example, <code class="docutils literal notranslate"><span class="pre">&quot;
 <p>For MySQL/MariaDB sources, <code class="docutils literal notranslate"><span class="pre">db_conn.engine</span></code> overrides server detection. Set it
 explicitly if a proxy hides the server identity. See <a class="reference internal" href="../connectors/taps/mysql.html#tap-mysql"><span class="std std-ref">MariaDB and MySQL source</span></a> for
 connection settings.</p>
+<p>For YugabyteDB sources, data-diff connects directly to <code class="docutils literal notranslate"><span class="pre">db_conn.host</span></code>. It
+ignores <code class="docutils literal notranslate"><span class="pre">load_balance</span></code> and <code class="docutils literal notranslate"><span class="pre">topology_keys</span></code>, which only replication uses.</p>
 </section>
 <section id="choosing-a-frequency-and-window">
 <h3>Choosing a frequency and window<a class="headerlink" href="#choosing-a-frequency-and-window" title="Link to this heading"></a></h3>
@@ -882,7 +891,17 @@ comparison queries run, and verified coverage does not advance.</p>
 BRIN, and still-building indexes do not satisfy this preflight policy.</p></li>
 <li><p>MySQL/MariaDB: a BTREE index with no prefix length on the timestamp column.
 <code class="docutils literal notranslate"><span class="pre">INVISIBLE</span></code> and <code class="docutils literal notranslate"><span class="pre">IGNORED</span></code> indexes do not satisfy the policy.</p></li>
+<li><p>YugabyteDB: a valid, ready, non-partial LSM index whose first column is the
+timestamp column, declared <code class="docutils literal notranslate"><span class="pre">ASC</span></code> or <code class="docutils literal notranslate"><span class="pre">DESC</span></code>. A YugabyteDB index column is
+<code class="docutils literal notranslate"><span class="pre">HASH</span></code> by default, and a <code class="docutils literal notranslate"><span class="pre">HASH</span></code> column does not qualify.</p></li>
+<li><p>YugabyteDB: the tap-yugabyte keyset index
+<code class="docutils literal notranslate"><span class="pre">((yb_hash_code(&lt;primary</span> <span class="pre">key&gt;)</span> <span class="pre">%</span> <span class="pre">N))</span> <span class="pre">ASC,</span> <span class="pre">&lt;timestamp_column&gt;</span> <span class="pre">ASC,</span> <span class="pre">&lt;primary</span> <span class="pre">key&gt;</span> <span class="pre">ASC</span></code>.
+The bucket must hash exactly the primary key. See <a class="reference internal" href="../connectors/taps/yugabyte.html#tap-yugabyte"><span class="std std-ref">YugabyteDB source</span></a>.</p></li>
 </ul>
+<p>With the YugabyteDB keyset index, data-diff adds a bucket condition to source
+queries. The condition matches every row. It lets YugabyteDB scan the index for
+wide windows instead of the whole table. The initial full scan still reads every
+source row before the cutoff to find the earliest timestamp.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>Preflight checks index metadata, not the query plan. A query may still use a

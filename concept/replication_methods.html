@@ -228,7 +228,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/resync.html#choose-an-operation">Choose an operation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/resync.html#preflight">Preflight</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/resync.html#full-resync">Full resync</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="../user_guide/resync.html#postgresql-source-slot-reset">PostgreSQL source-slot reset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/resync.html#postgresql-and-yugabytedb-source-slot-reset">PostgreSQL and YugabyteDB source-slot reset</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../user_guide/resync.html#configured-partialsync-and-replicas">Configured PartialSync and replicas</a></li>
 </ul>
 </li>
@@ -329,6 +329,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../connectors/taps/mixpanel.html">Mixpanel source</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../connectors/taps/salesforce.html">Salesforce source</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../connectors/taps/twilio.html">Twilio source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/yugabyte.html">YugabyteDB source</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../connectors/targets.html">Targets</a><ul>
@@ -391,9 +392,11 @@
 <p>A table’s replication method controls how its tap finds records after the
 initial load. FastSync is a transfer optimisation, not a replication method.</p>
 <p>MariaDB/MySQL and PostgreSQL preserve supported decimal precision and scale when
-replicating to Snowflake native, managed Iceberg v3, or PostgreSQL. This applies
-to every replication method; see <a class="reference internal" href="../user_guide/schema_changes.html#exact-decimal-mapping"><span class="std std-ref">Decimal mapping</span></a> for numeric fallback
-and column versioning after an upgrade.</p>
+replicating to Snowflake native, managed Iceberg v3, or PostgreSQL. YugabyteDB
+does the same for Snowflake native and PostgreSQL; it does not support managed
+Iceberg targets yet. This applies to every replication method; see
+<a class="reference internal" href="../user_guide/schema_changes.html#exact-decimal-mapping"><span class="std std-ref">Decimal mapping</span></a> for numeric fallback and column versioning after an
+upgrade.</p>
 <section id="choose-a-method">
 <h2>Choose a method<a class="headerlink" href="#choose-a-method" title="Link to this heading"></a></h2>
 <table class="docutils align-default" style="width: 100%">
@@ -440,8 +443,10 @@ stable increasing key. Use FULL_TABLE only when complete rescans are acceptable.
 <section id="log-based-replication">
 <span id="log-based"></span><h2>Log-based replication<a class="headerlink" href="#log-based-replication" title="Link to this heading"></a></h2>
 <p>LOG_BASED reads inserts, updates, and deletes from a database change log.
-PipelineWise supports it for MariaDB/MySQL, PostgreSQL, and MongoDB connectors.
-Experimental connector status still applies.</p>
+PipelineWise supports it for MariaDB/MySQL, PostgreSQL, YugabyteDB, and MongoDB
+connectors. Experimental connector status still applies. YugabyteDB LOG_BASED
+needs a target with FastSync, which creates its replication slot; see
+<a class="reference internal" href="../connectors/taps/yugabyte.html#tap-yugabyte"><span class="std std-ref">YugabyteDB source</span></a>.</p>
 <p>PostgreSQL and Snowflake targets physically remove source-deleted rows before
 acknowledging Singer state. See <a class="reference internal" href="../user_guide/metadata_columns.html#metadata-columns"><span class="std std-ref">Metadata columns</span></a> for deletion markers
 and processing.</p>

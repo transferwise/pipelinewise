@@ -228,7 +228,7 @@
 <li class="toctree-l2"><a class="reference internal" href="#choose-an-operation">Choose an operation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#preflight">Preflight</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#full-resync">Full resync</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#postgresql-source-slot-reset">PostgreSQL source-slot reset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#postgresql-and-yugabytedb-source-slot-reset">PostgreSQL and YugabyteDB source-slot reset</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#configured-partialsync-and-replicas">Configured PartialSync and replicas</a></li>
 </ul>
 </li>
@@ -329,6 +329,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../connectors/taps/mixpanel.html">Mixpanel source</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../connectors/taps/salesforce.html">Salesforce source</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../connectors/taps/twilio.html">Twilio source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/yugabyte.html">YugabyteDB source</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../connectors/targets.html">Targets</a><ul>
@@ -457,10 +458,11 @@ configured PartialSync into a full-table reload.</p>
 <code class="docutils literal notranslate"><span class="pre">properties.json</span></code>. It skips missing or unselected catalog entries and does
 nothing if no tables qualify. Explicit <code class="docutils literal notranslate"><span class="pre">--tables</span></code> requests retain existing
 catalog validation.</p>
-<section id="postgresql-source-slot-reset">
-<span id="resync-postgres-slot-reset"></span><h3>PostgreSQL source-slot reset<a class="headerlink" href="#postgresql-source-slot-reset" title="Link to this heading"></a></h3>
-<p>For a PostgreSQL tap containing enabled LOG_BASED tables, this command drops and
-recreates the tap-specific source slot once before any worker starts:</p>
+<section id="postgresql-and-yugabytedb-source-slot-reset">
+<span id="resync-postgres-slot-reset"></span><h3>PostgreSQL and YugabyteDB source-slot reset<a class="headerlink" href="#postgresql-and-yugabytedb-source-slot-reset" title="Link to this heading"></a></h3>
+<p>For a PostgreSQL or YugabyteDB tap containing enabled LOG_BASED tables, this
+command drops and recreates the tap-specific source slot once before any worker
+starts:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pipelinewise<span class="w"> </span>fast_sync<span class="w"> </span>--tap<span class="w"> </span>&lt;tap_id&gt;<span class="w"> </span>--target<span class="w"> </span>&lt;target_id&gt;
 </pre></div>
 </div>
@@ -469,7 +471,7 @@ so every selected table is rebuilt. The deprecated <code class="docutils literal
 the same behaviour. <code class="docutils literal notranslate"><span class="pre">--force</span></code> is not required for the reset: it only bypasses
 the resync size limit. Taps without enabled LOG_BASED tables do not reset a slot.</p>
 <table class="docutils align-default" id="id1">
-<caption><span class="caption-text">PostgreSQL slot behaviour during replication</span><a class="headerlink" href="#id1" title="Link to this table"></a></caption>
+<caption><span class="caption-text">Source slot behaviour during replication</span><a class="headerlink" href="#id1" title="Link to this table"></a></caption>
 <thead>
 <tr class="row-odd"><th class="head"><p>Command or operation</p></th>
 <th class="head"><p>Source slot</p></th>
@@ -499,6 +501,21 @@ or output plugin blocks the reset. Any legacy database-wide slot
 the legacy slot may serve other taps and is preferred by the replication reader.
 Coordinate any legacy-slot migration with your DBA and all affected taps; this
 command does not migrate or delete a legacy slot.</p>
+<p>For YugabyteDB, the reset differs in three ways:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">allowed_resync_max_size</span></code> uses YugabyteDB’s on-disk size, which differs
+from PostgreSQL’s. It also blocks colocated tables and views, which have no
+size. See <a class="reference internal" href="../connectors/taps/yugabyte.html#yugabyte-resync-size-limit"><span class="std std-ref">Resync size limit</span></a>.</p></li>
+<li><p>YugabyteDB reports a slot as active for
+<code class="docutils literal notranslate"><span class="pre">ysql_cdc_active_replication_slot_window_ms</span></code> (default five minutes) after its
+last consumer disconnects. The reset waits up to five and a half minutes for
+the flag to clear. A slot that stays active longer has a live consumer: stop
+it and retry. State is unchanged until the slot is free.</p></li>
+<li><p>For a PostgreSQL target, every LOG_BASED table needs <code class="docutils literal notranslate"><span class="pre">REPLICA</span> <span class="pre">IDENTITY</span>
+<span class="pre">DEFAULT</span></code> or <code class="docutils literal notranslate"><span class="pre">FULL</span></code>, because the new slot fixes each table’s identity.
+Otherwise the reset stops before any change. See
+<a class="reference internal" href="../connectors/taps/yugabyte.html#yugabyte-replica-identity"><span class="std std-ref">Replica identity</span></a>.</p></li>
+</ul>
 <p>After these checks, PipelineWise saves a unique
 <code class="docutils literal notranslate"><span class="pre">state.json.before-slot-reset-&lt;id&gt;.bak</span></code> alongside the state file, clears every
 tap bookmark, then drops and recreates the tap-specific slot. Backups are retained
@@ -552,9 +569,9 @@ location; visible unsupported dependencies stop the operation first. See
 <span class="w">  </span>--end_value<span class="w"> </span>&lt;inclusive_end&gt;
 </pre></div>
 </div>
-<p>PartialSync is available only from MariaDB/MySQL or PostgreSQL to Snowflake. If
-<code class="docutils literal notranslate"><span class="pre">--end_value</span></code> is omitted, PipelineWise captures the current replication
-position and updates state after the merge. See <a class="reference internal" href="partial_sync.html#partial-sync-cases"><span class="std std-ref">PartialSync behaviour</span></a> for
+<p>PartialSync is available only from MariaDB/MySQL, PostgreSQL, or YugabyteDB to
+Snowflake. If <code class="docutils literal notranslate"><span class="pre">--end_value</span></code> is omitted, PipelineWise captures the current
+replication position and updates state after the merge. See <a class="reference internal" href="partial_sync.html#partial-sync-cases"><span class="std std-ref">PartialSync behaviour</span></a> for
 schema and delete behaviour.</p>
 </section>
 <section id="failure-and-validation">

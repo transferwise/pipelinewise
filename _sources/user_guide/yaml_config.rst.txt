@@ -82,8 +82,9 @@ Global configuration
    * - ``allowed_resync_max_size`` / ``table_mb``
      - No
      - No limit
-     - Blocks oversized MariaDB/MySQL or PostgreSQL-to-Snowflake FullSync unless
-       ``--force`` is used.
+     - Blocks oversized MariaDB/MySQL, PostgreSQL, or YugabyteDB-to-Snowflake
+       FullSync unless ``--force`` is used. YugabyteDB measures size
+       differently; see :ref:`yugabyte_resync_size_limit`.
    * - ``switch_over_data_file``
      - No
      - None

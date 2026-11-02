@@ -228,7 +228,7 @@
 <li class="toctree-l2"><a class="reference internal" href="resync.html#choose-an-operation">Choose an operation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="resync.html#preflight">Preflight</a></li>
 <li class="toctree-l2"><a class="reference internal" href="resync.html#full-resync">Full resync</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="resync.html#postgresql-source-slot-reset">PostgreSQL source-slot reset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="resync.html#postgresql-and-yugabytedb-source-slot-reset">PostgreSQL and YugabyteDB source-slot reset</a></li>
 <li class="toctree-l3"><a class="reference internal" href="resync.html#configured-partialsync-and-replicas">Configured PartialSync and replicas</a></li>
 </ul>
 </li>
@@ -329,6 +329,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../connectors/taps/mixpanel.html">Mixpanel source</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../connectors/taps/salesforce.html">Salesforce source</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../connectors/taps/twilio.html">Twilio source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/yugabyte.html">YugabyteDB source</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../connectors/targets.html">Targets</a><ul>
@@ -388,11 +389,13 @@
              
   <section id="load-time-transformations">
 <span id="transformations"></span><h1>Load-time transformations<a class="headerlink" href="#load-time-transformations" title="Link to this heading"></a></h1>
-<p>PipelineWise can transform selected fields during ingestion. PostgreSQL and
-MySQL/MariaDB FastSync to Snowflake apply top-level transformations in the source
-<code class="docutils literal notranslate"><span class="pre">SELECT</span></code>, before CSV generation, for both FullSync and PartialSync and both
-native and managed Iceberg v3 targets. Local export files, S3 staging, archived
-load files, and Snowflake staging therefore receive only the configured output.
+<p>PipelineWise can transform selected fields during ingestion. PostgreSQL,
+MySQL/MariaDB, and YugabyteDB FastSync to Snowflake apply top-level
+transformations in the source <code class="docutils literal notranslate"><span class="pre">SELECT</span></code>, before CSV generation, for both
+FullSync and PartialSync. PostgreSQL and MySQL/MariaDB do this for both native
+and managed Iceberg v3 targets; YugabyteDB supports native targets only. Local
+export files, S3 staging, archived load files, and Snowflake staging therefore
+receive only the configured output.
 There is no subsequent Snowflake transformation <code class="docutils literal notranslate"><span class="pre">UPDATE</span></code> on these routes.</p>
 <p>Conditional rules intentionally retain the value when their conditions do not
 match; columns without transformations are unchanged. Configure rules accordingly
@@ -515,10 +518,11 @@ object named by <code class="docutils literal notranslate"><span class="pre">col
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
 <p>PipelineWise rejects <code class="docutils literal notranslate"><span class="pre">field_paths</span></code> and <code class="docutils literal notranslate"><span class="pre">when[].field_path</span></code> for every
-connector pair that has a FastSync component: MariaDB/MySQL, PostgreSQL, or
-MongoDB sources targeting PostgreSQL or Snowflake. This route-level check
-applies even when the configured table would use Singer replication. On
-those routes, transform only top-level columns or omit the nested condition.</p>
+connector pair that has a FastSync component: MariaDB/MySQL, PostgreSQL,
+YugabyteDB, or MongoDB sources targeting PostgreSQL or Snowflake. This
+route-level check applies even when the configured table would use Singer
+replication. On those routes, transform only top-level columns or omit the
+nested condition.</p>
 </div>
 </section>
 <section id="conditions">

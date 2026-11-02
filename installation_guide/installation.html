@@ -228,7 +228,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/resync.html#choose-an-operation">Choose an operation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/resync.html#preflight">Preflight</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/resync.html#full-resync">Full resync</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="../user_guide/resync.html#postgresql-source-slot-reset">PostgreSQL source-slot reset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/resync.html#postgresql-and-yugabytedb-source-slot-reset">PostgreSQL and YugabyteDB source-slot reset</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../user_guide/resync.html#configured-partialsync-and-replicas">Configured PartialSync and replicas</a></li>
 </ul>
 </li>
@@ -329,6 +329,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../connectors/taps/mixpanel.html">Mixpanel source</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../connectors/taps/salesforce.html">Salesforce source</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../connectors/taps/twilio.html">Twilio source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/yugabyte.html">YugabyteDB source</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../connectors/targets.html">Targets</a><ul>
@@ -478,6 +479,11 @@ make<span class="w"> </span>pipelinewise
 make<span class="w"> </span>connectors<span class="w"> </span>-e<span class="w"> </span><span class="nv">pw_connector</span><span class="o">=</span>tap-postgres,target-snowflake
 </pre></div>
 </div>
+<p><code class="docutils literal notranslate"><span class="pre">tap-yugabyte</span></code> FastSync and PartialSync run from their own virtual
+environment. Build it when the pipeline uses <code class="docutils literal notranslate"><span class="pre">tap-yugabyte</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span>fastsync-yugabyte
+</pre></div>
+</div>
 <p>PipelineWise creates an isolated virtual environment per component below
 <code class="docutils literal notranslate"><span class="pre">${PIPELINEWISE_HOME}/.virtualenvs</span></code>. Activate the CLI environment before use:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">PIPELINEWISE_HOME</span><span class="o">=</span><span class="s2">"</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span><span class="s2">"</span>
@@ -554,7 +560,11 @@ components. Install a subset with a comma-separated <code class="docutils litera
 <td><p>Experimental</p></td>
 <td><p>Twilio</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">tap-zendesk</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">tap-yugabyte</span></code></p></td>
+<td><p>Experimental</p></td>
+<td><p>YugabyteDB</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">tap-zendesk</span></code></p></td>
 <td><p>Experimental</p></td>
 <td><p>Zendesk</p></td>
 </tr>

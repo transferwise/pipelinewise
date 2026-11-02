@@ -228,7 +228,7 @@
 <li class="toctree-l2"><a class="reference internal" href="resync.html#choose-an-operation">Choose an operation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="resync.html#preflight">Preflight</a></li>
 <li class="toctree-l2"><a class="reference internal" href="resync.html#full-resync">Full resync</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="resync.html#postgresql-source-slot-reset">PostgreSQL source-slot reset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="resync.html#postgresql-and-yugabytedb-source-slot-reset">PostgreSQL and YugabyteDB source-slot reset</a></li>
 <li class="toctree-l3"><a class="reference internal" href="resync.html#configured-partialsync-and-replicas">Configured PartialSync and replicas</a></li>
 </ul>
 </li>
@@ -329,6 +329,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../connectors/taps/mixpanel.html">Mixpanel source</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../connectors/taps/salesforce.html">Salesforce source</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../connectors/taps/twilio.html">Twilio source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/yugabyte.html">YugabyteDB source</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../connectors/targets.html">Targets</a><ul>
@@ -455,14 +456,17 @@ required merely because an old target column remains.</p>
 <p>MariaDB/MySQL <code class="docutils literal notranslate"><span class="pre">DECIMAL(p,s)</span></code> or <code class="docutils literal notranslate"><span class="pre">NUMERIC(p,s)</span></code> and PostgreSQL
 <code class="docutils literal notranslate"><span class="pre">NUMERIC(p,s)</span></code> or <code class="docutils literal notranslate"><span class="pre">DECIMAL(p,s)</span></code> retain their declared precision and scale
 where supported by Snowflake native, Snowflake managed Iceberg v3, and PostgreSQL
-targets. This applies to Singer and supported FullSync/PartialSync routes. New
+targets. YugabyteDB <code class="docutils literal notranslate"><span class="pre">NUMERIC(p,s)</span></code> or <code class="docutils literal notranslate"><span class="pre">DECIMAL(p,s)</span></code> retain them on Snowflake
+native and PostgreSQL targets; YugabyteDB does not support managed Iceberg
+targets yet. This applies to Singer and supported FullSync/PartialSync routes. New
 columns always use this mapping. Snowflake reports <code class="docutils literal notranslate"><span class="pre">NUMERIC</span></code> as its equivalent
 <code class="docutils literal notranslate"><span class="pre">NUMBER</span></code> type.
 Approximate <code class="docutils literal notranslate"><span class="pre">FLOAT</span></code>, <code class="docutils literal notranslate"><span class="pre">DOUBLE</span></code>, and <code class="docutils literal notranslate"><span class="pre">REAL</span></code> columns keep their existing mapping.
 Other sources and destination combinations keep their existing behavior.
 PostgreSQL numeric primary keys use canonical text on Snowflake so a <code class="docutils literal notranslate"><span class="pre">NaN</span></code>
 key remains representable; other supported decimal columns use the mapping
-below.</p>
+below. YugabyteDB rejects <code class="docutils literal notranslate"><span class="pre">NaN</span></code> in decimal columns, so its supported numeric
+primary keys use the fixed-point mapping.</p>
 <p>Run <code class="docutils literal notranslate"><span class="pre">import_config</span></code> after upgrading to refresh the generated tap configuration
 and catalogs before replication resumes. Decimal values and decimal replication
 bookmarks travel as exact strings within the Singer protocol. Their schema

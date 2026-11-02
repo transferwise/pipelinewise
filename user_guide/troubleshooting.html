@@ -228,7 +228,7 @@
 <li class="toctree-l2"><a class="reference internal" href="resync.html#choose-an-operation">Choose an operation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="resync.html#preflight">Preflight</a></li>
 <li class="toctree-l2"><a class="reference internal" href="resync.html#full-resync">Full resync</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="resync.html#postgresql-source-slot-reset">PostgreSQL source-slot reset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="resync.html#postgresql-and-yugabytedb-source-slot-reset">PostgreSQL and YugabyteDB source-slot reset</a></li>
 <li class="toctree-l3"><a class="reference internal" href="resync.html#configured-partialsync-and-replicas">Configured PartialSync and replicas</a></li>
 </ul>
 </li>
@@ -329,6 +329,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../connectors/taps/mixpanel.html">Mixpanel source</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../connectors/taps/salesforce.html">Salesforce source</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../connectors/taps/twilio.html">Twilio source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/yugabyte.html">YugabyteDB source</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../connectors/targets.html">Targets</a><ul>
@@ -825,7 +826,7 @@ Run <code class="docutils literal notranslate"><span class="pre">pipelinewise</s
 no <code class="docutils literal notranslate"><span class="pre">--tables</span></code> and the default <code class="docutils literal notranslate"><span class="pre">--replication_method_only</span> <span class="pre">'*'</span></code> to resync the
 whole tap and recreate its slot. Add <code class="docutils literal notranslate"><span class="pre">--force</span></code> only to bypass the resync size
 limit; <code class="docutils literal notranslate"><span class="pre">sync_start_from</span></code> remains effective either way. See
-<a class="reference internal" href="resync.html#resync-postgres-slot-reset"><span class="std std-ref">PostgreSQL source-slot reset</span></a> for preflight checks, backups, and
+<a class="reference internal" href="resync.html#resync-postgres-slot-reset"><span class="std std-ref">PostgreSQL and YugabyteDB source-slot reset</span></a> for preflight checks, backups, and
 pending-Iceberg recovery before proceeding.</p>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>

@@ -228,7 +228,7 @@
 <li class="toctree-l2"><a class="reference internal" href="resync.html#choose-an-operation">Choose an operation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="resync.html#preflight">Preflight</a></li>
 <li class="toctree-l2"><a class="reference internal" href="resync.html#full-resync">Full resync</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="resync.html#postgresql-source-slot-reset">PostgreSQL source-slot reset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="resync.html#postgresql-and-yugabytedb-source-slot-reset">PostgreSQL and YugabyteDB source-slot reset</a></li>
 <li class="toctree-l3"><a class="reference internal" href="resync.html#configured-partialsync-and-replicas">Configured PartialSync and replicas</a></li>
 </ul>
 </li>
@@ -329,6 +329,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../connectors/taps/mixpanel.html">Mixpanel source</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../connectors/taps/salesforce.html">Salesforce source</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../connectors/taps/twilio.html">Twilio source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/yugabyte.html">YugabyteDB source</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../connectors/targets.html">Targets</a><ul>
@@ -389,17 +390,17 @@
   <section id="partialsync-behaviour">
 <span id="partial-sync-cases"></span><h1>PartialSync behaviour<a class="headerlink" href="#partialsync-behaviour" title="Link to this heading"></a></h1>
 <p>PartialSync exports a bounded source range, loads a temporary target table, and
-merges that range into the existing target. It is available from MariaDB/MySQL or
-PostgreSQL to Snowflake.</p>
+merges that range into the existing target. It is available from MariaDB/MySQL,
+PostgreSQL, or YugabyteDB to Snowflake.</p>
 <p>Changed non-key decimal definitions use column versioning before the merge.
 Historical versions remain available, and untouched rows have NULL in the new
 column. Decimal primary-key changes and lossy decimal range mappings require FullSync. See <a class="reference internal" href="schema_changes.html#exact-decimal-mapping"><span class="std std-ref">Decimal mapping</span></a>.</p>
 <p>A table configured with <code class="docutils literal notranslate"><span class="pre">sync_start_from</span></code> also uses PartialSync during
 <code class="docutils literal notranslate"><span class="pre">fast_sync</span></code>, including <code class="docutils literal notranslate"><span class="pre">fast_sync</span> <span class="pre">--force</span></code>. The flag bypasses the FullSync
 size limit; it does not override the configured range or request a full-table
-reload. An unfiltered whole-tap PostgreSQL <code class="docutils literal notranslate"><span class="pre">fast_sync</span></code> still resets its
-LOG_BASED source slot before workers start; standalone <code class="docutils literal notranslate"><span class="pre">partial_sync_table</span></code>
-retains it. See <a class="reference internal" href="resync.html#resync-postgres-slot-reset"><span class="std std-ref">PostgreSQL source-slot reset</span></a>.</p>
+reload. An unfiltered whole-tap PostgreSQL or YugabyteDB <code class="docutils literal notranslate"><span class="pre">fast_sync</span></code> still
+resets its LOG_BASED source slot before workers start; standalone
+<code class="docutils literal notranslate"><span class="pre">partial_sync_table</span></code> retains it. See <a class="reference internal" href="resync.html#resync-postgres-slot-reset"><span class="std std-ref">PostgreSQL and YugabyteDB source-slot reset</span></a>.</p>
 <section id="range-semantics">
 <h2>Range semantics<a class="headerlink" href="#range-semantics" title="Link to this heading"></a></h2>
 <p>The start boundary is inclusive. An explicit end boundary is also inclusive.

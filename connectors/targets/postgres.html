@@ -228,7 +228,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/resync.html#choose-an-operation">Choose an operation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/resync.html#preflight">Preflight</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/resync.html#full-resync">Full resync</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="../../user_guide/resync.html#postgresql-source-slot-reset">PostgreSQL source-slot reset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/resync.html#postgresql-and-yugabytedb-source-slot-reset">PostgreSQL and YugabyteDB source-slot reset</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../user_guide/resync.html#configured-partialsync-and-replicas">Configured PartialSync and replicas</a></li>
 </ul>
 </li>
@@ -329,6 +329,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../taps/mixpanel.html">Mixpanel source</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../taps/salesforce.html">Salesforce source</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../taps/twilio.html">Twilio source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../taps/yugabyte.html">YugabyteDB source</a></li>
 </ul>
 </li>
 <li class="toctree-l1 current"><a class="reference internal" href="../targets.html">Targets</a><ul class="current">
@@ -391,8 +392,8 @@
 <span id="target-postgres"></span><h1>PostgreSQL target<a class="headerlink" href="#postgresql-target" title="Link to this heading"></a></h1>
 <p><code class="docutils literal notranslate"><span class="pre">target-postgres</span></code> loads Singer streams into PostgreSQL and manages compatible
 target schema changes.</p>
-<p>MariaDB/MySQL and PostgreSQL source decimals use <code class="docutils literal notranslate"><span class="pre">NUMERIC(p,s)</span></code> with their
-supported dimensions. Unconstrained PostgreSQL <code class="docutils literal notranslate"><span class="pre">NUMERIC</span></code> remains unconstrained.
+<p>MariaDB/MySQL, PostgreSQL, and YugabyteDB source decimals use <code class="docutils literal notranslate"><span class="pre">NUMERIC(p,s)</span></code>
+with their supported dimensions. Unconstrained <code class="docutils literal notranslate"><span class="pre">NUMERIC</span></code> remains unconstrained.
 Older targets use unconstrained <code class="docutils literal notranslate"><span class="pre">NUMERIC</span></code> for unsupported scale declarations.
 Existing <code class="docutils literal notranslate"><span class="pre">REAL</span></code> or <code class="docutils literal notranslate"><span class="pre">DOUBLE</span> <span class="pre">PRECISION</span></code> columns created by the legacy decimal
 mapping remain in place, including primary keys. Singer stages those values with
@@ -428,7 +429,8 @@ See <a class="reference internal" href="../../user_guide/schema_changes.html#exa
 <tbody>
 <tr class="row-even"><td><p>PostgreSQL</p></td>
 <td><p>Available</p></td>
-<td><p>FullSync from MariaDB/MySQL, PostgreSQL, or MongoDB; no PartialSync</p></td>
+<td><p>FullSync from MariaDB/MySQL, PostgreSQL, YugabyteDB, or MongoDB; no
+PartialSync</p></td>
 </tr>
 </tbody>
 </table>

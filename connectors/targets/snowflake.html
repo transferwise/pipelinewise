@@ -228,7 +228,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/resync.html#choose-an-operation">Choose an operation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/resync.html#preflight">Preflight</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/resync.html#full-resync">Full resync</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="../../user_guide/resync.html#postgresql-source-slot-reset">PostgreSQL source-slot reset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/resync.html#postgresql-and-yugabytedb-source-slot-reset">PostgreSQL and YugabyteDB source-slot reset</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../user_guide/resync.html#configured-partialsync-and-replicas">Configured PartialSync and replicas</a></li>
 </ul>
 </li>
@@ -329,6 +329,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../taps/mixpanel.html">Mixpanel source</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../taps/salesforce.html">Salesforce source</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../taps/twilio.html">Twilio source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../taps/yugabyte.html">YugabyteDB source</a></li>
 </ul>
 </li>
 <li class="toctree-l1 current"><a class="reference internal" href="../targets.html">Targets</a><ul class="current">
@@ -394,6 +395,8 @@ CSV files into native or managed Iceberg v3 tables. It also supports FastSync
 for selected database sources.</p>
 <p>MariaDB/MySQL and PostgreSQL source <code class="docutils literal notranslate"><span class="pre">DECIMAL</span></code> and <code class="docutils literal notranslate"><span class="pre">NUMERIC</span></code> columns retain
 supported precision and scale in new native and managed Iceberg columns.
+YugabyteDB columns do the same in native tables; YugabyteDB does not support
+managed Iceberg targets yet.
 Existing legacy floating-point decimal columns remain unchanged unless
 <code class="docutils literal notranslate"><span class="pre">version_legacy_float_columns</span></code> is enabled on the tap. See
 <a class="reference internal" href="../../user_guide/schema_changes.html#exact-decimal-mapping"><span class="std std-ref">Decimal mapping</span></a> for compatible numeric declarations, FLOAT
@@ -425,9 +428,9 @@ acknowledged. Metadata columns are enabled automatically; see
 <tbody>
 <tr class="row-even"><td><p>Snowflake</p></td>
 <td><p>Available</p></td>
-<td><p>Native FullSync from MariaDB/MySQL, PostgreSQL, or MongoDB; native or
-managed Iceberg v3 FullSync and PartialSync from MariaDB/MySQL or
-PostgreSQL</p></td>
+<td><p>Native FullSync from MariaDB/MySQL, PostgreSQL, YugabyteDB, or MongoDB;
+native PartialSync from YugabyteDB; native or managed Iceberg v3
+FullSync and PartialSync from MariaDB/MySQL or PostgreSQL</p></td>
 </tr>
 </tbody>
 </table>

@@ -228,7 +228,7 @@
 <li class="toctree-l2"><a class="reference internal" href="resync.html#choose-an-operation">Choose an operation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="resync.html#preflight">Preflight</a></li>
 <li class="toctree-l2"><a class="reference internal" href="resync.html#full-resync">Full resync</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="resync.html#postgresql-source-slot-reset">PostgreSQL source-slot reset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="resync.html#postgresql-and-yugabytedb-source-slot-reset">PostgreSQL and YugabyteDB source-slot reset</a></li>
 <li class="toctree-l3"><a class="reference internal" href="resync.html#configured-partialsync-and-replicas">Configured PartialSync and replicas</a></li>
 </ul>
 </li>
@@ -329,6 +329,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../connectors/taps/mixpanel.html">Mixpanel source</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../connectors/taps/salesforce.html">Salesforce source</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../connectors/taps/twilio.html">Twilio source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/yugabyte.html">YugabyteDB source</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../connectors/targets.html">Targets</a><ul>
@@ -555,9 +556,12 @@ result. A successful status row does not prove source-to-target equality.</p>
 <h3><code class="docutils literal notranslate"><span class="pre">tap_info</span></code><a class="headerlink" href="#tap-info" title="Link to this heading"></a></h3>
 <p>Run <code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">tap_info</span> <span class="pre">--tap</span> <span class="pre">&lt;tap_id&gt;</span></code> to get information about the tap
 and its selected tables, including table sizes, indexes, and primary keys.
-This command is available only for MySQL and PostgreSQL taps.
-Only <code class="docutils literal notranslate"><span class="pre">--tap</span></code> is required. Use <code class="docutils literal notranslate"><span class="pre">--target</span> <span class="pre">&lt;target_id&gt;</span></code> to select a target.
-If the tap ID exists under multiple targets.</p>
+This command is available only for MySQL, PostgreSQL, and YugabyteDB taps.
+Only <code class="docutils literal notranslate"><span class="pre">--tap</span></code> is required. If the tap ID exists under multiple targets, use
+<code class="docutils literal notranslate"><span class="pre">--target</span> <span class="pre">&lt;target_id&gt;</span></code> to select one.</p>
+<p><code class="docutils literal notranslate"><span class="pre">size_bytes</span></code> is <code class="docutils literal notranslate"><span class="pre">null</span></code> for views and foreign tables. For YugabyteDB it is
+also <code class="docutils literal notranslate"><span class="pre">null</span></code> for colocated tables. YugabyteDB measures size differently from
+PostgreSQL; see <a class="reference internal" href="../connectors/taps/yugabyte.html#yugabyte-resync-size-limit"><span class="std std-ref">YugabyteDB resync size limit</span></a>.</p>
 </section>
 <section id="test-tap-connection">
 <span id="cli-test-tap-connection"></span><h3><code class="docutils literal notranslate"><span class="pre">test_tap_connection</span></code><a class="headerlink" href="#test-tap-connection" title="Link to this heading"></a></h3>
@@ -633,10 +637,11 @@ state after an unexpected interruption.</p>
 back to Singer. A table with <code class="docutils literal notranslate"><span class="pre">sync_start_from</span></code> uses PartialSync. <code class="docutils literal notranslate"><span class="pre">sync_tables</span></code>
 remains a deprecated alias. Supplying <code class="docutils literal notranslate"><span class="pre">--tables</span></code> or setting
 <code class="docutils literal notranslate"><span class="pre">--replication_method_only</span></code> to anything other than <code class="docutils literal notranslate"><span class="pre">*</span></code> makes the resync
-filtered and retains the PostgreSQL replication slot, even if <code class="docutils literal notranslate"><span class="pre">--tables</span></code> lists
-every table. An unfiltered whole-tap PostgreSQL run with LOG_BASED tables resets
-its tap-specific slot once before workers start, with or without <code class="docutils literal notranslate"><span class="pre">--force</span></code>.
-See <a class="reference internal" href="resync.html#resync-postgres-slot-reset"><span class="std std-ref">PostgreSQL source-slot reset</span></a> for safety checks, backups, pending-Iceberg
+filtered and retains the PostgreSQL or YugabyteDB replication slot, even if
+<code class="docutils literal notranslate"><span class="pre">--tables</span></code> lists every table. An unfiltered whole-tap PostgreSQL or YugabyteDB
+run with LOG_BASED tables resets its tap-specific slot once before workers start,
+with or without <code class="docutils literal notranslate"><span class="pre">--force</span></code>.
+See <a class="reference internal" href="resync.html#resync-postgres-slot-reset"><span class="std std-ref">PostgreSQL and YugabyteDB source-slot reset</span></a> for safety checks, backups, pending-Iceberg
 guards, and non-atomic reset recovery.</p>
 </section>
 <section id="partial-sync-table">
@@ -652,7 +657,7 @@ guards, and non-atomic reset recovery.</p>
 </div>
 <p><code class="docutils literal notranslate"><span class="pre">--end_value</span></code> is optional. When absent, PipelineWise captures the current
 replication position and can update state after the merge. PartialSync is
-available only from MariaDB/MySQL or PostgreSQL to Snowflake. See
+available only from MariaDB/MySQL, PostgreSQL, or YugabyteDB to Snowflake. See
 <a class="reference internal" href="partial_sync.html#partial-sync-cases"><span class="std std-ref">PartialSync behaviour</span></a>.</p>
 </section>
 <section id="reset-state">

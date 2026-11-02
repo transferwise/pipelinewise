@@ -3,11 +3,13 @@
 Load-time transformations
 =========================
 
-PipelineWise can transform selected fields during ingestion. PostgreSQL and
-MySQL/MariaDB FastSync to Snowflake apply top-level transformations in the source
-``SELECT``, before CSV generation, for both FullSync and PartialSync and both
-native and managed Iceberg v3 targets. Local export files, S3 staging, archived
-load files, and Snowflake staging therefore receive only the configured output.
+PipelineWise can transform selected fields during ingestion. PostgreSQL,
+MySQL/MariaDB, and YugabyteDB FastSync to Snowflake apply top-level
+transformations in the source ``SELECT``, before CSV generation, for both
+FullSync and PartialSync. PostgreSQL and MySQL/MariaDB do this for both native
+and managed Iceberg v3 targets; YugabyteDB supports native targets only. Local
+export files, S3 staging, archived load files, and Snowflake staging therefore
+receive only the configured output.
 There is no subsequent Snowflake transformation ``UPDATE`` on these routes.
 
 Conditional rules intentionally retain the value when their conditions do not
@@ -119,10 +121,11 @@ object named by ``column``. A condition can similarly inspect
 .. warning::
 
    PipelineWise rejects ``field_paths`` and ``when[].field_path`` for every
-   connector pair that has a FastSync component: MariaDB/MySQL, PostgreSQL, or
-   MongoDB sources targeting PostgreSQL or Snowflake. This route-level check
-   applies even when the configured table would use Singer replication. On
-   those routes, transform only top-level columns or omit the nested condition.
+   connector pair that has a FastSync component: MariaDB/MySQL, PostgreSQL,
+   YugabyteDB, or MongoDB sources targeting PostgreSQL or Snowflake. This
+   route-level check applies even when the configured table would use Singer
+   replication. On those routes, transform only top-level columns or omit the
+   nested condition.
 
 
 .. _conditional_transformations:
