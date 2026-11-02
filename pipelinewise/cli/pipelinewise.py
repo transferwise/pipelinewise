@@ -1734,9 +1734,10 @@ class PipelineWise:
             error, traceback_text = result
             self.logger.debug('Child process traceback:\n%s', traceback_text)
             raise error
-        if process.exitcode != 0:
+        if not process.result_received or process.exitcode != 0:
+            # The child reports success explicitly, so silence is never treated as success.
             raise ChildProcessError(
-                f'The child process exited with status {process.exitcode} before reporting a result'
+                f'The child process exited with status {process.exitcode} without reporting a result'
             )
 
     def _run_with_command_signals(self, target, *args) -> None:

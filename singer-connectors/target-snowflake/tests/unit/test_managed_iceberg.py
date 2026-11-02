@@ -332,6 +332,17 @@ def test_connector_matches_shared_text_variant_classes():
         assert column_class == case['expected_class'], case
 
 
+def test_connector_matches_shared_level_zero_column_names():
+    for case in _v3_behavior_cases()['level_zero_column_names']:
+        name = case['name_repeat'] * case['name_times']
+        flattened = flattening.flatten_schema(
+            {'properties': {name: {'type': ['null', 'string']}}},
+            max_level=0,
+        )
+
+        assert [column.upper() for column in flattened] == [case['expected_column']], case
+
+
 def test_connector_executes_shared_mariadb_json_transport_case():
     case = _v3_behavior_cases()['mariadb_json_transport']
     schema = case['schema']

@@ -133,6 +133,16 @@ def test_plan_records_catalog_text_and_variant_columns():
     assert targets[0].writer_types == {'NOTE': plan.TEXT, 'ATTRIBUTES': plan.VARIANT}
 
 
+def test_plan_records_shortened_column_names_for_long_properties():
+    """A property name of 255 or more characters is checked under the column the connector writes."""
+    long_name = 'very_long_property_name_' * 12
+    catalog = {'streams': [_stream('public-orders', {long_name: {'type': ['null', 'object'], 'properties': {}}})]}
+
+    targets = plan.plan_conversion_targets(catalog, TARGET_CONFIG, ['public-orders'], True)
+
+    assert targets[0].writer_types == {'VLPN' * 12 + '_': plan.VARIANT}
+
+
 def test_selected_stream_ids_use_root_metadata():
     """Only streams selected at the root breadcrumb are planned."""
     catalog = {'streams': [

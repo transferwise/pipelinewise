@@ -323,6 +323,20 @@ def test_gate_post_check_requires_every_table_to_be_iceberg():
             native_to_iceberg.convert_tap_tables({}, '/runtime', [])
 
 
+def test_gate_resumes_a_pending_table_behind_a_blocked_sibling_stream():
+    """A blocked stream listed first never hides another stream's pending conversion."""
+    first = [
+        _classified('T', STATE_BLOCKED, 1, reasons=('FastSync writes another table',), stream='a-t'),
+        _classified('T', STATE_PENDING, 1, stream='b-t'),
+    ]
+
+    with _gate(first) as (converter, _, _):
+        with pytest.raises(NativeToIcebergConversionException, match=r'T \(stream a-t\) needs an operator'):
+            native_to_iceberg.convert_tap_tables({}, '/runtime', [])
+
+    assert converter.convert.call_args_list == [call(_quoted('T'), eventual='iceberg', writer_types={})]
+
+
 def test_gate_checks_every_stream_of_a_shared_table():
     """A second stream's blocker on a shared table is never hidden by de-duplication."""
     first = [

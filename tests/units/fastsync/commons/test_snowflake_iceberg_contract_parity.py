@@ -65,6 +65,17 @@ def test_core_classifies_singer_text_variant_cases():
         assert singer_text_variant_class(case['schema']) == case['expected_class'], case
 
 
+def test_core_predicts_shared_level_zero_column_names():
+    """Conversion preflight finds the column target-snowflake writes, even for long names."""
+    from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_plan import (
+        level_zero_column_name,
+    )
+
+    for case in _v3_behavior_cases()['level_zero_column_names']:
+        name = case['name_repeat'] * case['name_times']
+        assert level_zero_column_name(name) == case['expected_column'], case
+
+
 def test_core_matches_contract():
     """Core exposes exactly the shared supported-version declaration."""
     expected_contract = _contract_fixture()['declarative_contract']

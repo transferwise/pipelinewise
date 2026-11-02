@@ -98,8 +98,14 @@ def test_child_process_errors_are_raised_in_the_parent(pipelinewise):
 
 def test_child_process_exit_without_a_result_fails_the_parent(pipelinewise):
     """A child that dies without reporting still fails the parent with its exit status."""
-    with pytest.raises(ChildProcessError, match='exited with status 3 before reporting a result'):
+    with pytest.raises(ChildProcessError, match='exited with status 3 without reporting a result'):
         pipelinewise._run_in_child_process(_exit_with, 3)
+
+
+def test_child_that_exits_cleanly_without_reporting_fails(pipelinewise):
+    """A child that exits 0 without reporting is a failure, never a silent success."""
+    with pytest.raises(ChildProcessError, match='exited with status 0 without reporting a result'):
+        pipelinewise._run_in_child_process(_exit_with, 0)
 
 
 def test_large_child_errors_do_not_deadlock(pipelinewise):

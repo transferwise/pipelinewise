@@ -271,10 +271,11 @@ def _convert_tap_tables(
     # Every stream's blockers and column classes count; only physical work is de-duplicated.
     writer_types, conflicts = _merge_writer_types([item.target for item in classified])
     unique = _unique_tables(classified)
-    pending = [
-        item for item in unique
+    # Filter before de-duplicating, so a blocked sibling stream cannot hide a table's state.
+    pending = _unique_tables([
+        item for item in classified
         if item.state == STATE_PENDING and item.target.table.key not in conflicts
-    ]
+    ])
     for item in pending:
         # Interrupted cutovers are closed first, so no other refusal leaves a name missing.
         _convert(
@@ -289,7 +290,7 @@ def _convert_tap_tables(
         action,
     )
     candidates = sorted(
-        (item for item in unique if item.state == STATE_NATIVE),
+        _unique_tables([item for item in classified if item.state == STATE_NATIVE]),
         key=lambda item: (item.bytes is None, item.bytes or 0, item.target.table.key),
     )
     _raise_if_any(

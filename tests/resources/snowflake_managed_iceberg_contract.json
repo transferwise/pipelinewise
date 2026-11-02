@@ -386,6 +386,14 @@
           },
           "expected_class": null
         }
+      ],
+      "level_zero_column_names": [
+        {"name_repeat": "Email", "name_times": 1, "expected_column": "EMAIL"},
+        {"name_repeat": "c", "name_times": 254, "expected_column": "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC"},
+        {"name_repeat": "c", "name_times": 255, "expected_column": "CCC"},
+        {"name_repeat": "very_long_property_name_", "name_times": 12, "expected_column": "VLPNVLPNVLPNVLPNVLPNVLPNVLPNVLPNVLPNVLPNVLPNVLPN_"},
+        {"name_repeat": "field_1_", "name_times": 40, "expected_column": "F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1_"},
+        {"name_repeat": "SomeCamelCaseName", "name_times": 16, "expected_column": "SCCNSCCNSCCNSCCNSCCNSCCNSCCNSCCNSCCNSCCNSCCNSCCNSCCNSCCNSCCNSCCN"}
       ]
     }
   }

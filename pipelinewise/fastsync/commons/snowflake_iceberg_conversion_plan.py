@@ -1,5 +1,6 @@
 """Plan and classify a tap's Snowflake tables for native-to-Iceberg conversion."""
 
+import re
 from dataclasses import dataclass, field, replace
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
@@ -125,6 +126,15 @@ def singer_text_variant_class(schema_property: Any) -> Optional[str]:
     return TEXT
 
 
+def level_zero_column_name(name: str) -> str:
+    """Mirror target-snowflake's flatten_key, which shortens names of 255 or more characters."""
+    if len(name) < 255:
+        return name.upper()
+    camelized = re.sub(r'(?:^|_)(.)', lambda match: match.group(1).upper(), name)
+    reduced = re.sub(r'[a-z]', '', camelized)
+    return (reduced if len(reduced) > 1 else name[0:3]).upper()
+
+
 def native_text_variant_class(data_type: str) -> Optional[str]:
     """Return the TEXT or VARIANT class of a native Snowflake column type."""
     return _NATIVE_TYPE_CLASSES.get(str(data_type).upper())
@@ -194,7 +204,7 @@ def fastsync_target_table(
 def _writer_types(stream: Mapping[str, Any]) -> Dict[str, str]:
     properties = (stream.get('schema') or {}).get('properties') or {}
     return {
-        name.upper(): column_class
+        level_zero_column_name(name): column_class
         for name, schema_property in properties.items()
         if (column_class := singer_text_variant_class(schema_property)) is not None
     }

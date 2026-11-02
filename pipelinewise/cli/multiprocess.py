@@ -11,6 +11,7 @@ class Process(multiprocessing.Process):
         multiprocessing.Process.__init__(self, *args, **kwargs)
         self._pconn, self._cconn = multiprocessing.Pipe()
         self._exception = None
+        self.result_received = False
 
     def run(self):
         try:
@@ -31,15 +32,18 @@ class Process(multiprocessing.Process):
 
     def join_with_result(self, poll_seconds=1.0):
         """Join after reading the child's result, so a large exception cannot fill the pipe."""
-        # The child blocks in send() until its result is read, so receiving must come first.
-        while True:
-            if self._pconn.poll(poll_seconds):
+        # Only the child may hold its end open, so a child that dies mid-send reaches EOF.
+        self._cconn.close()
+        self.result_received = False
+        try:
+            # The child blocks in send() until its result is read, so receiving must come first.
+            while not self._pconn.poll(poll_seconds):
+                if not self.is_alive() and not self._pconn.poll():
+                    break
+            else:
                 self._exception = self._pconn.recv()
-                break
-            if not self.is_alive():
-                # A result sent just before exiting is still in the pipe.
-                if self._pconn.poll():
-                    self._exception = self._pconn.recv()
-                break
+                self.result_received = True
+        except (EOFError, OSError):
+            pass  # a child that died before or while sending has no result
         self.join()
         return self._exception
