@@ -374,6 +374,24 @@ Inject environment values with Jinja:
 
 Ansible Vault values are also supported; see :ref:`encrypting_passwords`.
 
+Generated connector configuration can use environment lookups too. Commands
+that load a tap or target, such as ``run_tap``, ``discover_tap``, ``fast_sync``,
+``partial_sync_table``, ``test_tap_connection``, and ``tap_info``, render
+``{{ env_var['NAME'] }}`` lookups in the main, target, and tap ``config.json``.
+Use them when another tool generates these files and secrets must stay out of
+them:
+
+.. code-block:: text
+
+   "password": {{ env_var['POSTGRES_PASSWORD'] | tojson }}
+
+``tojson`` quotes and escapes the value, so any secret renders to valid JSON. A
+missing variable fails the command. Connectors read a rendered copy in the
+``tmp`` directory of the configuration directory. Only its owner can read it,
+and it is removed when the command exits. Files without lookups are used as
+they are, so ``import_config`` output is unaffected. Data-diff commands do not
+render lookups.
+
 After every change:
 
 .. code-block:: bash

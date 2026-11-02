@@ -155,6 +155,10 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
   database-role ownership and unsafe dependencies/metadata. Conversion is
   target-only and fidelity-first: exclude external writers for every copy;
   `eventual=iceberg` also needs a reader/writer outage. Retain the native backup
-  and recover through the manifest. Copy/validate the whole row multiset,
+  and recover through the manifest. A promoted table with its backup and no
+  manifest is complete; rename a promoted table away only after re-proving that
+  its columns and rows equal the backup, never on drift or transient errors, and
+  never restore `_NATIVE` once a manifest is published. Every saved
+  conversion manifest must load. Copy/validate the whole row multiset,
   including duplicate keys and representable flaws, without filtering, repair,
   or deduplication; fail before cutover if v3 cannot represent it exactly.

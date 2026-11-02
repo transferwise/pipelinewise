@@ -18,7 +18,7 @@ import shutil
 
 from io import StringIO
 from datetime import date, datetime
-from jinja2 import Template
+from jinja2 import StrictUndefined, Template
 from ansible.errors import AnsibleError
 from ansible.module_utils._text import to_text
 from ansible.module_utils.common._collections_compat import Mapping
@@ -107,6 +107,37 @@ def is_json_file(path):
         return False
     except Exception:
         return False
+
+
+# Generated connector configs may keep secrets as `{{ env_var['NAME'] }}` lookups instead of values.
+ENV_VAR_LOOKUP = re.compile(r'\{\{\s*env_var\[')
+
+
+def render_env_var_lookups(text: str) -> str:
+    """
+    Render `{{ env_var['NAME'] }}` lookups from the environment; a missing variable raises an error.
+
+    Text without lookups is returned unchanged, so other `{{ }}` placeholders such as a
+    target's query tag survive.
+    """
+    if not ENV_VAR_LOOKUP.search(text):
+        return text
+    return Template(text, undefined=StrictUndefined).render(env_var=os.environ)
+
+
+def load_json_with_env_vars(path):
+    """
+    Deserialize a JSON config file to python object, rendering env_var lookups first
+    """
+    try:
+        LOGGER.debug('Parsing file at %s', path)
+        if not os.path.isfile(path):
+            LOGGER.debug('No file at %s', path)
+            return None
+        with open(path, encoding='utf-8') as jsonfile:
+            return json.loads(render_env_var_lookups(jsonfile.read()))
+    except Exception as exc:
+        raise Exception(f'Error parsing {path} {exc}') from exc
 
 
 def load_json(path):

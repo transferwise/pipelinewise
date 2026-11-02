@@ -44,7 +44,7 @@ def test_cutover_warns_for_reader_outage(warning, tmp_path):
 
 
 def test_missing_primary_recovers_on_retry(tmp_path):
-    """A retry promotes staging after interruption between the two renames."""
+    """A retry restores the native name before any scan, then cuts over again."""
     snowflake = FakeSnowflake()
     snowflake.interrupt_after_native_rename = True
 
@@ -63,6 +63,7 @@ def test_missing_primary_recovers_on_retry(tmp_path):
     assert manifest['phase'] == 'submitted'
 
     snowflake.interrupt_after_native_rename = False
+    query_count = len(snowflake.queries)
     _converter(tmp_path, snowflake).convert(
         'database.schema.table',
         eventual=EVENTUAL_ICEBERG,
@@ -70,3 +71,8 @@ def test_missing_primary_recovers_on_retry(tmp_path):
 
     assert snowflake.formats == {'TABLE_NATIVE': 'native', 'TABLE': 'iceberg'}
     assert not _manifest_files(tmp_path)
+    retry_sql = [sql for sql, _, _ in snowflake.queries[query_count:]]
+    restore = retry_sql.index(
+        'ALTER TABLE "DATABASE"."SCHEMA"."TABLE_NATIVE" RENAME TO "DATABASE"."SCHEMA"."TABLE"'
+    )
+    assert all(sql.startswith('SHOW TABLES IN SCHEMA') for sql in retry_sql[:restore])
