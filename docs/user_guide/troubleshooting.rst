@@ -62,6 +62,14 @@ Symptom index
        <troubleshooting_iceberg_conversion_missing_primary>`
      - Snowflake conversion
      - Conversion manifest and ``_NATIVE`` / ``_ICEBERG`` companions.
+   * - :ref:`Native-to-Iceberg manifest cannot be read
+       <troubleshooting_iceberg_conversion_unreadable_manifest>`
+     - Snowflake conversion
+     - Conversion manifest and physical format of the primary and ``_ICEBERG``.
+   * - :ref:`Native-to-Iceberg contents changed after cutover
+       <troubleshooting_iceberg_conversion_contents_changed>`
+     - Snowflake conversion
+     - Promoted table, ``_NATIVE`` backup, and conversion manifest.
    * - :ref:`Stale running log <troubleshooting_logging>`
      - Process lifecycle
      - PID file and complete process tree.
@@ -630,10 +638,87 @@ recovery runs.
 
 Keep every reader and writer stopped. Retry the identical command from the same
 imported target runtime directory with the same table, ``--eventual`` value,
-target identity, and account role. Do not rename or drop companion tables and do
-not delete or edit the recovery manifest. If PipelineWise cannot prove one safe
-table state, inspect the primary, ``_NATIVE``, ``_ICEBERG``, and manifest before
-making a manual change. See :ref:`snowflake_iceberg`.
+target identity, and account role. The retry restores ``<table>_NATIVE`` to the
+primary name before it validates anything, then repeats the cutover. Do not
+rename or drop companion tables and do not delete or edit the recovery manifest.
+If PipelineWise cannot prove one safe table state, inspect the primary,
+``_NATIVE``, ``_ICEBERG``, and manifest before making a manual change. See
+:ref:`snowflake_iceberg`.
+
+.. _troubleshooting_iceberg_conversion_unreadable_manifest:
+
+Native-to-Iceberg manifest cannot be read
+"""""""""""""""""""""""""""""""""""""""""
+
+``copy_native_to_iceberg``, Snowflake Iceberg FastSync, or a PostgreSQL slot reset
+fails with ``Iceberg publication requires a row count and row fingerprint`` for a
+table that was converted earlier. Singer runs for the table can also fail with
+``Table <schema>."<TABLE>" is native, but target_table_format requires
+managed_iceberg_v3``.
+
+Before 0.98.1, rerunning ``copy_native_to_iceberg --eventual iceberg`` after a
+completed conversion could rename the live Iceberg table to ``<table>_ICEBERG``.
+It then restored the old ``<table>_NATIVE`` table as ``<table>`` and saved a
+manifest that no command can read. PipelineWise 0.98.1 and later never save such
+a manifest, and a rerun after a completed conversion changes nothing.
+
+To recover:
+
+1. Upgrade to 0.98.1 or later. Keep every reader and writer of the table stopped.
+2. In ``$PIPELINEWISE_CONFIG_DIRECTORY/<target_id>/``, find the
+   ``iceberg-recovery-<hash>.json`` file whose ``kind`` is ``manual_conversion``
+   and whose ``target`` names this table. If there is no such file, this entry
+   does not apply. A completed ``--eventual native`` conversion leaves the same
+   tables without a manifest.
+3. Confirm that ``<table>`` is native and ``<table>_ICEBERG`` is Iceberg, for
+   example from the ``is_iceberg`` column of ``SHOW TABLES``. Confirm that no
+   writer changed ``<table>`` after the failed rerun; otherwise reconcile those
+   rows first.
+4. Rename the tables back to their converted state:
+
+   .. code-block:: sql
+
+      ALTER TABLE <database>.<schema>.<table>
+        RENAME TO <database>.<schema>.<table>_NATIVE;
+
+      ALTER ICEBERG TABLE <database>.<schema>.<table>_ICEBERG
+        RENAME TO <database>.<schema>.<table>;
+
+5. Remove only the manifest file found in step 2. Keep every other recovery file.
+6. Rerun ``copy_native_to_iceberg --eventual iceberg`` for the table. It confirms
+   the completed conversion and changes nothing.
+
+.. _troubleshooting_iceberg_conversion_contents_changed:
+
+Native-to-Iceberg contents changed after cutover
+""""""""""""""""""""""""""""""""""""""""""""""""
+
+``copy_native_to_iceberg --eventual iceberg`` fails after promotion with
+``does not match the projected contents``, ``Promoted Iceberg contents do not
+match staged conversion evidence``, ``schema or primary key does not match the
+conversion source``, or ``Native backup schema no longer matches the conversion
+manifest``. Every retry fails the same way. While the manifest exists, Iceberg
+FastSync refuses the table, and an Iceberg PostgreSQL tap cannot reset its
+replication slot.
+
+A writer changed the rows or columns of the promoted table, or its native backup,
+after the cutover.
+PipelineWise keeps the promoted table live, because renaming it away could hide
+those writes. Keep every reader and writer of the table stopped, compare
+``<table>`` with ``<table>_NATIVE``, and decide which copy is correct:
+
+- **The promoted Iceberg table is correct**, for example because replication
+  restarted early and loaded new rows. Validate it as described in
+  :ref:`snowflake_iceberg`. Then remove only the ``iceberg-recovery-<hash>.json``
+  file in ``$PIPELINEWISE_CONFIG_DIRECTORY/<target_id>/`` whose ``kind`` is
+  ``manual_conversion`` and whose ``target`` names this table. The conversion is
+  complete, and ``<table>_NATIVE`` stays as the rollback point.
+- **The native backup is correct.** Rename ``<table>`` to ``<table>_ICEBERG`` with
+  ``ALTER ICEBERG TABLE``, then ``<table>_NATIVE`` to ``<table>`` with
+  ``ALTER TABLE``. Reconcile any rows written to the Iceberg table. Rename
+  ``<table>_ICEBERG`` aside or drop it, because a retry refuses a stale
+  companion. Remove the manifest as described above and run the conversion
+  again.
 
 .. _troubleshooting_fastsync_table_not_found:
 

@@ -156,6 +156,15 @@ def test_rejects_invalid_column_metadata():
         parse_native_columns((row, row.copy()))
 
 
+# External grant automation can add this to Iceberg tables after their native grants are copied.
+AUTOMATED_REFERENCES_GRANT = {
+    'privilege': 'REFERENCES',
+    'granted_to': 'ROLE',
+    'grantee_name': 'EXTERNAL_READER',
+    'grant_option': 'false',
+}
+
+
 class FakeSnowflake:
     """Stateful Snowflake adapter for conversion and interruption tests."""
 
@@ -185,6 +194,7 @@ class FakeSnowflake:
         self.column_comment = 'identifier'
         self.companion_column_comment = None
         self.companion_column_overrides = {}
+        self.companion_extra_columns = []
         self.companion_primary_key = ('ID',)
         self.clustering_key = None
         self.owner = 'OWNER_ROLE'
@@ -199,6 +209,10 @@ class FakeSnowflake:
         self.interrupt_after_native_rename = False
         self.commit_before_promotion_error = False
         self.post_promotion_staging_evidence = None
+        self.post_promotion_companion_grants = None
+        self.post_promotion_companion_extra_columns = None
+        self.post_promotion_query_error = None
+        self._pending_query_error = None
         self.interrupt_iceberg_rollback = False
         self.rollback_commits = False
         self.interrupt_native_restore = False
@@ -213,6 +227,9 @@ class FakeSnowflake:
     ):
         """Return deterministic metadata and mutate names for DDL."""
         self.queries.append((sql, params, query_tag_props))
+        if self._pending_query_error is not None and sql.startswith(self._pending_query_error[0]):
+            (_, error), self._pending_query_error = self._pending_query_error, None
+            raise error
         if sql.startswith('SHOW TABLES IN SCHEMA'):
             return [
                 {
@@ -253,6 +270,7 @@ class FakeSnowflake:
             }
             if is_companion:
                 row.update(self.companion_column_overrides)
+                return [row, *self.companion_extra_columns]
             return [row]
         if sql.startswith('SHOW PRIMARY KEYS'):
             is_companion = any(
@@ -347,6 +365,11 @@ class FakeSnowflake:
             self.formats['TABLE'] = self.formats.pop('TABLE_ICEBERG')
             if self.post_promotion_staging_evidence is not None:
                 self.staging_evidence = self.post_promotion_staging_evidence
+            if self.post_promotion_companion_grants is not None:
+                self.companion_grants = self.post_promotion_companion_grants
+            if self.post_promotion_companion_extra_columns is not None:
+                self.companion_extra_columns = self.post_promotion_companion_extra_columns
+            self._pending_query_error = self.post_promotion_query_error
             return []
         if sql.startswith(
             'ALTER ICEBERG TABLE "DATABASE"."SCHEMA"."TABLE" RENAME'
@@ -534,7 +557,7 @@ def test_rejects_bad_companion_schema(
 
 @pytest.mark.parametrize('metadata_kind', ['comment', 'grant', 'tag'])
 def test_rejects_stale_companion_metadata(tmp_path, metadata_kind):
-    """Removed governance metadata cannot remain on a later promoted companion."""
+    """Stale companion metadata blocks promotion without leaving a blocking manifest."""
     snowflake = FakeSnowflake()
     _converter(tmp_path, snowflake).convert('database.schema.table')
     if metadata_kind == 'comment':
@@ -564,7 +587,7 @@ def test_rejects_stale_companion_metadata(tmp_path, metadata_kind):
         )
 
     assert snowflake.formats == {'TABLE': 'native', 'TABLE_ICEBERG': 'iceberg'}
-    assert len(_manifest_files(tmp_path)) == 1
+    assert not _manifest_files(tmp_path)
     assert not any(' RENAME TO ' in sql for sql, _, _ in snowflake.queries)
 
 
@@ -697,12 +720,12 @@ def test_lost_promotion_response_reconciles(tmp_path):
     assert not _manifest_files(tmp_path)
 
 
-def test_final_failure_restores_native(tmp_path):
-    """A failed final validation restores the native live name for retry."""
+def test_final_metadata_failure_restores_native(tmp_path):
+    """A metadata mismatch over equal contents restores the native live name."""
     snowflake = FakeSnowflake()
-    snowflake.post_promotion_staging_evidence = (2, 54321)
+    snowflake.post_promotion_companion_grants = [AUTOMATED_REFERENCES_GRANT]
 
-    with pytest.raises(NativeToIcebergConversionError, match='does not match'):
+    with pytest.raises(NativeToIcebergConversionError, match='comments, grants, or tags'):
         _converter(tmp_path, snowflake).convert(
             'database.schema.table',
             eventual=EVENTUAL_ICEBERG,
@@ -710,10 +733,12 @@ def test_final_failure_restores_native(tmp_path):
         )
 
     assert snowflake.formats == {'TABLE': 'native', 'TABLE_ICEBERG': 'iceberg'}
-    assert len(_manifest_files(tmp_path)) == 1
+    manifest = json.loads(_manifest_files(tmp_path)[0].read_text(encoding='utf-8'))
+    assert manifest['phase'] == 'submitted'
+    assert 'rollback_required' not in manifest['context']
 
-    snowflake.post_promotion_staging_evidence = None
-    snowflake.staging_evidence = snowflake.source_evidence
+    snowflake.post_promotion_companion_grants = None
+    snowflake.companion_grants = None
     _converter(tmp_path, snowflake).convert(
         'database.schema.table',
         eventual=EVENTUAL_ICEBERG,
@@ -727,7 +752,7 @@ def test_final_failure_restores_native(tmp_path):
 def test_restart_finishes_required_rollback(tmp_path):
     """Recovery completes a rollback interrupted between its two renames."""
     snowflake = FakeSnowflake()
-    snowflake.post_promotion_staging_evidence = (2, 54321)
+    snowflake.post_promotion_companion_grants = [AUTOMATED_REFERENCES_GRANT]
     snowflake.interrupt_native_restore = True
 
     with pytest.raises(SystemExit, match='rollback interruption'):
@@ -745,8 +770,8 @@ def test_restart_finishes_required_rollback(tmp_path):
     assert manifest['context']['rollback_required'] is True
 
     snowflake.interrupt_native_restore = False
-    snowflake.post_promotion_staging_evidence = None
-    snowflake.staging_evidence = snowflake.source_evidence
+    snowflake.post_promotion_companion_grants = None
+    snowflake.companion_grants = None
     _converter(tmp_path, snowflake).convert(
         'database.schema.table',
         eventual=EVENTUAL_ICEBERG,
@@ -763,7 +788,7 @@ def test_first_rename_rollback_recovery(
 ):
     """Recovery uses the durable marker after either first-rename outcome."""
     snowflake = FakeSnowflake()
-    snowflake.post_promotion_staging_evidence = (2, 54321)
+    snowflake.post_promotion_companion_grants = [AUTOMATED_REFERENCES_GRANT]
     snowflake.interrupt_iceberg_rollback = True
     snowflake.rollback_commits = committed_before_interrupt
 
@@ -784,8 +809,8 @@ def test_first_rename_rollback_recovery(
     assert manifest['context']['rollback_required'] is True
 
     snowflake.interrupt_iceberg_rollback = False
-    snowflake.post_promotion_staging_evidence = None
-    snowflake.staging_evidence = snowflake.source_evidence
+    snowflake.post_promotion_companion_grants = None
+    snowflake.companion_grants = None
     _converter(tmp_path, snowflake).convert(
         'database.schema.table',
         eventual=EVENTUAL_ICEBERG,
