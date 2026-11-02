@@ -4,6 +4,8 @@ import os
 import signal
 import sys
 
+import pipelinewise.cli.native_to_iceberg  # noqa: F401 - load before patches bind its imports
+
 from unittest.mock import call, patch
 
 import pytest
@@ -110,7 +112,45 @@ def test_dispatches_target_only_conversion(mock_adapter, mock_converter):
         'DATABASE.SCHEMA.TABLE',
         eventual='iceberg',
         iceberg_version=3,
+        writer_types={},
     )
+
+
+@patch(
+    'pipelinewise.fastsync.commons.snowflake_iceberg_converter.'
+    'SnowflakeNativeToIcebergConverter'
+)
+@patch('pipelinewise.fastsync.commons.snowflake_iceberg.SnowflakeConversionQueryAdapter')
+def test_manual_conversion_applies_the_writing_taps_catalog(mock_adapter, mock_converter):
+    """A manual promotion is checked against the catalog of the tap that writes the table."""
+    args = _args(target='target_one', table='MY_DB.DB_TEST_MYSQL.TABLE_ONE', eventual='iceberg')
+    pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
+
+    pipelinewise.copy_native_to_iceberg()
+
+    mock_converter.return_value.convert.assert_called_once_with(
+        'MY_DB.DB_TEST_MYSQL.TABLE_ONE',
+        eventual='iceberg',
+        iceberg_version=3,
+        writer_types={'EMAIL': 'TEXT'},
+    )
+
+
+@patch('pipelinewise.cli.native_to_iceberg.preflight_report', return_value=[])
+def test_table_scoped_report_plans_the_streams_that_write_it(mock_report):
+    """A table report uses the imported streams that write the table, with their classes."""
+    pipelinewise = PipelineWise(
+        _args(target='target_one', table='my_db.db_test_mysql.table_one', preflight_only=True),
+        CONFIG_DIR,
+        VIRTUALENVS_DIR,
+    )
+
+    pipelinewise.copy_native_to_iceberg()
+
+    _, _, targets, _ = mock_report.call_args.args
+    assert [(target.stream_id, target.table.key, target.writer_types) for target in targets] == [
+        ('db_test_mysql-table_one', 'MY_DB.DB_TEST_MYSQL.TABLE_ONE', {'EMAIL': 'TEXT'}),
+    ]
 
 
 @patch('pipelinewise.cli.pipelinewise.signal.signal')

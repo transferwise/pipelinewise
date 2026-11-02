@@ -762,11 +762,17 @@ message names each table and the reason:
 
 3. Fix each blocker. For a failed conversion, the manifest records the attempt,
    and the next ``run_tap`` resumes it. For an interrupted cutover, see
-   :ref:`troubleshooting_iceberg_conversion_missing_primary`. A pending attempt
-   that a conversion check now refuses, for example one started by an earlier
-   release over a ``TIMESTAMP_TZ`` column, keeps its manifest and companion
-   table. Fix the column, or remove that manifest and ``<table>_ICEBERG`` as
-   described in :ref:`troubleshooting_iceberg_conversion_contents_changed`.
+   :ref:`troubleshooting_iceberg_conversion_missing_primary`.
+
+   A pending attempt that a conversion check now refuses, for example one
+   started by an earlier release, keeps its manifest and companion table. A grant
+   or sub-microsecond values can be fixed in place, and the next ``run_tap``
+   resumes the attempt. A fix that changes the table's columns, such as replacing
+   a ``TIMESTAMP_TZ`` column or changing a ``TEXT`` column to ``VARIANT``, makes
+   every resume fail with ``The schema of <table> changed after conversion started``.
+   While ``<table>`` is still native, discard that attempt instead: remove its
+   manifest and drop ``<table>_ICEBERG`` as described in
+   :ref:`troubleshooting_iceberg_conversion_contents_changed`, then rerun.
 4. Rerun ``run_tap``. Watch PostgreSQL WAL and MySQL binlog retention while the
    tap is stopped.
 

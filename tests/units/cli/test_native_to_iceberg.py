@@ -17,7 +17,13 @@ from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_plan import (
     ClassifiedTarget,
     ConversionTarget,
 )
-from pipelinewise.fastsync.commons.snowflake_iceberg_model import SnowflakeObjectName
+from pipelinewise.fastsync.commons.snowflake_iceberg_coordination import RecoveryCoordinator
+from pipelinewise.fastsync.commons.snowflake_iceberg_model import (
+    IcebergColumn,
+    IcebergTableSpec,
+    SnowflakeObjectName,
+)
+from tests.units.fastsync.commons.snowflake_iceberg_test_helpers import make_attempt
 from tests.units.fastsync.commons.test_snowflake_iceberg_converter import FakeSnowflake
 from tests.units.fastsync.commons.test_snowflake_iceberg_converter_preflight import (
     _submitted_attempt_over_temporal_column,
@@ -395,6 +401,41 @@ def test_gate_drives_the_real_converter(tmp_path):
 
     assert snowflake.formats == {'TABLE_NATIVE': 'native', 'TABLE': 'iceberg'}
     assert not list(tmp_path.glob('iceberg-recovery-*.json'))
+
+
+def test_table_writer_types_merge_streams_and_refuse_conflicts():
+    """A manual conversion uses every writing stream's classes and refuses a disagreement."""
+    table = SnowflakeObjectName('DATABASE', 'SCHEMA', 'T')
+    other = SnowflakeObjectName('DATABASE', 'SCHEMA', 'OTHER')
+    imported = [
+        ConversionTarget('a-t', table, {'DOC': 'VARIANT'}),
+        ConversionTarget('b-t', table, {'NOTE': 'TEXT'}),
+        ConversionTarget('c-other', other, {'DOC': 'TEXT'}),
+    ]
+
+    assert native_to_iceberg.writer_types_for_table('database.schema.t', imported) == {
+        'DOC': 'VARIANT', 'NOTE': 'TEXT',
+    }
+    assert native_to_iceberg.writer_types_for_table('database.schema.unplanned', imported) == {}
+    with pytest.raises(PreRunChecksException, match='Column DOC is VARIANT for stream a-t but TEXT'):
+        native_to_iceberg.writer_types_for_table(
+            'database.schema.t', imported + [ConversionTarget('d-t', table, {'DOC': 'TEXT'})],
+        )
+
+
+def test_fastsync_readiness_lets_an_interrupted_publication_resume(tmp_path):
+    """A pending FastSync pointer beside an Iceberg target is FastSync's own state to resume."""
+    spec = IcebergTableSpec(
+        SnowflakeObjectName('DATABASE', 'SCHEMA', 'TABLE'),
+        (IcebergColumn('ID', 'NUMBER(38,0)', False),),
+        ('ID',),
+    )
+    RecoveryCoordinator(str(tmp_path)).persist_new_attempt(make_attempt(spec))
+    snowflake = FakeSnowflake()
+    snowflake.formats = {'TABLE': 'iceberg'}
+
+    with patch.object(native_to_iceberg, 'SnowflakeQueryAdapter', return_value=snowflake):
+        native_to_iceberg.assert_fastsync_targets_ready(FASTSYNC_CONFIG, str(tmp_path), ['schema.table'])
 
 
 def test_tap_blockers_require_flattening_level_zero():
