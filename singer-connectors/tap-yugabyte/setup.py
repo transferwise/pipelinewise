@@ -1,0 +1,44 @@
+#!/usr/bin/env python
+
+from setuptools import setup
+
+with open('README.md') as f:
+    long_description = f.read()
+
+setup(name='pipelinewise-tap-yugabyte',
+      version='0.1.0',
+      description='Singer.io tap for extracting data from YugabyteDB - PipelineWise compatible',
+      long_description=long_description,
+      long_description_content_type='text/markdown',
+      author='Wise',
+      url='https://github.com/transferwise/pipelinewise-tap-yugabyte',
+      classifiers=[
+          'License :: OSI Approved :: GNU Affero General Public License v3',
+          'Programming Language :: Python :: 3 :: Only'
+      ],
+      python_requires=">=3.12.0, <3.13",
+      install_requires=[
+          'pipelinewise-singer-python==3.0.2+pipelinewise.0.96.1',
+          # YugabyteDB's native-load-balancing psycopg2 fork; drop-in compatible with psycopg2-binary
+          "psycopg2-yugabytedb-binary==2.9.3.5.post1; sys_platform == 'darwin'",
+          "psycopg2-yugabytedb-binary==2.9.3.5; sys_platform == 'linux'",
+          'python-dateutil==2.9.0.post0',
+          'PyYAML==6.0.3',
+          'pytz==2026.5',
+          'strict-rfc3339==0.7',
+          'simplejson==4.1.1'
+      ],
+      extras_require={
+          "test": [
+              'pytest==9.1.1',
+              'ruff==0.16.1',
+              'pytest-cov==7.1.0'
+          ]
+      },
+      entry_points='''
+          [console_scripts]
+          tap-yugabyte=tap_yugabyte:main
+          tap-yugabyte-index-check=tap_yugabyte.index_check:main
+      ''',
+      packages=['tap_yugabyte', 'tap_yugabyte.sync_strategies']
+      )

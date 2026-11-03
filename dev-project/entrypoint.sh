@@ -75,6 +75,7 @@ dev-project/mongo/initiate-replica-set.sh
 tests/db/tap_mysql_db.sh
 tests/db/tap_oracle_mysql_db.sh
 tests/db/tap_postgres_db.sh
+tests/db/tap_yugabyte_db.sh
 tests/db/tap_mongodb.sh
 tests/db/target_postgres.sh
 
@@ -86,11 +87,20 @@ if ! make pipelinewise -e pw_acceptlicenses=y; then
     exit 1
 fi
 
+# Isolated venv for the YugabyteDB FastSync executables so they get the
+# native-load-balancing psycopg2 driver instead of the main venv's psycopg2-binary.
+if ! make fastsync-yugabyte -e pw_acceptlicenses=y; then
+    echo
+    echo "ERROR: Docker container not started. Failed to install the YugabyteDB FastSync venv."
+    exit 1
+fi
+
 CONNECTORS=(
   target-snowflake
   target-postgres
   tap-mysql
   tap-postgres
+  tap-yugabyte
   tap-mongodb
   transform-field
   tap-s3-csv
@@ -177,6 +187,7 @@ echo
 echo "Running containers:"
 echo "   - PipelineWise CLI and connectors"
 echo "   - PostgreSQL server with test database  (From host: localhost:${TAP_POSTGRES_PORT_ON_HOST} - From CLI: ${TAP_POSTGRES_HOST}:${TAP_POSTGRES_PORT})"
+echo "   - YugabyteDB server with test database  (From host: localhost:${TAP_YUGABYTE_PORT_ON_HOST} - From CLI: ${TAP_YUGABYTE_HOST}:${TAP_YUGABYTE_PORT})"
 echo "   - MariaDB server with test database     (From host: localhost:${TAP_MYSQL_PORT_ON_HOST} - From CLI: ${TAP_MYSQL_HOST}:${TAP_MYSQL_PORT})"
 echo "   - MySQL server with test database       (From host: localhost:${TAP_ORACLE_MYSQL_PORT_ON_HOST} - From CLI: ${TAP_ORACLE_MYSQL_HOST}:${TAP_ORACLE_MYSQL_PORT})"
 echo "   - MongoDB replicaSet server with test database (From host: localhost:${TAP_MONGODB_PORT_ON_HOST} - From CLI: ${TAP_MONGODB_HOST}:${TAP_MONGODB_PORT})"

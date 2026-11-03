@@ -896,6 +896,7 @@ def assert_main_impl_exit_normally_on_success(
                         ns = Namespace(
                             **{
                                 'tables': ['table_1', 'table_2', 'table_3', 'table_4'],
+                                'properties': {'streams': []},
                                 'target': {},
                                 'transform': None,
                                 'tap': {},
@@ -946,6 +947,7 @@ def assert_main_impl_should_exit_with_error_on_failure(
                         ns = Namespace(
                             **{
                                 'tables': ['table_1', 'table_2', 'table_3', 'table_4'],
+                                'properties': {'streams': []},
                                 'target': {},
                                 'transform': None,
                                 'tap': {

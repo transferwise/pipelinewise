@@ -88,8 +88,10 @@ jobs:
           tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_postgres \
           tests/end_to_end/test_numeric_replication.py::test_postgres_decimal_float_underflow \
           tests/end_to_end/test_postgres_stream_buffer_recovery.py \
+          tests/end_to_end/test_yugabyte_recovery.py \
           tests/end_to_end/data_diff/test_postgres_to_postgres.py \
           tests/end_to_end/data_diff/test_mysql_to_postgres.py \
+          tests/end_to_end/data_diff/test_yugabyte_to_postgres.py \
           -vx --timer-top-n 10
 
       - name: Run SQL source and PostgreSQL target decimal integrations
@@ -120,11 +122,14 @@ jobs:
               tests/end_to_end/target_snowflake/tap_postgres/test_partial_sync_pg_to_sf.py
               tests/end_to_end/target_snowflake/tap_postgres/test_multiline_native_pg_to_sf.py
               tests/end_to_end/data_diff/test_postgres_to_snowflake.py
+              tests/end_to_end/target_snowflake/tap_yugabyte/test_partial_sync_yugabyte_to_sf.py
+              tests/end_to_end/target_snowflake/tap_yugabyte/test_partial_sync_repair_yugabyte_to_sf.py
           - shard: mariadb-partial
             check_name: e2e_tests_05
             test_paths: >-
               tests/end_to_end/target_snowflake/tap_mariadb/test_partial_sync_mariadb_to_sf.py
               tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_with_split_large_files.py
+              tests/end_to_end/target_snowflake/tap_yugabyte/test_replicate_yugabyte_to_sf.py
               tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py::TestIcebergV3MySQLToSnowflake::test_iceberg_replication_preserves_keys_and_supplementary_unicode
           - shard: pg-iceberg
             check_name: e2e_tests_06
@@ -159,6 +164,7 @@ jobs:
             check_name: e2e_tests_10
             test_paths: >-
               tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[postgres-native]
+              tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[yugabyte-native]
               tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_transformations_are_private_through_publication
           - shard: decimal-migration
             check_name: e2e_tests_11
@@ -186,6 +192,7 @@ jobs:
             check_name: e2e_tests_14
             test_paths: >-
               tests/end_to_end/test_numeric_replication.py::test_postgres_bounded_numeric_key_snowflake
+              tests/end_to_end/test_numeric_replication.py::test_yugabyte_bounded_numeric_key_snowflake
               tests/end_to_end/test_numeric_replication.py::test_mysql_bounded_decimal_key_snowflake
               tests/end_to_end/test_numeric_replication.py::test_mysql_extended_types_snowflake
               tests/end_to_end/test_numeric_replication.py::test_mysql_legacy_binary_width_partial_sync_snowflake

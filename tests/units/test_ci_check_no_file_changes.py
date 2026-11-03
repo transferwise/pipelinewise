@@ -263,6 +263,8 @@ def test_snowflake_e2e_matrix_contract():
                 'tests/end_to_end/target_snowflake/tap_postgres/test_partial_sync_pg_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_postgres/test_multiline_native_pg_to_sf.py',
                 'tests/end_to_end/data_diff/test_postgres_to_snowflake.py',
+                'tests/end_to_end/target_snowflake/tap_yugabyte/test_partial_sync_yugabyte_to_sf.py',
+                'tests/end_to_end/target_snowflake/tap_yugabyte/test_partial_sync_repair_yugabyte_to_sf.py',
             ),
         ),
         'mariadb-partial': (
@@ -270,6 +272,7 @@ def test_snowflake_e2e_matrix_contract():
             (
                 'tests/end_to_end/target_snowflake/tap_mariadb/test_partial_sync_mariadb_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_with_split_large_files.py',
+                'tests/end_to_end/target_snowflake/tap_yugabyte/test_replicate_yugabyte_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py::TestIcebergV3MySQLToSnowflake::test_iceberg_replication_preserves_keys_and_supplementary_unicode',
             ),
         ),
@@ -314,6 +317,7 @@ def test_snowflake_e2e_matrix_contract():
             'e2e_tests_10',
             (
                 'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[postgres-native]',
+                'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[yugabyte-native]',
                 'tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_transformations_are_private_through_publication',
             ),
         ),
@@ -349,6 +353,7 @@ def test_snowflake_e2e_matrix_contract():
             'e2e_tests_14',
             (
                 'tests/end_to_end/test_numeric_replication.py::test_postgres_bounded_numeric_key_snowflake',
+                'tests/end_to_end/test_numeric_replication.py::test_yugabyte_bounded_numeric_key_snowflake',
                 'tests/end_to_end/test_numeric_replication.py::test_mysql_bounded_decimal_key_snowflake',
                 'tests/end_to_end/test_numeric_replication.py::test_mysql_extended_types_snowflake',
                 'tests/end_to_end/test_numeric_replication.py::test_mysql_legacy_binary_width_partial_sync_snowflake',
@@ -458,7 +463,7 @@ def test_snowflake_e2e_matrix_contract():
 
     assert set(selected_tests) == expected_tests
     split_test_counts = {
-        'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake': 6,
+        'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake': 7,
         'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake': 6,
         'tests/end_to_end/test_numeric_replication.py::test_legacy_decimal_float_migration_requires_opt_in': 6,
     }
@@ -621,7 +626,8 @@ def test_required_connector_status_contract():
     configured_names = [check['name'] for check in configured_checks]
 
     assert aggregate['name'] == 'connector_tests'
-    assert set(aggregate['needs']) == {'test_connector_units', 'test_shared_singer'}
+    assert set(aggregate['needs']) == {
+        'test_connector_units', 'test_shared_singer', 'test_tap_yugabyte_index_check'}
     assert aggregate['if'] == '${{ always() }}'
     assert 'connector_tests' in configured_names
 

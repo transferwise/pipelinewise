@@ -1,0 +1,28 @@
+---
+
+id: "yugabyte_recovery_sf"
+name: "YugabyteDB recovery source (Snowflake target)"
+type: "tap-yugabyte"
+owner: "test-runner"
+
+db_conn:
+  host: "${TAP_YUGABYTE_HOST}"
+  port: ${TAP_YUGABYTE_PORT}
+  user: "${TAP_YUGABYTE_USER}"
+  password: "${TAP_YUGABYTE_PASSWORD}"
+  dbname: "${TAP_YUGABYTE_DB}"
+  logical_poll_total_seconds: 20
+  break_at_end_lsn: false
+  max_run_seconds: 90
+  fastsync_parallelism: 1
+
+target: "yugabyte_recovery_sf_dwh"
+batch_size_rows: 1000
+stream_buffer_size: 0
+
+schemas:
+  - source_schema: "ppw_e2e_yb_recovery_sf_source"
+    target_schema: "ppw_e2e_yb_recovery_sf${TARGET_SNOWFLAKE_SCHEMA_POSTFIX}"
+    tables:
+      - table_name: "repaired_records"
+        replication_method: "LOG_BASED"

@@ -28,6 +28,7 @@ from .adapters import (
     MySQLAdapter,
     PostgresAdapter,
     SnowflakeAdapter,
+    YugabyteAdapter,
     _match_columns,
     _quote,
     _utc_boundary,
@@ -139,7 +140,11 @@ def build_metric_query(
             expression = METRIC_EXPRESSIONS[check].format(key=key)
         expressions.append(f"{expression} AS {adapter.quote(check)}")
     timestamp = adapter.quote(timestamp_column)
-    predicates = [f"{timestamp} >= %s", f"{timestamp} < %s"]
+    predicates = [
+        f"{timestamp} >= %s",
+        f"{timestamp} < %s",
+        *adapter.window_predicates(schema, table, timestamp_column),
+    ]
     return (
         f"SELECT {', '.join(expressions)} "
         f"FROM {adapter.qualified_table(schema, table)} "
@@ -264,6 +269,17 @@ def connect_source(check: dict, connection_config: dict) -> DatabaseAdapter:
             application_name="pipelinewise-data-diff-source",
         )
 
+    if check["source_type"] == "tap-yugabyte":
+        # tap-yugabyte has no replica keys; load_balance and topology_keys need the
+        # YugabyteDB driver fork, which the main venv does not install.
+        return _connect_postgres(
+            connection_config,
+            timeout,
+            use_replica=False,
+            application_name="pipelinewise-data-diff-source",
+            adapter_class=YugabyteAdapter,
+        )
+
     if check["source_type"] == "tap-mysql":
         connection_args = {
             "host": connection_config.get("replica_host", connection_config["host"]),
@@ -311,8 +327,9 @@ def _connect_postgres(
     *,
     use_replica: bool,
     application_name: str,
+    adapter_class=PostgresAdapter,
 ) -> PostgresAdapter:
-    """Open a direct or replica PostgreSQL connection for bounded read-only work."""
+    """Open a direct or replica PostgreSQL-protocol connection for bounded read-only work."""
     prefix = "replica_" if use_replica else ""
     connection_args = {
         "host": connection_config.get(f"{prefix}host", connection_config["host"]),
@@ -335,7 +352,7 @@ def _connect_postgres(
             "SELECT set_config('statement_timeout', %s, true)",
             (f"{timeout}s",),
         )
-    return PostgresAdapter(connection, timeout)
+    return adapter_class(connection, timeout)
 
 
 def _mysql_ssl_context(connection_config: dict):
