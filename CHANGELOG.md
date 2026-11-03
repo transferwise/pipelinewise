@@ -9,8 +9,10 @@
   if any table cannot convert; it never replicates into native tables. It
   refuses a table that another imported tap writes without managed Iceberg v3,
   and stops before any Snowflake work if the tap's generated configuration is
-  not imported with its Iceberg settings. An optional `conversion_warehouse`
-  runs only the conversion queries on another warehouse. See
+  not imported with its Iceberg settings. It also refuses to convert while the
+  tap catalog is older than its imported settings. An optional
+  `conversion_warehouse` runs only the conversion queries on another warehouse.
+  See
   [automatic conversion](docs/connectors/targets/snowflake_iceberg.rst#snowflake-iceberg-auto-conversion)
 - Add `copy_native_to_iceberg --preflight-only` with `--tap` or `--table`. It
   reports each table's state, size, and conversion blockers without taking a
