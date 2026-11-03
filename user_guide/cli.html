@@ -597,9 +597,12 @@ See <a class="reference internal" href="../installation_guide/running_pipelines.
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pipelinewise<span class="w"> </span>stop_tap<span class="w"> </span>--tap<span class="w"> </span>&lt;tap_id&gt;<span class="w"> </span>--target<span class="w"> </span>&lt;target_id&gt;
 </pre></div>
 </div>
-<p>Signals the process tree associated with the tap-target PID file. The target is
-given an opportunity to finish data already received. Restart without editing
-state after an unexpected interruption.</p>
+<p>Sends SIGTERM to the PipelineWise process in the tap-target PID file. That
+process stops its child processes, marks its run log <code class="docutils literal notranslate"><span class="pre">.terminated</span></code>, and
+exits. The target is given an opportunity to finish data already received. If
+the run is still alive after 25 seconds, <code class="docutils literal notranslate"><span class="pre">stop_tap</span></code> kills its process tree.
+Restart without editing state after an unexpected interruption.</p>
+<p>Sending SIGTERM or SIGINT to the PipelineWise process has the same effect.</p>
 </section>
 <section id="fast-sync">
 <span id="cli-fast-sync"></span><h3><code class="docutils literal notranslate"><span class="pre">fast_sync</span></code><a class="headerlink" href="#fast-sync" title="Link to this heading"></a></h3>
