@@ -23,6 +23,7 @@ from pipelinewise.fastsync.commons.snowflake_iceberg_model import (
     IcebergTableSpec,
     SnowflakeObjectName,
 )
+from pipelinewise.fastsync.commons.snowflake_iceberg_validation import NativeToIcebergConversionError
 from tests.units.fastsync.commons.snowflake_iceberg_test_helpers import make_attempt
 from tests.units.fastsync.commons.test_snowflake_iceberg_converter import FakeSnowflake
 from tests.units.fastsync.commons.test_snowflake_iceberg_converter_preflight import (
@@ -323,18 +324,55 @@ def test_gate_post_check_requires_every_table_to_be_iceberg():
             native_to_iceberg.convert_tap_tables({}, '/runtime', [])
 
 
-def test_gate_resumes_a_pending_table_behind_a_blocked_sibling_stream():
-    """A blocked stream listed first never hides another stream's pending conversion."""
+@pytest.mark.parametrize('primary', ['native', 'iceberg'])
+def test_gate_holds_a_whole_table_behind_a_blocked_stream(primary):
+    """A table whose name is present is never resumed while another of its streams is blocked."""
     first = [
-        _classified('T', STATE_BLOCKED, 1, reasons=('FastSync writes another table',), stream='a-t'),
-        _classified('T', STATE_PENDING, 1, stream='b-t'),
+        _classified('T', STATE_BLOCKED, 1, reasons=('FastSync writes another table',), stream='a-t', primary=primary),
+        _classified('T', STATE_PENDING, 1, stream='b-t', primary=primary),
     ]
 
     with _gate(first) as (converter, _, _):
-        with pytest.raises(NativeToIcebergConversionException, match=r'T \(stream a-t\) needs an operator'):
+        with pytest.raises(NativeToIcebergConversionException) as error:
             native_to_iceberg.convert_tap_tables({}, '/runtime', [])
 
-    assert converter.convert.call_args_list == [call(_quoted('T'), eventual='iceberg', writer_types={})]
+    assert 'T (stream a-t) needs an operator' in str(error.value)
+    assert 'stream b-t' not in str(error.value)
+    converter.convert.assert_not_called()
+
+
+def test_gate_resumes_a_pending_table_behind_a_blocked_sibling_stream():
+    """An absent name is restored first, with every stream's reason refusing a new cutover."""
+    first = [
+        _classified('T', STATE_PENDING, 1, reasons=('FastSync writes another table',), stream='a-t', primary='missing'),
+        _classified('T', STATE_PENDING, 1, stream='b-t', primary='missing'),
+    ]
+
+    with _gate(first) as (converter, _, _):
+        native_to_iceberg.convert_tap_tables({}, '/runtime', [])
+
+    assert converter.convert.call_args_list == [call(
+        _quoted('T'), eventual='iceberg', writer_types={}, refusals=('FastSync writes another table',),
+    )]
+
+
+def test_gate_resumes_every_pending_table_interrupted_cutovers_first():
+    """One refused resume never leaves another table's name absent."""
+    first = [
+        _classified('NATIVE_PENDING', STATE_PENDING, 1),
+        _classified('ABSENT', STATE_PENDING, 2, primary='missing'),
+        _classified('ALSO_ABSENT', STATE_PENDING, 3, primary='missing'),
+    ]
+
+    with _gate(first, convert_error=[RuntimeError('refused'), None, None]) as (converter, _, _):
+        with pytest.raises(
+            NativeToIcebergConversionException, match=r'ABSENT \(stream public-absent\) failed: refused',
+        ):
+            native_to_iceberg.convert_tap_tables({}, '/runtime', [])
+
+    assert [entry.args[0] for entry in converter.convert.call_args_list] == [
+        _quoted('ABSENT'), _quoted('ALSO_ABSENT'), _quoted('NATIVE_PENDING'),
+    ]
 
 
 def test_gate_checks_every_stream_of_a_shared_table():
@@ -417,7 +455,7 @@ def test_gate_drives_the_real_converter(tmp_path):
     assert not list(tmp_path.glob('iceberg-recovery-*.json'))
 
 
-def test_table_writer_types_merge_streams_and_refuse_conflicts():
+def test_table_writer_classes_merge_streams_and_report_conflicts():
     """A manual conversion uses every writing stream's classes and refuses a disagreement."""
     table = SnowflakeObjectName('DATABASE', 'SCHEMA', 'T')
     other = SnowflakeObjectName('DATABASE', 'SCHEMA', 'OTHER')
@@ -427,14 +465,14 @@ def test_table_writer_types_merge_streams_and_refuse_conflicts():
         ConversionTarget('c-other', other, {'DOC': 'TEXT'}),
     ]
 
-    assert native_to_iceberg.writer_types_for_table('database.schema.t', imported) == {
-        'DOC': 'VARIANT', 'NOTE': 'TEXT',
-    }
-    assert native_to_iceberg.writer_types_for_table('database.schema.unplanned', imported) == {}
-    with pytest.raises(PreRunChecksException, match='Column DOC is VARIANT for stream a-t but TEXT'):
-        native_to_iceberg.writer_types_for_table(
-            'database.schema.t', imported + [ConversionTarget('d-t', table, {'DOC': 'TEXT'})],
-        )
+    assert native_to_iceberg.writer_classes_for_table('database.schema.t', imported) == (
+        {'DOC': 'VARIANT', 'NOTE': 'TEXT'}, (),
+    )
+    assert native_to_iceberg.writer_classes_for_table('database.schema.unplanned', imported) == ({}, ())
+    _, conflicts = native_to_iceberg.writer_classes_for_table(
+        'database.schema.t', imported + [ConversionTarget('d-t', table, {'DOC': 'TEXT'})],
+    )
+    assert conflicts == ('Column DOC is VARIANT for stream a-t but TEXT for stream d-t',)
 
 
 def test_fastsync_readiness_lets_an_interrupted_publication_resume(tmp_path):
@@ -605,13 +643,135 @@ def test_gate_holds_back_a_pending_attempt_that_has_not_cut_over():
 
 
 def test_gate_still_closes_an_interrupted_cutover_of_a_shared_table():
-    """A missing primary gets its name back first, whoever else writes the table."""
+    """A missing primary gets its name back first; the shared writer then stops the run."""
     first = [_classified('T', STATE_PENDING, 1, primary='missing')]
+    refused = NativeToIcebergConversionError(f'Cannot convert {_quoted("T")}: {LEGACY_REFUSAL}')
 
-    with _gate(first, [_classified('T', STATE_ICEBERG)]) as (converter, _, _):
-        native_to_iceberg.convert_tap_tables({}, '/runtime', [], other_writers=[_other_writer(LEGACY_REFUSAL)])
+    with _gate(first, convert_error=refused) as (converter, _, _):
+        with pytest.raises(
+            NativeToIcebergConversionException, match=r'T \(stream public-t\) failed: Cannot convert .*tap legacy',
+        ):
+            native_to_iceberg.convert_tap_tables({}, '/runtime', [], other_writers=[_other_writer(LEGACY_REFUSAL)])
 
-    converter.convert.assert_called_once_with(_quoted('T'), eventual='iceberg', writer_types={})
+    converter.convert.assert_called_once_with(
+        _quoted('T'), eventual='iceberg', writer_types={}, refusals=(LEGACY_REFUSAL,),
+    )
+
+
+@pytest.mark.parametrize('source', ['conflict', 'tap'])
+def test_gate_resumes_an_interrupted_cutover_with_its_conflicts_and_tap_refusals(source):
+    """Class conflicts and tap-wide reasons reach the converter, which restores the name before refusing."""
+    first = [
+        _classified('T', STATE_PENDING, 1, stream='a-t', writer_types={'DOC': 'TEXT'}, primary='missing'),
+        _classified('T', STATE_PENDING, 1, stream='b-t',
+                    writer_types={'DOC': 'VARIANT' if source == 'conflict' else 'TEXT'}, primary='missing'),
+    ]
+    tap_refusals = ['stale'] if source == 'tap' else []
+    expected = (
+        ('Column DOC is TEXT for stream a-t but VARIANT for stream b-t',) if source == 'conflict' else ('stale',)
+    )
+
+    with _gate(first, convert_error=NativeToIcebergConversionError('refused')) as (converter, _, _):
+        with pytest.raises(NativeToIcebergConversionException, match=r'T \(stream a-t\) failed: refused'):
+            native_to_iceberg.convert_tap_tables({}, '/runtime', [], tap_refusals=tap_refusals)
+
+    converter.convert.assert_called_once_with(
+        _quoted('T'), eventual='iceberg', writer_types={'DOC': 'TEXT'}, refusals=expected,
+    )
+
+
+@pytest.mark.parametrize('source', ['writer', 'tap', 'conflict'])
+def test_gate_never_finalizes_a_promoted_table_that_a_reason_stops(source):
+    """A promoted but unfinished table is held back like a native one, so replication never starts."""
+    first = [_classified('T', STATE_PENDING, 1, stream='a-t', writer_types={'DOC': 'TEXT'}, primary='iceberg')]
+    if source == 'conflict':
+        first.append(_classified(
+            'T', STATE_PENDING, 1, stream='b-t', writer_types={'DOC': 'VARIANT'}, primary='iceberg',
+        ))
+    options = {
+        'writer': {'other_writers': [_other_writer(LEGACY_REFUSAL)]},
+        'tap': {'tap_refusals': ['stale']},
+        'conflict': {},
+    }[source]
+
+    with _gate(first) as (converter, _, _):
+        with pytest.raises(NativeToIcebergConversionException, match='T .*needs an operator'):
+            native_to_iceberg.convert_tap_tables({}, '/runtime', [], **options)
+
+    converter.convert.assert_not_called()
+
+
+def test_gate_finalizes_a_promoted_table_after_restoring_absent_names():
+    """Without a reason, a promoted attempt is finished after every absent name is restored."""
+    first = [
+        _classified('DONE', STATE_PENDING, 1, primary='iceberg'),
+        _classified('GONE', STATE_PENDING, 2, primary='missing'),
+    ]
+
+    with _gate(first, [_classified('DONE', STATE_ICEBERG), _classified('GONE', STATE_ICEBERG)]) as (converter, _, _):
+        native_to_iceberg.convert_tap_tables({}, '/runtime', [])
+
+    assert [entry.args[0] for entry in converter.convert.call_args_list] == [_quoted('GONE'), _quoted('DONE')]
+
+
+@pytest.mark.parametrize('state', [STATE_NEW, STATE_ICEBERG])
+def test_gate_stops_when_writers_disagree_on_a_finished_table(state):
+    """The writers would fail on the column, so a new or Iceberg table with a class conflict stops the run."""
+    first = [
+        _classified('T', state, stream='a-t', writer_types={'DOC': 'TEXT'}),
+        _classified('T', state, stream='b-t', writer_types={'DOC': 'VARIANT'}),
+    ]
+
+    with _gate(first) as (converter, _, _):
+        with pytest.raises(NativeToIcebergConversionException, match='Column DOC is TEXT for stream a-t but VARIANT'):
+            native_to_iceberg.convert_tap_tables({}, '/runtime', [])
+
+    converter.convert.assert_not_called()
+
+
+def test_gate_applies_tap_refusals_only_to_tables_it_would_change():
+    """A stale catalog stops conversions, but never the replication of finished tables."""
+    first = [_classified('DONE', STATE_ICEBERG), _classified('LATER', STATE_NEW), _classified('T', STATE_NATIVE, 1)]
+
+    with _gate(first) as (converter, _, _):
+        with pytest.raises(NativeToIcebergConversionException, match=r'T \(stream public-t\) needs an operator: stale'):
+            native_to_iceberg.convert_tap_tables({}, '/runtime', [], tap_refusals=['stale'])
+    with _gate(first[:2]) as (converter_after, _, _):
+        native_to_iceberg.convert_tap_tables({}, '/runtime', [], tap_refusals=['stale'])
+
+    converter.convert.assert_not_called()
+    converter_after.convert.assert_not_called()
+
+
+def test_report_flags_a_pending_attempt_whose_name_is_absent(tmp_path):
+    """The report says which command only restores the name and which also finishes the cutover."""
+    classified = [_classified('TABLE', STATE_PENDING, reasons=(LEGACY_REFUSAL,), primary='missing')]
+
+    with patch.object(native_to_iceberg, 'SnowflakeConversionQueryAdapter', return_value=FakeSnowflake()), \
+            patch.object(native_to_iceberg, 'classify', return_value=classified):
+        reports = native_to_iceberg.preflight_report(
+            {'dbname': 'database'}, str(tmp_path), [_target('TABLE')], conversion_warehouse='CONVERSION_WH',
+        )
+
+    assert reports[0].action == 'resolve the blockers'
+    assert reports[0].blockers[0] == LEGACY_REFUSAL
+    absent = reports[0].blockers[1]
+    assert 'absent after an interrupted cutover' in absent
+    assert 'run_tap restores it and then stops on any other blocker' in absent
+    assert 'copy_native_to_iceberg --eventual iceberg --conversion-warehouse CONVERSION_WH' in absent
+    assert 'without checking other taps' in absent
+
+
+def test_fastsync_readiness_reports_a_failed_check_without_changing_anything(tmp_path):
+    """An error reaching Snowflake becomes a pre-run refusal that the child can always report."""
+    snowflake = MagicMock()
+    snowflake.query.side_effect = RuntimeError('403 Forbidden')
+
+    with patch.object(native_to_iceberg, 'SnowflakeQueryAdapter', return_value=snowflake):
+        with pytest.raises(PreRunChecksException, match='Cannot check the FastSync targets in Snowflake: 403'):
+            native_to_iceberg.assert_fastsync_targets_ready(FASTSYNC_CONFIG, str(tmp_path), ['schema.table'])
+
+    assert not list(tmp_path.iterdir())
 
 
 def test_gate_refuses_column_classes_that_another_iceberg_tap_disagrees_with():

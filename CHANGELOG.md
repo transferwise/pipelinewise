@@ -15,12 +15,17 @@
 - Add `copy_native_to_iceberg --preflight-only` with `--tap` or `--table`. It
   reports each table's state, size, and conversion blockers without taking a
   lock, writing a manifest, or running DDL. With `--output-format json`, stdout
-  carries only the report and log lines go to stderr. See
+  carries only the report and log lines go to stderr. `--conversion-warehouse`
+  runs the report or a manual conversion on another warehouse. See
   [feasibility report](docs/connectors/targets/snowflake_iceberg.rst#snowflake-iceberg-conversion-report)
 - Refuse a conversion before copying when Iceberg v3 cannot hold the data
   exactly: `TIMESTAMP_TZ` columns, and time or timestamp values with
-  sub-microsecond digits. Before this fix, the copy truncated them and still
-  passed validation. Also refuse grants that an Iceberg table cannot carry, and a
+  sub-microsecond digits. Before this fix, the copy dropped `TIMESTAMP_TZ`
+  offsets and cut sub-microsecond digits, and still passed validation. Tables
+  that earlier releases converted are not checked again; their exact values
+  remain only in `<table>_NATIVE`, so
+  [check those backups](docs/connectors/targets/snowflake_iceberg.rst#snowflake-iceberg-earlier-conversions)
+  before you drop them. Also refuse grants that an Iceberg table cannot carry, and a
   `TEXT`/`VARIANT` column that an imported tap writing the table now maps to the
   other class. A pending `--eventual iceberg` attempt from an earlier release is
   checked again before its cutover and can be refused; see

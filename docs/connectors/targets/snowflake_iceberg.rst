@@ -352,12 +352,17 @@ To move a tap that already replicates into native tables:
 
 1. Run the :ref:`feasibility report <snowflake_iceberg_conversion_report>`
    while the tap still replicates natively, and resolve the blockers it shows.
+   To keep the report's scans off the loading warehouse, first import
+   ``native_to_iceberg_conversion: {enabled: false, conversion_warehouse: ...}``
+   while the tap is still native.
 2. Pause the tap's schedule. Set the Iceberg format, add the setting with
    ``enabled: false``, and run ``import_config``. Run the report again: this
    catalog is the one conversion uses, and MariaDB JSON aliases appear as
-   ``VARIANT`` only now. Keep the tap paused in this state, because both writers
-   refuse native tables under the Iceberg format. Keep the pause short: the
-   source keeps accumulating changes.
+   ``VARIANT`` only now. If ``import_config`` fails, fix the error and run it
+   again: while the catalog is older than the imported settings, the report and
+   ``run_tap`` refuse to convert. Keep the tap paused in this state, because both
+   writers refuse native tables under the Iceberg format. Keep the pause short:
+   the source keeps accumulating changes.
 3. When the report is ready, set ``enabled: true``, run ``import_config``, and
    resume the schedule.
 
@@ -382,10 +387,11 @@ pidfile, before FastSync or Singer writes anything:
 
 1. It plans each selected stream's Snowflake table and classifies them all with
    one ``SHOW TABLES`` per schema and the target's recovery manifests.
-2. It resumes any pending ``--eventual iceberg`` conversion first, so an
-   interrupted cutover gets its table name back before any other check can stop
-   the run. A resumed attempt passes the same checks as a new one, including the
-   tap catalog's column classes, before its cutover.
+2. It resumes every pending ``--eventual iceberg`` conversion of these tables
+   first, starting with interrupted cutovers, and tries every one even when one
+   fails. If another check would stop a table, the resume restores its name and
+   then stops before another cutover. A resumed attempt passes the same checks
+   as a new one, including the tap catalog's column classes, before its cutover.
 3. It stops if any table needs an operator, then preflights every native table
    and stops before converting anything if any table is blocked. When several
    streams write one table, every stream's blockers and column classes count,
@@ -397,9 +403,9 @@ pidfile, before FastSync or Singer writes anything:
 
 After the last table converts, each run costs one ``SHOW TABLES`` per schema,
 and runs with FastSync work list those schemas once more before FastSync starts.
-The setting accepts any tap that can write managed Iceberg v3 through
-``target-snowflake``. It requires ``data_flattening_max_level: 0``, because
-conversion compares native columns with the tap catalog's top-level properties.
+Enabling the setting needs a tap that can write managed Iceberg v3 through
+``target-snowflake``, and ``data_flattening_max_level: 0``, because conversion
+compares native columns with the tap catalog's top-level properties.
 ``run_tap`` also stops before any Snowflake work if the tap's generated
 configuration is not imported with these settings, for example after an
 ``import_config --taps`` run that did not include the tap.
@@ -436,22 +442,33 @@ Enabling the setting accepts the cutover gap described below: each table's name
 is briefly absent between its two renames, so readers of that table fail for
 that moment. A large table converts within the scheduled run and holds the tap
 for the copy; use the report's row and byte counts to pick when to enable it.
+Each conversion statement must finish within Snowflake's statement timeout:
+the lowest non-zero ``STATEMENT_TIMEOUT_IN_SECONDS`` of the conversion warehouse
+and of the target user, which can also come from the account. This covers the
+copy and the full-table scans that check it. Otherwise every run repeats the
+statement that timed out and times out again.
 
 If any table cannot convert, the run fails before replication starts, sends the
 tap's alert, and exits 1. It never falls back to native tables. Tables converted
 earlier in the run stay converted, each validated with its native backup kept
-as ``<table>_NATIVE``. The next ``run_tap`` resumes a pending conversion, so fix
-the cause and rerun; see :ref:`troubleshooting_iceberg_auto_conversion`. While
-the tap is stopped, its source keeps accumulating changes, so watch PostgreSQL
-WAL and MySQL binlog retention.
+as ``<table>_NATIVE``. Pause the tap's schedule until you have fixed the cause:
+each scheduled run preflights every native table again and restarts a copy that
+failed. The next ``run_tap`` resumes a pending conversion; see
+:ref:`troubleshooting_iceberg_auto_conversion`. While the tap is stopped, its
+source keeps accumulating changes, so watch PostgreSQL WAL and MySQL binlog
+retention.
 
 .. warning::
 
    Finish or recover every pending conversion before you set
-   ``enabled: false``, remove ``native_to_iceberg_conversion``, or change the
-   tap's format. Unless the setting is enabled, ``run_tap`` does not resume a
-   conversion, and a writer could create an empty table under a primary name
-   that an interrupted cutover left absent.
+   ``enabled: false``, remove ``native_to_iceberg_conversion``, change the tap's
+   format, deselect a stream, change its schema mapping, or remove the tap.
+   ``run_tap`` resumes only the conversions of the tables it plans, and only while
+   the setting is enabled. Otherwise a writer could create an empty table under a
+   primary name that an interrupted cutover left absent. Finish any other pending
+   conversion with ``copy_native_to_iceberg --eventual iceberg``, adding
+   ``--conversion-warehouse`` to keep it off the loading warehouse. That command
+   does not check other taps that write the table.
    Once a table has converted, the tap cannot return to ``native``: the native
    contract refuses Iceberg tables.
 
@@ -471,7 +488,10 @@ using an imported Snowflake target:
 
 ``--eventual`` defaults to ``native``. The command converts one table in the
 target's configured database. ``--tap`` is accepted only by the feasibility
-report below.
+report below. The command runs on the target's warehouse, or on
+``--conversion-warehouse`` when you give one. If imported taps that write the
+table map a column to different ``TEXT``/``VARIANT`` classes, the command refuses
+the table; it first restores the name of an interrupted cutover.
 
 .. list-table:: Conversion outcomes
    :header-rows: 1
@@ -513,8 +533,10 @@ Conversion feasibility report
 Run ``copy_native_to_iceberg --preflight-only`` with ``--tap`` or ``--table``
 before converting anything. It takes no lock, writes no manifest, and runs no
 DDL, so it is safe to run beside the tap. Its read queries include one aggregate
-scan of each native table's time and timestamp columns. It uses the same table
-planning and checks as conversion. Each table gets one state:
+scan of each native table's time and timestamp columns. They run on
+``--conversion-warehouse`` when you give one. Otherwise ``--tap`` uses the tap's
+``conversion_warehouse``, and ``--table`` uses the target's warehouse. It uses
+the same table planning and checks as conversion. Each table gets one state:
 
 .. list-table:: Feasibility states
    :header-rows: 1
@@ -531,13 +553,22 @@ planning and checks as conversion. Each table gets one state:
      - The table would be converted. Any preflight blockers are listed.
    * - ``pending``
      - An ``--eventual iceberg`` conversion manifest exists and would be resumed.
-       If the table is still native, its preflight blockers are listed.
+       If the table is still native, its preflight blockers are listed. If its
+       name is absent after an interrupted cutover, that is a blocker until the
+       name is back. ``run_tap`` restores the name, then stops on the table's
+       other blockers. ``copy_native_to_iceberg --eventual iceberg`` also
+       restores it, but then finishes the cutover without checking other taps,
+       reserved names, planning, or catalog freshness, so resolve those first.
    * - ``blocked``
      - The table needs an operator first, for example a leftover ``_NATIVE``
        table, an ``_ICEBERG`` companion without a manifest, or unreadable
-       recovery state. A companion without a manifest may be stale: drop it, or
-       promote it with ``copy_native_to_iceberg --eventual iceberg`` while the
-       tap is stopped.
+       recovery state. Find out what a leftover table holds before you change
+       it. A ``_NATIVE`` table, or any companion beside a missing primary, may
+       hold the only copy of the rows; see
+       :ref:`troubleshooting_iceberg_conversion_missing_primary`. Only an
+       ``_ICEBERG`` copy beside a native table, once you know it is a leftover
+       copy, can be dropped or promoted with
+       ``copy_native_to_iceberg --eventual iceberg`` while the tap is stopped.
 
 For ``--tap``, PipelineWise derives each table name the way target-snowflake
 does, from the stream ID and the tap's schema mapping. For MariaDB, MySQL, and
@@ -547,16 +578,19 @@ names differ. A native ``TEXT`` column that the tap catalog now maps to
 that mismatch. MariaDB JSON aliases are discovered as ``VARIANT`` only after the
 tap is imported with its Iceberg settings, so the report is not ready until then;
 follow the order in :ref:`snowflake_iceberg_auto_conversion`. The report also
-requires ``data_flattening_max_level: 0``. ``--table`` checks one table against
-the catalogs of the imported taps that write it, but skips the tap-wide checks. A
-manual ``copy_native_to_iceberg`` conversion applies the same catalogs and
-refuses a ``TEXT``/``VARIANT`` mismatch before copying.
+requires ``data_flattening_max_level: 0``, and a catalog that the last
+``import_config`` rediscovered. ``--table`` checks one table against the catalogs
+of the imported taps that write it, but skips the tap-wide checks. A manual
+``copy_native_to_iceberg`` conversion applies the same catalogs and refuses a
+``TEXT``/``VARIANT`` mismatch before copying. For a tap that flattens deeper than
+level 0, the checks skip each object that the tap writes as child columns.
 
 For each table, the report lists the first metadata refusal, such as a policy or
-a stream, and every conversion blocker, such as a ``TIMESTAMP_TZ`` column or a
-grant that cannot be replayed. After fixing a metadata refusal, run the report
-again, because the next one may be hidden behind it. Row and byte counts come
-from ``SHOW TABLES`` and help estimate the copy time and warehouse cost. The
+a stream. A table without a refusal lists every conversion blocker instead, such
+as a ``TIMESTAMP_TZ`` column or a grant that cannot be replayed. A refusal hides
+the remaining refusals and every conversion blocker, so run the report again
+after each fix. Row and byte counts come from ``SHOW TABLES`` and help estimate
+the copy time and warehouse cost. The
 ``--tap`` report also blocks a table that another imported tap writes, by the
 same rules as automatic conversion.
 
@@ -707,3 +741,28 @@ deterministic checksum, critical values, physical format and version, ownership,
 grants, tags, comments, and downstream access. For ``eventual=iceberg``, retain
 ``_NATIVE`` until at least one Singer or FastSync cycle and independent
 reconciliation have succeeded.
+
+.. _snowflake_iceberg_earlier_conversions:
+
+Check tables that earlier releases converted
+--------------------------------------------
+
+Before 0.100.0, conversion changed ``TIMESTAMP_TZ`` columns to ``TIMESTAMP_LTZ``,
+which keeps each instant but drops its offset, and cut time and timestamp values
+to microseconds. Validation still passed, because it compared the converted
+values. Finishing an attempt that an earlier release interrupted after its
+cutover does not check this again either. The exact values remain only in
+``<table>_NATIVE``, so check each backup before you drop it:
+
+.. code-block:: sql
+
+   SELECT TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME
+   FROM <database>.INFORMATION_SCHEMA.COLUMNS
+   WHERE ENDSWITH(TABLE_NAME, '_NATIVE') AND DATA_TYPE = 'TIMESTAMP_TZ';
+
+   SELECT COUNT_IF(MOD(DATE_PART(NANOSECOND, <column>), 1000) <> 0)
+   FROM <database>.<schema>.<table>_NATIVE;
+
+Run the second query for each ``TIME``, ``TIMESTAMP_NTZ``, and ``TIMESTAMP_LTZ``
+column. Managed Iceberg v3 holds neither offsets nor nanoseconds, so converting
+again cannot restore them. Keep ``<table>_NATIVE`` for any table that needs them.

@@ -76,6 +76,16 @@ def test_core_predicts_shared_level_zero_column_names():
         assert level_zero_column_name(name) == case['expected_column'], case
 
 
+def test_core_skips_the_objects_target_snowflake_splits():
+    """Conversion predicts no class for a top-level object the connector writes as child columns."""
+    from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_plan import (
+        splits_into_child_columns,
+    )
+
+    for case in _v3_behavior_cases()['top_level_splits']:
+        assert splits_into_child_columns(case['schema'], case['max_level']) is case['expected_split'], case
+
+
 def test_core_matches_contract():
     """Core exposes exactly the shared supported-version declaration."""
     expected_contract = _contract_fixture()['declarative_contract']

@@ -183,6 +183,24 @@ Tap configuration
      - No
      - Global channel
      - Adds a tap-specific Slack destination; must start with ``#``.
+   * - ``native_to_iceberg_conversion``
+     - No
+     - Omitted
+     - Object with a Boolean ``enabled`` and an optional
+       ``conversion_warehouse``. With ``enabled: true``, ``run_tap`` converts
+       the tap's existing native Snowflake tables to managed Iceberg v3 before
+       it replicates. ``enabled: true`` is valid only with
+       ``target_table_format: iceberg``, ``iceberg_version: 3``, a
+       ``target-snowflake`` target, and an effective
+       ``data_flattening_max_level`` of ``0``. Any tap accepts
+       ``enabled: false``, for example to run the report on
+       ``conversion_warehouse`` before the switch. ``conversion_warehouse`` runs
+       only the conversion work and the tap's report on another Snowflake
+       warehouse. With ``enabled: false``, ``run_tap`` neither converts nor
+       resumes a pending conversion. Only PipelineWise reads the setting, from
+       its main configuration; it never reaches the target connector or
+       ``inheritable_config.json``. Configure it at the tap root, not in
+       ``db_conn`` or the target. See :ref:`snowflake_iceberg_auto_conversion`.
    * - ``add_metadata_columns``
      - No
      - ``false``
@@ -237,19 +255,6 @@ Tap configuration
      - Managed-Iceberg version discriminator. Its only supported value is integer
        ``3``; it is required with ``target_table_format: iceberg`` and invalid
        otherwise.
-   * - ``native_to_iceberg_conversion``
-     - Omitted
-     - Object with a Boolean ``enabled`` and an optional
-       ``conversion_warehouse``. With ``enabled: true``, ``run_tap`` converts
-       the tap's existing native Snowflake tables to managed Iceberg v3 before
-       it replicates. Valid only with ``target_table_format: iceberg``,
-       ``iceberg_version: 3``, a ``target-snowflake`` target, and an effective
-       ``data_flattening_max_level`` of ``0``. ``conversion_warehouse`` runs
-       only the conversion work on another Snowflake warehouse. With
-       ``enabled: false``, ``run_tap`` neither converts nor resumes a pending
-       conversion. Configure it at the tap root, not in ``db_conn`` or the
-       target. See
-       :ref:`snowflake_iceberg_auto_conversion`.
    * - ``version_legacy_float_columns``
      - ``false``
      - For MariaDB/MySQL or PostgreSQL taps writing to Snowflake, set ``true``

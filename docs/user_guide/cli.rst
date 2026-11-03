@@ -42,7 +42,9 @@ Command summary
      - Runs source discovery.
    * - ``run_tap``
      - Run normal initial and ongoing replication.
-     - Loads target data and advances acknowledged state.
+     - Loads target data and advances acknowledged state. With
+       ``native_to_iceberg_conversion`` enabled, can first convert and rename
+       native tables.
    * - ``stop_tap``
      - Terminate a managed running pipeline.
      - Stops processes; may leave replayable work.
@@ -356,9 +358,15 @@ Retry from the same imported target runtime directory with the same table,
 ``--eventual`` value, target account/database/user, and account role before
 resuming readers or writers. After an interrupted cutover, a retry restores the
 native table name before it validates anything. A rerun after a completed
-``--eventual iceberg`` conversion changes nothing. Do not delete its recovery manifest or companion tables. See
-:ref:`snowflake_iceberg` for preflight, unsupported metadata, and rollback
-behaviour.
+``--eventual iceberg`` conversion changes nothing. Do not delete its recovery
+manifest or companion tables. See :ref:`snowflake_iceberg` for preflight,
+unsupported metadata, and rollback behaviour.
+
+The command and its report run on the target's warehouse by default.
+``--conversion-warehouse <warehouse>`` runs them on another warehouse, which the
+target role must be able to use. For a ``--tap`` report, the tap's
+``conversion_warehouse`` applies when you give no option. Other commands reject
+``--conversion-warehouse``.
 
 Check feasibility first with ``--preflight-only``:
 
@@ -374,9 +382,10 @@ Check feasibility first with ``--preflight-only``:
 The report changes nothing. It takes no lock, writes no manifest, and runs no
 DDL, so it can run beside the tap. ``--tap`` reports every table that the tap's
 selected streams write; ``--table`` reports one table, checked against the
-catalogs of the imported taps that write it. Each row shows the table's state, the action conversion would take,
-Snowflake's row and byte counts, the first metadata refusal, and every
-conversion blocker. ``--output-format json`` prints only the report on stdout,
+catalogs of the imported taps that write it. Each row shows the table's state,
+the action conversion would take, Snowflake's row and byte counts, and its
+blockers: the first metadata refusal, or every conversion blocker when there is
+no refusal. ``--output-format json`` prints only the report on stdout,
 with a top-level ``ready`` flag; log messages go to stderr. The command exits 0
 whenever it produces a report, so check ``ready`` or the final line. Other
 commands reject ``--preflight-only``, and this command accepts ``--tap`` only

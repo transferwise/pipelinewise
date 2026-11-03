@@ -27,6 +27,7 @@ def _pipelinewise():
     # The sample tap's generated files are native; this fixture models a tap imported as Iceberg v3.
     imported = instance._iceberg_target_config
     instance._iceberg_target_config = lambda: {**imported(), 'target_table_format': 'iceberg', 'iceberg_version': 3}
+    instance._stale_catalog_reasons = lambda: []
     return instance
 
 
@@ -56,6 +57,15 @@ def test_enabled_conversion_runs_in_a_child_process(pipelinewise):
     )
 
 
+def test_a_stale_catalog_refuses_conversions(pipelinewise):
+    """A catalog the last import did not rediscover stops new conversions, not finished tables."""
+    pipelinewise._stale_catalog_reasons = lambda: ['stale catalog']
+    with patch('pipelinewise.cli.native_to_iceberg.convert_tap_tables') as convert_tables:
+        pipelinewise._run_native_to_iceberg_conversion(STREAMS[:1], None)
+
+    assert convert_tables.call_args.kwargs['tap_refusals'] == ['stale catalog']
+
+
 def test_main_config_alone_never_converts_a_tap_imported_as_native():
     """A tap whose generated files lack its Iceberg settings stops before any Snowflake work."""
     instance = PipelineWise(CliArgs(target='target_one', tap='tap_one'), CONFIG_DIR, VIRTUALENVS_DIR)
@@ -75,7 +85,7 @@ def test_conversion_plans_the_selected_streams(pipelinewise):
 
     target_config, runtime_dir, targets, conversion_warehouse = convert_tables.call_args.args
     assert convert_tables.call_args.kwargs == {
-        'other_writers': [], 'target_id': 'target_one', 'tap_id': 'tap_one',
+        'other_writers': [], 'tap_refusals': [], 'target_id': 'target_one', 'tap_id': 'tap_one',
     }
     assert target_config['dbname'] == 'my_db'
     assert target_config['schema_mapping']['db_test_mysql']['target_schema'] == 'db_test_mysql'
@@ -255,7 +265,14 @@ def _project(tmp_path):
                 'selection': [{'tap_stream_id': stream, 'replication_method': 'LOG_BASED'} for stream in streams],
             })
             _write_json(tap_dir / 'properties.json', {'streams': [
-                {'tap_stream_id': stream, 'schema': {'properties': {'doc': {'type': ['null', 'object']}}}}
+                {
+                    'tap_stream_id': stream,
+                    'schema': {'properties': {
+                        'doc': {'type': ['null', 'object']},
+                        'address': {'type': ['null', 'object'], 'properties': {'city': {'type': ['null', 'string']}}},
+                    }},
+                    'metadata': [{'breadcrumb': [], 'metadata': {'selected': True}}],
+                }
                 for stream in streams
             ]})
         main['targets'].append({'id': target_id, 'name': target_id, 'type': target_type, 'taps': entries})
@@ -285,7 +302,7 @@ def test_other_writers_cover_every_tap_writing_a_planned_table(tmp_path):
     assert 'does not write managed Iceberg v3' in refusals['public-orders of tap legacy']
     assert 'two targets cannot coordinate a conversion' in refusals['public-items of tap twin of target snow_too']
     mirror = next(writer for writer in writers if writer.refusal is None)
-    assert mirror.target.writer_types == {'DOC': 'VARIANT'}
+    assert mirror.target.writer_types == {'DOC': 'VARIANT', 'ADDRESS': 'VARIANT'}
 
 
 def test_other_writers_skip_a_target_that_cannot_be_read(tmp_path):
@@ -300,3 +317,22 @@ def test_other_writers_skip_a_target_that_cannot_be_read(tmp_path):
 
     assert [writer.target.stream_id for writer in writers] == ['public-items of tap mirror']
     assert warning.call_args.args[1] == 'snow_too'
+
+
+def test_writer_classes_skip_only_the_objects_a_flattening_tap_splits(tmp_path):
+    """A tap that flattens deeper writes an object with properties as child columns; other classes still count."""
+    instance = _project(tmp_path)
+    settings = tmp_path / 'snow' / 'mirror' / 'inheritable_config.json'
+    settings.write_text(json.dumps({
+        'schema_mapping': {'public': {'target_schema': 'sales'}}, 'data_flattening_max_level': 10, **ICEBERG_FILES,
+    }), encoding='utf-8')
+
+    imported = instance._imported_tap_targets({'dbname': 'x'})
+    writers = instance._other_writers({'account': 'ACC', 'dbname': 'analytics'}, PLANNED)
+
+    assert [target.writer_types for target in imported if target.stream_id == 'public-items'] == [
+        {'DOC': 'VARIANT', 'ADDRESS': 'VARIANT'},  # orders, at level 0
+        {'DOC': 'VARIANT'},  # mirror, at level 10
+    ]
+    mirror = next(writer for writer in writers if 'mirror' in writer.target.stream_id)
+    assert mirror.target.writer_types == {'DOC': 'VARIANT'}

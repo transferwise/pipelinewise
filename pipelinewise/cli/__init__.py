@@ -187,17 +187,26 @@ def _validate_command_specific_arguments(args):
     if args.command == 'partial_sync_table':
         _validate_partial_sync_arguments(args)
 
+    _validate_iceberg_options(args)
+
+    if args.command == 'tap_info':
+        _validate_tap_info(args)
+
+    _validate_data_diff_arguments(args)
+
+
+def _validate_iceberg_options(args):
+    """Validate copy_native_to_iceberg options, and reject them for every other command."""
     if args.command == 'copy_native_to_iceberg':
         _validate_iceberg_copy_arguments(args)
     elif getattr(args, 'preflight_only', False):
         raise CommandSpecificArgumentsException(
             '--preflight-only is only valid with copy_native_to_iceberg'
         )
-
-    if args.command == 'tap_info':
-        _validate_tap_info(args)
-
-    _validate_data_diff_arguments(args)
+    elif getattr(args, 'conversion_warehouse', None) is not None:
+        raise CommandSpecificArgumentsException(
+            '--conversion-warehouse is only valid with copy_native_to_iceberg'
+        )
 
 
 def _prints_json_report(args):
@@ -255,6 +264,9 @@ def _validate_iceberg_copy_arguments(args):
         raise CommandSpecificArgumentsException(
             'You must explicitly specify Iceberg version 3 using --iceberg-version 3'
         )
+    warehouse = getattr(args, 'conversion_warehouse', None)
+    if warehouse is not None and not warehouse.strip():
+        raise CommandSpecificArgumentsException('--conversion-warehouse must name a Snowflake warehouse')
 
 
 def _validate_data_diff_arguments(args):
@@ -379,6 +391,15 @@ def main():
         help=(
             'Report whether native-to-Iceberg conversion can run for a tap or table '
             'without changing anything'
+        ),
+    )
+    parser.add_argument(
+        '--conversion-warehouse',
+        type=str,
+        default=None,
+        help=(
+            'Snowflake warehouse for copy_native_to_iceberg queries; overrides the tap setting '
+            'and defaults to the target warehouse'
         ),
     )
     parser.add_argument('--column', type=str, default='*', help='Name of the column to use as sync key in partial sync')

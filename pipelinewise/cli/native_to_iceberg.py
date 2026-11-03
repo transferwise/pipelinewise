@@ -25,6 +25,7 @@ from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_plan import (
     fastsync_target_table,
     plan_conversion_targets,
     selected_stream_ids,
+    with_refusals,
 )
 from pipelinewise.fastsync.commons.snowflake_iceberg_converter import (
     EVENTUAL_ICEBERG,
@@ -108,13 +109,14 @@ def table_targets(fqtn: str, imported: Sequence[ConversionTarget]) -> List[Conve
     return [target for target in imported if target.table == table] or [ConversionTarget('', table)]
 
 
-def writer_types_for_table(fqtn: str, imported: Sequence[ConversionTarget]) -> Dict[str, str]:
-    """Return the TEXT/VARIANT classes every imported stream writing one table expects."""
+def writer_classes_for_table(
+    fqtn: str,
+    imported: Sequence[ConversionTarget],
+) -> Tuple[Dict[str, str], Tuple[str, ...]]:
+    """Return the TEXT/VARIANT classes the imported streams writing one table expect, and conflicts."""
     table = SnowflakeObjectName.parse(fqtn)
     merged, conflicts = _merge_writer_types([target for target in imported if target.table == table])
-    if conflicts.get(table.key):
-        raise PreRunChecksException(f'Cannot convert {table.key}: ' + '; '.join(conflicts[table.key]))
-    return merged.get(table.key, {})
+    return merged.get(table.key, {}), tuple(conflicts.get(table.key, ()))
 
 
 def tap_blockers(target_config: Mapping[str, Any]) -> List[str]:
@@ -167,21 +169,22 @@ def other_tap_writers(
     ]
 
 
-def _with_other_writers(
+def _held_back(
     classified: Sequence[ClassifiedTarget],
     writers: Sequence[OtherWriter],
+    conflicts: Mapping[str, Sequence[str]],
+    tap_refusals: Sequence[str] = (),
 ) -> List[ClassifiedTarget]:
-    """Block every native table that another tap writes in a form the converted table breaks."""
-    refusals: Dict[str, List[str]] = {}
+    """Stop every table that would be converted or resumed for the tap's or its writers' reasons."""
+    refusals: Dict[str, List[str]] = {key: list(reasons) for key, reasons in conflicts.items()}
     for writer in writers:
         if writer.refusal:
             refusals.setdefault(writer.target.table.key, []).append(writer.refusal)
     result = []
     for item in classified:
-        reasons = refusals.get(item.target.table.key) if item.target.table else None
-        # An interrupted cutover is still closed first; only a native primary is held back.
-        if reasons and item.primary == STATE_NATIVE:
-            item = replace(item, state=STATE_BLOCKED, reasons=(*item.reasons, *dict.fromkeys(reasons)))
+        reasons = [*tap_refusals, *refusals.get(item.target.table.key if item.target.table else None, ())]
+        if reasons and item.state in (STATE_NATIVE, STATE_PENDING, STATE_BLOCKED):
+            item = with_refusals(item, reasons)
         result.append(item)
     return result
 
@@ -257,13 +260,15 @@ def preflight_report(
     snowflake = SnowflakeConversionQueryAdapter(dict(target_config), conversion_warehouse)
     converter = SnowflakeNativeToIcebergConverter(snowflake, runtime_dir)
     reports = []
-    classified = _with_other_writers(classify(targets, snowflake, runtime_dir), other_writers)
+    classified = classify(targets, snowflake, runtime_dir)
     writer_types, conflicts = _writer_classes(classified, other_writers)
-    for item in classified:
+    for item in _held_back(classified, other_writers, conflicts):
         key = item.target.table.key if item.target.table else None
-        blockers = tuple(item.reasons) + tuple(conflicts.get(key, ()))
+        blockers = tuple(dict.fromkeys((*item.reasons, *conflicts.get(key, ()))))
+        if item.state == STATE_PENDING and item.primary not in (STATE_NATIVE, STATE_ICEBERG):
+            blockers += (_absent_name_blocker(item, conversion_warehouse),)
         if item.primary == STATE_NATIVE and item.state != STATE_ICEBERG:
-            # Blocked and pending native tables are preflighted too, so every blocker shows.
+            # Blocked and pending native tables are preflighted too, so their conversion blockers show.
             blockers += _preflight_blockers(converter, item, writer_types.get(key, {}))
         reports.append(TableReport(
             item.target.stream_id,
@@ -277,9 +282,34 @@ def preflight_report(
     return reports
 
 
+def _absent_name_blocker(item: ClassifiedTarget, conversion_warehouse: Optional[str]) -> str:
+    warehouse = f' --conversion-warehouse {conversion_warehouse}' if conversion_warehouse else ''
+    return (
+        f'{item.target.table.quoted} is absent after an interrupted cutover, so its conversion checks run only '
+        'once the name is restored. With native_to_iceberg_conversion enabled, run_tap restores it and then '
+        'stops on any other blocker listed here. copy_native_to_iceberg --eventual iceberg'
+        f'{warehouse} also restores it, but then finishes the cutover without checking other taps, reserved '
+        'names, planning or catalog freshness, so resolve those blockers first'
+    )
+
+
 def _label(item: ClassifiedTarget) -> str:
     table = item.target.table.key if item.target.table else 'an unplanned table'
     return f'{table} (stream {item.target.stream_id})' if item.target.stream_id else table
+
+
+def _raise_stopped(
+    stops: Sequence[Tuple[ClassifiedTarget, str, Sequence[str]]],
+    action: str,
+) -> None:
+    if stops:
+        details = [
+            f'{_label(item)} {problem}: {" | ".join(reasons) or item.state}'
+            for item, problem, reasons in stops
+        ]
+        raise NativeToIcebergConversionException(
+            f'Automatic native-to-Iceberg conversion stopped. {_listed(details)}. {action}'
+        )
 
 
 def _raise_if_any(
@@ -287,14 +317,7 @@ def _raise_if_any(
     problem: str,
     action: str,
 ) -> None:
-    if failures:
-        details = [
-            f'{_label(item)} {problem}: {" | ".join(reasons) or item.state}'
-            for item, reasons in failures
-        ]
-        raise NativeToIcebergConversionException(
-            f'Automatic native-to-Iceberg conversion stopped. {_listed(details)}. {action}'
-        )
+    _raise_stopped([(item, problem, reasons) for item, reasons in failures], action)
 
 
 def _unique_tables(classified: Sequence[ClassifiedTarget]) -> List[ClassifiedTarget]:
@@ -309,25 +332,57 @@ def _unique_tables(classified: Sequence[ClassifiedTarget]) -> List[ClassifiedTar
     return unique
 
 
-def _convert(
+def _converted(
     converter: SnowflakeNativeToIcebergConverter,
     item: ClassifiedTarget,
     writer_types: Mapping[str, str],
     verb: str,
-    action: str,
-) -> None:
+    refusals: Sequence[str] = (),
+) -> Optional[Exception]:
+    """Convert or resume one table, and return its error instead of raising it."""
     table = item.target.table
     LOGGER.info('%s %s (%s rows, %s bytes)', verb, table.key, item.rows, item.bytes)
     started = time.monotonic()
+    options = {'refusals': tuple(dict.fromkeys(refusals))} if refusals else {}
     try:
-        converter.convert(table.quoted, eventual=EVENTUAL_ICEBERG, writer_types=writer_types)
+        converter.convert(table.quoted, eventual=EVENTUAL_ICEBERG, writer_types=writer_types, **options)
     except Exception as exc:
         if not isinstance(exc, NativeToIcebergConversionError):
             LOGGER.exception('Unexpected error while converting %s', table.key)
-        raise NativeToIcebergConversionException(
-            f'Automatic native-to-Iceberg conversion of {_label(item)} failed: {exc}. {action}'
-        ) from exc
+        return exc
     LOGGER.info('Converted %s in %.0f seconds', table.key, time.monotonic() - started)
+    return None
+
+
+def _resume_pending(
+    converter: SnowflakeNativeToIcebergConverter,
+    classified: Sequence[ClassifiedTarget],
+    writer_types: Mapping[str, Mapping[str, str]],
+) -> Tuple[List[ClassifiedTarget], List[Tuple[ClassifiedTarget, str, Tuple[str, ...]]]]:
+    """Resume every pending attempt, interrupted cutovers first, and collect each failure."""
+    # A blocked stream holds its whole table back; an absent name keeps every stream pending instead.
+    blocked = {item.target.table.key for item in classified if item.state == STATE_BLOCKED and item.target.table}
+    pending = sorted(
+        _unique_tables([
+            item for item in classified
+            if item.state == STATE_PENDING and item.target.table.key not in blocked
+        ]),
+        key=lambda item: item.primary in (STATE_NATIVE, STATE_ICEBERG),
+    )
+    failures = []
+    for item in pending:
+        # Any stream's reason stops a new cutover; the converter restores a missing name first.
+        refusals = [
+            reason for other in classified if other.target.table == item.target.table
+            for reason in other.reasons
+        ]
+        error = _converted(
+            converter, item, writer_types.get(item.target.table.key, {}),
+            'Resuming the pending conversion of', refusals,
+        )
+        if error is not None:
+            failures.append((item, 'failed', (str(error),)))
+    return pending, failures
 
 
 def _convert_tap_tables(
@@ -337,29 +392,25 @@ def _convert_tap_tables(
     conversion_warehouse: Optional[str],
     action: str,
     writers: Sequence[OtherWriter],
+    tap_refusals: Sequence[str],
 ) -> None:
     snowflake = SnowflakeConversionQueryAdapter(dict(target_config), conversion_warehouse)
     converter = SnowflakeNativeToIcebergConverter(snowflake, runtime_dir)
-    classified = _with_other_writers(classify(targets, snowflake, runtime_dir), writers)
+    classified = classify(targets, snowflake, runtime_dir)
     # Every stream's blockers and column classes count; only physical work is de-duplicated.
     writer_types, conflicts = _writer_classes(classified, writers)
-    unique = _unique_tables(classified)
-    # Filter before de-duplicating, so a blocked sibling stream cannot hide a table's state.
-    pending = _unique_tables([
-        item for item in classified
-        if item.state == STATE_PENDING and item.target.table.key not in conflicts
-    ])
-    for item in pending:
-        # Interrupted cutovers are closed first, so no other refusal leaves a name missing.
-        _convert(
-            converter, item, writer_types.get(item.target.table.key, {}),
-            'Resuming the pending conversion of', action,
-        )
-    _raise_if_any(
-        [(item, item.reasons) for item in classified if item.state == STATE_BLOCKED]
-        + [(item, tuple(conflicts[item.target.table.key])) for item in unique
-           if item.target.table and item.target.table.key in conflicts],
-        'needs an operator',
+    classified = _held_back(classified, writers, conflicts, tap_refusals)
+    pending, failures = _resume_pending(converter, classified, writer_types)
+    # Writers that disagree on a column fail on a new or Iceberg table too, so the run stops for them.
+    finished_conflicts = [
+        (item, 'needs an operator', tuple(conflicts[item.target.table.key]))
+        for item in _unique_tables(classified)
+        if item.state in (STATE_NEW, STATE_ICEBERG) and item.target.table.key in conflicts
+    ]
+    _raise_stopped(
+        failures
+        + [(item, 'needs an operator', item.reasons) for item in classified if item.state == STATE_BLOCKED]
+        + finished_conflicts,
         action,
     )
     candidates = sorted(
@@ -378,10 +429,14 @@ def _convert_tap_tables(
         action,
     )
     for index, item in enumerate(candidates, start=1):
-        _convert(
+        error = _converted(
             converter, item, writer_types.get(item.target.table.key, {}),
-            f'Converting table {index} of {len(candidates)}:', action,
+            f'Converting table {index} of {len(candidates)}:',
         )
+        if error is not None:
+            raise NativeToIcebergConversionException(
+                f'Automatic native-to-Iceberg conversion of {_label(item)} failed: {error}. {action}'
+            ) from error
     if pending or candidates:
         _raise_if_any(
             [
@@ -401,13 +456,16 @@ def convert_tap_tables(
     conversion_warehouse: Optional[str] = None,
     *,
     other_writers: Sequence[OtherWriter] = (),
+    tap_refusals: Sequence[str] = (),
     target_id: str = '<target_id>',
     tap_id: str = '<tap_id>',
 ) -> None:
     """Leave every planned table new or managed Iceberg, or stop before any writer runs."""
     action = next_action(target_id, tap_id)
     try:
-        _convert_tap_tables(target_config, runtime_dir, targets, conversion_warehouse, action, other_writers)
+        _convert_tap_tables(
+            target_config, runtime_dir, targets, conversion_warehouse, action, other_writers, tap_refusals,
+        )
     except NativeToIcebergConversionException:
         raise
     except Exception as exc:
@@ -428,10 +486,14 @@ def assert_fastsync_targets_ready(
         for source_table in source_tables
     ]
     snowflake = SnowflakeQueryAdapter(dict(target_config))
-    not_ready = [
-        item for item in classify(targets, snowflake, runtime_dir, fastsync_rebuild=True)
-        if item.state not in (STATE_NEW, STATE_ICEBERG)
-    ]
+    try:
+        classified = classify(targets, snowflake, runtime_dir, fastsync_rebuild=True)
+    except Exception as exc:
+        LOGGER.exception('Cannot check the FastSync targets in Snowflake')
+        raise PreRunChecksException(
+            f'Cannot check the FastSync targets in Snowflake: {exc}. No source or state changes were made.'
+        ) from exc
+    not_ready = [item for item in classified if item.state not in (STATE_NEW, STATE_ICEBERG)]
     if not_ready:
         details = [
             f'{item.target.table.key} is {item.state}'

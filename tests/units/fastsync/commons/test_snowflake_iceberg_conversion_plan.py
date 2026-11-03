@@ -80,7 +80,7 @@ def _target(table):
     ],
 )
 def test_singer_target_table_mirrors_target_snowflake(stream_id, config, expected):
-    """Stream parsing, schema mapping, and table normalization match the connector."""
+    """Stream parsing, schema mapping, and table names match the connector; a quoted dbname follows the converter."""
     table = plan.singer_target_table(stream_id, config)
 
     assert (table.database, table.schema, table.table) == expected
@@ -236,7 +236,7 @@ def test_classification_uses_one_listing_per_schema(tmp_path):
     ]
     assert (classified[1].rows, classified[1].bytes) == (5, 1024)
     assert (classified[2].rows, classified[2].bytes) == (None, None)
-    assert 'STAGED_ICEBERG" already exists without a conversion manifest' in classified[3].reasons[0]
+    assert 'STAGED_ICEBERG" is an Iceberg table without a conversion manifest' in classified[3].reasons[0]
     assert 'BACKED_NATIVE" already exists' in classified[4].reasons[0]
     assert 'companion exists without a conversion manifest' in classified[5].reasons[0]
     assert not list(tmp_path.iterdir())
@@ -391,6 +391,85 @@ def test_a_retained_backup_selected_later_is_never_converted(tmp_path):
 
     assert classified[0].state == plan.STATE_BLOCKED
     assert 'reserves for "DATABASE"."SCHEMA"."ADS"' in classified[0].reasons[0]
+
+
+def test_an_unmanifested_iceberg_copy_needs_inspection_before_any_drop(tmp_path):
+    """Advice to drop or promote an Iceberg copy comes only after finding out what it holds."""
+    _, classified = _classify(
+        tmp_path, [_target('EVENTS')], [_row('EVENTS'), _row('EVENTS_ICEBERG', is_iceberg=True)],
+    )
+
+    assert classified[0].state == plan.STATE_BLOCKED
+    assert classified[0].reasons[0].startswith(
+        '"DATABASE"."SCHEMA"."EVENTS_ICEBERG" is an Iceberg table without a conversion manifest. '
+        'Find out what it holds.'
+    )
+
+
+def test_another_streams_live_table_is_never_advised_to_be_dropped(tmp_path):
+    """When a planned table holds the _ICEBERG name, only the collision is reported."""
+    _, classified = _classify(
+        tmp_path,
+        [_target('EVENTS'), _target('EVENTS_ICEBERG')],
+        [_row('EVENTS'), _row('EVENTS_ICEBERG', is_iceberg=True)],
+    )
+
+    assert classified[0].state == plan.STATE_BLOCKED
+    assert len(classified[0].reasons) == 1
+    assert classified[0].reasons[0].startswith(
+        '"DATABASE"."SCHEMA"."EVENTS_ICEBERG" is the table of stream public-events_iceberg'
+    )
+
+
+def test_an_interrupted_cutover_stays_resumable_behind_planning_blockers(tmp_path):
+    """A blocked stream's interrupted cutover is still resumed, so its name returns before it stops."""
+    snowflake = FakeSnowflake()
+    snowflake.fail_promotion = RuntimeError('promotion rejected')
+    with pytest.raises(RuntimeError, match='promotion rejected'):
+        _converter(tmp_path, snowflake).convert('database.schema.table', eventual=EVENTUAL_ICEBERG)
+    target = plan.ConversionTarget(
+        'public-table', SnowflakeObjectName('DATABASE', 'SCHEMA', 'TABLE'), blockers=('names differ',),
+    )
+
+    _, absent = _classify(tmp_path, [target], [_row('TABLE_NATIVE'), _row('TABLE_ICEBERG', is_iceberg=True)])
+    _, present = _classify(tmp_path, [target], [_row('TABLE'), _row('TABLE_ICEBERG', is_iceberg=True)])
+
+    assert (absent[0].state, absent[0].reasons, absent[0].primary) == (plan.STATE_PENDING, ('names differ',), 'missing')
+    assert (present[0].state, present[0].reasons) == (plan.STATE_BLOCKED, ('names differ',))
+
+
+@pytest.mark.parametrize('kind', ['manifest', 'pointer'])
+def test_peek_treats_recovery_state_deleted_mid_read_as_absent(tmp_path, kind):
+    """A writer that deletes a recovery file between the check and the read never blocks the table."""
+    store = RecoveryCoordinator(str(tmp_path)).recovery_store(SnowflakeObjectName('DATABASE', 'SCHEMA', 'TABLE'))
+    path = store.path if kind == 'manifest' else store.fastsync_target_pointer_path
+    with open(path, 'w', encoding='utf-8') as recovery_file:
+        recovery_file.write('{}')
+
+    with patch(
+        'pipelinewise.fastsync.commons.snowflake_iceberg_model.open', create=True, side_effect=FileNotFoundError(path),
+    ):
+        assert store.peek() == (None, None)
+
+
+@pytest.mark.parametrize(
+    ('state', 'primary', 'expected_state'),
+    [
+        (plan.STATE_PENDING, 'missing', plan.STATE_PENDING),
+        (plan.STATE_PENDING, 'native', plan.STATE_BLOCKED),
+        (plan.STATE_PENDING, 'iceberg', plan.STATE_BLOCKED),
+        (plan.STATE_NATIVE, 'native', plan.STATE_BLOCKED),
+        (plan.STATE_BLOCKED, 'missing', plan.STATE_BLOCKED),
+    ],
+)
+def test_refusals_block_every_table_except_an_interrupted_cutover(state, primary, expected_state):
+    """Only an absent name stays resumable, so the converter can restore it before refusing."""
+    item = plan.ClassifiedTarget(_target('T'), state, ('earlier',), None, None, primary)
+
+    refused = plan.with_refusals(item, ['first', 'earlier'])
+
+    assert (refused.state, refused.reasons) == (expected_state, ('first', 'earlier'))
+    assert plan.with_refusals(item, []) is item
 
 
 def test_a_native_iceberg_named_table_is_never_called_stale(tmp_path):

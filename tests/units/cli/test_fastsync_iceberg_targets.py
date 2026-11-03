@@ -1,9 +1,9 @@
 """Iceberg FastSync refuses native targets before any source or state change."""
 
 import json
+import multiprocessing
 import os
 import signal
-import threading
 from pathlib import Path
 from unittest.mock import MagicMock, call, patch
 
@@ -108,30 +108,49 @@ def test_child_that_exits_cleanly_without_reporting_fails(pipelinewise):
         pipelinewise._run_in_child_process(_exit_with, 0)
 
 
+def _deadlocked(*_):
+    pytest.fail('the parent deadlocked waiting for a child blocked on the pipe')
+
+
 def test_large_child_errors_do_not_deadlock(pipelinewise):
     """An error larger than the pipe buffer is read while the parent waits for the child."""
-    outcome = {}
-
-    def run():
-        try:
+    # Forking from the main thread avoids copying a multi-threaded process; a timer bounds the wait.
+    previous = signal.signal(signal.SIGALRM, _deadlocked)
+    outer_timer = signal.setitimer(signal.ITIMER_REAL, 60)
+    try:
+        with pytest.raises(PreRunChecksException) as error:
             pipelinewise._run_in_child_process(_raise_pre_run_checks, 'x' * 2_000_000)
-        except PreRunChecksException as error:
-            outcome['length'] = len(str(error))
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous)
+        signal.setitimer(signal.ITIMER_REAL, *outer_timer)
+        for child in multiprocessing.active_children():  # a deadlocked child would block interpreter exit
+            child.kill()
+            child.join()
 
-    waiter = threading.Thread(target=run, daemon=True)
-    waiter.start()
-    waiter.join(timeout=60)
-
-    assert not waiter.is_alive(), 'the parent deadlocked waiting for a child blocked on the pipe'
-    assert outcome == {'length': 2_000_000}
+    assert len(str(error.value)) == 2_000_000
 
 
-def test_child_installs_command_signal_handlers(pipelinewise):
-    """A child never inherits the handler that deletes the tap pidfile."""
-    target = MagicMock()
-    with patch('pipelinewise.cli.pipelinewise.signal.signal') as set_signal:
-        pipelinewise._run_with_command_signals(target, 'argument')
+def test_child_installs_command_signal_handlers_before_its_work(pipelinewise):
+    """A child installs its own exit handlers before any work, never running under the tap's stop handler."""
+    calls = MagicMock()
+    with patch('pipelinewise.cli.pipelinewise.signal.signal', calls.set_signal):
+        pipelinewise._run_with_command_signals(calls.target, 'argument')
 
     handler = pipelinewise._stop_command_on_signal
-    assert set_signal.call_args_list == [call(signal.SIGINT, handler), call(signal.SIGTERM, handler)]
-    target.assert_called_once_with('argument')
+    assert calls.mock_calls == [
+        call.set_signal(signal.SIGINT, handler),
+        call.set_signal(signal.SIGTERM, handler),
+        call.target('argument'),
+    ]
+
+
+def _report_sigterm_handler():
+    handler = signal.getsignal(signal.SIGTERM)
+    raise PreRunChecksException(getattr(handler, '__name__', repr(handler)))
+
+
+def test_child_work_runs_under_command_signal_handlers(pipelinewise):
+    """The real child, not only the wrapper, runs its work under the pidfile-safe handler."""
+    with pytest.raises(PreRunChecksException, match='^_stop_command_on_signal$'):
+        pipelinewise._run_in_child_process(_report_sigterm_handler)

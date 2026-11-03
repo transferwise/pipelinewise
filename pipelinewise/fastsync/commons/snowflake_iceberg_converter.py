@@ -2,7 +2,7 @@
 
 import logging
 
-from typing import Any, Dict, List, Mapping, Optional, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from pipelinewise.fastsync.commons.snowflake_iceberg import (
     PHASE_FINALIZED,
@@ -129,6 +129,7 @@ class SnowflakeNativeToIcebergConverter:
         self.evidence_service = SnowflakeConversionEvidenceService(self)
         self._query_tag_context = {}
         self._writer_types = {}
+        self._refusals = ()
         self.finalization_validator = SnowflakeConversionFinalizationValidator(
             self._query,
             self._inspect_source,
@@ -149,8 +150,13 @@ class SnowflakeNativeToIcebergConverter:
         eventual: str = EVENTUAL_NATIVE,
         iceberg_version: int = ICEBERG_V3,
         writer_types: Optional[Mapping[str, str]] = None,
+        refusals: Sequence[str] = (),
     ) -> None:
-        """Convert one target table while retaining a native rollback point."""
+        """Convert one target table while retaining a native rollback point.
+
+        Refusals stop the attempt before any new manifest or cutover, but only after an
+        interrupted cutover has its table name back.
+        """
         if eventual not in (EVENTUAL_NATIVE, EVENTUAL_ICEBERG):
             raise ValueError('eventual must be native or iceberg')
         if not is_exact_integer(iceberg_version) or iceberg_version != ICEBERG_V3:
@@ -162,6 +168,7 @@ class SnowflakeNativeToIcebergConverter:
         self._query_tag_context = {}
         # A tap's catalog classes join every pre-cutover check, including resumed attempts.
         self._writer_types = dict(writer_types or {})
+        self._refusals = tuple(refusals)
         recovery_identity = _manual_recovery_identity(
             self.snowflake.connection_config
         )
@@ -236,7 +243,8 @@ class SnowflakeNativeToIcebergConverter:
         table: SnowflakeTableName,
         metadata: ConversionMetadata,
     ) -> None:
-        blockers = self._conversion_blockers(table, metadata)
+        # Known refusals already stop the attempt, so the full-table probe is skipped.
+        blockers = list(self._refusals) or self._conversion_blockers(table, metadata)
         if blockers:
             raise NativeToIcebergConversionError(
                 f'Cannot convert {table.quoted}: ' + '; '.join(blockers)

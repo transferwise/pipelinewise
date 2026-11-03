@@ -332,6 +332,16 @@ def test_connector_matches_shared_text_variant_classes():
         assert column_class == case['expected_class'], case
 
 
+def test_connector_matches_shared_top_level_splits():
+    for case in _v3_behavior_cases()['top_level_splits']:
+        flattened = flattening.flatten_schema(
+            {'properties': {'VALUE': case['schema']}},
+            max_level=case['max_level'],
+        )
+
+        assert ('VALUE' not in flattened) is case['expected_split'], case
+
+
 def test_connector_matches_shared_level_zero_column_names():
     for case in _v3_behavior_cases()['level_zero_column_names']:
         name = case['name_repeat'] * case['name_times']

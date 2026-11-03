@@ -147,8 +147,9 @@ invariants. Connector-specific rules follow:
   whitespace, empty-field, multiline, UTF-8, header, and empty `NULL_IF` options.
 - Conversion stays in the PipelineWise command; do not restore a connector
   executable or duplicate its type, metadata, or recovery policy. Core
-  conversion preflight predicts level-0 TEXT/VARIANT columns and their names;
-  change the fixture's `singer_text_variant_classes` and `level_zero_column_names`
+  conversion preflight predicts level-0 TEXT/VARIANT columns, their names, and
+  which top-level objects a flattening tap splits; change the fixture's
+  `singer_text_variant_classes`, `level_zero_column_names` and `top_level_splits`
   with any flattening, naming, or type-mapping change so both suites keep
   executing the same cases.
 - Detect MariaDB JSON aliases only from the exact generated `JSON_VALID`

@@ -1355,6 +1355,8 @@ class PipelineWise:
         log_dir = self.get_tap_log_dir(target_id, tap_id)
         current_time = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
 
+        # Conversion judges the freshness of this catalog read, not of a later one.
+        self._catalog_read_mtime_ns = self._file_mtime_ns(tap_properties)
         # Create fastsync and singer specific filtered tap properties that contains only
         # the tables that needs to be synced by the specific command
         (
@@ -1717,9 +1719,33 @@ class PipelineWise:
             targets,
             conversion_warehouse,
             other_writers=self._other_writers(target_config, targets),
+            tap_refusals=self._stale_catalog_reasons(),
             target_id=self.target['id'],
             tap_id=self.tap['id'],
         )
+
+    @staticmethod
+    def _file_mtime_ns(path: str) -> Optional[int]:
+        try:
+            return os.stat(path).st_mtime_ns
+        except OSError:
+            return None
+
+    def _stale_catalog_reasons(self) -> List[str]:
+        """Return why the catalog this command read may predate the tap's imported settings, if it may."""
+        current = self._file_mtime_ns(self.tap['files']['properties'])
+        read = getattr(self, '_catalog_read_mtime_ns', None)
+        read = current if read is None else read
+        settings = self._file_mtime_ns(self.tap['files']['inheritable_config'])
+        # import_config writes the settings first, and the catalog only when discovery succeeds.
+        if read is None or settings is None or read < settings:
+            return [
+                'The tap catalog is older than its imported settings, so the last import_config did not '
+                'rediscover the tap. Fix the import error and run import_config again before converting'
+            ]
+        if current != read:
+            return ['The tap catalog changed after this run read it. Rerun run_tap so conversion uses it']
+        return []
 
     def _other_writers(self, target_config: Dict, targets: List) -> List:
         """Find the streams of other imported taps that write one of the planned tables."""
@@ -2584,18 +2610,20 @@ class PipelineWise:
             print(self._native_to_iceberg_preflight(target_config))
             return
         # The writers refuse a TEXT/VARIANT change, so every imported tap's classes apply here too.
-        writer_types = native_to_iceberg.writer_types_for_table(
+        writer_types, conflicts = native_to_iceberg.writer_classes_for_table(
             self.args.table, self._imported_tap_targets(target_config),
         )
         converter = SnowflakeNativeToIcebergConverter(
-            SnowflakeConversionQueryAdapter(target_config),
+            SnowflakeConversionQueryAdapter(target_config, getattr(self.args, 'conversion_warehouse', None)),
             runtime_dir=self.get_target_dir(self.target['id']),
         )
+        # Conflicts refuse the table only after an interrupted cutover has its name back.
         converter.convert(
             self.args.table,
             eventual=self.args.eventual,
             iceberg_version=self.args.iceberg_version,
             writer_types=writer_types,
+            refusals=conflicts,
         )
 
     def _imported_tap_targets(self, target_config: Dict) -> List:
@@ -2622,18 +2650,19 @@ class PipelineWise:
         from pipelinewise.cli import native_to_iceberg
 
         blockers = []
-        conversion_warehouse = None
+        conversion_warehouse = getattr(self.args, 'conversion_warehouse', None)
         if hasattr(self, 'tap'):
             conversion = self.tap.get(Config.NATIVE_TO_ICEBERG_CONVERSION) or {}
-            conversion_warehouse = conversion.get('conversion_warehouse')
+            conversion_warehouse = conversion_warehouse or conversion.get('conversion_warehouse')
             target_config = self._iceberg_target_config()
+            self._catalog_read_mtime_ns = self._file_mtime_ns(self.tap['files']['properties'])
             catalog = utils.load_json(self.tap['files']['properties'])
             self._validate_tap_catalog(catalog, self.tap['files']['properties'])
             fastsync_capable = resolve_fastsync_capabilities(
                 self.tap['type'], self.target['type'], Config.TABLE_FORMAT_ICEBERG,
             ).full_sync
             targets = native_to_iceberg.tap_targets(catalog, target_config, fastsync_capable)
-            blockers = native_to_iceberg.tap_blockers(target_config)
+            blockers = native_to_iceberg.tap_blockers(target_config) + self._stale_catalog_reasons()
             other_writers = self._other_writers(target_config, targets)
         else:
             targets = native_to_iceberg.table_targets(

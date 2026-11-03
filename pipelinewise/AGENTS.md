@@ -173,21 +173,29 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
   runs one `run_tap` step inside the pidfile, in a child with pidfile-safe
   signal handlers, before FastSync/Singer. It plans with target-snowflake
   naming and blocks FastSync/Singer name disagreement, classifies with one
-  `SHOW TABLES` per schema plus lock-free manifest peeks, resumes pending
-  `eventual=iceberg` attempts first, preflights every native table (including
-  catalog TEXT/VARIANT classes merged across a table's streams, also checked
-  for resumed attempts before cutover), converts smallest first, then requires
-  every table new or Iceberg; any failure stops the tap. De-duplicate only the
-  physical work, never another stream's blockers. Never call `convert()` for a
-  table classified `iceberg` without a manifest; resume every pending
-  `eventual=iceberg` manifest whatever the primary's format, except a native
-  primary held back below. Block a native primary with an unmanifested
-  `_ICEBERG` companion, and any table whose reserved companion names collide
-  with another planned or existing table. Block a native primary that another
-  imported tap writes unless that tap is Iceberg v3 under the same target; taps
-  under other targets with the same account and dbname count and must not also
-  convert. Merge those Iceberg taps' TEXT/VARIANT classes. Refuse before any
-  Snowflake work unless the tap's generated files carry Iceberg v3 and level 0.
-  Manual conversion applies the classes of every imported tap writing the table.
-  `--preflight-only` takes no lock, manifest, or DDL. `fast_sync` never converts and refuses native targets
-  before a slot reset; it may rebuild a missing primary beside leftover companions.
+  `SHOW TABLES` per schema plus lock-free manifest peeks, resumes every pending
+  `eventual=iceberg` attempt first (interrupted cutovers first, continuing past
+  a failure), preflights every native table (including catalog TEXT/VARIANT
+  classes merged across a table's streams, also checked for resumed attempts
+  before cutover), converts smallest first, then requires every table new or
+  Iceberg; any failure stops the tap. De-duplicate only the physical work, never
+  another stream's blockers. Never call `convert()` for a table classified
+  `iceberg` without a manifest. A reason that stops a table (planning blocker,
+  reserved-name collision, another tap writing it, a class conflict, a stale
+  catalog) blocks a native or promoted primary, but an interrupted cutover is
+  still resumed with the reasons as `refusals`: the converter restores the name,
+  then refuses before another cutover. Block a native primary with an
+  unmanifested `_ICEBERG` companion, and any table whose reserved companion
+  names collide with another planned or existing table. Block a table that
+  another imported tap writes unless that tap is Iceberg v3 under the same
+  target; taps under other targets with the same account and dbname count and
+  must not also convert. Merge those Iceberg taps' TEXT/VARIANT classes, skipping
+  top-level objects a writer splits into child columns at its flattening level.
+  A blocked stream holds back its table unless the name is absent, and a class
+  conflict on a new or Iceberg table also stops the run. Refuse before any Snowflake
+  work unless the tap's generated files carry Iceberg v3 and level 0, and refuse
+  conversions while the catalog is older than `inheritable_config.json`. Manual
+  conversion applies the classes of every imported tap writing the table and
+  passes conflicts as refusals. `--preflight-only` takes no lock, manifest, or
+  DDL. `fast_sync` never converts and refuses native targets before a slot
+  reset; it may rebuild a missing primary beside leftover companions.

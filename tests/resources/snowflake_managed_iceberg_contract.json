@@ -394,6 +394,16 @@
         {"name_repeat": "very_long_property_name_", "name_times": 12, "expected_column": "VLPNVLPNVLPNVLPNVLPNVLPNVLPNVLPNVLPNVLPNVLPNVLPN_"},
         {"name_repeat": "field_1_", "name_times": 40, "expected_column": "F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1_"},
         {"name_repeat": "SomeCamelCaseName", "name_times": 16, "expected_column": "SCCNSCCNSCCNSCCNSCCNSCCNSCCNSCCNSCCNSCCNSCCNSCCNSCCNSCCNSCCNSCCN"}
+      ],
+      "top_level_splits": [
+        {"schema": {"type": ["null", "object"], "properties": {"city": {"type": ["null", "string"]}}}, "max_level": 10, "expected_split": true},
+        {"schema": {"type": ["null", "object"], "properties": {"city": {"type": ["null", "string"]}}}, "max_level": 0, "expected_split": false},
+        {"schema": {"type": ["null", "object"]}, "max_level": 10, "expected_split": false},
+        {"schema": {"type": ["null", "array", "object"], "properties": {"city": {"type": ["null", "string"]}}}, "max_level": 10, "expected_split": false},
+        {"schema": {"type": ["null", "string"]}, "max_level": 10, "expected_split": false},
+        {"schema": {"anyOf": [{"type": "null"}, {"type": "object", "properties": {"city": {"type": ["null", "string"]}}}]}, "max_level": 1, "expected_split": true},
+        {"schema": {"anyOf": [{"type": "string"}, {"type": "object", "properties": {"city": {"type": ["null", "string"]}}}]}, "max_level": 1, "expected_split": false},
+        {"schema": {"oneOf": [{"type": "object", "properties": {"city": {"type": ["null", "string"]}}}]}, "max_level": 10, "expected_split": false}
       ]
     }
   }

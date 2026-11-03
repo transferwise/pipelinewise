@@ -322,3 +322,49 @@ def test_resumed_attempt_checks_catalog_classes_before_cutover(tmp_path):
         TABLE, eventual=EVENTUAL_ICEBERG, writer_types={'ATTRIBUTES': 'TEXT'},
     )
     assert snowflake.formats == {'TABLE_NATIVE': 'native', 'TABLE': 'iceberg'}
+
+
+def test_refusals_stop_a_new_attempt_before_any_change(tmp_path):
+    """A refusal from the caller stops a fresh attempt without a manifest, DDL, or full-table probe."""
+    snowflake = FakeSnowflake()
+    snowflake.native_extra_columns = [_native_column('UPDATED_AT', 'TIMESTAMP_NTZ')]
+
+    with pytest.raises(NativeToIcebergConversionError, match='Cannot convert .*: tap legacy also writes it'):
+        _converter(tmp_path, snowflake).convert(
+            TABLE, eventual=EVENTUAL_ICEBERG, refusals=('tap legacy also writes it',),
+        )
+
+    assert not _manifest_files(tmp_path)
+    assert not _mutations(snowflake)
+    assert not any(sql.startswith(PROBE) for sql, _, _ in snowflake.queries)
+
+
+def test_refusals_stop_an_interrupted_cutover_only_after_its_name_is_back(tmp_path):
+    """A refused resume restores the primary name first, then stops before another cutover."""
+    snowflake = FakeSnowflake()
+    snowflake.fail_promotion = RuntimeError('promotion rejected')
+    with pytest.raises(RuntimeError, match='promotion rejected'):
+        _converter(tmp_path, snowflake).convert(TABLE, eventual=EVENTUAL_ICEBERG)
+    snowflake.fail_promotion = None
+    # A run killed between the two renames leaves only the companions.
+    snowflake.formats = {'TABLE_NATIVE': 'native', 'TABLE_ICEBERG': 'iceberg'}
+
+    with pytest.raises(NativeToIcebergConversionError, match='tap legacy also writes it'):
+        _converter(tmp_path, snowflake).convert(
+            TABLE, eventual=EVENTUAL_ICEBERG, refusals=('tap legacy also writes it',),
+        )
+
+    assert snowflake.formats == {'TABLE': 'native', 'TABLE_ICEBERG': 'iceberg'}
+    assert len(_manifest_files(tmp_path)) == 1
+
+
+def test_refusals_never_carry_over_to_the_next_conversion(tmp_path):
+    """A converter reused across tables applies each call's refusals only to that call."""
+    snowflake = FakeSnowflake()
+    converter = _converter(tmp_path, snowflake)
+    with pytest.raises(NativeToIcebergConversionError, match='earlier refusal'):
+        converter.convert(TABLE, eventual=EVENTUAL_ICEBERG, refusals=('earlier refusal',))
+
+    converter.convert(TABLE, eventual=EVENTUAL_ICEBERG)
+
+    assert snowflake.formats == {'TABLE_NATIVE': 'native', 'TABLE': 'iceberg'}

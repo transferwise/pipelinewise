@@ -1,5 +1,15 @@
 import multiprocessing
 import traceback
+from multiprocessing.reduction import ForkingPickler
+
+
+def _rebuildable(exp: Exception) -> Exception:
+    """Return the exception, or a stand-in carrying its message when a pickle cannot rebuild it."""
+    try:
+        ForkingPickler.loads(ForkingPickler.dumps(exp))
+    except Exception:  # for example Snowflake HTTP errors, whose constructors take keywords only
+        return RuntimeError(f'{type(exp).__module__}.{type(exp).__qualname__}: {exp}')
+    return exp
 
 
 class Process(multiprocessing.Process):
@@ -19,7 +29,7 @@ class Process(multiprocessing.Process):
             self._cconn.send(None)
         except Exception as exp:
             t_b = traceback.format_exc()
-            self._cconn.send((exp, t_b))
+            self._cconn.send((_rebuildable(exp), t_b))
 
     @property
     def exception(self):
@@ -45,5 +55,8 @@ class Process(multiprocessing.Process):
                 self.result_received = True
         except (EOFError, OSError):
             pass  # a child that died before or while sending has no result
+        except Exception as exc:  # the result arrived but could not be rebuilt
+            self._exception = (RuntimeError(f'The child process result could not be read: {exc!r}'), '')
+            self.result_received = True
         self.join()
         return self._exception

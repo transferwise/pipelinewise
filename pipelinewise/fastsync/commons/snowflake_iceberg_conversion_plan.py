@@ -135,6 +135,19 @@ def level_zero_column_name(name: str) -> str:
     return (reduced if len(reduced) > 1 else name[0:3]).upper()
 
 
+def splits_into_child_columns(schema_property: Any, max_level: Any) -> bool:
+    """Mirror target-snowflake, which expands a top-level object with properties below max_level."""
+    if not isinstance(schema_property, dict) or not isinstance(max_level, (int, float)) or max_level <= 0:
+        return False
+    if 'type' in schema_property:
+        return _preferred_type(schema_property['type']) == 'object' and 'properties' in schema_property
+    candidates = schema_property.get('anyOf') if 'anyOf' in schema_property else None
+    for candidate in candidates if isinstance(candidates, list) else []:
+        if isinstance(candidate, dict) and (preferred := _preferred_type(candidate.get('type'))):
+            return preferred == 'object' and 'properties' in candidate
+    return False
+
+
 def native_text_variant_class(data_type: str) -> Optional[str]:
     """Return the TEXT or VARIANT class of a native Snowflake column type."""
     return _NATIVE_TYPE_CLASSES.get(str(data_type).upper())
@@ -212,12 +225,14 @@ def fastsync_target_table(
     )
 
 
-def _writer_types(stream: Mapping[str, Any]) -> Dict[str, str]:
+def _writer_types(stream: Mapping[str, Any], max_level: Any = 0) -> Dict[str, str]:
+    """Predict the top-level TEXT/VARIANT columns; objects split into child columns are skipped."""
     properties = (stream.get('schema') or {}).get('properties') or {}
     return {
         level_zero_column_name(name): column_class
         for name, schema_property in properties.items()
-        if (column_class := singer_text_variant_class(schema_property)) is not None
+        if not splits_into_child_columns(schema_property, max_level)
+        and (column_class := singer_text_variant_class(schema_property)) is not None
     }
 
 
@@ -249,7 +264,7 @@ def plan_conversion_targets(
         targets.append(ConversionTarget(
             stream_id,
             table,
-            _writer_types(streams.get(stream_id) or {}),
+            _writer_types(streams.get(stream_id) or {}, target_config.get('data_flattening_max_level') or 0),
             blockers,
         ))
     return targets
@@ -271,7 +286,7 @@ def plan_written_tables(
                 tables.add(fastsync_target_table(stream_id.replace('-', '.', 1), target_config))
         except Exception:  # get_target_schema raises a bare Exception; such a stream writes nothing
             continue
-        writer_types = _writer_types(streams.get(stream_id) or {})
+        writer_types = _writer_types(streams.get(stream_id) or {}, target_config.get('data_flattening_max_level') or 0)
         targets.extend(
             ConversionTarget(stream_id, table, writer_types)
             for table in sorted(tables, key=lambda table: table.key)
@@ -362,13 +377,28 @@ def _classify(
             'that name for its Iceberg copy. Find out what it holds before renaming it',
         )
     if staging != _MISSING:
-        return classified(
-            STATE_BLOCKED,
-            f'{table.with_suffix("_ICEBERG").quoted} already exists without a conversion '
-            'manifest and may be stale. Drop it so conversion can rebuild it, or promote it '
-            'while the tap is stopped with copy_native_to_iceberg --eventual iceberg',
-        )
+        return classified(STATE_BLOCKED, _unmanifested_copy_reason(table))
     return classified(STATE_NATIVE)
+
+
+def _unmanifested_copy_reason(table: SnowflakeObjectName) -> str:
+    return (
+        f'{table.with_suffix("_ICEBERG").quoted} is an Iceberg table without a conversion manifest. '
+        'Find out what it holds. Only if it is a copy left by copy_native_to_iceberg --eventual native '
+        'or by an abandoned conversion, drop it so conversion can rebuild it, or promote it while the '
+        'tap is stopped with copy_native_to_iceberg --eventual iceberg'
+    )
+
+
+def with_refusals(item: ClassifiedTarget, refusals: Sequence[str]) -> ClassifiedTarget:
+    """Stop a table for these reasons, but let an interrupted cutover be resumed first."""
+    if not refusals:
+        return item
+    reasons = tuple(dict.fromkeys((*refusals, *item.reasons)))
+    if item.state == STATE_PENDING and item.primary == _MISSING:
+        # The converter restores the name before it applies the reasons, which then stop a new cutover.
+        return replace(item, reasons=reasons)
+    return replace(item, state=STATE_BLOCKED, reasons=reasons)
 
 
 def _companion_collision(
@@ -408,7 +438,7 @@ def classify_conversion_targets(
     classified = []
     planned = {target.table.key: target for target in targets if target.table is not None}
     for target in targets:
-        if target.blockers:
+        if target.table is None:
             classified.append(ClassifiedTarget(target, STATE_BLOCKED, target.blockers))
             continue
         schema = (target.table.database, target.table.schema)
@@ -424,10 +454,13 @@ def classify_conversion_targets(
                     'to classify it safely'
                 )
         item = _classify(target, rows, coordinator, fastsync_rebuild)
+        refusals = list(target.blockers)
         if not fastsync_rebuild and item.state in (STATE_NATIVE, STATE_PENDING, STATE_BLOCKED):
             # Conversion renames into the reserved names, so they must not be another table's.
             collision = _companion_collision(target, planned, rows)
             if collision is not None:
-                item = replace(item, state=STATE_BLOCKED, reasons=(collision, *item.reasons))
-        classified.append(item)
+                refusals.insert(0, collision)
+                stale = _unmanifested_copy_reason(target.table)
+                item = replace(item, reasons=tuple(reason for reason in item.reasons if reason != stale))
+        classified.append(with_refusals(item, refusals))
     return classified
