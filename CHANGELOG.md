@@ -1,3 +1,11 @@
+0.99.1 (2026-11-03)
+-------------------
+
+- Stop taps by signaling the PipelineWise process recorded in the tap-target
+  PID file, rather than the stop command itself. Allow child processes 25
+  seconds to shut down before killing survivors, and retain shutdown output in
+  the run log.
+  
 0.99.0 (2026-11-02)
 -------------------
 
