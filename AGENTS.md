@@ -123,6 +123,9 @@ severity; if there are no concerns, say so explicitly.
   `git commit -S`; never create or push an unsigned commit.
 - Never include internal Jira names or issue keys (such as `AP-...`) in commit
   messages, PR titles, or PR descriptions, even when the branch name has one.
+- Never credit an AI agent in commit messages, PR titles, or PR descriptions:
+  add no `Co-authored-by` trailer naming an AI agent or model, and no
+  "Generated with" attribution line.
 - Write docs and CHANGELOG entries in plain language. Use short sentences with
   one idea each. Lead with behaviour, defaults, or the action the operator needs.
 - Keep CHANGELOG entries to user-visible outcomes and upgrade steps. Start
