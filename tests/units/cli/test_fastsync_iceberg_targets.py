@@ -151,6 +151,6 @@ def _report_sigterm_handler():
 
 
 def test_child_work_runs_under_command_signal_handlers(pipelinewise):
-    """The real child, not only the wrapper, runs its work under the pidfile-safe handler."""
+    """The real child, not only the wrapper, runs its work under the exit-only handler."""
     with pytest.raises(PreRunChecksException, match='^_stop_command_on_signal$'):
         pipelinewise._run_in_child_process(_report_sigterm_handler)

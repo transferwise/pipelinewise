@@ -164,7 +164,7 @@ class PipelineWise:
 
         # Catch SIGINT and SIGTERM to exit gracefully
         if not is_data_diff_command:
-            # A feasibility report can run beside the tap, so it must never remove its pidfile.
+            # A feasibility report can run beside the tap and is not a tap run, so a signal only ends it.
             signal_handler = (
                 self.stop_tap
                 if hasattr(self, 'tap') and args.command != 'copy_native_to_iceberg'
@@ -1864,7 +1864,7 @@ class PipelineWise:
             )
 
     def _run_with_command_signals(self, target, *args) -> None:
-        # The inherited stop_tap handler would delete the pidfile that the parent still holds.
+        # The inherited stop_tap handler would mark the parent's run log terminated; this child only exits.
         for sig in (signal.SIGINT, signal.SIGTERM):
             signal.signal(sig, self._stop_command_on_signal)
         target(*args)

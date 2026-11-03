@@ -170,8 +170,8 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
   comments, and tags match exactly; source grants are a required subset, and
   extra Iceberg grants are logged, never rolled back.
 - Tap-root `native_to_iceberg_conversion` (core-only, never in target config)
-  runs one `run_tap` step inside the pidfile, in a child with pidfile-safe
-  signal handlers, before FastSync/Singer. It plans with target-snowflake
+  runs one `run_tap` step inside the pidfile, in a child whose signal handlers
+  only exit (stop_tap stops the whole tap run), before FastSync/Singer. It plans with target-snowflake
   naming and blocks FastSync/Singer name disagreement, classifies with one
   `SHOW TABLES` per schema plus lock-free manifest peeks, resumes every pending
   `eventual=iceberg` attempt first (interrupted cutovers first, continuing past
