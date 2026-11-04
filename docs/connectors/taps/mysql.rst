@@ -160,6 +160,13 @@ Operational notes
   continues without applying it. Check that ``engine`` matches the server;
   this does not change engine selection. Unknown variables in custom
   ``session_sqls`` still fail the connection.
+- Stopping FullSync or PartialSync with SIGTERM or SIGINT kills its source
+  sessions before the process exits. Otherwise the server keeps running the
+  current query after the client is gone. The kill uses the export's host and
+  user, so it needs no extra privilege. Each connect, send, and read waits at
+  most 2 seconds. SIGKILL cannot trigger the kill. Neither can a proxy that
+  does not forward ``KILL`` to the server. In those cases, set a statement
+  timeout in ``session_sqls`` to stop an orphaned query.
 - MySQL partial-JSON events and MySQL/MariaDB compressed binlog events are not
   supported by the bundled decoder. Keep ``binlog_row_value_options`` empty,
   ``binlog_transaction_compression`` disabled, and MariaDB ``log_bin_compress``

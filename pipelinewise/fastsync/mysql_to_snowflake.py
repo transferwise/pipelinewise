@@ -14,7 +14,11 @@ from .commons import snowflake_iceberg_routes as iceberg_routes
 from .commons.snowflake_types import SNOWFLAKE_MAX_BINARY, SNOWFLAKE_MAX_VARCHAR
 from .commons.source_numeric import mysql_decimal_type
 from .commons.rdbms_source import RdbmsSnowflakeSource
-from .commons.tap_mysql import FastSyncTapMySql
+from .commons.tap_mysql import (
+    FastSyncTapMySql,
+    install_mysql_sync_signal_handlers,
+    install_mysql_worker_signal_handlers,
+)
 from .commons.target_snowflake import FastSyncTargetSnowflake
 from pipelinewise.utils import (get_tables_size,
                                 filter_out_selected_tables,
@@ -155,7 +159,9 @@ def main_impl():
 
     # Start loading tables in parallel in spawning processes
     if can_run_sync:
-        with multiprocessing.Pool(pool_size) as proc:
+        with multiprocessing.Pool(
+            pool_size, initializer=install_mysql_worker_signal_handlers
+        ) as proc:
             table_sync_excs = list(
                 filter(
                     lambda x: not isinstance(x, bool),
@@ -191,6 +197,7 @@ def main_impl():
 
 def main():
     """Main entry point"""
+    install_mysql_sync_signal_handlers()
     try:
         main_impl()
     except Exception as exc:
