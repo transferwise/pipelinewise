@@ -742,9 +742,9 @@ message names each table and the reason:
 * ``needs an operator``: for example a leftover ``<table>_NATIVE``, a companion
   table without a manifest, an unreadable manifest, a pending
   ``--eventual native`` conversion, two streams that write the same table but
-  map one column to ``TEXT`` and ``VARIANT``, or a table that
-  ``is also written by tap <tap_id>``, which does not write managed Iceberg v3
-  or converts it from another target;
+  map one column to ``TEXT`` and ``VARIANT``, a table that
+  ``is also written by tap <tap_id>`` without managed Iceberg v3 and conversion
+  enabled or from another target, or a companion name that another tap writes;
 * ``cannot be converted``: a preflight blocker, such as a policy, a stream, a
   ``TIMESTAMP_TZ`` column, sub-microsecond values, a grant that Iceberg cannot
   carry, or a ``TEXT``/``VARIANT`` mismatch with the tap catalog;
@@ -784,8 +784,9 @@ message names each table and the reason:
    only in the run's error, so the report can be ready while the cause remains.
    The manifest records the attempt, and the next ``run_tap`` resumes it. For an interrupted cutover, see
    :ref:`troubleshooting_iceberg_conversion_missing_primary`. For a table that
-   another tap writes, import that tap with ``target_table_format: iceberg`` and
-   ``iceberg_version: 3`` too, or stop it writing the table.
+   another tap writes, import that tap with ``target_table_format: iceberg``,
+   ``iceberg_version: 3`` and ``native_to_iceberg_conversion`` enabled too, or
+   stop it writing the table.
 
    If a failed conversion says ``<table>_ICEBERG does not match the projected
    contents of <table>`` before any cutover, ``<table>`` changed after the copy.

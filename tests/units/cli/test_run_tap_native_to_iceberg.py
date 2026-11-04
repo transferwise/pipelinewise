@@ -237,7 +237,9 @@ def _project(tmp_path):
         'snow': [
             ('orders', ICEBERG_FILES, ['public-orders', 'public-items'], CONVERTS),
             ('legacy', {}, ['public-orders'], {}),
-            ('mirror', ICEBERG_FILES, ['public-items'], {}),
+            ('mirror', ICEBERG_FILES, ['public-items'], CONVERTS),
+            ('shadow', ICEBERG_FILES, ['public-items'], {}),
+            ('backup', {}, ['public-orders_native'], {}),
             ('unrelated', {}, ['public-users'], {}),
         ],
         'snow_too': [('twin', ICEBERG_FILES, ['public-items'], CONVERTS)],
@@ -294,13 +296,17 @@ def test_other_writers_cover_every_tap_writing_a_planned_table(tmp_path):
 
     assert sorted((writer.target.stream_id, writer.target.table.key) for writer in writers) == [
         ('public-items of tap mirror', 'ANALYTICS.SALES.ITEMS'),
+        ('public-items of tap shadow', 'ANALYTICS.SALES.ITEMS'),
         ('public-items of tap twin of target snow_too', 'ANALYTICS.SALES.ITEMS'),
         ('public-orders of tap legacy', 'ANALYTICS.SALES.ORDERS'),
+        ('public-orders_native of tap backup', 'ANALYTICS.SALES.ORDERS'),
     ]
     refusals = {writer.target.stream_id: writer.refusal for writer in writers}
     assert refusals['public-items of tap mirror'] is None
     assert 'does not write managed Iceberg v3' in refusals['public-orders of tap legacy']
-    assert 'two targets cannot coordinate a conversion' in refusals['public-items of tap twin of target snow_too']
+    assert 'does not enable native_to_iceberg_conversion' in refusals['public-items of tap shadow']
+    assert 'writes it under another target' in refusals['public-items of tap twin of target snow_too']
+    assert 'cannot hold the conversion companion of' in refusals['public-orders_native of tap backup']
     mirror = next(writer for writer in writers if writer.refusal is None)
     assert mirror.target.writer_types == {'DOC': 'VARIANT', 'ADDRESS': 'VARIANT'}
 
@@ -315,7 +321,9 @@ def test_other_writers_skip_a_target_that_cannot_be_read(tmp_path):
     with patch.object(instance.logger, 'warning') as warning:
         writers = instance._other_writers({'account': 'ACC', 'dbname': 'analytics'}, PLANNED[1:])
 
-    assert [writer.target.stream_id for writer in writers] == ['public-items of tap mirror']
+    assert [writer.target.stream_id for writer in writers] == [
+        'public-items of tap mirror', 'public-items of tap shadow',
+    ]
     assert warning.call_args.args[1] == 'snow_too'
 
 
@@ -333,6 +341,7 @@ def test_writer_classes_skip_only_the_objects_a_flattening_tap_splits(tmp_path):
     assert [target.writer_types for target in imported if target.stream_id == 'public-items'] == [
         {'DOC': 'VARIANT', 'ADDRESS': 'VARIANT'},  # orders, at level 0
         {'DOC': 'VARIANT'},  # mirror, at level 10
+        {'DOC': 'VARIANT', 'ADDRESS': 'VARIANT'},  # shadow, at level 0
     ]
     mirror = next(writer for writer in writers if 'mirror' in writer.target.stream_id)
     assert mirror.target.writer_types == {'DOC': 'VARIANT'}

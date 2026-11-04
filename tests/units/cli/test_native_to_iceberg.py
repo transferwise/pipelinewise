@@ -621,6 +621,25 @@ def test_other_tap_writers_keep_only_planned_tables():
     assert native_to_iceberg.other_tap_writers('mirror', written, planned)[0].refusal is None
 
 
+@pytest.mark.parametrize('suffix', ['_NATIVE', '_ICEBERG'])
+def test_other_tap_writers_refuse_a_companion_name_another_tap_writes(suffix):
+    """Conversion never renames a table into another tap's destination, even before that tap creates it."""
+    planned = [ConversionTarget('public-t', SHARED)]
+    written = [ConversionTarget(f'public-t{suffix.lower()}', SHARED.with_suffix(suffix), {'DOC': 'TEXT'})]
+
+    writers = native_to_iceberg.other_tap_writers('backup', written, planned)
+
+    assert [(writer.target.stream_id, writer.target.table) for writer in writers] == [
+        (f'public-t{suffix.lower()} of tap backup', SHARED),
+    ]
+    assert writers[0].target.writer_types == {}
+    assert writers[0].refusal == (
+        f'"DATABASE"."SCHEMA"."T{suffix}" is the table of stream public-t{suffix.lower()} of tap backup, so it '
+        'cannot hold the conversion companion of "DATABASE"."SCHEMA"."T"; change one stream\'s schema mapping '
+        'or deselect it'
+    )
+
+
 def test_gate_refuses_a_native_table_that_another_tap_writes():
     """A table shared with a tap that would fail on Iceberg is never converted."""
     with _gate([_classified('T', STATE_NATIVE, 1)]) as (converter, _, _):

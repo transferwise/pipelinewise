@@ -7,12 +7,12 @@
   tap's native Snowflake tables before FastSync or Singer writes anything. It
   converts one table at a time, smallest first, and stops the tap with an alert
   if any table cannot convert; it never replicates into native tables. It
-  refuses a table that another imported tap writes without managed Iceberg v3,
-  and stops before any Snowflake work if the tap's generated configuration is
-  not imported with its Iceberg settings. It also refuses to convert while the
-  tap catalog is older than its imported settings. An optional
-  `conversion_warehouse` runs only the conversion queries on another warehouse.
-  See
+  refuses a table that another imported tap writes, unless that tap also
+  converts it as managed Iceberg v3 under the same target. It stops before any
+  Snowflake work if the tap's generated configuration is not imported with its
+  Iceberg settings, and refuses to convert while the tap catalog is older than
+  those settings. An optional `conversion_warehouse` runs only the conversion
+  queries on another warehouse. See
   [automatic conversion](docs/connectors/targets/snowflake_iceberg.rst#snowflake-iceberg-auto-conversion)
 - Add `copy_native_to_iceberg --preflight-only` with `--tap` or `--table`. It
   reports each table's state, size, and conversion blockers without taking a

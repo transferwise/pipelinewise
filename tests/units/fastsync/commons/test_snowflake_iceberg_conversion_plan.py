@@ -119,6 +119,24 @@ def test_writer_name_disagreement_blocks_only_fastsync_taps(fastsync_capable):
         assert targets[0].blockers == ()
 
 
+def test_a_fastsync_naming_failure_keeps_the_singer_table():
+    """A table Singer can name stays planned, so its recovery state is found and restored before refusing."""
+    targets = plan.plan_conversion_targets(
+        {'streams': [_stream('public-my.table')]}, TARGET_CONFIG, ['public-my.table'], fastsync_capable=True,
+    )
+
+    assert targets[0].table.key == 'DATABASE.SCHEMA.MY_TABLE'
+    assert len(targets[0].blockers) == 1
+    assert targets[0].blockers[0].startswith('FastSync cannot name the table of stream public-my.table: ')
+
+
+def test_written_tables_keep_every_name_a_writer_can_resolve():
+    """Another tap's Singer destination still counts when its FastSync name cannot be resolved."""
+    targets = plan.plan_written_tables({}, TARGET_CONFIG, ['public-my.table'], fastsync_capable=True)
+
+    assert [target.table.key for target in targets] == ['DATABASE.SCHEMA.MY_TABLE']
+
+
 @pytest.mark.parametrize('fastsync_capable', [True, False])
 def test_written_tables_cover_every_name_another_tap_writes(fastsync_capable):
     """Another tap writes both its FastSync and Singer tables; an unnamed stream writes nothing."""

@@ -157,16 +157,31 @@ def other_tap_writers(
     planned: Sequence[ConversionTarget],
     refusal: Optional[str] = None,
 ) -> List[OtherWriter]:
-    """Keep another tap's streams that write a planned table; a refusal blocks converting it."""
+    """Keep another tap's streams that write a planned table or its companion; a refusal blocks it."""
     keys = {target.table.key for target in planned if target.table is not None}
-    return [
-        OtherWriter(
-            replace(target, stream_id=f'{target.stream_id} of tap {tap_label}'),
-            f'{target.table.quoted} is also written by tap {tap_label}, which {refusal}' if refusal else None,
-        )
-        for target in written
-        if target.table is not None and target.table.key in keys
-    ]
+    companions = {
+        target.table.with_suffix(suffix).key: target.table
+        for target in planned if target.table is not None
+        for suffix in ('_ICEBERG', '_NATIVE')
+    }
+    writers = []
+    for target in written:
+        stream = f'{target.stream_id} of tap {tap_label}'
+        if target.table is None:
+            continue
+        if target.table.key in keys:
+            writers.append(OtherWriter(
+                replace(target, stream_id=stream),
+                f'{target.table.quoted} is also written by tap {tap_label}, which {refusal}' if refusal else None,
+            ))
+        elif (table := companions.get(target.table.key)) is not None:
+            # Conversion would rename into this name, where that stream could then write the backup.
+            writers.append(OtherWriter(
+                ConversionTarget(stream, table),
+                f'{target.table.quoted} is the table of stream {stream}, so it cannot hold the conversion '
+                f"companion of {table.quoted}; change one stream's schema mapping or deselect it",
+            ))
+    return writers
 
 
 def _held_back(

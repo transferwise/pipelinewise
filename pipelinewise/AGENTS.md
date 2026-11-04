@@ -186,10 +186,11 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
   still resumed with the reasons as `refusals`: the converter restores the name,
   then refuses before another cutover. Block a native primary with an
   unmanifested `_ICEBERG` companion, and any table whose reserved companion
-  names collide with another planned or existing table. Block a table that
-  another imported tap writes unless that tap is Iceberg v3 under the same
-  target; taps under other targets with the same account and dbname count and
-  must not also convert. Merge those Iceberg taps' TEXT/VARIANT classes, skipping
+  names collide with another planned or existing table, or with another tap's
+  destination. Block a table that another imported tap writes unless that tap is
+  Iceberg v3 with conversion enabled under the same target, so its run converts
+  or waits on the shared lock before its writers start; taps under other targets
+  with the same account and dbname always block. Merge those taps' TEXT/VARIANT classes, skipping
   top-level objects a writer splits into child columns at its flattening level.
   A blocked stream holds back its table unless the name is absent, and a class
   conflict on a new or Iceberg table also stops the run. Refuse before any Snowflake

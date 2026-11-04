@@ -415,13 +415,17 @@ identity, so a manual ``copy_native_to_iceberg`` on the target's warehouse can
 resume an automatic attempt.
 
 Conversion refuses a native table that another imported tap also writes,
-unless that tap writes managed Iceberg v3 under the same target. A native tap
-would fail on the converted table, and nothing would stop it writing during the
-copy. Taps under other targets with the same ``account`` and ``dbname`` count
-too. Such a tap must not also convert the table, because two targets cannot
-coordinate a conversion. Move every tap that writes a table to Iceberg v3
-together, or stop the other taps writing it. Writers outside PipelineWise are
-not visible: stop them before you enable the setting.
+unless that tap is under the same target, writes managed Iceberg v3, and also
+enables ``native_to_iceberg_conversion``. Such a tap's run finishes or waits for
+the table's conversion before its writers start. Any other tap could write
+during the copy or create an empty table while the name is absent, and a native
+tap would fail on the converted table. Taps under other targets with the same
+``account`` and ``dbname`` count too and always stop the table, because two
+targets cannot coordinate a conversion. Conversion also refuses a table whose
+``_NATIVE`` or ``_ICEBERG`` name is another tap's destination. Move every tap
+that writes a table to Iceberg v3 with conversion enabled together, or stop the
+other taps writing it. Writers outside PipelineWise are not visible: stop them
+before you enable the setting.
 
 Check each table before you enable the setting, because conversion runs
 unattended:

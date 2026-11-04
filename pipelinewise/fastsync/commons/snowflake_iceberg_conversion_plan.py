@@ -236,6 +236,28 @@ def _writer_types(stream: Mapping[str, Any], max_level: Any = 0) -> Dict[str, st
     }
 
 
+def _resolved_tables(
+    stream_id: str,
+    target_config: Mapping[str, Any],
+    fastsync_capable: bool,
+) -> Tuple[Optional[SnowflakeObjectName], Optional[SnowflakeObjectName], List[str]]:
+    """Resolve a stream's Singer and FastSync tables independently, keeping each failure."""
+    errors = []
+    try:
+        table = singer_target_table(stream_id, target_config)
+    except Exception as exc:  # a malformed schema mapping can raise more than ValueError
+        table = None
+        errors.append(str(exc))
+    fastsync_table = table
+    if fastsync_capable:
+        try:
+            fastsync_table = fastsync_target_table(stream_id.replace('-', '.', 1), target_config)
+        except Exception as exc:  # get_target_schema raises a bare Exception
+            fastsync_table = None
+            errors.append(f'FastSync cannot name the table of stream {stream_id}: {exc}')
+    return table, fastsync_table, errors
+
+
 def plan_conversion_targets(
     catalog: Mapping[str, Any],
     target_config: Mapping[str, Any],
@@ -246,26 +268,21 @@ def plan_conversion_targets(
     streams = {stream.get('tap_stream_id'): stream for stream in catalog.get('streams', [])}
     targets = []
     for stream_id in dict.fromkeys(stream_ids):
-        try:
-            table = singer_target_table(stream_id, target_config)
-            fastsync_table = (
-                fastsync_target_table(stream_id.replace('-', '.', 1), target_config)
-                if fastsync_capable else table
-            )
-        except Exception as exc:  # get_target_schema raises a bare Exception
-            targets.append(ConversionTarget(stream_id, None, blockers=(str(exc),)))
+        table, fastsync_table, blockers = _resolved_tables(stream_id, target_config, fastsync_capable)
+        if table is None:
+            targets.append(ConversionTarget(stream_id, None, blockers=tuple(blockers)))
             continue
-        blockers = ()
-        if fastsync_table != table:
-            blockers = (
+        # A known table keeps its recovery state visible, so a refusal can follow a restore.
+        if fastsync_table is not None and fastsync_table != table:
+            blockers.append(
                 f'FastSync writes {fastsync_table.key} but Singer writes {table.key}; '
-                'conversion cannot choose between them',
+                'conversion cannot choose between them'
             )
         targets.append(ConversionTarget(
             stream_id,
             table,
             _writer_types(streams.get(stream_id) or {}, target_config.get('data_flattening_max_level') or 0),
-            blockers,
+            tuple(blockers),
         ))
     return targets
 
@@ -280,12 +297,11 @@ def plan_written_tables(
     streams = {stream.get('tap_stream_id'): stream for stream in catalog.get('streams', [])}
     targets = []
     for stream_id in dict.fromkeys(stream_ids):
-        try:
-            tables = {singer_target_table(stream_id, target_config)}
-            if fastsync_capable:
-                tables.add(fastsync_target_table(stream_id.replace('-', '.', 1), target_config))
-        except Exception:  # get_target_schema raises a bare Exception; such a stream writes nothing
-            continue
+        # Each writer that can name a table may write it, even if the other writer cannot.
+        tables = {
+            table for table in _resolved_tables(stream_id, target_config, fastsync_capable)[:2]
+            if table is not None
+        }
         writer_types = _writer_types(streams.get(stream_id) or {}, target_config.get('data_flattening_max_level') or 0)
         targets.extend(
             ConversionTarget(stream_id, table, writer_types)

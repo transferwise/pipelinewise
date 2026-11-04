@@ -1828,15 +1828,21 @@ class PipelineWise:
             or isinstance(version, bool)
         ):
             return (
-                'does not write managed Iceberg v3 and would fail on the converted table; import it '
-                'with target_table_format: iceberg and iceberg_version: 3 as well, or stop it writing the table'
+                'does not write managed Iceberg v3 and would fail on the converted table; import it with '
+                'target_table_format: iceberg, iceberg_version: 3 and native_to_iceberg_conversion enabled as well, '
+                'or stop it writing the table'
             )
-        converts = (tap.get(Config.NATIVE_TO_ICEBERG_CONVERSION) or {}).get('enabled') is True
-        if converts and target['id'] != self.target['id']:
-            # Each target keeps its own recovery locks, so conversions under two targets could collide.
+        if target['id'] != self.target['id']:
+            # Each target keeps its own recovery locks, so nothing orders the two taps' runs.
             return (
-                'converts tables under another target, and two targets cannot coordinate a conversion; '
-                'enable native_to_iceberg_conversion for the table under one target only'
+                'writes it under another target, which cannot coordinate with this conversion; write the '
+                'table from taps under one target only, or stop that tap writing it'
+            )
+        if (tap.get(Config.NATIVE_TO_ICEBERG_CONVERSION) or {}).get('enabled') is not True:
+            # Its run would start writers without first finishing or waiting for this table's conversion.
+            return (
+                'does not enable native_to_iceberg_conversion, so nothing keeps its writers out while the '
+                'table name is absent during a cutover; enable it for that tap too, or stop it writing the table'
             )
         return None
 
