@@ -268,12 +268,13 @@ def plan_conversion_targets(
     streams = {stream.get('tap_stream_id'): stream for stream in catalog.get('streams', [])}
     targets = []
     for stream_id in dict.fromkeys(stream_ids):
-        table, fastsync_table, blockers = _resolved_tables(stream_id, target_config, fastsync_capable)
+        singer_table, fastsync_table, blockers = _resolved_tables(stream_id, target_config, fastsync_capable)
+        # A known table keeps its recovery state visible, so a refusal can follow a restore.
+        table = singer_table or fastsync_table
         if table is None:
             targets.append(ConversionTarget(stream_id, None, blockers=tuple(blockers)))
             continue
-        # A known table keeps its recovery state visible, so a refusal can follow a restore.
-        if fastsync_table is not None and fastsync_table != table:
+        if singer_table is not None and fastsync_table is not None and fastsync_table != singer_table:
             blockers.append(
                 f'FastSync writes {fastsync_table.key} but Singer writes {table.key}; '
                 'conversion cannot choose between them'
@@ -393,11 +394,12 @@ def _classify(
             'that name for its Iceberg copy. Find out what it holds before renaming it',
         )
     if staging != _MISSING:
-        return classified(STATE_BLOCKED, _unmanifested_copy_reason(table))
+        return classified(STATE_BLOCKED, unmanifested_copy_reason(table))
     return classified(STATE_NATIVE)
 
 
-def _unmanifested_copy_reason(table: SnowflakeObjectName) -> str:
+def unmanifested_copy_reason(table: SnowflakeObjectName) -> str:
+    """Return the advice for an Iceberg companion that has no conversion manifest."""
     return (
         f'{table.with_suffix("_ICEBERG").quoted} is an Iceberg table without a conversion manifest. '
         'Find out what it holds. Only if it is a copy left by copy_native_to_iceberg --eventual native '
@@ -476,7 +478,7 @@ def classify_conversion_targets(
             collision = _companion_collision(target, planned, rows)
             if collision is not None:
                 refusals.insert(0, collision)
-                stale = _unmanifested_copy_reason(target.table)
+                stale = unmanifested_copy_reason(target.table)
                 item = replace(item, reasons=tuple(reason for reason in item.reasons if reason != stale))
         classified.append(with_refusals(item, refusals))
     return classified

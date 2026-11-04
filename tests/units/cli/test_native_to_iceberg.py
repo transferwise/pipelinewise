@@ -16,6 +16,7 @@ from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_plan import (
     STATE_PENDING,
     ClassifiedTarget,
     ConversionTarget,
+    unmanifested_copy_reason,
 )
 from pipelinewise.fastsync.commons.snowflake_iceberg_coordination import RecoveryCoordinator
 from pipelinewise.fastsync.commons.snowflake_iceberg_model import (
@@ -619,6 +620,22 @@ def test_other_tap_writers_keep_only_planned_tables():
     assert writers == [_other_writer(LEGACY_REFUSAL)]
     assert writers[0].target.writer_types == {'DOC': 'VARIANT'}
     assert native_to_iceberg.other_tap_writers('mirror', written, planned)[0].refusal is None
+
+
+def test_another_taps_companion_replaces_the_advice_to_drop_it():
+    """When another tap owns the _ICEBERG name, the stop never suggests dropping or promoting that table."""
+    stale = unmanifested_copy_reason(SHARED)
+    first = [_classified('T', STATE_BLOCKED, 1, reasons=(stale,))]
+    written = [ConversionTarget('public-t_iceberg', SHARED.with_suffix('_ICEBERG'))]
+    writers = native_to_iceberg.other_tap_writers('backup', written, [ConversionTarget('public-t', SHARED)])
+
+    with _gate(first) as (converter, _, _):
+        with pytest.raises(NativeToIcebergConversionException) as error:
+            native_to_iceberg.convert_tap_tables({}, '/runtime', [], other_writers=writers)
+
+    assert 'cannot hold the conversion companion' in str(error.value)
+    assert 'Only if it is a copy left by' not in str(error.value)
+    converter.convert.assert_not_called()
 
 
 @pytest.mark.parametrize('suffix', ['_NATIVE', '_ICEBERG'])

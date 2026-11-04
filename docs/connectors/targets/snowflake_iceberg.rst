@@ -366,6 +366,14 @@ To move a tap that already replicates into native tables:
 3. When the report is ready, set ``enabled: true``, run ``import_config``, and
    resume the schedule.
 
+When other taps under the same target write some of the same tables, move them
+together. Pause all of them, and run steps 1 and 2 for each. Each tap's report
+then also shows that the others do not enable ``native_to_iceberg_conversion``;
+fix every other blocker. Set ``enabled: true`` for all of them in one
+``import_config`` while they stay paused: enabling changes nothing until
+``run_tap`` runs. Run each report again, and resume the schedules once every
+report is ready.
+
 If the report in step 2 is not ready and you cannot fix it during the pause,
 return the tap to native. Remove ``target_table_format``, ``iceberg_version``,
 and ``native_to_iceberg_conversion``, run ``import_config``, and resume the

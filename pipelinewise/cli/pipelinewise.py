@@ -1821,6 +1821,12 @@ class PipelineWise:
 
     def _other_writer_refusal(self, target: Dict, tap: Dict, inheritable_config: Dict) -> Optional[str]:
         """Return why converting a table that another tap writes would break it, if it would."""
+        if target['id'] != self.target['id']:
+            # Each target keeps its own recovery locks, so nothing orders the two taps' runs.
+            return (
+                'writes it under another target, which cannot coordinate with this conversion; write the '
+                'table from taps under one target only, or stop that tap writing it'
+            )
         version = inheritable_config.get('iceberg_version')
         if (
             inheritable_config.get('target_table_format') != Config.TABLE_FORMAT_ICEBERG
@@ -1828,21 +1834,15 @@ class PipelineWise:
             or isinstance(version, bool)
         ):
             return (
-                'does not write managed Iceberg v3 and would fail on the converted table; import it with '
-                'target_table_format: iceberg, iceberg_version: 3 and native_to_iceberg_conversion enabled as well, '
-                'or stop it writing the table'
-            )
-        if target['id'] != self.target['id']:
-            # Each target keeps its own recovery locks, so nothing orders the two taps' runs.
-            return (
-                'writes it under another target, which cannot coordinate with this conversion; write the '
-                'table from taps under one target only, or stop that tap writing it'
+                'does not write managed Iceberg v3 and would fail on the converted table; pause both taps and '
+                'import it with Iceberg v3 and native_to_iceberg_conversion enabled too, or stop it writing the table'
             )
         if (tap.get(Config.NATIVE_TO_ICEBERG_CONVERSION) or {}).get('enabled') is not True:
             # Its run would start writers without first finishing or waiting for this table's conversion.
             return (
                 'does not enable native_to_iceberg_conversion, so nothing keeps its writers out while the '
-                'table name is absent during a cutover; enable it for that tap too, or stop it writing the table'
+                'table name is absent during a cutover; enable it for that tap too (it needs '
+                'data_flattening_max_level: 0) while both taps stay paused, or stop it writing the table'
             )
         return None
 

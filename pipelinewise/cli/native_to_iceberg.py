@@ -25,6 +25,7 @@ from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_plan import (
     fastsync_target_table,
     plan_conversion_targets,
     selected_stream_ids,
+    unmanifested_copy_reason,
     with_refusals,
 )
 from pipelinewise.fastsync.commons.snowflake_iceberg_converter import (
@@ -76,6 +77,7 @@ class OtherWriter:
 
     target: ConversionTarget
     refusal: Optional[str] = None
+    companion: bool = False
 
 
 @dataclass(frozen=True)
@@ -180,6 +182,7 @@ def other_tap_writers(
                 ConversionTarget(stream, table),
                 f'{target.table.quoted} is the table of stream {stream}, so it cannot hold the conversion '
                 f"companion of {table.quoted}; change one stream's schema mapping or deselect it",
+                companion=True,
             ))
     return writers
 
@@ -192,12 +195,18 @@ def _held_back(
 ) -> List[ClassifiedTarget]:
     """Stop every table that would be converted or resumed for the tap's or its writers' reasons."""
     refusals: Dict[str, List[str]] = {key: list(reasons) for key, reasons in conflicts.items()}
+    companions = {writer.target.table.key for writer in writers if writer.companion}
     for writer in writers:
         if writer.refusal:
             refusals.setdefault(writer.target.table.key, []).append(writer.refusal)
     result = []
     for item in classified:
-        reasons = [*tap_refusals, *refusals.get(item.target.table.key if item.target.table else None, ())]
+        key = item.target.table.key if item.target.table else None
+        if key in companions:
+            # Another tap owns the companion name, so advice to drop or promote that table would mislead.
+            stale = unmanifested_copy_reason(item.target.table)
+            item = replace(item, reasons=tuple(reason for reason in item.reasons if reason != stale))
+        reasons = [*tap_refusals, *refusals.get(key, ())]
         if reasons and item.state in (STATE_NATIVE, STATE_PENDING, STATE_BLOCKED):
             item = with_refusals(item, reasons)
         result.append(item)

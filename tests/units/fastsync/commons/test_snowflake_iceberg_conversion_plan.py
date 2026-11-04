@@ -130,6 +130,16 @@ def test_a_fastsync_naming_failure_keeps_the_singer_table():
     assert targets[0].blockers[0].startswith('FastSync cannot name the table of stream public-my.table: ')
 
 
+def test_a_singer_naming_failure_keeps_the_fastsync_table():
+    """A table only FastSync can name stays planned, with the Singer failure as its blocker."""
+    config = {'dbname': 'database', 'schema_mapping': {'db': {'target_schema': 'raw'}}}
+
+    targets = plan.plan_conversion_targets({}, config, ['db-public-orders'], fastsync_capable=True)
+
+    assert targets[0].table.key == 'DATABASE.RAW.PUBLIC-ORDERS'
+    assert targets[0].blockers == ('No target schema is configured for stream db-public-orders',)
+
+
 def test_written_tables_keep_every_name_a_writer_can_resolve():
     """Another tap's Singer destination still counts when its FastSync name cannot be resolved."""
     targets = plan.plan_written_tables({}, TARGET_CONFIG, ['public-my.table'], fastsync_capable=True)

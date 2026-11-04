@@ -784,9 +784,12 @@ message names each table and the reason:
    only in the run's error, so the report can be ready while the cause remains.
    The manifest records the attempt, and the next ``run_tap`` resumes it. For an interrupted cutover, see
    :ref:`troubleshooting_iceberg_conversion_missing_primary`. For a table that
-   another tap writes, import that tap with ``target_table_format: iceberg``,
-   ``iceberg_version: 3`` and ``native_to_iceberg_conversion`` enabled too, or
-   stop it writing the table.
+   another tap under the same target writes, pause both and import that tap with
+   ``target_table_format: iceberg``, ``iceberg_version: 3``,
+   ``data_flattening_max_level: 0`` and ``native_to_iceberg_conversion`` enabled
+   too, or stop it writing the table. A tap under another target must stop
+   writing the table, or move under this target. For a companion name that
+   another tap writes, change one stream's schema mapping.
 
    If a failed conversion says ``<table>_ICEBERG does not match the projected
    contents of <table>`` before any cutover, ``<table>`` changed after the copy.

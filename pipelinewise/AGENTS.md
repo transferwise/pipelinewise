@@ -190,8 +190,9 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
   destination. Block a table that another imported tap writes unless that tap is
   Iceberg v3 with conversion enabled under the same target, so its run converts
   or waits on the shared lock before its writers start; taps under other targets
-  with the same account and dbname always block. Merge those taps' TEXT/VARIANT classes, skipping
-  top-level objects a writer splits into child columns at its flattening level.
+  with the same account and dbname always block. Merge those taps' TEXT/VARIANT
+  classes. Manual conversion skips the top-level objects that a deeper-flattening
+  imported tap splits into child columns.
   A blocked stream holds back its table unless the name is absent, and a class
   conflict on a new or Iceberg table also stops the run. Refuse before any Snowflake
   work unless the tap's generated files carry Iceberg v3 and level 0, and refuse
