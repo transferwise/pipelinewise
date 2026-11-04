@@ -81,7 +81,6 @@ def assert_table_locked(test_case, proc, monitor_conn, table, preexisting_sessio
             return set(sessions) - preexisting_sessions
 
 
-
 def _safe_mysql_datetime(column):
     """Mirror the FastSync export rule that nulls invalid MySQL datetimes."""
     quoted_column = f'`{column}`'
@@ -240,7 +239,7 @@ class TestPartialSyncMariaDBToSF(TapMariaDB):
             remaining, set(),
             f'Source sessions outlived the terminated PartialSync:\n{_process_output(log)}',
         )
-    
+
     def test_unbounded_empty_range_removes_target_only_row(self):
         """Publish an empty source range so its target-only row is deleted."""
         source_max = self.e2e_env.run_query_tap_mysql(

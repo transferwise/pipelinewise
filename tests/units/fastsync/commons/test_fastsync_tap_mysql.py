@@ -1129,7 +1129,7 @@ class TestFastSyncTapMySqlTerminationCancel(TestCase):
         for signum in tap_mysql.CANCEL_SIGNALS:
             self.assertEqual(signal.getsignal(signum), tap_mysql._cancel_active_mysql_sources)
         self.assertIn(self.mysql, tap_mysql._ACTIVE_MYSQL_SOURCES)
-    
+
         self.mysql.close_connections(silent=True)
         self.assertNotIn(self.mysql, tap_mysql._ACTIVE_MYSQL_SOURCES)
         self.assertEqual(signal.getsignal(signal.SIGTERM), tap_mysql._cancel_active_mysql_sources)
