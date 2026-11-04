@@ -1,3 +1,12 @@
+0.99.2 (2026-11-04)
+-------------------
+
+- Stop MariaDB/MySQL source queries when FullSync or PartialSync is stopped
+  with SIGTERM or SIGINT. Before this fix, the server kept running the current
+  query after the process exited. PipelineWise now kills its own source
+  sessions before exiting and waits at most 2 seconds per step. This also
+  covers SIGTERM sent only to the FastSync process.
+
 0.99.1 (2026-11-03)
 -------------------
 

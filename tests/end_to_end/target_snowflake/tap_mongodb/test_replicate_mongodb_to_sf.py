@@ -19,6 +19,7 @@ class TestReplicateMongoDBToSF(TapMongoDB):
     def setUp(self):
         super().setUp(tap_id=TAP_ID, target_id=TARGET_ID)
         self.mongodb_con = self.e2e_env.get_tap_mongodb_connection()
+        self.addCleanup(self.mongodb_con.client.close)
 
     def assert_row_counts_equal(self, target_schema, table, count_in_source):
         """

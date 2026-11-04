@@ -9,7 +9,11 @@ from typing import Union
 from datetime import datetime
 from ..logger import Logger
 from .commons import utils
-from .commons.tap_mysql import FastSyncTapMySql
+from .commons.tap_mysql import (
+    FastSyncTapMySql,
+    install_mysql_sync_signal_handlers,
+    install_mysql_worker_signal_handlers,
+)
 from .commons.target_postgres import FastSyncTargetPostgres
 from .commons.source_numeric import mysql_decimal_type
 
@@ -172,7 +176,9 @@ def main_impl():
     postgres_target.create_schemas(args.tables)
 
     # Start loading tables in parallel in spawning processes
-    with multiprocessing.Pool(pool_size) as proc:
+    with multiprocessing.Pool(
+        pool_size, initializer=install_mysql_worker_signal_handlers
+    ) as proc:
         table_sync_excs = list(
             filter(
                 lambda x: not isinstance(x, bool),
@@ -208,6 +214,7 @@ def main_impl():
 
 def main():
     """Main entry point"""
+    install_mysql_sync_signal_handlers()
     try:
         main_impl()
     except Exception as exc:

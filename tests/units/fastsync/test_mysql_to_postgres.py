@@ -6,6 +6,7 @@ from pipelinewise.fastsync.mysql_to_postgres import (
     sync_table,
     main_impl,
 )
+from pipelinewise.fastsync.commons.tap_mysql import install_mysql_worker_signal_handlers
 
 PACKAGE_IN_SCOPE = 'pipelinewise.fastsync.mysql_to_postgres'
 TAP = 'FastSyncTapMySql'
@@ -54,13 +55,15 @@ class S3CsvToPostgres(unittest.TestCase):
     @staticmethod
     def test_main_impl_with_all_tables_synced_successfully_should_exit_normally():
         assertions.assert_main_impl_exit_normally_on_success(
-            main_impl, PACKAGE_IN_SCOPE, TAP, TARGET
+            main_impl, PACKAGE_IN_SCOPE, TAP, TARGET,
+            pool_initializer=install_mysql_worker_signal_handlers,
         )
 
     @staticmethod
     def test_main_impl_with_one_table_fails_to_sync_should_exit_with_error():
         assertions.assert_main_impl_should_exit_with_error_on_failure(
-            main_impl, PACKAGE_IN_SCOPE, TAP, TARGET
+            main_impl, PACKAGE_IN_SCOPE, TAP, TARGET,
+            pool_initializer=install_mysql_worker_signal_handlers,
         )
 
 

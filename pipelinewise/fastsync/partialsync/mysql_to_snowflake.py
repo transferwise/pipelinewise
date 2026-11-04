@@ -6,7 +6,11 @@ from argparse import Namespace
 from typing import Union
 from datetime import datetime
 
-from pipelinewise.fastsync.commons.tap_mysql import FastSyncTapMySql
+from pipelinewise.fastsync.commons.tap_mysql import (
+    FastSyncTapMySql,
+    install_mysql_sync_signal_handlers,
+    install_mysql_worker_signal_handlers,
+)
 from pipelinewise.fastsync.commons.target_snowflake import FastSyncTargetSnowflake
 
 from pipelinewise.logger import Logger
@@ -69,7 +73,9 @@ def main_impl():
 
     sync_tables = utils.get_sync_tables(args)
     pool_size = len(sync_tables) if len(sync_tables) < pool_size else pool_size
-    with multiprocessing.Pool(pool_size) as proc:
+    with multiprocessing.Pool(
+        pool_size, initializer=install_mysql_worker_signal_handlers
+    ) as proc:
         sync_results = proc.map(
             partial(partial_sync_table, args=args),
             sync_tables.items(),
@@ -101,6 +107,7 @@ def main_impl():
 
 def main():
     """Main entry point"""
+    install_mysql_sync_signal_handlers()
     try:
         main_impl()
     except Exception as exc:

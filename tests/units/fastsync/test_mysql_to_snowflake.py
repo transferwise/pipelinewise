@@ -9,6 +9,7 @@ from pipelinewise.fastsync.mysql_to_snowflake import (
     sync_table,
     main_impl,
 )
+from pipelinewise.fastsync.commons.tap_mysql import install_mysql_worker_signal_handlers
 from pipelinewise.fastsync.commons.snowflake_iceberg import (
     QueryHistoryVisibilityTimeoutError,
     TABLE_FORMAT_MANAGED_ICEBERG_V3,
@@ -358,13 +359,15 @@ class MySqlToSnowflake(unittest.TestCase):
     @staticmethod
     def test_main_impl_with_all_tables_synced_successfully_should_exit_normally():
         assertions.assert_main_impl_exit_normally_on_success(
-            main_impl, PACKAGE_IN_SCOPE, TAP, TARGET
+            main_impl, PACKAGE_IN_SCOPE, TAP, TARGET,
+            pool_initializer=install_mysql_worker_signal_handlers,
         )
 
     @staticmethod
     def test_main_impl_with_one_table_fails_to_sync_should_exit_with_error():
         assertions.assert_main_impl_should_exit_with_error_on_failure(
-            main_impl, PACKAGE_IN_SCOPE, TAP, TARGET
+            main_impl, PACKAGE_IN_SCOPE, TAP, TARGET,
+            pool_initializer=install_mysql_worker_signal_handlers,
         )
 
 
