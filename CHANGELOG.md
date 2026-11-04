@@ -1,4 +1,4 @@
-0.100.0 (2026-11-03)
+0.100.0 (2026-11-04)
 --------------------
 
 - Add opt-in automatic native-to-Iceberg conversion. With
