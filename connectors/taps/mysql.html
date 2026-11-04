@@ -560,6 +560,13 @@ If the server lacks the built-in timeout variable, PipelineWise warns and
 continues without applying it. Check that <code class="docutils literal notranslate"><span class="pre">engine</span></code> matches the server;
 this does not change engine selection. Unknown variables in custom
 <code class="docutils literal notranslate"><span class="pre">session_sqls</span></code> still fail the connection.</p></li>
+<li><p>Stopping FullSync or PartialSync with SIGTERM or SIGINT kills its source
+sessions before the process exits. Otherwise the server keeps running the
+current query after the client is gone. The kill uses the export’s host and
+user, so it needs no extra privilege. Each connect, send, and read waits at
+most 2 seconds. SIGKILL cannot trigger the kill. Neither can a proxy that
+does not forward <code class="docutils literal notranslate"><span class="pre">KILL</span></code> to the server. In those cases, set a statement
+timeout in <code class="docutils literal notranslate"><span class="pre">session_sqls</span></code> to stop an orphaned query.</p></li>
 <li><p>MySQL partial-JSON events and MySQL/MariaDB compressed binlog events are not
 supported by the bundled decoder. Keep <code class="docutils literal notranslate"><span class="pre">binlog_row_value_options</span></code> empty,
 <code class="docutils literal notranslate"><span class="pre">binlog_transaction_compression</span></code> disabled, and MariaDB <code class="docutils literal notranslate"><span class="pre">log_bin_compress</span></code>
