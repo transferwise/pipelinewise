@@ -301,6 +301,7 @@
 <li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#native-to-iceberg-primary-name-is-absent">Native-to-Iceberg primary name is absent</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#native-to-iceberg-manifest-cannot-be-read">Native-to-Iceberg manifest cannot be read</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#native-to-iceberg-contents-changed-after-cutover">Native-to-Iceberg contents changed after cutover</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#automatic-native-to-iceberg-conversion-stopped">Automatic native-to-Iceberg conversion stopped</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#table-not-found">Table not found</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#failure-to-import-tap-0-tables-discovered">Failure to import tap (0 tables discovered)</a></li>
 </ul>
@@ -412,6 +413,10 @@ update generated runtime configuration.</p>
 <ol class="arabic simple">
 <li><p>locks the tap-target pair to prevent a concurrent run;</p></li>
 <li><p>selects FastSync-eligible initial tables and Singer tables;</p></li>
+<li><p>if the tap enables <code class="docutils literal notranslate"><span class="pre">native_to_iceberg_conversion</span></code>, converts its native
+Snowflake tables to managed Iceberg v3 first, keeping each original as
+<code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_NATIVE</span></code>, and stops before replication if any cannot convert; see
+<a class="reference internal" href="../connectors/targets/snowflake_iceberg.html#snowflake-iceberg-auto-conversion"><span class="std std-ref">Convert a tap’s tables automatically</span></a>;</p></li>
 <li><p>streams or stages records into the target;</p></li>
 <li><p>persists only target-acknowledged state; and</p></li>
 <li><p>marks the log <code class="docutils literal notranslate"><span class="pre">success</span></code> or <code class="docutils literal notranslate"><span class="pre">failed</span></code>.</p></li>

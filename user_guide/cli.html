@@ -301,6 +301,7 @@
 <li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#native-to-iceberg-primary-name-is-absent">Native-to-Iceberg primary name is absent</a></li>
 <li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#native-to-iceberg-manifest-cannot-be-read">Native-to-Iceberg manifest cannot be read</a></li>
 <li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#native-to-iceberg-contents-changed-after-cutover">Native-to-Iceberg contents changed after cutover</a></li>
+<li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#automatic-native-to-iceberg-conversion-stopped">Automatic native-to-Iceberg conversion stopped</a></li>
 <li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#table-not-found">Table not found</a></li>
 <li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#failure-to-import-tap-0-tables-discovered">Failure to import tap (0 tables discovered)</a></li>
 </ul>
@@ -437,7 +438,9 @@ reconciliation failure; automation must retain that exit status and the run log.
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">run_tap</span></code></p></td>
 <td><p>Run normal initial and ongoing replication.</p></td>
-<td><p>Loads target data and advances acknowledged state.</p></td>
+<td><p>Loads target data and advances acknowledged state. With
+<code class="docutils literal notranslate"><span class="pre">native_to_iceberg_conversion</span></code> enabled, can first convert and rename
+native tables.</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">stop_tap</span></code></p></td>
 <td><p>Terminate a managed running pipeline.</p></td>
@@ -452,8 +455,9 @@ reconciliation failure; automation must retain that exit status and the run log.
 <td><p>Merges target data; can update state.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">copy_native_to_iceberg</span></code></p></td>
-<td><p>Build or promote one managed Iceberg v3 copy.</p></td>
-<td><p>Creates companion tables; can rename the live table.</p></td>
+<td><p>Build or promote one managed Iceberg v3 copy, or report feasibility.</p></td>
+<td><p>Creates companion tables; can rename the live table. <code class="docutils literal notranslate"><span class="pre">--preflight-only</span></code>
+changes nothing.</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">reset_state</span></code></p></td>
 <td><p>Move CDC state after a controlled switchover.</p></td>
@@ -590,7 +594,10 @@ automatically.</p>
 </div>
 <p>Runs eligible initial FastSync work, then Singer replication in the same
 invocation. <code class="docutils literal notranslate"><span class="pre">--extra_log</span></code> mirrors connector output to the PipelineWise logger.
-See <a class="reference internal" href="../installation_guide/running_pipelines.html#running-pipelines"><span class="std std-ref">Run a pipeline</span></a> for preflight and recovery.</p>
+See <a class="reference internal" href="../installation_guide/running_pipelines.html#running-pipelines"><span class="std std-ref">Run a pipeline</span></a> for preflight and recovery. When the tap enables
+<code class="docutils literal notranslate"><span class="pre">native_to_iceberg_conversion</span></code>, the command first converts the tap’s native
+Snowflake tables and stops before replication if it cannot; see
+<a class="reference internal" href="../connectors/targets/snowflake_iceberg.html#snowflake-iceberg-auto-conversion"><span class="std std-ref">Convert a tap’s tables automatically</span></a>.</p>
 </section>
 <section id="stop-tap">
 <span id="cli-stop-tap"></span><h3><code class="docutils literal notranslate"><span class="pre">stop_tap</span></code><a class="headerlink" href="#stop-tap" title="Link to this heading"></a></h3>
@@ -703,9 +710,34 @@ command completes recovery.</p>
 <code class="docutils literal notranslate"><span class="pre">--eventual</span></code> value, target account/database/user, and account role before
 resuming readers or writers. After an interrupted cutover, a retry restores the
 native table name before it validates anything. A rerun after a completed
-<code class="docutils literal notranslate"><span class="pre">--eventual</span> <span class="pre">iceberg</span></code> conversion changes nothing. Do not delete its recovery manifest or companion tables. See
-<a class="reference internal" href="../connectors/targets/snowflake_iceberg.html#snowflake-iceberg"><span class="std std-ref">Snowflake Iceberg tables</span></a> for preflight, unsupported metadata, and rollback
-behaviour.</p>
+<code class="docutils literal notranslate"><span class="pre">--eventual</span> <span class="pre">iceberg</span></code> conversion changes nothing. Do not delete its recovery
+manifest or companion tables. See <a class="reference internal" href="../connectors/targets/snowflake_iceberg.html#snowflake-iceberg"><span class="std std-ref">Snowflake Iceberg tables</span></a> for preflight,
+unsupported metadata, and rollback behaviour.</p>
+<p>The command and its report run on the target’s warehouse by default.
+<code class="docutils literal notranslate"><span class="pre">--conversion-warehouse</span> <span class="pre">&lt;warehouse&gt;</span></code> runs them on another warehouse, which the
+target role must be able to use. For a <code class="docutils literal notranslate"><span class="pre">--tap</span></code> report, the tap’s
+<code class="docutils literal notranslate"><span class="pre">conversion_warehouse</span></code> applies when you give no option. Other commands reject
+<code class="docutils literal notranslate"><span class="pre">--conversion-warehouse</span></code>.</p>
+<p>Check feasibility first with <code class="docutils literal notranslate"><span class="pre">--preflight-only</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pipelinewise<span class="w"> </span>copy_native_to_iceberg<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--target<span class="w"> </span>&lt;target_id&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--tap<span class="w"> </span>&lt;tap_id&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--preflight-only<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iceberg-version<span class="w"> </span><span class="m">3</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output-format<span class="w"> </span>table
+</pre></div>
+</div>
+<p>The report changes nothing. It takes no lock, writes no manifest, and runs no
+DDL, so it can run beside the tap. <code class="docutils literal notranslate"><span class="pre">--tap</span></code> reports every table that the tap’s
+selected streams write; <code class="docutils literal notranslate"><span class="pre">--table</span></code> reports one table, checked against the
+catalogs of the imported taps that write it. Each row shows the table’s state,
+the action conversion would take, Snowflake’s row and byte counts, and its
+blockers: the first metadata refusal, or every conversion blocker when there is
+no refusal. <code class="docutils literal notranslate"><span class="pre">--output-format</span> <span class="pre">json</span></code> prints only the report on stdout,
+with a top-level <code class="docutils literal notranslate"><span class="pre">ready</span></code> flag; log messages go to stderr. The command exits 0
+whenever it produces a report, so check <code class="docutils literal notranslate"><span class="pre">ready</span></code> or the final line. Other
+commands reject <code class="docutils literal notranslate"><span class="pre">--preflight-only</span></code>, and this command accepts <code class="docutils literal notranslate"><span class="pre">--tap</span></code> only
+with <code class="docutils literal notranslate"><span class="pre">--preflight-only</span></code>. See <a class="reference internal" href="../connectors/targets/snowflake_iceberg.html#snowflake-iceberg-conversion-report"><span class="std std-ref">Conversion feasibility report</span></a>.</p>
 </section>
 </section>
 <section id="data-diff">

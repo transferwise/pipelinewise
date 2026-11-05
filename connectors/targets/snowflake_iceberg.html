@@ -301,6 +301,7 @@
 <li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#native-to-iceberg-primary-name-is-absent">Native-to-Iceberg primary name is absent</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#native-to-iceberg-manifest-cannot-be-read">Native-to-Iceberg manifest cannot be read</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#native-to-iceberg-contents-changed-after-cutover">Native-to-Iceberg contents changed after cutover</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#automatic-native-to-iceberg-conversion-stopped">Automatic native-to-Iceberg conversion stopped</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#table-not-found">Table not found</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#failure-to-import-tap-0-tables-discovered">Failure to import tap (0 tables discovered)</a></li>
 </ul>
@@ -509,8 +510,9 @@ remove <code class="docutils literal notranslate"><span class="pre">iceberg_crea
 their initial load can use FastSync before handing the stream to Singer.
 Singer-only sources retain their normal flattening setting; for example,
 Salesforce’s default level <code class="docutils literal notranslate"><span class="pre">10</span></code> is valid. A physical format mismatch fails
-before mutation. PipelineWise does not upgrade or automatically convert tables;
-use the manual command below during a controlled outage.</p>
+before mutation. To move a tap’s existing native tables to Iceberg, enable
+<a class="reference internal" href="#snowflake-iceberg-auto-conversion"><span class="std std-ref">automatic conversion</span></a> or use the
+manual command below during a controlled outage. Writers never convert tables.</p>
 <p>With flattening disabled, nested objects and arrays use <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> only with
 explicit v3 configuration. A Singer-only tap with a non-zero flattening level
 continues to apply its normal target flattening behavior. Keep
@@ -703,6 +705,138 @@ The polling budget is not part of recovery identity, so it can be increased for
 that unchanged retry. If the result remains ambiguous, PipelineWise preserves
 the evidence and fails for operator inspection.</p>
 </section>
+<section id="convert-a-tap-s-tables-automatically">
+<span id="snowflake-iceberg-auto-conversion"></span><h2>Convert a tap’s tables automatically<a class="headerlink" href="#convert-a-tap-s-tables-automatically" title="Link to this heading"></a></h2>
+<p>To move a tap that already replicates into native tables:</p>
+<ol class="arabic simple">
+<li><p>Run the <a class="reference internal" href="#snowflake-iceberg-conversion-report"><span class="std std-ref">feasibility report</span></a>
+while the tap still replicates natively, and resolve the blockers it shows.
+To keep the report’s scans off the loading warehouse, first import
+<code class="docutils literal notranslate"><span class="pre">native_to_iceberg_conversion:</span> <span class="pre">{enabled:</span> <span class="pre">false,</span> <span class="pre">conversion_warehouse:</span> <span class="pre">...}</span></code>
+while the tap is still native.</p></li>
+<li><p>Pause the tap’s schedule. Set the Iceberg format, add the setting with
+<code class="docutils literal notranslate"><span class="pre">enabled:</span> <span class="pre">false</span></code>, and run <code class="docutils literal notranslate"><span class="pre">import_config</span></code>. Run the report again: this
+catalog is the one conversion uses, and MariaDB JSON aliases appear as
+<code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> only now. If <code class="docutils literal notranslate"><span class="pre">import_config</span></code> fails, fix the error and run it
+again: while the catalog is older than the imported settings, the report and
+<code class="docutils literal notranslate"><span class="pre">run_tap</span></code> refuse to convert. Keep the tap paused in this state, because both
+writers refuse native tables under the Iceberg format. Keep the pause short:
+the source keeps accumulating changes.</p></li>
+<li><p>When the report is ready, set <code class="docutils literal notranslate"><span class="pre">enabled:</span> <span class="pre">true</span></code>, run <code class="docutils literal notranslate"><span class="pre">import_config</span></code>, and
+resume the schedule.</p></li>
+</ol>
+<p>When other taps under the same target write some of the same tables, move them
+together. Pause all of them, and run steps 1 and 2 for each. Each tap’s report
+then also shows that the others do not enable <code class="docutils literal notranslate"><span class="pre">native_to_iceberg_conversion</span></code>;
+fix every other blocker. Set <code class="docutils literal notranslate"><span class="pre">enabled:</span> <span class="pre">true</span></code> for all of them in one
+<code class="docutils literal notranslate"><span class="pre">import_config</span></code> while they stay paused: enabling changes nothing until
+<code class="docutils literal notranslate"><span class="pre">run_tap</span></code> runs. Run each report again, and resume the schedules once every
+report is ready.</p>
+<p>If the report in step 2 is not ready and you cannot fix it during the pause,
+return the tap to native. Remove <code class="docutils literal notranslate"><span class="pre">target_table_format</span></code>, <code class="docutils literal notranslate"><span class="pre">iceberg_version</span></code>,
+and <code class="docutils literal notranslate"><span class="pre">native_to_iceberg_conversion</span></code>, run <code class="docutils literal notranslate"><span class="pre">import_config</span></code>, and resume the
+schedule. This is safe while no table has converted and no conversion is
+pending. To clear a <code class="docutils literal notranslate"><span class="pre">TEXT</span></code>/<code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> blocker, see
+<a class="reference internal" href="#snowflake-iceberg-text-variant-blocker"><span class="std std-ref">Clear a TEXT/VARIANT blocker</span></a>.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">"snowflake"</span>
+<span class="nt">target_table_format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">iceberg</span>
+<span class="nt">iceberg_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<span class="nt">native_to_iceberg_conversion</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">conversion_warehouse</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CONVERSION_WH</span><span class="w">  </span><span class="c1"># optional; defaults to the target's warehouse</span>
+</pre></div>
+</div>
+<p>Every <code class="docutils literal notranslate"><span class="pre">run_tap</span></code> for the tap then runs a conversion step inside the tap’s
+pidfile, before FastSync or Singer writes anything:</p>
+<ol class="arabic simple">
+<li><p>It plans each selected stream’s Snowflake table and classifies them all with
+one <code class="docutils literal notranslate"><span class="pre">SHOW</span> <span class="pre">TABLES</span></code> per schema and the target’s recovery manifests.</p></li>
+<li><p>It resumes every pending <code class="docutils literal notranslate"><span class="pre">--eventual</span> <span class="pre">iceberg</span></code> conversion of these tables
+first, starting with interrupted cutovers, and tries every one even when one
+fails. If another check would stop a table, the resume restores its name and
+then stops before another cutover. A resumed attempt passes the same checks
+as a new one, including the tap catalog’s column classes, before its cutover.</p></li>
+<li><p>It stops if any table needs an operator, then preflights every native table
+and stops before converting anything if any table is blocked. When several
+streams write one table, every stream’s blockers and column classes count,
+and streams that disagree on a column’s class block the table.</p></li>
+<li><p>It converts the native tables one at a time, smallest first, with the
+same converter as <code class="docutils literal notranslate"><span class="pre">copy_native_to_iceberg</span> <span class="pre">--eventual</span> <span class="pre">iceberg</span></code>.</p></li>
+<li><p>When it resumed or converted anything, it checks that every planned table is
+now new or Iceberg with no pending manifest. Then replication starts.</p></li>
+</ol>
+<p>After the last table converts, each run costs one <code class="docutils literal notranslate"><span class="pre">SHOW</span> <span class="pre">TABLES</span></code> per schema,
+and runs with FastSync work list those schemas once more before FastSync starts.
+Enabling the setting needs a tap that can write managed Iceberg v3 through
+<code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code>, and <code class="docutils literal notranslate"><span class="pre">data_flattening_max_level:</span> <span class="pre">0</span></code>, because conversion
+compares native columns with the tap catalog’s top-level properties.
+<code class="docutils literal notranslate"><span class="pre">run_tap</span></code> also stops before any Snowflake work if the tap’s generated
+configuration is not imported with these settings, for example after an
+<code class="docutils literal notranslate"><span class="pre">import_config</span> <span class="pre">--taps</span></code> run that did not include the tap.
+<code class="docutils literal notranslate"><span class="pre">conversion_warehouse</span></code> runs only the conversion queries on another warehouse,
+which the target role must be able to use. It is not part of the recovery
+identity, so a manual <code class="docutils literal notranslate"><span class="pre">copy_native_to_iceberg</span></code> on the target’s warehouse can
+resume an automatic attempt.</p>
+<p>Conversion refuses a native table that another imported tap also writes,
+unless that tap is under the same target, writes managed Iceberg v3, and also
+enables <code class="docutils literal notranslate"><span class="pre">native_to_iceberg_conversion</span></code>. Such a tap’s run finishes or waits for
+the table’s conversion before its writers start. Any other tap could write
+during the copy or create an empty table while the name is absent, and a native
+tap would fail on the converted table. Taps under other targets with the same
+<code class="docutils literal notranslate"><span class="pre">account</span></code> and <code class="docutils literal notranslate"><span class="pre">dbname</span></code> count too and always stop the table, because two
+targets cannot coordinate a conversion. Conversion also refuses a table whose
+<code class="docutils literal notranslate"><span class="pre">_NATIVE</span></code> or <code class="docutils literal notranslate"><span class="pre">_ICEBERG</span></code> name is another tap’s destination. Move every tap
+that writes a table to Iceberg v3 with conversion enabled together, or stop the
+other taps writing it. Writers outside PipelineWise are not visible: stop them
+before you enable the setting.</p>
+<p>Check each table before you enable the setting, because conversion runs
+unattended:</p>
+<ul class="simple">
+<li><p>Preflight sees only the policies, tags, and streams that the target role can
+see. Make sure that role can see all of them on the tap’s tables, and that no
+masking or row access policy hides rows from it.</p></li>
+<li><p>Replaying grants and tags needs <code class="docutils literal notranslate"><span class="pre">APPLY</span></code> on each direct table tag and, in a
+managed-access schema, ownership of the schema or <code class="docutils literal notranslate"><span class="pre">MANAGE</span> <span class="pre">GRANTS</span></code>. A missing
+privilege fails after the copy, and every run stops at the same statement until
+it is granted.</p></li>
+<li><p>Conversion does not carry over search optimization or data metric functions.
+The Iceberg table keeps one day of data retention. Dynamic tables and
+materialized views that read the table are not recreated; check them after
+the conversion.</p></li>
+</ul>
+<p>Enabling the setting accepts the cutover gap described below: each table’s name
+is briefly absent between its two renames, so readers of that table fail for
+that moment. A large table converts within the scheduled run and holds the tap
+for the copy; use the report’s row and byte counts to pick when to enable it.
+Each conversion statement must finish within Snowflake’s statement timeout:
+the lowest non-zero <code class="docutils literal notranslate"><span class="pre">STATEMENT_TIMEOUT_IN_SECONDS</span></code> of the conversion warehouse
+and of the target user, which can also come from the account. This covers the
+copy and the full-table scans that check it. Otherwise every run repeats the
+statement that timed out and times out again.</p>
+<p>If any table cannot convert, the run fails before replication starts, sends the
+tap’s alert, and exits 1. It never falls back to native tables. Tables converted
+earlier in the run stay converted, each validated with its native backup kept
+as <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_NATIVE</span></code>. Pause the tap’s schedule until you have fixed the cause:
+each scheduled run preflights every native table again and restarts a copy that
+failed. The next <code class="docutils literal notranslate"><span class="pre">run_tap</span></code> resumes a pending conversion; see
+<a class="reference internal" href="../../user_guide/troubleshooting.html#troubleshooting-iceberg-auto-conversion"><span class="std std-ref">Automatic native-to-Iceberg conversion stopped</span></a>. While the tap is stopped, its
+source keeps accumulating changes, so watch PostgreSQL WAL and MySQL binlog
+retention.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Finish or recover every pending conversion before you set
+<code class="docutils literal notranslate"><span class="pre">enabled:</span> <span class="pre">false</span></code>, remove <code class="docutils literal notranslate"><span class="pre">native_to_iceberg_conversion</span></code>, change the tap’s
+format, deselect a stream, change its schema mapping, or remove the tap.
+<code class="docutils literal notranslate"><span class="pre">run_tap</span></code> resumes only the conversions of the tables it plans, and only while
+the setting is enabled. Otherwise a writer could create an empty table under a
+primary name that an interrupted cutover left absent. Finish any other pending
+conversion with <code class="docutils literal notranslate"><span class="pre">copy_native_to_iceberg</span> <span class="pre">--eventual</span> <span class="pre">iceberg</span></code>, adding
+<code class="docutils literal notranslate"><span class="pre">--conversion-warehouse</span></code> to keep it off the loading warehouse. That command
+does not check other taps that write the table.
+Once a table has converted, the tap cannot return to <code class="docutils literal notranslate"><span class="pre">native</span></code>: the native
+contract refuses Iceberg tables.</p>
+</div>
+</section>
 <section id="convert-a-native-table">
 <h2>Convert a native table<a class="headerlink" href="#convert-a-native-table" title="Link to this heading"></a></h2>
 <p>The PipelineWise-owned command builds and validates one managed Iceberg v3 copy
@@ -714,8 +848,12 @@ using an imported Snowflake target:</p>
 <span class="w">  </span>--iceberg-version<span class="w"> </span><span class="m">3</span>
 </pre></div>
 </div>
-<p><code class="docutils literal notranslate"><span class="pre">--eventual</span></code> defaults to <code class="docutils literal notranslate"><span class="pre">native</span></code>. The command has no tap argument and only
-accepts a table in the target’s configured database.</p>
+<p><code class="docutils literal notranslate"><span class="pre">--eventual</span></code> defaults to <code class="docutils literal notranslate"><span class="pre">native</span></code>. The command converts one table in the
+target’s configured database. <code class="docutils literal notranslate"><span class="pre">--tap</span></code> is accepted only by the feasibility
+report below. The command runs on the target’s warehouse, or on
+<code class="docutils literal notranslate"><span class="pre">--conversion-warehouse</span></code> when you give one. If imported taps that write the
+table map a column to different <code class="docutils literal notranslate"><span class="pre">TEXT</span></code>/<code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> classes, the command refuses
+the table; it first restores the name of an interrupted cutover.</p>
 <table class="docutils align-default" id="id3" style="width: 100%">
 <caption><span class="caption-text">Conversion outcomes</span><a class="headerlink" href="#id3" title="Link to this table"></a></caption>
 <colgroup>
@@ -741,7 +879,9 @@ accepts a table in the target’s configured database.</p>
 </tbody>
 </table>
 <p>The <code class="docutils literal notranslate"><span class="pre">_NATIVE</span></code> and <code class="docutils literal notranslate"><span class="pre">_ICEBERG</span></code> suffixes are reserved. Rename independently
-managed objects with those names before conversion. The PipelineWise-owned
+managed objects with those names before conversion. Automatic conversion blocks a
+table whose companion name is another selected stream’s table, or whose own name
+ends with <code class="docutils literal notranslate"><span class="pre">_NATIVE</span></code> or <code class="docutils literal notranslate"><span class="pre">_ICEBERG</span></code> while the base table exists. The PipelineWise-owned
 command is the only supported native-to-Iceberg converter; the old connector-local
 <code class="docutils literal notranslate"><span class="pre">copy-native-to-iceberg</span></code> executable has been removed.</p>
 <div class="admonition warning">
@@ -753,6 +893,106 @@ unmanifested state when the primary name is absent and <code class="docutils lit
 environment during deployment; a source-only update can leave a stale
 generated console wrapper that no longer has a Python implementation.</p>
 </div>
+</section>
+<section id="conversion-feasibility-report">
+<span id="snowflake-iceberg-conversion-report"></span><h2>Conversion feasibility report<a class="headerlink" href="#conversion-feasibility-report" title="Link to this heading"></a></h2>
+<p>Run <code class="docutils literal notranslate"><span class="pre">copy_native_to_iceberg</span> <span class="pre">--preflight-only</span></code> with <code class="docutils literal notranslate"><span class="pre">--tap</span></code> or <code class="docutils literal notranslate"><span class="pre">--table</span></code>
+before converting anything. It takes no lock, writes no manifest, and runs no
+DDL, so it is safe to run beside the tap. Its read queries include one aggregate
+scan of each native table’s time and timestamp columns. They run on
+<code class="docutils literal notranslate"><span class="pre">--conversion-warehouse</span></code> when you give one. Otherwise <code class="docutils literal notranslate"><span class="pre">--tap</span></code> uses the tap’s
+<code class="docutils literal notranslate"><span class="pre">conversion_warehouse</span></code>, and <code class="docutils literal notranslate"><span class="pre">--table</span></code> uses the target’s warehouse. It uses
+the same table planning and checks as conversion. Each table gets one state:</p>
+<table class="docutils align-default" id="id4" style="width: 100%">
+<caption><span class="caption-text">Feasibility states</span><a class="headerlink" href="#id4" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 80.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>State</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">new</span></code></p></td>
+<td><p>The table does not exist; the writers create it as Iceberg.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">iceberg</span></code></p></td>
+<td><p>The table is already Iceberg; nothing to convert.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">native</span></code></p></td>
+<td><p>The table would be converted. Any preflight blockers are listed.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">pending</span></code></p></td>
+<td><p>An <code class="docutils literal notranslate"><span class="pre">--eventual</span> <span class="pre">iceberg</span></code> conversion manifest exists and would be resumed.
+If the table is still native, its preflight blockers are listed. If its
+name is absent after an interrupted cutover, that is a blocker until the
+name is back. <code class="docutils literal notranslate"><span class="pre">run_tap</span></code> restores the name, then stops on the table’s
+other blockers. <code class="docutils literal notranslate"><span class="pre">copy_native_to_iceberg</span> <span class="pre">--eventual</span> <span class="pre">iceberg</span></code> also
+restores it, but then finishes the cutover without checking other taps,
+reserved names, planning, or catalog freshness, so resolve those first.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">blocked</span></code></p></td>
+<td><p>The table needs an operator first, for example a leftover <code class="docutils literal notranslate"><span class="pre">_NATIVE</span></code>
+table, an <code class="docutils literal notranslate"><span class="pre">_ICEBERG</span></code> companion without a manifest, or unreadable
+recovery state. Find out what a leftover table holds before you change
+it. A <code class="docutils literal notranslate"><span class="pre">_NATIVE</span></code> table, or any companion beside a missing primary, may
+hold the only copy of the rows; see
+<a class="reference internal" href="../../user_guide/troubleshooting.html#troubleshooting-iceberg-conversion-missing-primary"><span class="std std-ref">Native-to-Iceberg primary name is absent</span></a>. Only an
+<code class="docutils literal notranslate"><span class="pre">_ICEBERG</span></code> copy beside a native table, once you know it is a leftover
+copy, can be dropped or promoted with
+<code class="docutils literal notranslate"><span class="pre">copy_native_to_iceberg</span> <span class="pre">--eventual</span> <span class="pre">iceberg</span></code> while the tap is stopped.</p></td>
+</tr>
+</tbody>
+</table>
+<p>For <code class="docutils literal notranslate"><span class="pre">--tap</span></code>, PipelineWise derives each table name the way target-snowflake
+does, from the stream ID and the tap’s schema mapping. For MariaDB, MySQL, and
+PostgreSQL taps it also derives the FastSync name, and blocks a stream whose two
+names differ. A native <code class="docutils literal notranslate"><span class="pre">TEXT</span></code> column that the tap catalog now maps to
+<code class="docutils literal notranslate"><span class="pre">VARIANT</span></code>, or the reverse, is a blocker because both Iceberg writers refuse
+that mismatch. MariaDB JSON aliases are discovered as <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> only after the
+tap is imported with its Iceberg settings, so the report is not ready until then;
+follow the order in <a class="reference internal" href="#snowflake-iceberg-auto-conversion"><span class="std std-ref">Convert a tap’s tables automatically</span></a>. The report also
+requires <code class="docutils literal notranslate"><span class="pre">data_flattening_max_level:</span> <span class="pre">0</span></code>, and a catalog that the last
+<code class="docutils literal notranslate"><span class="pre">import_config</span></code> rediscovered. <code class="docutils literal notranslate"><span class="pre">--table</span></code> checks one table against the catalogs
+of the imported taps that write it, but skips the tap-wide checks. A manual
+<code class="docutils literal notranslate"><span class="pre">copy_native_to_iceberg</span></code> conversion applies the same catalogs and refuses a
+<code class="docutils literal notranslate"><span class="pre">TEXT</span></code>/<code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> mismatch before copying. For a tap that flattens deeper than
+level 0, the checks skip each object that the tap writes as child columns.</p>
+<p>For each table, the report lists the first metadata refusal, such as a policy or
+a stream. A table without a refusal lists every conversion blocker instead, such
+as a <code class="docutils literal notranslate"><span class="pre">TIMESTAMP_TZ</span></code> column or a grant that cannot be replayed. A refusal hides
+the remaining refusals and every conversion blocker, so run the report again
+after each fix. Row and byte counts come from <code class="docutils literal notranslate"><span class="pre">SHOW</span> <span class="pre">TABLES</span></code> and help estimate
+the copy time and warehouse cost. The
+<code class="docutils literal notranslate"><span class="pre">--tap</span></code> report also blocks a table that another imported tap writes, by the
+same rules as automatic conversion.</p>
+</section>
+<section id="clear-a-text-variant-blocker">
+<span id="snowflake-iceberg-text-variant-blocker"></span><h2>Clear a TEXT/VARIANT blocker<a class="headerlink" href="#clear-a-text-variant-blocker" title="Link to this heading"></a></h2>
+<p>Conversion cannot change a column’s class, so a native <code class="docutils literal notranslate"><span class="pre">TEXT</span></code> column that the
+tap catalog maps to <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code>, or the reverse, blocks the table. The usual
+cause is a MariaDB JSON alias: native routes load it as text, and the Iceberg
+catalog maps it to <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code>. With the tap paused and its Iceberg settings
+imported, fix the native table in one of two ways:</p>
+<ul>
+<li><p>Rebuild the column as <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code>:</p>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">ALTER</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="o">&lt;</span><span class="k">table</span><span class="o">&gt;</span><span class="w"> </span><span class="k">ADD</span><span class="w"> </span><span class="k">COLUMN</span><span class="w"> </span><span class="o">&lt;</span><span class="k">column</span><span class="o">&gt;</span><span class="n">__variant</span><span class="w"> </span><span class="n">VARIANT</span><span class="p">;</span>
+<span class="k">UPDATE</span><span class="w"> </span><span class="o">&lt;</span><span class="k">table</span><span class="o">&gt;</span><span class="w"> </span><span class="k">SET</span><span class="w"> </span><span class="o">&lt;</span><span class="k">column</span><span class="o">&gt;</span><span class="n">__variant</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">PARSE_JSON</span><span class="p">(</span><span class="o">&lt;</span><span class="k">column</span><span class="o">&gt;</span><span class="p">);</span>
+<span class="k">ALTER</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="o">&lt;</span><span class="k">table</span><span class="o">&gt;</span><span class="w"> </span><span class="k">DROP</span><span class="w"> </span><span class="k">COLUMN</span><span class="w"> </span><span class="o">&lt;</span><span class="k">column</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="k">ALTER</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="o">&lt;</span><span class="k">table</span><span class="o">&gt;</span><span class="w"> </span><span class="k">RENAME</span><span class="w"> </span><span class="k">COLUMN</span><span class="w"> </span><span class="o">&lt;</span><span class="k">column</span><span class="o">&gt;</span><span class="n">__variant</span><span class="w"> </span><span class="k">TO</span><span class="w"> </span><span class="o">&lt;</span><span class="k">column</span><span class="o">&gt;</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>Use <code class="docutils literal notranslate"><span class="pre">PARSE_JSON</span></code>, not <code class="docutils literal notranslate"><span class="pre">TRY_PARSE_JSON</span></code> or <code class="docutils literal notranslate"><span class="pre">TO_VARIANT</span></code>. Invalid text then
+fails instead of becoming <code class="docutils literal notranslate"><span class="pre">NULL</span></code>, and a JSON <code class="docutils literal notranslate"><span class="pre">null</span></code> stays distinct from SQL
+<code class="docutils literal notranslate"><span class="pre">NULL</span></code>. Restore the column comment if it had one, then run the report again.</p>
+</li>
+<li><p>Rename the native table to a name without the reserved <code class="docutils literal notranslate"><span class="pre">_NATIVE</span></code> and
+<code class="docutils literal notranslate"><span class="pre">_ICEBERG</span></code> suffixes, then reload it with
+<code class="docutils literal notranslate"><span class="pre">fast_sync</span> <span class="pre">--tables</span> <span class="pre">&lt;schema.table&gt;</span></code>. FastSync creates the table as Iceberg,
+but it does not carry over explicit grants, tags, or comments.</p></li>
+</ul>
 </section>
 <section id="conversion-preflight-and-metadata">
 <h2>Conversion preflight and metadata<a class="headerlink" href="#conversion-preflight-and-metadata" title="Link to this heading"></a></h2>
@@ -774,12 +1014,26 @@ repair. It preserves supported types, nullability, primary-key order, table and
 column comments, explicit non-ownership grants to account roles and qualified
 database roles, grant options, and direct table tags. The current account role
 must own the native source; database-role ownership is not supported.</p>
+<p>Ownership, comments, and direct table tags must match exactly. Every native
+grant must also be present on the Iceberg table, so no reader loses access.
+Extra grants on the Iceberg table, for example from future grants or scheduled
+grant automation, are logged and accepted.</p>
 <p>Conversion fails before copying when the table has visible dependent streams,
 policies, direct column tags, secondary constraints, inbound foreign keys,
 defaults, identity columns, a clustering key, NULL primary-key values, or an
 unsupported Iceberg type. Account-wide stream inspection is limited to objects
-visible to the current role. Time and timestamp precision is normalized to
-microseconds. Snowflake <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> remains <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code>.</p>
+visible to the current role. It also fails before copying when Iceberg v3
+cannot hold the data exactly or the grants cannot be replayed:</p>
+<ul class="simple">
+<li><p>a <code class="docutils literal notranslate"><span class="pre">TIMESTAMP_TZ</span></code> column, because managed Iceberg stores <code class="docutils literal notranslate"><span class="pre">TIMESTAMP_LTZ</span></code>
+and would drop each value’s offset;</p></li>
+<li><p>a <code class="docutils literal notranslate"><span class="pre">TIME</span></code>, <code class="docutils literal notranslate"><span class="pre">TIMESTAMP_NTZ</span></code>, or <code class="docutils literal notranslate"><span class="pre">TIMESTAMP_LTZ</span></code> value with sub-microsecond
+digits, because Iceberg columns hold microseconds. The command counts such
+values with one aggregate scan and reports only the count;</p></li>
+<li><p>a grant of a privilege that Iceberg tables do not accept, or a grant to
+anything other than an account role or a qualified database role.</p></li>
+</ul>
+<p>Snowflake <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> remains <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code>.</p>
 <p>Writes during the copy or cutover can be absent from the Iceberg result. The
 local manifest lock does not replace the required external writer exclusion.
 For <code class="docutils literal notranslate"><span class="pre">eventual=iceberg</span></code>, promotion renames <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;</span></code> to <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_NATIVE</span></code>
@@ -804,8 +1058,8 @@ immediately. Do not resume readers merely because writers are stopped.</p>
 <p>After promotion, PipelineWise first proves that the promoted table’s columns and
 rows still match the <code class="docutils literal notranslate"><span class="pre">_NATIVE</span></code> backup and the staged evidence. Then it checks
 the Iceberg table settings and metadata:</p>
-<table class="docutils align-default" id="id4" style="width: 100%">
-<caption><span class="caption-text">Validation after promotion</span><a class="headerlink" href="#id4" title="Link to this table"></a></caption>
+<table class="docutils align-default" id="id5" style="width: 100%">
+<caption><span class="caption-text">Validation after promotion</span><a class="headerlink" href="#id5" title="Link to this table"></a></caption>
 <colgroup>
 <col style="width: 35.0%" />
 <col style="width: 65.0%" />
@@ -827,7 +1081,9 @@ see <a class="reference internal" href="../../user_guide/troubleshooting.html#tr
 </tr>
 <tr class="row-even"><td><p>Columns and rows match, but the Iceberg table settings or metadata differ</p></td>
 <td><p>PipelineWise records rollback intent, restores the native table name, and
-keeps the manifest. A retry cuts over again once the difference is fixed.</p></td>
+keeps the manifest. A retry cuts over again once the difference is fixed.
+An extra grant on the promoted table is not a difference; a missing native
+grant is.</p></td>
 </tr>
 <tr class="row-odd"><td><p>A connection or other unexpected error</p></td>
 <td><p>The promoted table stays live and the manifest is kept. Retry the identical
@@ -854,6 +1110,26 @@ deterministic checksum, critical values, physical format and version, ownership,
 grants, tags, comments, and downstream access. For <code class="docutils literal notranslate"><span class="pre">eventual=iceberg</span></code>, retain
 <code class="docutils literal notranslate"><span class="pre">_NATIVE</span></code> until at least one Singer or FastSync cycle and independent
 reconciliation have succeeded.</p>
+</section>
+<section id="check-tables-that-earlier-releases-converted">
+<span id="snowflake-iceberg-earlier-conversions"></span><h2>Check tables that earlier releases converted<a class="headerlink" href="#check-tables-that-earlier-releases-converted" title="Link to this heading"></a></h2>
+<p>Before 0.100.0, conversion changed <code class="docutils literal notranslate"><span class="pre">TIMESTAMP_TZ</span></code> columns to <code class="docutils literal notranslate"><span class="pre">TIMESTAMP_LTZ</span></code>,
+which keeps each instant but drops its offset, and cut time and timestamp values
+to microseconds. Validation still passed, because it compared the converted
+values. Finishing an attempt that an earlier release interrupted after its
+cutover does not check this again either. The exact values remain only in
+<code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_NATIVE</span></code>, so check each backup before you drop it:</p>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">SELECT</span><span class="w"> </span><span class="n">TABLE_SCHEMA</span><span class="p">,</span><span class="w"> </span><span class="k">TABLE_NAME</span><span class="p">,</span><span class="w"> </span><span class="k">COLUMN_NAME</span>
+<span class="k">FROM</span><span class="w"> </span><span class="o">&lt;</span><span class="k">database</span><span class="o">&gt;</span><span class="p">.</span><span class="n">INFORMATION_SCHEMA</span><span class="p">.</span><span class="n">COLUMNS</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">ENDSWITH</span><span class="p">(</span><span class="k">TABLE_NAME</span><span class="p">,</span><span class="w"> </span><span class="s1">'_NATIVE'</span><span class="p">)</span><span class="w"> </span><span class="k">AND</span><span class="w"> </span><span class="n">DATA_TYPE</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'TIMESTAMP_TZ'</span><span class="p">;</span>
+
+<span class="k">SELECT</span><span class="w"> </span><span class="n">COUNT_IF</span><span class="p">(</span><span class="k">MOD</span><span class="p">(</span><span class="n">DATE_PART</span><span class="p">(</span><span class="n">NANOSECOND</span><span class="p">,</span><span class="w"> </span><span class="o">&lt;</span><span class="k">column</span><span class="o">&gt;</span><span class="p">),</span><span class="w"> </span><span class="mi">1000</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&gt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span>
+<span class="k">FROM</span><span class="w"> </span><span class="o">&lt;</span><span class="k">database</span><span class="o">&gt;</span><span class="p">.</span><span class="o">&lt;</span><span class="k">schema</span><span class="o">&gt;</span><span class="p">.</span><span class="o">&lt;</span><span class="k">table</span><span class="o">&gt;</span><span class="n">_NATIVE</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>Run the second query for each <code class="docutils literal notranslate"><span class="pre">TIME</span></code>, <code class="docutils literal notranslate"><span class="pre">TIMESTAMP_NTZ</span></code>, and <code class="docutils literal notranslate"><span class="pre">TIMESTAMP_LTZ</span></code>
+column. Managed Iceberg v3 holds neither offsets nor nanoseconds, so converting
+again cannot restore them. Keep <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_NATIVE</span></code> for any table that needs them.</p>
 </section>
 </section>
 

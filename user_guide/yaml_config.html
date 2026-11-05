@@ -301,6 +301,7 @@
 <li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#native-to-iceberg-primary-name-is-absent">Native-to-Iceberg primary name is absent</a></li>
 <li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#native-to-iceberg-manifest-cannot-be-read">Native-to-Iceberg manifest cannot be read</a></li>
 <li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#native-to-iceberg-contents-changed-after-cutover">Native-to-Iceberg contents changed after cutover</a></li>
+<li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#automatic-native-to-iceberg-conversion-stopped">Automatic native-to-Iceberg conversion stopped</a></li>
 <li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#table-not-found">Table not found</a></li>
 <li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#failure-to-import-tap-0-tables-discovered">Failure to import tap (0 tables discovered)</a></li>
 </ul>
@@ -600,7 +601,26 @@ See <a class="reference internal" href="data_diff.html#data-diff-initial-scan"><
 <td><p>Global channel</p></td>
 <td><p>Adds a tap-specific Slack destination; must start with <code class="docutils literal notranslate"><span class="pre">#</span></code>.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">add_metadata_columns</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">native_to_iceberg_conversion</span></code></p></td>
+<td><p>No</p></td>
+<td><p>Omitted</p></td>
+<td><p>Object with a Boolean <code class="docutils literal notranslate"><span class="pre">enabled</span></code> and an optional
+<code class="docutils literal notranslate"><span class="pre">conversion_warehouse</span></code>. With <code class="docutils literal notranslate"><span class="pre">enabled:</span> <span class="pre">true</span></code>, <code class="docutils literal notranslate"><span class="pre">run_tap</span></code> converts
+the tap’s existing native Snowflake tables to managed Iceberg v3 before
+it replicates. <code class="docutils literal notranslate"><span class="pre">enabled:</span> <span class="pre">true</span></code> is valid only with
+<code class="docutils literal notranslate"><span class="pre">target_table_format:</span> <span class="pre">iceberg</span></code>, <code class="docutils literal notranslate"><span class="pre">iceberg_version:</span> <span class="pre">3</span></code>, a
+<code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code> target, and an effective
+<code class="docutils literal notranslate"><span class="pre">data_flattening_max_level</span></code> of <code class="docutils literal notranslate"><span class="pre">0</span></code>. Any tap accepts
+<code class="docutils literal notranslate"><span class="pre">enabled:</span> <span class="pre">false</span></code>, for example to run the report on
+<code class="docutils literal notranslate"><span class="pre">conversion_warehouse</span></code> before the switch. <code class="docutils literal notranslate"><span class="pre">conversion_warehouse</span></code> runs
+only the conversion work and the tap’s report on another Snowflake
+warehouse. With <code class="docutils literal notranslate"><span class="pre">enabled:</span> <span class="pre">false</span></code>, <code class="docutils literal notranslate"><span class="pre">run_tap</span></code> neither converts nor
+resumes a pending conversion. Only PipelineWise reads the setting, from
+its main configuration; it never reaches the target connector or
+<code class="docutils literal notranslate"><span class="pre">inheritable_config.json</span></code>. Configure it at the tap root, not in
+<code class="docutils literal notranslate"><span class="pre">db_conn</span></code> or the target. See <a class="reference internal" href="../connectors/targets/snowflake_iceberg.html#snowflake-iceberg-auto-conversion"><span class="std std-ref">Convert a tap’s tables automatically</span></a>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">add_metadata_columns</span></code></p></td>
 <td><p>No</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">false</span></code></p></td>
 <td><p>Adds ingestion metadata to <a class="reference internal" href="../connectors/targets/s3_csv.html#target-s3-csv"><span class="std std-ref">S3 CSV target</span></a> output. PostgreSQL and
@@ -724,8 +744,9 @@ remain limited to <code class="docutils literal notranslate"><span class="pre">t
 FastSync-capable taps require <code class="docutils literal notranslate"><span class="pre">data_flattening_max_level:</span> <span class="pre">0</span></code>. Singer-only
 sources retain their normal flattening setting, including Salesforce’s
 default level <code class="docutils literal notranslate"><span class="pre">10</span></code>.
-Native remains the default, and PipelineWise does not convert an existing
-table when the requested format conflicts. Every managed Iceberg version
+Native remains the default. PipelineWise converts an existing native table
+only when the tap enables <code class="docutils literal notranslate"><span class="pre">native_to_iceberg_conversion</span></code>; otherwise a
+conflicting format fails before mutation. Every managed Iceberg version
 other than v3 is rejected before mutation. See <a class="reference internal" href="../connectors/targets/snowflake_iceberg.html#snowflake-iceberg"><span class="std std-ref">Snowflake Iceberg tables</span></a>.</p>
 <p>Managed Iceberg selection is tap-level. Target YAML rejects these keys and
 the removed <code class="docutils literal notranslate"><span class="pre">iceberg_create</span></code> setting. Remove <code class="docutils literal notranslate"><span class="pre">iceberg_create</span></code> and

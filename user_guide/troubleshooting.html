@@ -301,6 +301,7 @@
 <li class="toctree-l4"><a class="reference internal" href="#native-to-iceberg-primary-name-is-absent">Native-to-Iceberg primary name is absent</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#native-to-iceberg-manifest-cannot-be-read">Native-to-Iceberg manifest cannot be read</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#native-to-iceberg-contents-changed-after-cutover">Native-to-Iceberg contents changed after cutover</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#automatic-native-to-iceberg-conversion-stopped">Automatic native-to-Iceberg conversion stopped</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#table-not-found">Table not found</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#failure-to-import-tap-0-tables-discovered">Failure to import tap (0 tables discovered)</a></li>
 </ul>
@@ -974,6 +975,88 @@ complete, and <code class="docutils literal notranslate"><span class="pre">&lt;t
 companion. Remove the manifest as described above and run the conversion
 again.</p></li>
 </ul>
+</section>
+<section id="automatic-native-to-iceberg-conversion-stopped">
+<span id="troubleshooting-iceberg-auto-conversion"></span><h4>Automatic native-to-Iceberg conversion stopped<a class="headerlink" href="#automatic-native-to-iceberg-conversion-stopped" title="Link to this heading"></a></h4>
+<p><em>Log message:</em></p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Automatic native-to-Iceberg conversion stopped. &lt;database&gt;.&lt;schema&gt;.&lt;TABLE&gt; (stream &lt;stream&gt;) ...
+</pre></div>
+</div>
+<p>or <code class="docutils literal notranslate"><span class="pre">Automatic</span> <span class="pre">native-to-Iceberg</span> <span class="pre">conversion</span> <span class="pre">of</span> <span class="pre">&lt;table&gt;</span> <span class="pre">(stream</span> <span class="pre">&lt;stream&gt;)</span> <span class="pre">failed</span></code>.
+The tap’s alert reads <code class="docutils literal notranslate"><span class="pre">&lt;tap_id&gt;</span> <span class="pre">tap</span> <span class="pre">failed:</span> <span class="pre">native-to-Iceberg</span> <span class="pre">conversion</span> <span class="pre">stopped</span></code>.</p>
+<p><em>Why it happens:</em>
+A tap with <code class="docutils literal notranslate"><span class="pre">native_to_iceberg_conversion</span></code> enabled could not leave every
+selected table new or Iceberg, so <code class="docutils literal notranslate"><span class="pre">run_tap</span></code> stopped before replication. The
+message names each table and the reason:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">needs</span> <span class="pre">an</span> <span class="pre">operator</span></code>: for example a leftover <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_NATIVE</span></code>, a companion
+table without a manifest, an unreadable manifest, a pending
+<code class="docutils literal notranslate"><span class="pre">--eventual</span> <span class="pre">native</span></code> conversion, two streams that write the same table but
+map one column to <code class="docutils literal notranslate"><span class="pre">TEXT</span></code> and <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code>, a table that
+<code class="docutils literal notranslate"><span class="pre">is</span> <span class="pre">also</span> <span class="pre">written</span> <span class="pre">by</span> <span class="pre">tap</span> <span class="pre">&lt;tap_id&gt;</span></code> without managed Iceberg v3 and conversion
+enabled or from another target, or a companion name that another tap writes;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">cannot</span> <span class="pre">be</span> <span class="pre">converted</span></code>: a preflight blocker, such as a policy, a stream, a
+<code class="docutils literal notranslate"><span class="pre">TIMESTAMP_TZ</span></code> column, sub-microsecond values, a grant that Iceberg cannot
+carry, or a <code class="docutils literal notranslate"><span class="pre">TEXT</span></code>/<code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> mismatch with the tap catalog;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">failed</span></code>: the conversion itself raised an error, or a resumed attempt
+restored its table name and then stopped for one of the reasons above;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">stopped</span> <span class="pre">before</span> <span class="pre">any</span> <span class="pre">Snowflake</span> <span class="pre">work</span></code>: the main configuration enables
+conversion, but the tap’s generated configuration is not imported with its
+Iceberg settings, for example after <code class="docutils literal notranslate"><span class="pre">import_config</span> <span class="pre">--taps</span></code> without this
+tap. Run <code class="docutils literal notranslate"><span class="pre">import_config</span></code> for the tap;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">The</span> <span class="pre">tap</span> <span class="pre">catalog</span> <span class="pre">is</span> <span class="pre">older</span> <span class="pre">than</span> <span class="pre">its</span> <span class="pre">imported</span> <span class="pre">settings</span></code>: the last
+<code class="docutils literal notranslate"><span class="pre">import_config</span></code> failed before it rediscovered the tap. Fix the import error
+and run <code class="docutils literal notranslate"><span class="pre">import_config</span></code> again.</p></li>
+</ul>
+<p><em>How to fix:</em></p>
+<ol class="arabic">
+<li><p>Pause the tap’s schedule until you have fixed the cause. Each scheduled run
+preflights every native table again and restarts a copy that failed. The tap
+never replicates into native tables, and tables that converted earlier stay
+converted. Keep <code class="docutils literal notranslate"><span class="pre">native_to_iceberg_conversion</span></code> enabled while you recover:
+with <code class="docutils literal notranslate"><span class="pre">enabled:</span> <span class="pre">false</span></code>, <code class="docutils literal notranslate"><span class="pre">run_tap</span></code> does not resume a pending conversion. Do
+not deselect a stream or change its schema mapping to unblock the tap while
+its table has a pending conversion. Finish that conversion first with
+<code class="docutils literal notranslate"><span class="pre">copy_native_to_iceberg</span> <span class="pre">--eventual</span> <span class="pre">iceberg</span></code>, once the table’s other blockers
+are resolved: that command does not check other taps that write the table.
+Add <code class="docutils literal notranslate"><span class="pre">--conversion-warehouse</span></code> to keep it off the loading warehouse.</p></li>
+<li><p>List the remaining blockers with the feasibility report, and rerun it after
+each fix until it is ready:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pipelinewise<span class="w"> </span>copy_native_to_iceberg<span class="w"> </span>--target<span class="w"> </span>&lt;target_id&gt;<span class="w"> </span>--tap<span class="w"> </span>&lt;tap_id&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--preflight-only<span class="w"> </span>--iceberg-version<span class="w"> </span><span class="m">3</span>
+</pre></div>
+</div>
+</li>
+<li><p>Fix each blocker. For a failed conversion, fix the cause named in the error.
+The report lists only the blockers it can detect: a statement timeout, a
+missing <code class="docutils literal notranslate"><span class="pre">APPLY</span></code> or <code class="docutils literal notranslate"><span class="pre">MANAGE</span> <span class="pre">GRANTS</span></code> privilege, or changed contents shows
+only in the run’s error, so the report can be ready while the cause remains.
+The manifest records the attempt, and the next <code class="docutils literal notranslate"><span class="pre">run_tap</span></code> resumes it. For an interrupted cutover, see
+<a class="reference internal" href="#troubleshooting-iceberg-conversion-missing-primary"><span class="std std-ref">Native-to-Iceberg primary name is absent</span></a>. For a table that
+another tap under the same target writes, pause both and import that tap with
+<code class="docutils literal notranslate"><span class="pre">target_table_format:</span> <span class="pre">iceberg</span></code>, <code class="docutils literal notranslate"><span class="pre">iceberg_version:</span> <span class="pre">3</span></code>,
+<code class="docutils literal notranslate"><span class="pre">data_flattening_max_level:</span> <span class="pre">0</span></code> and <code class="docutils literal notranslate"><span class="pre">native_to_iceberg_conversion</span></code> enabled
+too, or stop it writing the table. A tap under another target must stop
+writing the table, or move under this target. For a companion name that
+another tap writes, change one stream’s schema mapping.</p>
+<p>If a failed conversion says <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_ICEBERG</span> <span class="pre">does</span> <span class="pre">not</span> <span class="pre">match</span> <span class="pre">the</span> <span class="pre">projected</span>
+<span class="pre">contents</span> <span class="pre">of</span> <span class="pre">&lt;table&gt;</span></code> before any cutover, <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;</span></code> changed after the copy.
+Stop every writer to it and drop <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_ICEBERG</span></code>. Keep the manifest: the
+next <code class="docutils literal notranslate"><span class="pre">run_tap</span></code> copies the table again.</p>
+<p>A pending attempt that a conversion check now refuses, for example one
+started by an earlier release, keeps its manifest and companion table. A grant
+or sub-microsecond values can be fixed in place, and the next <code class="docutils literal notranslate"><span class="pre">run_tap</span></code>
+resumes the attempt. A fix that changes the table’s columns, such as replacing
+a <code class="docutils literal notranslate"><span class="pre">TIMESTAMP_TZ</span></code> column or changing a <code class="docutils literal notranslate"><span class="pre">TEXT</span></code> column to <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code>, makes
+every resume fail with <code class="docutils literal notranslate"><span class="pre">The</span> <span class="pre">schema</span> <span class="pre">of</span> <span class="pre">&lt;table&gt;</span> <span class="pre">changed</span> <span class="pre">after</span> <span class="pre">conversion</span> <span class="pre">started</span></code>.
+While <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;</span></code> is still native, discard that attempt instead: remove its
+manifest and drop <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_ICEBERG</span></code> as described in
+<a class="reference internal" href="#troubleshooting-iceberg-conversion-contents-changed"><span class="std std-ref">Native-to-Iceberg contents changed after cutover</span></a>, then rerun.</p>
+</li>
+<li><p>Resume the schedule, or rerun <code class="docutils literal notranslate"><span class="pre">run_tap</span></code>. Watch PostgreSQL WAL and MySQL
+binlog retention while the tap is stopped.</p></li>
+</ol>
+<p>See <a class="reference internal" href="../connectors/targets/snowflake_iceberg.html#snowflake-iceberg-auto-conversion"><span class="std std-ref">Convert a tap’s tables automatically</span></a>.</p>
 </section>
 <section id="table-not-found">
 <span id="troubleshooting-fastsync-table-not-found"></span><h4>Table not found<a class="headerlink" href="#table-not-found" title="Link to this heading"></a></h4>
