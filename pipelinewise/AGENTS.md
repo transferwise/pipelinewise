@@ -100,9 +100,9 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
   Retain both through Singer
   handover/evolution. Route compatible Singer taps through target-snowflake and
   MySQL/PostgreSQL FastSync through the shared publisher; retain native
-  `SWAP WITH`. Only FastSync-capable MySQL/PostgreSQL need
-  `data_flattening_max_level: 0` (keep Singer-only defaults such as Salesforce
-  level 10).
+  `SWAP WITH`. Only FastSync-capable MySQL/PostgreSQL and taps enabling
+  `native_to_iceberg_conversion` need `data_flattening_max_level: 0` (keep
+  Singer-only defaults such as Salesforce level 10).
 - Carry `iceberg_version` through tap/generated config, publication/recovery,
   and conversion; reject non-v3 before mutation. Future versions need explicit
   branches/tests. Through executable hooks, `snowflake_iceberg_versions.py`
@@ -165,3 +165,39 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
   conversion manifest must load. Copy/validate the whole row multiset,
   including duplicate keys and representable flaws, without filtering, repair,
   or deduplication; fail before cutover if v3 cannot represent it exactly.
+  Evidence hashes projected values, so refuse `TIMESTAMP_TZ`, sub-microsecond
+  values, and unreplayable grants before any manifest or DDL. Ownership,
+  comments, and tags match exactly; source grants are a required subset, and
+  extra Iceberg grants are logged, never rolled back.
+- Tap-root `native_to_iceberg_conversion` (core-only, never in target config)
+  runs one `run_tap` step inside the pidfile, in a child whose signal handlers
+  only exit (stop_tap stops the whole tap run), before FastSync/Singer. It plans with target-snowflake
+  naming and blocks FastSync/Singer name disagreement, classifies with one
+  `SHOW TABLES` per schema plus lock-free manifest peeks, resumes every pending
+  `eventual=iceberg` attempt first (interrupted cutovers first, continuing past
+  a failure), preflights every native table (including catalog TEXT/VARIANT
+  classes merged across a table's streams, also checked for resumed attempts
+  before cutover), converts smallest first, then requires every table new or
+  Iceberg; any failure stops the tap. De-duplicate only the physical work, never
+  another stream's blockers. Never call `convert()` for a table classified
+  `iceberg` without a manifest. A reason that stops a table (planning blocker,
+  reserved-name collision, another tap writing it, a class conflict, a stale
+  catalog) blocks a native or promoted primary, but an interrupted cutover is
+  still resumed with the reasons as `refusals`: the converter restores the name,
+  then refuses before another cutover. Block a native primary with an
+  unmanifested `_ICEBERG` companion, and any table whose reserved companion
+  names collide with another planned or existing table, or with another tap's
+  destination. Block a table that another imported tap writes unless that tap is
+  Iceberg v3 with conversion enabled under the same target, so its run converts
+  or waits on the shared lock before its writers start; taps under other targets
+  with the same account and dbname always block. Merge those taps' TEXT/VARIANT
+  classes. Manual conversion skips the top-level objects that a deeper-flattening
+  imported tap splits into child columns.
+  A blocked stream holds back its table unless the name is absent, and a class
+  conflict on a new or Iceberg table also stops the run. Refuse before any Snowflake
+  work unless the tap's generated files carry Iceberg v3 and level 0, and refuse
+  conversions while the catalog is older than `inheritable_config.json`. Manual
+  conversion applies the classes of every imported tap writing the table and
+  passes conflicts as refusals. `--preflight-only` takes no lock, manifest, or
+  DDL. `fast_sync` never converts and refuses native targets before a slot
+  reset; it may rebuild a missing primary beside leftover companions.

@@ -247,6 +247,8 @@ def test_snowflake_e2e_matrix_contract():
             'e2e_tests_02',
             (
                 'tests/end_to_end/target_snowflake/test_native_to_iceberg_converter.py',
+                'tests/end_to_end/target_snowflake/tap_postgres/test_auto_native_to_iceberg_pg_to_sf.py',
+                'tests/end_to_end/target_snowflake/tap_mongodb/test_auto_native_to_iceberg_mongodb_to_sf.py',
                 'tests/end_to_end/data_diff/test_mysql_to_snowflake.py',
             ),
         ),

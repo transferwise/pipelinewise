@@ -720,6 +720,96 @@ those writes. Keep every reader and writer of the table stopped, compare
   companion. Remove the manifest as described above and run the conversion
   again.
 
+.. _troubleshooting_iceberg_auto_conversion:
+
+Automatic native-to-Iceberg conversion stopped
+""""""""""""""""""""""""""""""""""""""""""""""
+
+*Log message:*
+
+.. code-block:: text
+
+    Automatic native-to-Iceberg conversion stopped. <database>.<schema>.<TABLE> (stream <stream>) ...
+
+or ``Automatic native-to-Iceberg conversion of <table> (stream <stream>) failed``.
+The tap's alert reads ``<tap_id> tap failed: native-to-Iceberg conversion stopped``.
+
+*Why it happens:*
+A tap with ``native_to_iceberg_conversion`` enabled could not leave every
+selected table new or Iceberg, so ``run_tap`` stopped before replication. The
+message names each table and the reason:
+
+* ``needs an operator``: for example a leftover ``<table>_NATIVE``, a companion
+  table without a manifest, an unreadable manifest, a pending
+  ``--eventual native`` conversion, two streams that write the same table but
+  map one column to ``TEXT`` and ``VARIANT``, a table that
+  ``is also written by tap <tap_id>`` without managed Iceberg v3 and conversion
+  enabled or from another target, or a companion name that another tap writes;
+* ``cannot be converted``: a preflight blocker, such as a policy, a stream, a
+  ``TIMESTAMP_TZ`` column, sub-microsecond values, a grant that Iceberg cannot
+  carry, or a ``TEXT``/``VARIANT`` mismatch with the tap catalog;
+* ``failed``: the conversion itself raised an error, or a resumed attempt
+  restored its table name and then stopped for one of the reasons above;
+* ``stopped before any Snowflake work``: the main configuration enables
+  conversion, but the tap's generated configuration is not imported with its
+  Iceberg settings, for example after ``import_config --taps`` without this
+  tap. Run ``import_config`` for the tap;
+* ``The tap catalog is older than its imported settings``: the last
+  ``import_config`` failed before it rediscovered the tap. Fix the import error
+  and run ``import_config`` again.
+
+*How to fix:*
+
+1. Pause the tap's schedule until you have fixed the cause. Each scheduled run
+   preflights every native table again and restarts a copy that failed. The tap
+   never replicates into native tables, and tables that converted earlier stay
+   converted. Keep ``native_to_iceberg_conversion`` enabled while you recover:
+   with ``enabled: false``, ``run_tap`` does not resume a pending conversion. Do
+   not deselect a stream or change its schema mapping to unblock the tap while
+   its table has a pending conversion. Finish that conversion first with
+   ``copy_native_to_iceberg --eventual iceberg``, once the table's other blockers
+   are resolved: that command does not check other taps that write the table.
+   Add ``--conversion-warehouse`` to keep it off the loading warehouse.
+2. List the remaining blockers with the feasibility report, and rerun it after
+   each fix until it is ready:
+
+   .. code-block:: bash
+
+       pipelinewise copy_native_to_iceberg --target <target_id> --tap <tap_id> \
+         --preflight-only --iceberg-version 3
+
+3. Fix each blocker. For a failed conversion, fix the cause named in the error.
+   The report lists only the blockers it can detect: a statement timeout, a
+   missing ``APPLY`` or ``MANAGE GRANTS`` privilege, or changed contents shows
+   only in the run's error, so the report can be ready while the cause remains.
+   The manifest records the attempt, and the next ``run_tap`` resumes it. For an interrupted cutover, see
+   :ref:`troubleshooting_iceberg_conversion_missing_primary`. For a table that
+   another tap under the same target writes, pause both and import that tap with
+   ``target_table_format: iceberg``, ``iceberg_version: 3``,
+   ``data_flattening_max_level: 0`` and ``native_to_iceberg_conversion`` enabled
+   too, or stop it writing the table. A tap under another target must stop
+   writing the table, or move under this target. For a companion name that
+   another tap writes, change one stream's schema mapping.
+
+   If a failed conversion says ``<table>_ICEBERG does not match the projected
+   contents of <table>`` before any cutover, ``<table>`` changed after the copy.
+   Stop every writer to it and drop ``<table>_ICEBERG``. Keep the manifest: the
+   next ``run_tap`` copies the table again.
+
+   A pending attempt that a conversion check now refuses, for example one
+   started by an earlier release, keeps its manifest and companion table. A grant
+   or sub-microsecond values can be fixed in place, and the next ``run_tap``
+   resumes the attempt. A fix that changes the table's columns, such as replacing
+   a ``TIMESTAMP_TZ`` column or changing a ``TEXT`` column to ``VARIANT``, makes
+   every resume fail with ``The schema of <table> changed after conversion started``.
+   While ``<table>`` is still native, discard that attempt instead: remove its
+   manifest and drop ``<table>_ICEBERG`` as described in
+   :ref:`troubleshooting_iceberg_conversion_contents_changed`, then rerun.
+4. Resume the schedule, or rerun ``run_tap``. Watch PostgreSQL WAL and MySQL
+   binlog retention while the tap is stopped.
+
+See :ref:`snowflake_iceberg_auto_conversion`.
+
 .. _troubleshooting_fastsync_table_not_found:
 
 Table not found

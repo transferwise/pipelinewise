@@ -55,6 +55,37 @@ def test_core_preserves_shared_decimal_dimensions():
         assert column.columns[0].data_type == case['canonical_type']
 
 
+def test_core_classifies_singer_text_variant_cases():
+    """Conversion preflight predicts the connector's level-0 TEXT and VARIANT columns."""
+    from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_plan import (
+        singer_text_variant_class,
+    )
+
+    for case in _v3_behavior_cases()['singer_text_variant_classes']:
+        assert singer_text_variant_class(case['schema']) == case['expected_class'], case
+
+
+def test_core_predicts_shared_level_zero_column_names():
+    """Conversion preflight finds the column target-snowflake writes, even for long names."""
+    from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_plan import (
+        level_zero_column_name,
+    )
+
+    for case in _v3_behavior_cases()['level_zero_column_names']:
+        name = case['name_repeat'] * case['name_times']
+        assert level_zero_column_name(name) == case['expected_column'], case
+
+
+def test_core_skips_the_objects_target_snowflake_splits():
+    """Conversion predicts no class for a top-level object the connector writes as child columns."""
+    from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_plan import (
+        splits_into_child_columns,
+    )
+
+    for case in _v3_behavior_cases()['top_level_splits']:
+        assert splits_into_child_columns(case['schema'], case['max_level']) is case['expected_split'], case
+
+
 def test_core_matches_contract():
     """Core exposes exactly the shared supported-version declaration."""
     expected_contract = _contract_fixture()['declarative_contract']

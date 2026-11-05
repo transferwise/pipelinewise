@@ -24,6 +24,7 @@ from tests.units.fastsync.commons.test_snowflake_iceberg_converter import (
     FakeSnowflake,
     _converter,
     _manifest_files,
+    revoke_reader_grant_after_promotion,
 )
 
 
@@ -151,7 +152,7 @@ def test_combined_drift_never_rolls_back(tmp_path):
     """Content drift wins over a metadata mismatch, so changed rows are never renamed away."""
     snowflake = FakeSnowflake()
     snowflake.post_promotion_staging_evidence = (2, 54321)
-    snowflake.post_promotion_companion_grants = [AUTOMATED_REFERENCES_GRANT]
+    revoke_reader_grant_after_promotion(snowflake)
 
     with pytest.raises(NativeToIcebergConversionError, match='does not match'):
         _convert(tmp_path, snowflake)
@@ -269,7 +270,7 @@ def test_post_cutover_column_change_keeps_promoted_table(tmp_path):
 def test_rollback_resume_refuses_changed_columns(tmp_path):
     """A pending rollback never renames away a promoted table whose columns changed."""
     snowflake = FakeSnowflake()
-    snowflake.post_promotion_companion_grants = [AUTOMATED_REFERENCES_GRANT]
+    revoke_reader_grant_after_promotion(snowflake)
     snowflake.interrupt_iceberg_rollback = True
     with pytest.raises(SystemExit, match='first rollback interruption'):
         _convert(tmp_path, snowflake)
@@ -288,7 +289,7 @@ def test_rollback_resume_refuses_changed_columns(tmp_path):
 def test_rollback_resume_refuses_changed_promoted_table(tmp_path):
     """A pending rollback never renames away a promoted table whose contents changed."""
     snowflake = FakeSnowflake()
-    snowflake.post_promotion_companion_grants = [AUTOMATED_REFERENCES_GRANT]
+    revoke_reader_grant_after_promotion(snowflake)
     snowflake.interrupt_iceberg_rollback = True
 
     with pytest.raises(SystemExit, match='first rollback interruption'):
@@ -360,6 +361,24 @@ def test_recreates_dropped_companion(tmp_path, interrupted_phase):
     assert snowflake.formats == PROMOTED
     assert not _manifest_files(tmp_path)
     assert len([sql for sql, _, _ in snowflake.queries if sql.startswith('CREATE')]) == 2
+
+
+def test_stale_companion_names_the_drop_and_rerun_fix(tmp_path):
+    """A copy that no longer matches the native rows says how to rebuild it, before any cutover."""
+    snowflake = FakeSnowflake()
+    snowflake.staging_evidence = (2, 54321)
+
+    with pytest.raises(NativeToIcebergConversionError) as error:
+        _convert(tmp_path, snowflake)
+    with pytest.raises(NativeToIcebergConversionError) as resumed:
+        _convert(tmp_path, snowflake)
+
+    for message in (str(error.value), str(resumed.value)):
+        assert 'does not match the projected contents' in message
+        assert 'stop every writer to it, drop "DATABASE"."SCHEMA"."TABLE_ICEBERG", and rerun' in message
+    assert _manifest(tmp_path)['phase'] == 'staging_created'
+    assert snowflake.formats == {'TABLE': 'native', 'TABLE_ICEBERG': 'iceberg'}
+    assert not _renames(snowflake.queries)
 
 
 def test_query_tags_reset_between_calls(tmp_path):
