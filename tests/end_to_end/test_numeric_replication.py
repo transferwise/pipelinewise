@@ -916,6 +916,26 @@ def test_postgres_float_nonfinite_snowflake(source_export, tmp_path):
             row_id: fastsync[(row_id - 1) % 4 + 1][3:] for row_id in range(1, 9)
         }
         assert source_columns() == columns
+
+        if source.iceberg:
+            # Iceberg PartialSync publishes with MERGE INTO rather than FullSync's CREATE ... AS SELECT.
+            partial_rows = [(row[0] + 8, float(row[0] + 8), *row[2:]) for row in rows[:4]]
+            for row in partial_rows:
+                source.execute(f'INSERT INTO {source.quoted_table} VALUES (%s, %s, %s, %s, %s, %s)', row)
+            request = (source.table, {
+                'column': 'id', 'start_value': '<S>9', 'end_value': '<S>12', 'drop_target_table': False,
+            })
+            result = SNOWFLAKE_PARTIAL[source.engine].partial_sync_table(request, args)
+            assert result is True, result
+            partial = loaded_rows()
+            assert {row_id: row[1:] for row_id, row in decoded(partial).items() if row_id > 8} == {
+                row_id + 8: loaded_expected[row_id][1:] for row_id in range(1, 5)
+            }
+            assert {row_id: row[3:] for row_id, row in partial.items() if row_id > 8} == {
+                row_id + 8: fastsync[row_id][3:] for row_id in range(1, 5)
+            }
+            assert {row_id: row for row_id, row in partial.items() if row_id <= 8} == singer
+            assert source_columns() == columns
     finally:
         try:
             target.query(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
@@ -1008,6 +1028,28 @@ def test_mysql_float_exact_snowflake(source_export, tmp_path):
         assert singer == expected
         # == ignores the sign of zero and Snowflake may normalise -0.0, so both paths must store the same sign.
         assert math.copysign(1.0, singer[8][1]) == math.copysign(1.0, fastsync[4][1])
+
+        if source.iceberg:
+            # Iceberg PartialSync publishes with MERGE INTO; the FLOAT range re-merges rows 5-8 and adds rows 9-12.
+            partial_rows = [
+                (row_id, key, amount, RAW_SECRET if amount == 0.1 else 'public')
+                for row_id, (key, amount) in enumerate(zip(
+                    (1234568.25, 1234568.75, 1234569.25, 1234569.75), (16777217, 1234567.8, 0.1, -0.0)), 9)
+            ]
+            for row in partial_rows:
+                source.execute(f'INSERT INTO {source.quoted_table} VALUES (%s, %s, %s, %s)', row)
+            request = (source.table, {
+                'column': 'position', 'start_value': '<S>1234568', 'end_value': '<S>1234570',
+                'drop_target_table': False,
+            })
+            result = partial_mysql.partial_sync_table(request, args)
+            assert result is True, result
+            partial = loaded_rows()
+            assert partial == {**expected, **{
+                row_id: (float32(key), float32(amount), 'hidden' if secret == RAW_SECRET else secret)
+                for row_id, key, amount, secret in partial_rows
+            }}
+            assert math.copysign(1.0, partial[12][1]) == math.copysign(1.0, fastsync[4][1])
     finally:
         try:
             target.query(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')

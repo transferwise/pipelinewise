@@ -292,6 +292,17 @@ def test_fast_sync_rounds_float_literals_before_syncing(tmp_path):
     assert seen == [[{'column': 'weight', 'equals': 0.30000001192092896}]]
 
 
+def test_partial_sync_table_rounds_float_literals_before_syncing(tmp_path):
+    """PartialSync must hash the same rounded rules as run_tap and fast_sync into its Iceberg recovery identity."""
+    instance = _command_pipelinewise(tmp_path)
+    seen = []
+
+    with patch.object(instance, 'sync_tables_partial_sync', side_effect=lambda: seen.append(_conditions(instance))):
+        instance.partial_sync_table()
+
+    assert seen == [[{'column': 'weight', 'equals': 0.30000001192092896}]]
+
+
 @pytest.mark.parametrize('tap_type', ['tap-postgres', 'tap-yugabyte'])
 def test_runs_of_other_taps_keep_their_transformation_literals(tmp_path, tap_type):
     instance = _command_pipelinewise(tmp_path, tap_type)
