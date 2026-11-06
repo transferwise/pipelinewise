@@ -110,3 +110,58 @@ def test_numeric_equals_condition_matches_finite_floats_only(monkeypatch, field_
 @pytest.mark.parametrize('condition', [{'column': 'amount', 'regex_match': 'N'}, {'column': 'amount', 'equals': 'NaN'}])
 def test_text_conditions_still_match_string_fields(monkeypatch, condition):
     assert _conditional_secrets(monkeypatch, ['null', 'string'], condition, ['NaN', 'other']) == [None, 'private']
+
+
+# tap-mysql's MariaDB JSON alias schema: MARIADB_JSON_ROOT_TYPES with the mariadb-json format.
+MARIADB_JSON_SCHEMA = {'type': ['null', 'object', 'array', 'string', 'number', 'boolean'], 'format': 'mariadb-json'}
+
+
+def _secrets(monkeypatch, amount_schema, when, values):
+    output = []
+    monkeypatch.setattr(singer, 'write_message', output.append)
+    transformer = TransformField({'transformations': [{
+        'tap_stream_name': 'items', 'field_id': 'secret', 'type': 'SET-NULL', 'when': when,
+    }]})
+    messages = [
+        {'type': 'SCHEMA', 'stream': 'items', 'key_properties': ['id'], 'schema': {'properties': {
+            'id': {'type': ['integer']}, 'amount': amount_schema, 'secret': {'type': ['null', 'string']},
+        }}},
+        *({'type': 'RECORD', 'stream': 'items', 'record': {'id': index, 'amount': value, 'secret': 'private'}}
+          for index, value in enumerate(values)),
+    ]
+    transformer.consume(json.dumps(message) for message in messages)
+    return [message.record['secret'] for message in output[1:]]
+
+
+@pytest.mark.parametrize('condition', [
+    {'column': 'amount', 'equals': '"card"'},
+    {'column': 'amount', 'regex_match': 'card'},
+])
+def test_text_conditions_still_match_mariadb_json_values(monkeypatch, condition):
+    values = ['"card"', '"other"', '{"kind": "card"}', None]
+    expected = [None, 'private', None if 'regex_match' in condition else 'private', 'private']
+    assert _secrets(monkeypatch, MARIADB_JSON_SCHEMA, [condition], values) == expected
+
+
+@pytest.mark.parametrize('field_type', [*FLOAT_TOKEN_TYPES, ['null', 'number']])
+def test_zero_equals_condition_matches_zero(monkeypatch, field_type):
+    values = [0.0, -0.0, 1.5, 'NaN', None]
+    condition = {'column': 'amount', 'equals': 0.0}
+    expected = [None, None, 'private', 'private', 'private']
+    assert _secrets(monkeypatch, {'type': field_type}, [condition], values) == expected
+
+
+@pytest.mark.parametrize('amount_schema', [{'type': ['null', 'number', 'string']}, {'type': ['null', 'string']}])
+def test_null_equals_condition_matches_only_null(monkeypatch, amount_schema):
+    values = [None, 0.0, '', 'NaN']
+    assert _secrets(monkeypatch, amount_schema, [{'column': 'amount', 'equals': None}], values) == \
+        [None, 'private', 'private', 'private']
+
+
+@pytest.mark.parametrize(('when', 'expected'), [
+    ([{'column': 'amount', 'equals': None}, {'column': 'id', 'equals': 0}], [None, 'private', 'private']),
+    ([{'column': 'id', 'equals': 1}, {'column': 'amount', 'equals': None}], ['private', 'private', 'private']),
+    ([{'column': 'amount', 'equals': 0.0}, {'column': 'id', 'equals': 2}], ['private', 'private', None]),
+])
+def test_falsy_equals_conditions_combine_with_other_conditions(monkeypatch, when, expected):
+    assert _secrets(monkeypatch, {'type': ['null', 'number', 'string']}, when, [None, 1.5, 0.0]) == expected

@@ -39,6 +39,10 @@
   table if its state already holds one of these values.
 - Stop `archive_load_files` from failing when an INCREMENTAL replication key
   holds `NULL` or a floating-point special value.
+- Evaluate Singer `equals` transformation conditions with `0`, `false` or `null`
+  the way FullSync and PartialSync do. Before this fix, Singer ignored these
+  conditions, so a rule that depended on them alone never ran and the field
+  stayed unmasked. See [transformations](docs/user_guide/transformations.rst)
 - Load PostgreSQL and YugabyteDB arrays through Singer the same way as
   FullSync and PartialSync on Snowflake and PostgreSQL targets. A `NULL` array
   now loads as `NULL` instead of an empty array. `NUMERIC` and `DECIMAL` arrays

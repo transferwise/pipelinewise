@@ -346,7 +346,8 @@ print(json.dumps(record))
 ''', {'record': record, 'rules': rules}))
     assert actual['unicode_secret'] == '雪' + _digest('AB')
     assert singer['unicode_secret'] == '雪' + hashlib.sha256('雪AB'.encode('utf-8')[1:]).hexdigest()
-    assert (actual['equals_secret'], singer['equals_secret']) == ('hidden', 'public')
+    # Singer now evaluates falsy equality literals the way FastSync does.
+    assert (actual['equals_secret'], singer['equals_secret']) == ('hidden', 'hidden')
     assert (actual['regex_secret'], singer['regex_secret']) == ('public', 'hidden')
 
 

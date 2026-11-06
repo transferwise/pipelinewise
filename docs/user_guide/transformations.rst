@@ -165,11 +165,11 @@ This differs from Singer's sequential configuration order. Avoid depending on
 the difference in tables that switch between FastSync and Singer.
 
 Other existing Singer differences also remain: ``HASH-SKIP-FIRST-n`` slices
-the hash input by UTF-8 bytes rather than characters; regex conditions search
-within the string; and equality conditions with ``0``, ``false``, or ``null``
-are ignored and do not trigger a rule on their own. For PostgreSQL JSON
-object/array schemas, Singer can load a
-transformed ``None`` as JSON ``null`` rather than FastSync's SQL ``NULL``.
+the hash input by UTF-8 bytes rather than characters, and regex conditions search
+within the string. Since 0.101.0, Singer evaluates equality conditions with
+``0``, ``false``, or ``null`` like FastSync; earlier releases ignored them. For
+PostgreSQL JSON object/array schemas, Singer can load a transformed ``None`` as
+JSON ``null`` rather than FastSync's SQL ``NULL``.
 These differences are tested explicitly; matching column types alone does not
 guarantee identical transformation results.
 

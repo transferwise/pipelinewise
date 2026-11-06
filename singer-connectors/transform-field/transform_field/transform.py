@@ -70,11 +70,10 @@ def is_transform_required(record: Dict, when: Optional[List[Dict]], schema: Opti
         cond_equals = condition.get('equals')
         cond_pattern = condition.get('regex_match')
         decimal_condition = is_decimal_schema(field_schema) and not field_path_to_match
-        # Float NaN and +/-Infinity arrive as strings; text conditions never match numeric fields.
-        numeric_condition = 'number' in (field_schema.get('type') or []) and not field_path_to_match
+        numeric_condition = _is_float_token_schema(field_schema) and not field_path_to_match
 
-        # Exact condition
-        if cond_equals or (decimal_condition and 'equals' in condition):
+        # Exact condition; falsy literals such as 0 and null are real conditions too.
+        if 'equals' in condition:
             LOGGER.debug('Equals condition found, value is: %s', cond_equals)
             if decimal_condition:
                 transform_required = _decimal_equals(column_value, cond_equals, field_schema)
@@ -112,6 +111,13 @@ def is_transform_required(record: Dict, when: Optional[List[Dict]], schema: Opti
     LOGGER.debug('Transformation required? %s', transform_required)
 
     return transform_required
+
+
+def _is_float_token_schema(field_schema):
+    """Scalar float fields may carry NaN/Infinity as strings; polymorphic JSON schemas keep text conditions."""
+    types = field_schema.get('type') or []
+    types = types if isinstance(types, list) else [types]
+    return 'number' in types and set(types) <= {'null', 'number', 'string'} and not field_schema.get('format')
 
 
 def _decimal_equals(value, condition, schema):

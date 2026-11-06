@@ -119,7 +119,7 @@ def test_set_null_replaces_the_whole_json_text(monkeypatch, field_paths):
 @pytest.mark.parametrize(('when', 'expected_secrets'), [
     (None, [None, None, None, None]),
     ([{'column': 'id', 'equals': 1}], ['private', None, 'private', 'private']),
-    ([{'column': 'amounts', 'equals': None}], ['private', 'private', 'private', 'private']),
+    ([{'column': 'amounts', 'equals': None}], ['private', 'private', 'private', None]),
 ])
 def test_json_text_passes_unchanged_through_other_transformations_and_record_validation(
         monkeypatch, when, expected_secrets):
@@ -151,12 +151,12 @@ def test_the_same_conditions_still_match_plain_string_fields(condition):
     assert transform.is_transform_required({'id': 1, 'amounts': JSON_TEXT}, [condition], schema)
 
 
-def test_runtime_null_equals_on_json_text_keeps_generic_semantics():
+def test_runtime_null_equals_on_json_text_matches_only_null_like_unmarked_arrays():
     when = [{'column': 'id', 'equals': 1}, {'column': 'amounts', 'equals': None}]
     for record in ({'id': 1, 'amounts': None}, {'id': 1, 'amounts': '[]'}, {'id': 2, 'amounts': None}):
         assert transform.is_transform_required(record, when, _stream_schema(JSON_TEXT_SCHEMA)) == (
             transform.is_transform_required(record, when, _stream_schema(ARRAY_SCHEMA))
-        ) == (record['id'] == 1)
+        ) == (record['id'] == 1 and record['amounts'] is None)
 
 
 @pytest.mark.parametrize('source', ['catalog', 'schema_message'])
