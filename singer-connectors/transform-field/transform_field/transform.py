@@ -9,6 +9,19 @@ from singer.decimal_support import decimal_to_string, is_decimal_schema
 from dateutil import parser
 
 LOGGER = get_logger('transform_field')
+JSON_TEXT_FORMAT = 'singer.json'
+
+
+def is_json_text_schema(schema: Any) -> bool:
+    """Return whether a property carries serialized JSON text, such as PostgreSQL numeric[] on decimal routes."""
+    if hasattr(schema, 'to_dict'):
+        schema = schema.to_dict()
+    return isinstance(schema, dict) and schema.get('format') == JSON_TEXT_FORMAT
+
+
+def is_unsupported_json_text_condition(condition: Dict) -> bool:
+    """Return whether a condition would inspect JSON text through a field path, a pattern or a non-null value."""
+    return bool(condition.get('field_path')) or 'regex_match' in condition or condition.get('equals') is not None
 
 
 def is_transform_required(record: Dict, when: Optional[List[Dict]], schema: Optional[Dict] = None) -> bool:
@@ -28,9 +41,24 @@ def is_transform_required(record: Dict, when: Optional[List[Dict]], schema: Opti
     # Evaluate every condition
     for condition in when:
         column_to_match = condition['column']
+
+        # LOG_BASED PATCH records omit unchanged columns and deletes carry only keys: no equality, not even
+        # equals '', matches an omitted column, while regex conditions search it as an empty string.
+        if 'equals' in condition and column_to_match not in record:
+            LOGGER.debug('Column "%s" is absent, so its equals condition is not met.', column_to_match)
+            transform_required = False
+            break
+
         column_value = record.get(column_to_match, "")
+        field_schema = (schema or {}).get('properties', {}).get(column_to_match, {})
+
+        # Server-rendered JSON text would match on formatting rather than values; validation rejects these too.
+        if is_json_text_schema(field_schema) and is_unsupported_json_text_condition(condition):
+            transform_required = False
+            break
 
         field_path_to_match = condition.get('field_path')
+        field_value = column_value
 
         # check if given field exists in the column value
         if field_path_to_match:
@@ -50,18 +78,18 @@ def is_transform_required(record: Dict, when: Optional[List[Dict]], schema: Opti
 
         cond_equals = condition.get('equals')
         cond_pattern = condition.get('regex_match')
-        field_schema = (schema or {}).get('properties', {}).get(column_to_match, {})
         decimal_condition = is_decimal_schema(field_schema) and not field_path_to_match
+        numeric_condition = _is_float_token_schema(field_schema) and not field_path_to_match
 
-        # Exact condition
-        if cond_equals or (decimal_condition and 'equals' in condition):
+        # Exact condition; falsy literals such as 0 and null are real conditions too.
+        if 'equals' in condition:
             LOGGER.debug('Equals condition found, value is: %s', cond_equals)
             if decimal_condition:
                 transform_required = _decimal_equals(column_value, cond_equals, field_schema)
-            elif field_path_to_match:
-                transform_required = __is_condition_met('equal', cond_equals, field_value)
+            elif numeric_condition and isinstance(cond_equals, str):
+                transform_required = False
             else:
-                transform_required = __is_condition_met('equal', cond_equals, column_value)
+                transform_required = __is_condition_met('equal', cond_equals, field_value)
 
             # Condition isn't met, exit the loop
             if not transform_required:
@@ -73,14 +101,11 @@ def is_transform_required(record: Dict, when: Optional[List[Dict]], schema: Opti
             LOGGER.debug('Regex condition found, pattern is: %s', cond_pattern)
 
             # String transport must not enable regex matching for numeric fields.
-            if decimal_condition:
+            if decimal_condition or numeric_condition:
                 transform_required = False
                 break
 
-            if field_path_to_match:
-                transform_required = __is_condition_met('regex', cond_pattern, field_value)
-            else:
-                transform_required = __is_condition_met('regex', cond_pattern, column_value)
+            transform_required = __is_condition_met('regex', cond_pattern, field_value)
 
             # Condition isn't met, exit the loop
             if not transform_required:
@@ -90,6 +115,13 @@ def is_transform_required(record: Dict, when: Optional[List[Dict]], schema: Opti
     LOGGER.debug('Transformation required? %s', transform_required)
 
     return transform_required
+
+
+def _is_float_token_schema(field_schema):
+    """Scalar float fields may carry NaN/Infinity as strings; polymorphic JSON schemas keep text conditions."""
+    types = field_schema.get('type') or []
+    types = types if isinstance(types, list) else [types]
+    return 'number' in types and set(types) <= {'null', 'number', 'string'} and not field_schema.get('format')
 
 
 def _decimal_equals(value, condition, schema):

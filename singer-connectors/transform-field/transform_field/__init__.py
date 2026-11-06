@@ -40,11 +40,26 @@ def _field_schema(stream_schema, field_id):
     return stream_schema['properties'][field_id]
 
 
+def _declared_property(stream_schema, field_id):
+    """Return a property's schema, or None when the stream does not declare it."""
+    if isinstance(stream_schema, Schema):
+        properties = stream_schema.properties
+    else:
+        properties = stream_schema.get('properties') if isinstance(stream_schema, dict) else None
+    return properties.get(field_id) if isinstance(properties, dict) else None
+
+
 def _validate_condition_types(stream_id, stream_schema, transformation):
     for condition in transformation.when or []:
+        condition_field = condition.get('column')
+        if transform.is_unsupported_json_text_condition(condition) and \
+                transform.is_json_text_schema(_declared_property(stream_schema, condition_field)):
+            raise InvalidTransformationException(
+                f'Conditions on JSON text field `{condition_field}` in stream `{stream_id}` cannot use '
+                '`field_path`, `regex_match` or a non-null `equals`'
+            )
         if 'regex_match' not in condition or condition.get('field_path'):
             continue
-        condition_field = condition['column']
         if is_decimal_schema(_field_schema(stream_schema, condition_field)):
             raise InvalidTransformationException(
                 f'Cannot apply a `regex_match` condition to decimal field `{condition_field}` '
@@ -289,6 +304,12 @@ class TransformField:
 
             _validate_condition_types(stream_id, stream_schema, transformation)
 
+            # JSON text arrives as one string, so field paths would transform the whole serialized value.
+            if transformation.field_paths is not None and trans_type != TransformationTypes.SET_NULL.value and \
+                    transform.is_json_text_schema(field_schema):
+                raise InvalidTransformationException(
+                    f'Only `SET-NULL` can use `field_paths` on JSON text field `{field_id}` in stream `{stream_id}`')
+
             # If the value we want to transform is a field in a JSON property
             # then no need to enforce rules below for now
             if field_type and \
@@ -299,7 +320,11 @@ class TransformField:
             if trans_type in (TransformationTypes.HASH.value, TransformationTypes.MASK_HIDDEN.value) or \
                     trans_type.startswith(TransformationTypes.HASH_SKIP_FIRST.value) or \
                     trans_type.startswith(TransformationTypes.MASK_STRING_SKIP_ENDS.value):
-                if not (field_type is not None and 'string' in field_type and not field_format):
+                # Floats may carry 'NaN'/'Infinity' string tokens; their column type stays numeric.
+                if not (
+                    field_type is not None and 'string' in field_type and 'number' not in field_type
+                    and not field_format
+                ):
                     raise InvalidTransformationException(
                         f'Cannot apply `{trans_type}` transformation type to a non-string field `'
                         f'{field_id}` in stream `{stream_id}`')

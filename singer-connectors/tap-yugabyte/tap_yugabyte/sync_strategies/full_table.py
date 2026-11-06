@@ -29,6 +29,7 @@ connection to one hybrid time.
 
 import copy
 import decimal
+import math
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -47,8 +48,8 @@ LOGGER = singer.get_logger('tap_yugabyte')
 UPDATE_BOOKMARK_PERIOD = 1000
 
 
-def _escaped_columns(desired_columns, md_map):
-    return list(map(partial(yb_db.prepare_columns_for_select_sql, md_map=md_map),
+def _escaped_columns(desired_columns, md_map, properties=None):
+    return list(map(partial(yb_db.prepare_columns_for_select_sql, md_map=md_map, properties=properties),
                     desired_columns))
 
 
@@ -77,7 +78,8 @@ def sync_view(conn_info, stream, state, desired_columns, md_map):
     singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
 
     schema_name = md_map.get(()).get('schema-name')
-    escaped_columns = map(yb_db.prepare_columns_sql, desired_columns)
+    properties = stream.get('schema', {}).get('properties')
+    escaped_columns = map(partial(yb_db.prepare_view_column_sql, properties=properties), desired_columns)
     fq_table_name = yb_db.fully_qualified_table_name(schema_name, stream['table_name'])
 
     activate_version_message = singer.ActivateVersionMessage(
@@ -135,7 +137,8 @@ def _sync_table_without_pk(conn_info, stream, state, desired_columns, md_map):
 
     LOGGER.info('Table %s has no primary key: syncing with a non-resumable full scan',
                 tap_stream_id)
-    select_sql = (f"SELECT {','.join(_escaped_columns(desired_columns, md_map))} "
+    properties = stream.get('schema', {}).get('properties')
+    select_sql = (f"SELECT {','.join(_escaped_columns(desired_columns, md_map, properties))} "
                   f'FROM {fq_table_name}')
 
     def scan():
@@ -166,8 +169,37 @@ def _sync_table_without_pk(conn_info, stream, state, desired_columns, md_map):
 
 
 def _bookmark_values(values):
-    """Keep NUMERIC key bounds exact in state; Singer serializes Decimal as float."""
-    return [str(value) if isinstance(value, decimal.Decimal) else value for value in values]
+    """Keep key bounds valid in state: NUMERIC stays exact text, and nonfinite floats use YSQL's spellings."""
+    return [_bookmark_value(value) for value in values]
+
+
+def _bookmark_value(value):
+    if isinstance(value, decimal.Decimal):
+        # Singer serializes Decimal as float.
+        return str(value)
+    if isinstance(value, float):
+        # Text binds as the key's own type (a REAL key never equals a double literal); orjson writes
+        # NaN and +/-Infinity as null, which would bound the scan to no rows.
+        if math.isfinite(value):
+            return repr(value)
+        return yb_db.float_to_singer_value(value, nonfinite_tokens=True)
+    return value
+
+
+def _discard_null_key_bounds(state, tap_stream_id):
+    """Restart a scan whose saved key bounds hold null, which older releases wrote for NaN/Infinity float keys.
+
+    Primary keys are never NULL, so a null bound is always invalid and would match no rows on resume.
+    """
+    max_pk_values = singer.get_bookmark(state, tap_stream_id, 'max_pk_values')
+    fetched = singer.get_bookmark(state, tap_stream_id, 'last_pk_fetched')
+    bounds = [max_pk_values] + (list(fetched.values()) if isinstance(fetched, dict) else [])
+    if not any(isinstance(bound, list) and None in bound for bound in bounds):
+        return state
+    LOGGER.warning('Discarding resume bookmarks with a null key bound for %s; the scan restarts', tap_stream_id)
+    state = singer.write_bookmark(state, tap_stream_id, 'max_pk_values', None)
+    state = singer.write_bookmark(state, tap_stream_id, 'last_pk_fetched', {})
+    return singer.write_bookmark(state, tap_stream_id, 'completed_buckets', None)
 
 
 def _fetch_max_pk_values(conn_info, fq_table_name, table_name, pk_columns, buckets):
@@ -218,7 +250,7 @@ def _scan_bucket(conn_info, stream, state, desired_columns, md_map, pk_columns,
     retry after a read restart or a lost connection resumes from the last row
     that reached the target instead of replaying the bucket.
     """
-    escaped = _escaped_columns(desired_columns, md_map)
+    escaped = _escaped_columns(desired_columns, md_map, stream.get('schema', {}).get('properties'))
     pk_indices = [desired_columns.index(pk) for pk in pk_columns]
     # this statement is always executed with a parameter sequence, so the modulo
     # has to survive psycopg2's placeholder interpolation
@@ -331,6 +363,7 @@ def _sync_table_with_pk(conn_info, stream, state, desired_columns, md_map, pk_co
     buckets = conn_info.get('keyset_buckets', keyset.BUCKETS_DEFAULT)
 
     first_run = singer.get_bookmark(state, tap_stream_id, 'version') is None
+    state = _discard_null_key_bounds(state, tap_stream_id)
     max_pk_values = singer.get_bookmark(state, tap_stream_id, 'max_pk_values')
 
     # a max_pk_values bookmark means a previous run was interrupted mid-scan;

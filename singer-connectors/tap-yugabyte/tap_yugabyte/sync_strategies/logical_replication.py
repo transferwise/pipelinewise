@@ -19,7 +19,8 @@ from functools import reduce
 import tap_yugabyte.db as yb_db
 import tap_yugabyte.sync_strategies.common as sync_common
 from tap_yugabyte.stream_utils import refresh_streams_schema
-from tap_yugabyte.discovery_utils import Column, schema_for_column
+from tap_yugabyte.discovery_utils import (
+    FLOAT_ARRAY_TYPES, Column, allow_nonfinite_float_array_items, schema_for_column)
 
 LOGGER = singer.get_logger('tap_yugabyte')
 
@@ -208,6 +209,56 @@ def create_array_elem(elem, sql_datatype, conn_info):  # noqa: C901
             return res
 
 
+# array_out spells a numeric[] as optional bounds, then braces, commas and numeric_out values.
+_NUMERIC_ARRAY_BOUNDS = re.compile(r'(?:\[-?\d+:-?\d+\])+=')
+_NUMERIC_ARRAY_TOKENS = re.compile(r'[{},]|[^{},]+')
+# numeric_out never writes an exponent, a plus sign, a leading zero or a negative zero.
+_NUMERIC_OUT = re.compile(r'(?!-0(?:\.0+)?$)-?(?:0|[1-9]\d*)(?:\.\d+)?')
+_NUMERIC_JSON_TOKENS = {'NULL': 'null', 'NaN': '"NaN"', 'Infinity': '"Infinity"', '-Infinity': '"-Infinity"'}
+
+
+def numeric_array_json_text(elem, sql_datatype, stream_id, column):
+    """Render a CDC numeric[] literal as the server's array_to_json text, which FastSync exports.
+
+    array_to_json copies each numeric_out value, quotes the nonfinite ones and drops the bounds, so the
+    literal is rewritten here instead of on a server round trip. Text that array_out would not write is
+    rejected rather than rendered differently from the server.
+    """
+    if elem is None:
+        return None
+    if sql_datatype != 'numeric[]' or not isinstance(elem, str):
+        raise ValueError(f'Expected numeric[] text in WAL for stream {stream_id}, column {column}')
+    bounds = _NUMERIC_ARRAY_BOUNDS.match(elem)
+    tokens = _NUMERIC_ARRAY_TOKENS.findall(elem, bounds.end() if bounds else 0)
+    parts, depth, previous = [], 0, None
+    for token in tokens:
+        if token == '{' and previous in (None, '{', ','):
+            depth, part = depth + 1, '['
+        elif token == '}' and depth and previous != ',':
+            depth, part = depth - 1, ']'
+        elif token == ',' and depth and previous not in ('{', ','):
+            part = ','
+        elif depth and previous in ('{', ',') and token in _NUMERIC_JSON_TOKENS:
+            part = _NUMERIC_JSON_TOKENS[token]
+        elif depth and previous in ('{', ',') and _NUMERIC_OUT.fullmatch(token):
+            part = token
+        else:
+            break
+        parts.append(part)
+        previous = token
+    if len(parts) != len(tokens) or depth or previous != '}':
+        # The literal holds source values, so the message names only where it came from.
+        raise ValueError(f'Unable to render numeric[] from WAL for stream {stream_id}, column {column}')
+    return ''.join(parts)
+
+
+def _float_to_singer_value(elem, conn_info):
+    """Spell nonfinite floats as YSQL tokens on decimal routes; other routes keep the float."""
+    if (conn_info or {}).get('decimal_target'):
+        return yb_db.float_to_singer_value(elem, nonfinite_tokens=True)
+    return elem
+
+
 def selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info):  # noqa: C901
     sql_datatype = og_sql_datatype.replace('[]', '')
 
@@ -330,7 +381,7 @@ def selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info):  # no
     if isinstance(elem, int):
         return elem
     if isinstance(elem, float):
-        return elem
+        return _float_to_singer_value(elem, conn_info)
     if isinstance(elem, str):
         return elem
 
@@ -347,6 +398,9 @@ def selected_array_to_singer_value(elem, sql_datatype, conn_info):
 def selected_value_to_singer_value(elem, sql_datatype, conn_info):
     # are we dealing with an array?
     if sql_datatype.find('[]') > 0:
+        if elem is None and (conn_info or {}).get('decimal_target'):
+            # FastSync exports a NULL array as SQL NULL; other routes keep the historical empty list.
+            return None
         cleaned_elem = create_array_elem(elem, sql_datatype, conn_info)
         return list(map(lambda elem: selected_array_to_singer_value(elem, sql_datatype, conn_info),
                         (cleaned_elem or [])))
@@ -369,6 +423,8 @@ def row_to_singer_message(stream, row, version, columns, time_extracted, md_map,
         column_schema = stream.get('schema', {}).get('properties', {}).get(columns[idx], {})
         if is_decimal_schema(column_schema):
             cleaned_elem = decimal_to_string(elem, column_schema)
+        elif yb_db.is_json_text_schema(column_schema):
+            cleaned_elem = numeric_array_json_text(elem, sql_datatype, stream['tap_stream_id'], columns[idx])
         else:
             if (conn_info or {}).get('decimal_target') and elem is not None:
                 if sql_datatype in {'real', 'double precision'}:
@@ -442,6 +498,8 @@ def reconcile_wal_decimal_schema(payload, stream, previous_metadata, decimal_tar
                              key_properties.index(name) if name in key_properties else None)
         column_schema = schema_for_column(description, decimal_target)
         stream['schema']['properties'][name] = column_schema or {'type': ['null', 'string']}
+        if sql_type in FLOAT_ARRAY_TYPES:
+            allow_nonfinite_float_array_items(stream['schema'])
         field_metadata = md_map.setdefault(('properties', name), dict(previous_metadata.get(('properties', name), {})))
         field_metadata.setdefault('inclusion', 'available')
         field_metadata['sql-datatype'] = sql_type

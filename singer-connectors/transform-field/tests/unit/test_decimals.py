@@ -69,9 +69,10 @@ def test_decimal_conditions_compare_exact_values(monkeypatch, amount, condition,
     assert messages[1]['record']['other'] == (None if matches else 'private')
 
 
-def test_generic_zero_condition_retains_existing_behavior():
+def test_generic_zero_condition_matches_zero():
     from transform_field.transform import is_transform_required
-    assert not is_transform_required({'amount': 0}, [{'column': 'amount', 'equals': 0}])
+    assert is_transform_required({'amount': 0}, [{'column': 'amount', 'equals': 0}])
+    assert not is_transform_required({'amount': 1}, [{'column': 'amount', 'equals': 0}])
 
 
 def test_decimal_regex_condition_is_rejected(monkeypatch):

@@ -103,6 +103,32 @@ def get_database_name(catalog_entry):
     return md_map.get((), {}).get('database-name')
 
 
+def is_float_column(catalog_entry, column_name):
+    """Return whether the catalog marks a 4-byte FLOAT column whose schema is a plain number.
+
+    resolve_catalog takes the datatype from the discovery that built the schema; the schema check still keeps an
+    entry whose datatype and schema disagree from promoting decimals, strings, integers or formatted values.
+    """
+    column_metadata = metadata.to_map(catalog_entry.metadata).get(('properties', column_name), {})
+    column_schema = catalog_entry.schema.properties.get(column_name)
+    if column_metadata.get('datatype') != 'float' or column_schema is None:
+        return False
+    types = column_schema.type if isinstance(column_schema.type, list) else [column_schema.type]
+    return (
+        set(types) in ({'number'}, {'null', 'number'})
+        and column_schema.format is None
+        and column_schema.multipleOf is None
+    )
+
+
+def float_select_expression(escaped_column):
+    """Promote FLOAT exactly to DOUBLE; the text protocol rounds FLOAT to six significant digits.
+
+    No alias: MySQL would bind ORDER BY to the alias instead of the indexed column.
+    """
+    return f'{escaped_column} * 1E0'
+
+
 def generate_select_sql(catalog_entry, columns):
     database_name = get_database_name(catalog_entry)
     escaped_db = escape(database_name)
@@ -124,6 +150,8 @@ def generate_select_sql(catalog_entry, columns):
         elif property_format == 'spatial':
             escaped_columns.append(
                 f'ST_AsGeoJSON({escaped_col}) as {escaped_col}')
+        elif is_float_column(catalog_entry, col_name):
+            escaped_columns.append(float_select_expression(escaped_col))
         else:
             escaped_columns.append(escaped_col)
 

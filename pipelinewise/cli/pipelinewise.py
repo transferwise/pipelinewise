@@ -23,6 +23,7 @@ from tabulate import tabulate
 
 from . import utils
 from . import fastsync_capabilities as fastsync_capability_policy
+from . import mysql_float_conditions
 from .constants import ConnectorType
 from . import commands
 from .commands import TapParams, TargetParams, TransformParams
@@ -1045,6 +1046,26 @@ class PipelineWise:
         except Exception as exc:
             return f'Cannot save file. {str(exc)}'
 
+        try:
+            self._round_mysql_float_conditions(tap, schema_with_diff)
+        except Exception as exc:
+            return f'Cannot update transformation file. {str(exc)}'
+
+    def _round_mysql_float_conditions(self, tap: Dict, catalog: Optional[Dict] = None) -> None:
+        """Round a tap-mysql tap's FLOAT equality literals to the exact FLOAT values the tap extracts.
+
+        Args:
+            tap: Tap definition with its generated file paths.
+            catalog: Catalog that identifies FLOAT columns; defaults to the tap's saved properties file.
+        """
+        if tap.get('type') != ConnectorType.TAP_MYSQL.value:
+            return
+        files = tap.get('files', {})
+        if catalog is None:
+            catalog = utils.load_json(files.get('properties'))
+        if mysql_float_conditions.round_transformation_file(files.get('transformation'), catalog):
+            self.logger.info('Rounded FLOAT equality conditions to stored FLOAT values in %s', files['transformation'])
+
     def detect_tap_status(self, target_id, tap_id):
         """
         Detect status of a tap
@@ -1381,6 +1402,8 @@ class PipelineWise:
         start_time = datetime.now()
         try:
             with pidfile.PIDFile(self.tap['files']['pidfile']):
+                # A saved catalog already makes tap-mysql read FLOAT exactly; do not wait for a new discovery.
+                self._round_mysql_float_conditions(self.tap)
 
                 target_params = TargetParams(
                     target_id=target_id,
@@ -1583,6 +1606,7 @@ class PipelineWise:
         self.force_fast_sync = self.args.force
         try:
             with pidfile.PIDFile(self.tap['files']['pidfile']):
+                self._round_mysql_float_conditions(self.tap)
                 self.do_sync_tables(
                     reset_source_slot=self._should_reset_source_slot_for_fast_sync()
                 )
@@ -2692,6 +2716,8 @@ class PipelineWise:
         """
         try:
             with pidfile.PIDFile(self.tap['files']['pidfile']):
+                # Keep the recovery identity's transformation fingerprint the same as run_tap and fast_sync use.
+                self._round_mysql_float_conditions(self.tap)
 
                 # this command allows only static values!
                 if self.args.start_value:

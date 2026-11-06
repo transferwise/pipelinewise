@@ -1,8 +1,12 @@
 """Exact decimal extraction against the isolated dev-project source databases."""
 
 import json
+import math
 import os
+import random
+import struct
 import uuid
+from decimal import Decimal
 from unittest.mock import patch
 
 import pytest
@@ -10,14 +14,18 @@ import singer
 from pymysqlreplication import BinLogStreamReader
 from pymysqlreplication.event import GtidEvent, MariadbGtidEvent, QueryEvent, RotateEvent, XidEvent
 from pymysqlreplication.row_event import DeleteRowsEvent, TableMapEvent, UpdateRowsEvent, WriteRowsEvent
+from singer.catalog import Catalog
 
+from tap_mysql import get_non_binlog_streams
 from tap_mysql.connection import MySQLConnection, connect_with_backoff
 from tap_mysql.discover_utils import discover_catalog
-from tap_mysql.sync_strategies import binlog, common, incremental
+from tap_mysql.sync_strategies import binlog, common, full_table, incremental
 
 
 EXACT = '12345678901234567890.123456789012345678'
 CHANGED = '12345678901234567890.123456789012345679'
+# Six-digit FLOAT text changes the first three stored values; -0.0 checks that the sign survives.
+FLOAT_INPUTS = (16777217, 1234567.8, 0.1, -0.0)
 
 
 @pytest.mark.parametrize('prefix', ['TAP_MYSQL', 'TAP_ORACLE_MYSQL'])
@@ -207,3 +215,282 @@ def test_queued_alter_replays_each_binlog_decimal_schema_without_repeated_discov
             source.autocommit(True)
             with source.cursor() as cursor:
                 cursor.execute(f'DROP TABLE IF EXISTS {qualified}')
+
+
+def _float32(value):
+    """Return the FLOAT a source stores for a value, as mysql-replication decodes it from the binlog."""
+    return struct.unpack('<f', struct.pack('<f', value))[0]
+
+
+def _float_source_config(prefix):
+    if not os.environ.get(f'{prefix}_DB'):
+        pytest.skip(f'{prefix}_DB is required for the dev-project FLOAT probe')
+    config = {key: os.environ[f'{prefix}_{key.upper()}'] for key in ('host', 'port', 'user', 'password')}
+    config['database'] = os.environ[f'{prefix}_DB']
+    return config
+
+
+def _selected_stream(config, table, datatype='float', **stream_metadata):
+    stream = discover_catalog(MySQLConnection(config), config['database'], table).streams[0]
+    md_map = singer.metadata.to_map(stream.metadata)
+    md_map[()].update(stream_metadata)
+    for name in stream.schema.properties:
+        md_map[('properties', name)]['selected'] = True
+    stream.metadata = singer.metadata.to_list(md_map)
+    assert md_map[('properties', 'amount')]['datatype'] == datatype
+    return stream
+
+
+def _wire_records(sync, *args):
+    """Run a sync strategy and return its records as the target would parse them."""
+    messages = []
+    with patch('singer.write_message', side_effect=messages.append):
+        sync(*args)
+    return [
+        json.loads(singer.messages.format_message(message))['record']
+        for message in messages if isinstance(message, singer.RecordMessage)
+    ]
+
+
+def _assert_same_floats(actual, expected):
+    """Compare values and the signs of zeros, which equality alone ignores."""
+    assert actual == expected
+    assert [math.copysign(1.0, value) for value in actual] == [math.copysign(1.0, value) for value in expected]
+
+
+def _drop_table(config, qualified):
+    with connect_with_backoff(MySQLConnection(config)) as source:
+        source.autocommit(True)
+        with source.cursor() as cursor:
+            cursor.execute(f'DROP TABLE IF EXISTS {qualified}')
+
+
+@pytest.mark.parametrize('prefix', ['TAP_MYSQL', 'TAP_ORACLE_MYSQL'])
+def test_float_full_table_and_binlog_load_the_stored_value(prefix):
+    """FULL_TABLE used to read FLOAT as six-digit text while binlog decoded the stored value."""
+    config = _float_source_config(prefix)
+    table = 'float_probe_' + uuid.uuid4().hex[:12]
+    qualified = f'`{config["database"]}`.`{table}`'
+    reader = None
+    try:
+        with connect_with_backoff(MySQLConnection(config)) as source:
+            source.autocommit(True)
+            with source.cursor() as cursor:
+                cursor.execute(f'CREATE TABLE {qualified} (id INT PRIMARY KEY, amount FLOAT)')
+                cursor.execute('SHOW MASTER STATUS')
+                log_file, log_pos, *_ = cursor.fetchone()
+                cursor.executemany(f'INSERT INTO {qualified} VALUES (%s, %s)', list(enumerate(FLOAT_INPUTS, 1)))
+                is_mariadb = 'mariadb' in source.get_server_info().lower()
+        expected = [_float32(value) for value in FLOAT_INPUTS]
+        assert expected[:3] == [16777216.0, 1234567.75, 0.10000000149011612]
+
+        stream = _selected_stream(config, table, **{'replication-method': 'FULL_TABLE'})
+        records = _wire_records(full_table.sync_table, MySQLConnection(config), stream, {}, ['id', 'amount'], 1)
+        _assert_same_floats([record['amount'] for record in sorted(records, key=lambda r: r['id'])], expected)
+
+        reader = BinLogStreamReader(
+            connection_settings={
+                'host': config['host'], 'port': int(config['port']), 'user': config['user'],
+                'passwd': config['password'], 'ssl': {'': True},
+            },
+            server_id=int(uuid.uuid4().hex[:7], 16), only_schemas=[config['database']], only_tables=[table],
+            only_events=[WriteRowsEvent], log_file=log_file, log_pos=log_pos, resume_stream=True,
+            blocking=False, is_mariadb=is_mariadb,
+        )
+        binlog_values = []
+        for event in reader:
+            for row in event.rows:
+                record = binlog.row_to_singer_record(
+                    stream, 1, binlog.get_db_column_types(event), row['values'], None)
+                binlog_values.append(json.loads(singer.messages.format_message(record))['record']['amount'])
+        _assert_same_floats(binlog_values, expected)
+    finally:
+        if reader is not None:
+            reader.close()
+        _drop_table(config, qualified)
+
+
+@pytest.mark.parametrize('prefix', ['TAP_MYSQL', 'TAP_ORACLE_MYSQL'])
+def test_float_full_table_is_exact_across_sampled_values(prefix):
+    """Every sampled FLOAT, including ones needing 17 significant digits as DOUBLE, loads unchanged."""
+    config = _float_source_config(prefix)
+    table = 'float_sample_' + uuid.uuid4().hex[:12]
+    qualified = f'`{config["database"]}`.`{table}`'
+    rng = random.Random(1805)
+    values = []
+    while len(values) < 500:
+        bits = rng.getrandbits(32)
+        # Normal exponents only: the source documents FLOAT's range without subnormals, NaN or infinity.
+        if 0 < (bits >> 23) & 0xFF < 0xFF:
+            values.append(struct.unpack('<f', bits.to_bytes(4, 'little'))[0])
+    try:
+        with connect_with_backoff(MySQLConnection(config)) as source:
+            source.autocommit(True)
+            with source.cursor() as cursor:
+                cursor.execute(f'CREATE TABLE {qualified} (id INT PRIMARY KEY, amount FLOAT)')
+                cursor.executemany(f'INSERT INTO {qualified} VALUES (%s, %s)', list(enumerate(values, 1)))
+
+        stream = _selected_stream(config, table, **{'replication-method': 'FULL_TABLE'})
+        records = _wire_records(full_table.sync_table, MySQLConnection(config), stream, {}, ['id', 'amount'], 1)
+        _assert_same_floats([record['amount'] for record in sorted(records, key=lambda r: r['id'])], values)
+        assert any(len(Decimal(repr(value)).as_tuple().digits) == 17 for value in values)
+    finally:
+        _drop_table(config, qualified)
+
+
+@pytest.mark.parametrize('prefix', ['TAP_MYSQL', 'TAP_ORACLE_MYSQL'])
+def test_float_incremental_values_and_bookmark_are_exact(prefix):
+    """A six-digit bookmark is not the stored maximum, so INCREMENTAL resumed from the wrong boundary."""
+    config = _float_source_config(prefix)
+    table = 'float_incremental_' + uuid.uuid4().hex[:12]
+    qualified = f'`{config["database"]}`.`{table}`'
+    try:
+        with connect_with_backoff(MySQLConnection(config)) as source:
+            source.autocommit(True)
+            with source.cursor() as cursor:
+                cursor.execute(f'CREATE TABLE {qualified} (id INT PRIMARY KEY, amount FLOAT, KEY (amount))')
+                cursor.executemany(f'INSERT INTO {qualified} VALUES (%s, %s)', list(enumerate(FLOAT_INPUTS, 1)))
+
+        stream = _selected_stream(
+            config, table, **{'replication-method': 'INCREMENTAL', 'replication-key': 'amount'})
+        state = {}
+        records = _wire_records(incremental.sync_table, MySQLConnection(config), stream, state, ['id', 'amount'])
+        expected = sorted(_float32(value) for value in FLOAT_INPUTS)
+        _assert_same_floats([record['amount'] for record in records], expected)
+        assert state['bookmarks'][stream.tap_stream_id]['replication_key_value'] == 16777216.0
+
+        with connect_with_backoff(MySQLConnection(config)) as source:
+            source.autocommit(True)
+            with source.cursor() as cursor:
+                cursor.execute(f'INSERT INTO {qualified} VALUES (5, 16777218)')
+        records = _wire_records(incremental.sync_table, MySQLConnection(config), stream, state, ['id', 'amount'])
+        assert [(record['id'], record['amount']) for record in records] == [(1, 16777216.0), (5, 16777218.0)]
+        assert state['bookmarks'][stream.tap_stream_id]['replication_key_value'] == 16777218.0
+    finally:
+        _drop_table(config, qualified)
+
+
+@pytest.mark.parametrize('prefix', ['TAP_MYSQL', 'TAP_ORACLE_MYSQL'])
+def test_float_auto_increment_key_bounds_full_table_by_the_stored_maximum(prefix):
+    """A six-digit maximum key of 16777200 would leave the stored 16777216 row out of the copy."""
+    config = _float_source_config(prefix)
+    table = 'float_key_' + uuid.uuid4().hex[:12]
+    qualified = f'`{config["database"]}`.`{table}`'
+    # AUTO_INCREMENT generates a new key for an inserted value that rounds to zero, such as 0.1.
+    keys = (1.1, 1234567.8, 16777217)
+    try:
+        with connect_with_backoff(MySQLConnection(config)) as source:
+            source.autocommit(True)
+            with source.cursor() as cursor:
+                cursor.execute(f'CREATE TABLE {qualified} (amount FLOAT AUTO_INCREMENT PRIMARY KEY, label CHAR(1))')
+                cursor.executemany(f'INSERT INTO {qualified} VALUES (%s, %s)', [(key, 'x') for key in keys])
+
+        stream = _selected_stream(config, table, **{'replication-method': 'FULL_TABLE'})
+        assert full_table.pks_are_auto_incrementing(MySQLConnection(config), stream)
+        state = {}
+        records = _wire_records(full_table.sync_table, MySQLConnection(config), stream, state, ['amount', 'label'], 1)
+        _assert_same_floats([record['amount'] for record in records], [_float32(key) for key in keys])
+    finally:
+        _drop_table(config, qualified)
+
+
+@pytest.mark.parametrize('prefix', ['TAP_MYSQL', 'TAP_ORACLE_MYSQL'])
+def test_columns_altered_from_float_before_rediscovery_load_their_new_values(prefix):
+    """The saved catalog still says 'float'; promoting these columns would load DOUBLEs instead of their values."""
+    config = _float_source_config(prefix)
+    table = 'float_altered_' + uuid.uuid4().hex[:12]
+    qualified = f'`{config["database"]}`.`{table}`'
+    big = 2 ** 53 + 1
+    try:
+        with connect_with_backoff(MySQLConnection(config)) as source:
+            source.autocommit(True)
+            with source.cursor() as cursor:
+                cursor.execute(
+                    f'CREATE TABLE {qualified} '
+                    '(id FLOAT AUTO_INCREMENT PRIMARY KEY, amount FLOAT, label FLOAT, total FLOAT, rate FLOAT)'
+                )
+                cursor.execute(f'INSERT INTO {qualified} VALUES (1, 1.25, 2.5, 3, 0.1)')
+        stale = _selected_stream(config, table, **{'replication-method': 'FULL_TABLE', 'selected': True})
+
+        with connect_with_backoff(MySQLConnection(config)) as source:
+            source.autocommit(True)
+            with source.cursor() as cursor:
+                cursor.execute(
+                    f'ALTER TABLE {qualified} MODIFY id BIGINT AUTO_INCREMENT, MODIFY amount DECIMAL(18,2), '
+                    'MODIFY label VARCHAR(10), MODIFY total BIGINT'
+                )
+                cursor.execute(f"INSERT INTO {qualified} VALUES (%s, 0.10, 'N/A', %s, 0.1)", (big, big))
+
+        resolved = get_non_binlog_streams(
+            MySQLConnection(config), Catalog([stale]),
+            {'filter_dbs': config['database'], 'decimal_target': 'snowflake'}, {},
+        ).streams
+        assert [stream.tap_stream_id for stream in resolved] == [stale.tap_stream_id]
+        columns = ['id', 'amount', 'label', 'total', 'rate']
+        records = _wire_records(full_table.sync_table, MySQLConnection(config), resolved[0], {}, columns, 1)
+        assert records == [
+            {'id': 1, 'amount': '1.25', 'label': '2.5', 'total': 3, 'rate': _float32(0.1)},
+            {'id': big, 'amount': '0.10', 'label': 'N/A', 'total': big, 'rate': _float32(0.1)},
+        ]
+    finally:
+        _drop_table(config, qualified)
+
+
+@pytest.mark.parametrize('prefix', ['TAP_MYSQL', 'TAP_ORACLE_MYSQL'])
+@pytest.mark.parametrize('table_format', ['native', 'iceberg'])
+def test_columns_altered_to_float_before_rediscovery_load_the_stored_value(prefix, table_format):
+    """Saved 'double' metadata left FLOAT columns unpromoted: six-digit values and a 16777200 key bound."""
+    config = _float_source_config(prefix)
+    table = 'float_from_double_' + uuid.uuid4().hex[:12]
+    qualified = f'`{config["database"]}`.`{table}`'
+    # Distinct as FLOATs; six-digit text reads the stored 16777216 maximum key as 16777200 and skips its row.
+    keys = (1.1, 2.5, 1234567.8, 16777217)
+    try:
+        with connect_with_backoff(MySQLConnection(config)) as source:
+            source.autocommit(True)
+            with source.cursor() as cursor:
+                cursor.execute(
+                    f'CREATE TABLE {qualified} (id DOUBLE AUTO_INCREMENT PRIMARY KEY, amount DOUBLE, KEY (amount))')
+                cursor.executemany(f'INSERT INTO {qualified} VALUES (%s, %s)', list(zip(keys, FLOAT_INPUTS)))
+                is_mariadb = 'mariadb' in source.get_server_info().lower()
+        stale = {
+            method: _selected_stream(config, table, 'double', **{'selected': True, **stream_metadata})
+            for method, stream_metadata in (
+                ('FULL_TABLE', {'replication-method': 'FULL_TABLE'}),
+                ('INCREMENTAL', {'replication-method': 'INCREMENTAL', 'replication-key': 'amount'}),
+            )
+        }
+        with connect_with_backoff(MySQLConnection(config)) as source:
+            source.autocommit(True)
+            with source.cursor() as cursor:
+                cursor.execute(f'ALTER TABLE {qualified} MODIFY id FLOAT AUTO_INCREMENT, MODIFY amount FLOAT')
+
+        # Iceberg v3 makes MariaDB discovery detect JSON aliases; FLOAT resolution must not depend on it.
+        runtime_config = {
+            'filter_dbs': config['database'], 'decimal_target': 'snowflake',
+            'engine': 'mariadb' if is_mariadb else 'mysql',
+            **({'target_table_format': 'iceberg', 'iceberg_version': 3} if table_format == 'iceberg' else {}),
+        }
+        resolved = {
+            method: get_non_binlog_streams(MySQLConnection(config), Catalog([stream]), runtime_config, {}).streams[0]
+            for method, stream in stale.items()
+        }
+        for stream in resolved.values():
+            assert singer.metadata.to_map(stream.metadata)[('properties', 'amount')]['datatype'] == 'float'
+        rows = sorted((_float32(key), _float32(amount)) for key, amount in zip(keys, FLOAT_INPUTS))
+        assert rows[-1][0] == 16777216.0
+
+        records = _wire_records(
+            full_table.sync_table, MySQLConnection(config), resolved['FULL_TABLE'], {}, ['id', 'amount'], 1)
+        assert [(record['id'], record['amount']) for record in records] == rows
+        _assert_same_floats([record['amount'] for record in records], [amount for _, amount in rows])
+
+        state = {}
+        records = _wire_records(
+            incremental.sync_table, MySQLConnection(config), resolved['INCREMENTAL'], state, ['id', 'amount'])
+        rows.sort(key=lambda row: row[1])
+        assert [(record['id'], record['amount']) for record in records] == rows
+        _assert_same_floats([record['amount'] for record in records], [amount for _, amount in rows])
+        assert state['bookmarks'][resolved['INCREMENTAL'].tap_stream_id]['replication_key_value'] == 16777216.0
+    finally:
+        _drop_table(config, qualified)

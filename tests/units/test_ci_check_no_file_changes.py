@@ -240,23 +240,21 @@ def test_snowflake_e2e_matrix_contract():
     assert job['name'] == '${{ matrix.check_name }}'
     assert strategy['fail-fast'] is False
     assert 'max-parallel' not in strategy
-    assert len(shards) == 19
+    assert len(shards) == 22
 
     expected_shards = {
         'conversion': (
             'e2e_tests_02',
             (
-                'tests/end_to_end/target_snowflake/test_native_to_iceberg_converter.py',
                 'tests/end_to_end/target_snowflake/tap_postgres/test_auto_native_to_iceberg_pg_to_sf.py',
-                'tests/end_to_end/target_snowflake/tap_mongodb/test_auto_native_to_iceberg_mongodb_to_sf.py',
                 'tests/end_to_end/data_diff/test_mysql_to_snowflake.py',
+                'tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_replica_to_sf.py',
             ),
         ),
         'publication': (
             'e2e_tests_03',
             (
                 'tests/end_to_end/target_snowflake/tap_postgres/test_snowflake_iceberg_publisher.py',
-                'tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_replica_to_sf.py',
             ),
         ),
         'pg-partial': (
@@ -265,23 +263,26 @@ def test_snowflake_e2e_matrix_contract():
                 'tests/end_to_end/target_snowflake/tap_postgres/test_partial_sync_pg_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_postgres/test_multiline_native_pg_to_sf.py',
                 'tests/end_to_end/data_diff/test_postgres_to_snowflake.py',
-                'tests/end_to_end/target_snowflake/tap_yugabyte/test_partial_sync_yugabyte_to_sf.py',
-                'tests/end_to_end/target_snowflake/tap_yugabyte/test_partial_sync_repair_yugabyte_to_sf.py',
+                'tests/end_to_end/target_snowflake/tap_mariadb/test_partial_sync_mariadb_to_sf.py::TestPartialSyncMariaDBToSF::test_partial_sync_removes_existing_row_deleted_from_source',
             ),
         ),
         'mariadb-partial': (
             'e2e_tests_05',
             (
-                'tests/end_to_end/target_snowflake/tap_mariadb/test_partial_sync_mariadb_to_sf.py',
-                'tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_with_split_large_files.py',
+                'tests/end_to_end/target_snowflake/tap_mariadb/test_partial_sync_mariadb_to_sf.py::TestPartialSyncMariaDBToSF::test_partial_sync_if_table_does_not_exist_in_target',
+                'tests/end_to_end/target_snowflake/tap_mariadb/test_partial_sync_mariadb_to_sf.py::TestPartialSyncMariaDBToSF::test_terminated_partial_sync_kills_blocked_source_query',
+                'tests/end_to_end/target_snowflake/tap_mariadb/test_partial_sync_mariadb_to_sf.py::TestPartialSyncMariaDBToSF::test_partial_sync_if_there_is_additional_column_in_source',
+                'tests/end_to_end/target_snowflake/tap_mariadb/test_partial_sync_mariadb_to_sf.py::TestPartialSyncMariaDBToSF::test_partial_sync_if_there_is_additional_column_in_target',
+                'tests/end_to_end/target_snowflake/tap_mariadb/test_partial_sync_mariadb_to_sf.py::TestPartialSyncMariaDBToSF::test_partial_sync_mariadb_to_sf',
+                'tests/end_to_end/target_snowflake/tap_mariadb/test_partial_sync_mariadb_to_sf.py::TestPartialSyncMariaDBToSF::test_unbounded_empty_range_removes_target_only_row',
                 'tests/end_to_end/target_snowflake/tap_yugabyte/test_replicate_yugabyte_to_sf.py',
-                'tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py::TestIcebergV3MySQLToSnowflake::test_iceberg_replication_preserves_keys_and_supplementary_unicode',
             ),
         ),
         'pg-iceberg': (
             'e2e_tests_06',
             (
-                'tests/end_to_end/target_snowflake/tap_postgres/test_iceberg_v3_postgres_to_sf.py',
+                'tests/end_to_end/target_snowflake/tap_postgres/test_iceberg_v3_postgres_to_sf.py::TestIcebergV3PostgresToSnowflake::test_full_and_bounded_partial_sync_preserve_multiline_bytes',
+                'tests/end_to_end/target_snowflake/tap_postgres/test_iceberg_v3_postgres_to_sf.py::TestIcebergV3PostgresToSnowflake::test_fullsync_hands_over_to_singer_on_managed_iceberg_v3',
                 'tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py::TestIcebergV3MySQLToSnowflake::test_fullsync_hands_over_to_singer_on_managed_iceberg_v3',
             ),
         ),
@@ -290,6 +291,7 @@ def test_snowflake_e2e_matrix_contract():
             (
                 'tests/end_to_end/target_snowflake/tap_mariadb/test_iceberg_v3_mariadb_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_mongodb/test_replicate_mongodb_to_sf.py',
+                'tests/end_to_end/test_numeric_replication.py::test_mysql_float_exact_snowflake',
             ),
         ),
         'mysql-iceberg': (
@@ -303,6 +305,7 @@ def test_snowflake_e2e_matrix_contract():
                 'tests/end_to_end/target_snowflake/tap_s3/test_replicate_s3_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf_with_archive_load_files.py',
+                'tests/end_to_end/test_numeric_replication.py::test_legacy_decimal_float_migration_requires_opt_in[postgres-native]',
             ),
         ),
         'mariadb-native': (
@@ -313,6 +316,7 @@ def test_snowflake_e2e_matrix_contract():
                 'tests/end_to_end/target_snowflake/tap_mariadb/test_multiline_native_mariadb_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_mariadb/test_defined_partial_sync_mariadb_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_with_split_large_files.py',
+                'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[mariadb-native]',
             ),
         ),
         'decimal-fastsync-postgres': (
@@ -321,15 +325,14 @@ def test_snowflake_e2e_matrix_contract():
                 'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[postgres-native]',
                 'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[yugabyte-native]',
                 'tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_transformations_are_private_through_publication',
+                'tests/end_to_end/target_snowflake/tap_postgres/test_iceberg_v3_postgres_to_sf.py::TestIcebergV3PostgresToSnowflake::test_partial_sync_merges_a_bounded_range_into_managed_iceberg_v3',
             ),
         ),
         'decimal-migration': (
             'e2e_tests_11',
             (
-                'tests/end_to_end/test_numeric_replication.py::test_legacy_decimal_float_migration_requires_opt_in[postgres-native]',
                 'tests/end_to_end/test_numeric_replication.py::test_legacy_decimal_float_migration_requires_opt_in[mysql-native]',
                 'tests/end_to_end/test_numeric_replication.py::test_legacy_decimal_float_migration_requires_opt_in[mysql-v3]',
-                'tests/end_to_end/test_numeric_replication.py::test_legacy_decimal_float_migration_requires_opt_in[mariadb-native]',
                 'tests/end_to_end/test_numeric_replication.py::test_legacy_decimal_float_migration_requires_opt_in[mariadb-v3]',
             ),
         ),
@@ -340,6 +343,7 @@ def test_snowflake_e2e_matrix_contract():
                 'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[postgres-v3]',
                 'tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_with_custom_buffer_size.py',
                 'tests/end_to_end/test_numeric_replication.py::test_legacy_decimal_float_migration_requires_opt_in[postgres-v3]',
+                'tests/end_to_end/test_numeric_replication.py::test_legacy_decimal_float_migration_requires_opt_in[mariadb-native]',
             ),
         ),
         'transformation-parity': (
@@ -354,11 +358,11 @@ def test_snowflake_e2e_matrix_contract():
         'numeric-boundaries': (
             'e2e_tests_14',
             (
-                'tests/end_to_end/test_numeric_replication.py::test_postgres_bounded_numeric_key_snowflake',
                 'tests/end_to_end/test_numeric_replication.py::test_yugabyte_bounded_numeric_key_snowflake',
                 'tests/end_to_end/test_numeric_replication.py::test_mysql_bounded_decimal_key_snowflake',
                 'tests/end_to_end/test_numeric_replication.py::test_mysql_extended_types_snowflake',
                 'tests/end_to_end/test_numeric_replication.py::test_mysql_legacy_binary_width_partial_sync_snowflake',
+                'tests/end_to_end/target_snowflake/tap_mongodb/test_auto_native_to_iceberg_mongodb_to_sf.py',
             ),
         ),
         'connector-evolution': (
@@ -367,7 +371,9 @@ def test_snowflake_e2e_matrix_contract():
         ),
         'connector-keys': (
             'e2e_tests_16',
-            (),
+            (
+                'tests/end_to_end/target_snowflake/test_native_to_iceberg_converter.py',
+            ),
         ),
         'postgres-maintenance': (
             'e2e_tests_17',
@@ -391,13 +397,35 @@ def test_snowflake_e2e_matrix_contract():
             (
                 'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[mysql-native]',
                 'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[mysql-v3]',
-                'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[mariadb-native]',
                 'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[mariadb-v3]',
             ),
         ),
         'connector-overflow': (
             'e2e_tests_20',
-            (),
+            (
+                'tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py::TestIcebergV3MySQLToSnowflake::test_iceberg_replication_preserves_keys_and_supplementary_unicode',
+            ),
+        ),
+        'yugabyte-partial': (
+            'e2e_tests_21',
+            (
+                'tests/end_to_end/target_snowflake/tap_yugabyte/test_partial_sync_yugabyte_to_sf.py',
+                'tests/end_to_end/target_snowflake/tap_yugabyte/test_partial_sync_repair_yugabyte_to_sf.py',
+                'tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_with_split_large_files.py',
+            ),
+        ),
+        'yugabyte-recovery': (
+            'e2e_tests_22',
+            (
+                'tests/end_to_end/test_yugabyte_recovery.py',
+            ),
+        ),
+        'postgres-float-parity': (
+            'e2e_tests_23',
+            (
+                'tests/end_to_end/test_numeric_replication.py::test_postgres_float_nonfinite_snowflake',
+                'tests/end_to_end/test_numeric_replication.py::test_postgres_bounded_numeric_key_snowflake',
+            ),
         ),
     }
     actual_shards = {
@@ -422,6 +450,7 @@ def test_snowflake_e2e_matrix_contract():
             'tests/end_to_end/data_diff/test_mysql_to_snowflake.py',
             'tests/end_to_end/data_diff/test_postgres_to_snowflake.py',
             'tests/end_to_end/test_numeric_replication.py',
+            'tests/end_to_end/test_yugabyte_recovery.py',
         }
     )
     postgres_decimal_tests = {
@@ -488,32 +517,49 @@ def test_snowflake_e2e_matrix_contract():
         if shard.get('connector_test_paths')
     }
     assert connector_shards == {
+        'publication': (
+            'tests/integration/test_decimals.py::test_numeric_array_json_text_loads_like_parse_json_without_versioning',
+            'tests/integration/test_decimals.py::test_native_nan_float_key_loaded_twice_keeps_one_row',
+        ),
+        'mysql-iceberg': (
+            'tests/integration/test_decimals.py::test_postgres_bounded_numeric_key_keeps_nan_and_canonical_identity',
+        ),
+        'decimal-migration': (
+            'tests/integration/test_decimals.py::test_float_tokens_load_nonfinite_values_into_existing_float_column',
+        ),
         'connector-evolution': (
             'tests/integration/test_decimals.py::test_opt_in_exact_decimal_load_versions_history_and_retries_without_reversion',
             'tests/integration/test_decimals.py::test_decimal_precision_reversal_in_one_process_refreshes_startup_cache',
             'tests/integration/test_decimals.py::test_decimal_archive_bounds_preserve_exact_text_and_ignore_nulls',
-            'tests/integration/test_decimals.py::test_mysql_extended_composite_key_upgrade_preserves_historical_updates_and_deletes',
             'tests/integration/test_runtime_contracts.py::test_cli_loads_utf8_and_acknowledges_committed_state',
             'tests/integration/test_runtime_contracts.py::test_cli_rejects_invalid_file_format_before_loading',
             'tests/integration/test_runtime_contracts.py::test_rejects_managed_text_variant_changes_without_versioning',
+            'tests/integration/test_decimals.py::test_float_fallback_keys_preserve_distinct_rows_across_batches',
+            'tests/integration/test_runtime_contracts.py::test_rejects_managed_merge_on_read_before_schema_changes',
+            'tests/integration/test_decimals.py::test_bounded_nan_retains_rows_in_copy_and_merge',
         ),
         'connector-keys': (
-            'tests/integration/test_decimals.py::test_decimal_key_change_retains_existing_type_and_adds_other_columns',
-            'tests/integration/test_decimals.py::test_decimal_primary_keys_coalesce_equal_numeric_values',
-            'tests/integration/test_decimals.py::test_postgres_bounded_numeric_key_keeps_nan_and_canonical_identity',
-            'tests/integration/test_decimals.py::test_float_fallback_keys_preserve_distinct_rows_across_batches',
-            'tests/integration/test_decimals.py::test_bounded_nan_retains_rows_in_copy_and_merge',
             'tests/integration/test_decimals.py::test_legacy_text_binary_key_matches_uppercase_fastsync_hex',
-            'tests/integration/test_runtime_contracts.py::test_rejects_table_format_change_without_altering_rows',
             'tests/integration/test_runtime_contracts.py::test_rejects_managed_v2_before_schema_changes',
-            'tests/integration/test_runtime_contracts.py::test_rejects_managed_merge_on_read_before_schema_changes',
+        ),
+        'decimal-fastsync-mysql-family': (
+            'tests/integration/test_runtime_contracts.py::test_sparse_patch_batches_preserve_omitted_values_and_apply_null',
+            'tests/integration/test_runtime_contracts.py::test_polymorphic_and_untyped_source_fields_load_after_flattening',
+        ),
+        'decimal-fallback-mysql-family': (
+            'tests/integration/test_runtime_contracts.py::test_failed_copy_or_merge_does_not_acknowledge_state',
+            'tests/integration/test_decimals.py::test_decimal_primary_keys_coalesce_equal_numeric_values',
         ),
         'connector-overflow': (
             'tests/integration/test_decimals.py::test_float_fallback_retains_overflow_rows_nulls_and_stable_column',
+            'tests/integration/test_decimals.py::test_decimal_key_change_retains_existing_type_and_adds_other_columns',
+        ),
+        'yugabyte-recovery': (
+            'tests/integration/test_decimals.py::test_mysql_extended_composite_key_upgrade_preserves_historical_updates_and_deletes',
+            'tests/integration/test_runtime_contracts.py::test_rejects_table_format_change_without_altering_rows',
+        ),
+        'postgres-float-parity': (
             'tests/integration/test_decimals.py::test_legacy_float_decimal_keys_coalesce_collisions_and_keep_last_patch_and_delete',
-            'tests/integration/test_runtime_contracts.py::test_failed_copy_or_merge_does_not_acknowledge_state',
-            'tests/integration/test_runtime_contracts.py::test_sparse_patch_batches_preserve_omitted_values_and_apply_null',
-            'tests/integration/test_runtime_contracts.py::test_polymorphic_and_untyped_source_fields_load_after_flattening',
         ),
     }
     connector_test_directory = (
@@ -608,7 +654,7 @@ def test_required_e2e_status_contract():
 
     assert len(configured_names) == len(set(configured_names))
     assert expected_statuses == {
-        f'e2e_tests_{shard_number:02d}' for shard_number in range(1, 21)
+        f'e2e_tests_{shard_number:02d}' for shard_number in range(1, 24)
     }
     assert required_statuses == expected_statuses
     assert not {

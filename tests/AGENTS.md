@@ -1,26 +1,36 @@
 # Test Suite Instructions
 
-Read root `AGENTS.md`; database/dev-project work also follows E2E guidance and
-connector-local tests follow connector guidance.
+Read root `AGENTS.md`. Database/dev-project work follows
+`tests/end_to_end/AGENTS.md`; connector tests follow `singer-connectors/AGENTS.md`.
 
 ## Boundaries
 
-- Prefer root units in the ready `pipelinewise` container and report host
-  fallback. `tests/units` is the credential/container-free root CI gate; use
-  the exact root command and fixed 77% threshold regardless of `.coveragerc`.
-- Collect nested data-diff/backend-db selections from `tests/units` and narrow
-  with `-k`; direct nested paths can break imports. Never run bare
-  `pytest tests/`, which collects credentialed E2E.
-- Connector tests are separate; database-backed and route tests follow their
-  scoped guides.
+- `tests/units` is the credential/container-free root gate. Use the root command
+  and its fixed 77% floor regardless of `.coveragerc`, in the ready container or
+  a declared host fallback. Collect nested data-diff/backend-db units from
+  `tests/units` with `-k`; direct nested paths can break imports.
+- Never run bare `pytest tests/`: it collects credentialed E2E. Connector suites
+  are separate. Local E2E requires an explicit user request; reviews and shared
+  sessions follow the root validation/isolation rules.
 
-## Proof
+## Test design and evidence
 
-- Generated-SQL assertions prove text, not database acceptance; identify absent
-  real-engine proof.
-- Mirror implementation paths and unsupported-route guards, not only happy
-  paths. Prefer behavior assertions unless exact SQL is the behavior.
-- Add import/AST coverage for dependency-seam changes; only backend-db →
-  data-diff is currently enforced directly.
-- Report pass/skip/fail counts per command group; skips and partial matrices are
-  incomplete verification.
+- Test observable behaviour and failure risks, not private implementation shape
+  or coverage percentages. Cover unsupported-route guards as well as successful
+  paths; prefer behaviour assertions unless exact SQL is the contract. Add a
+  regression for the actual trigger, including boundary types and state.
+- For recovery changes, exercise persisted state, target acknowledgement,
+  complete transaction boundaries and interruption/restart. For concurrency,
+  notification or rollback guarantees, use real sessions/engine tests where
+  needed; in-memory mocks alone do not prove durability or locking.
+- Generated SQL proves text, not engine acceptance. Distinguish unit/fake,
+  integration and E2E evidence; identify missing real-engine verification.
+- Add import/AST tests for dependency seams; only backend-db → data-diff is
+  currently enforced directly.
+- Ensure new tests are collected by their intended CI command/matrix and not
+  conditionally skipped. A file existing or a green aggregate is insufficient;
+  inspect named steps while following the CI status/log policy.
+- Keep coverage gates and purposeful exclusions. Do not lower thresholds, mix
+  coverage files or add superficial tests to make a percentage pass. Report
+  actual pass/skip/fail and intentional deselection counts per group; unavailable
+  checks and partial matrices remain incomplete verification.

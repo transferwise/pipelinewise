@@ -27,6 +27,7 @@ Column = collections.namedtuple('Column', [
 
 INTEGER_TYPES = {'integer', 'smallint', 'bigint'}
 FLOAT_TYPES = {'real', 'double precision'}
+FLOAT_ARRAY_TYPES = {'real[]', 'double precision[]'}
 JSON_TYPES = {'json', 'jsonb'}
 BASE_RECURSIVE_SCHEMAS = {
     'sdc_recursive_integer_array': {'type': ['null', 'integer', 'array'],
@@ -189,7 +190,7 @@ def discover_columns(connection, table_info, decimal_target=None):
                       'properties': column_schemas,
                       'definitions': {}}
 
-            schema = include_array_schemas(columns, schema)
+            schema = include_array_schemas(columns, schema, decimal_target)
 
             for c_name in column_schemas.keys():
                 mdata = write_sql_data_type_md(mdata, columns[c_name])
@@ -290,7 +291,8 @@ def schema_for_column_datatype(col, decimal_target=None):  # noqa: C901
         return schema
 
     if data_type in FLOAT_TYPES:
-        schema['type'] = nullable_column('number', col.is_primary_key)
+        # Decimal routes carry NaN and +/-Infinity as strings; targets still pick a float column from 'number'.
+        schema['type'] = nullable_columns(['number', 'string'] if decimal_target else ['number'], col.is_primary_key)
         return schema
 
     if data_type == 'text':
@@ -350,6 +352,11 @@ def schema_for_column(col_info, decimal_target=None):  # noqa: C901
         precision = post_db.numeric_precision(col_info)
         schema_name = schema_name_for_numeric_array(precision, scale)
         column_schema['items'] = {'$ref': f'#/definitions/{schema_name}'}
+        if decimal_target and not col_info.is_primary_key:
+            # FastSync's array_to_json text: 'array' keeps VARIANT/JSONB and the format keeps string transforms off.
+            # Keys keep list transport: targets dedup on key text, and display scale would split one key.
+            column_schema['type'] = ['null', 'string', 'array']
+            column_schema['format'] = post_db.JSON_TEXT_FORMAT
     elif col_info.sql_data_type == 'double precision[]':
         column_schema['items'] = {'$ref': '#/definitions/sdc_recursive_number_array'}
     elif col_info.sql_data_type == 'hstore[]':
@@ -401,8 +408,19 @@ def schema_name_for_numeric_array(precision, scale):
     return schema_name
 
 
-def include_array_schemas(columns, schema):
+def allow_nonfinite_float_array_items(schema):
+    """Let this stream's float array items carry NaN and +/-Infinity tokens without touching shared definitions."""
+    definitions = schema.setdefault('definitions', {})
+    number_array = copy.deepcopy(
+        definitions.get('sdc_recursive_number_array', BASE_RECURSIVE_SCHEMAS['sdc_recursive_number_array']))
+    number_array['type'] = ['null', 'number', 'string', 'array']
+    definitions['sdc_recursive_number_array'] = number_array
+
+
+def include_array_schemas(columns, schema, decimal_target=None):
     schema['definitions'] = copy.deepcopy(BASE_RECURSIVE_SCHEMAS)
+    if decimal_target and any(col.sql_data_type in FLOAT_ARRAY_TYPES for col in columns.values()):
+        allow_nonfinite_float_array_items(schema)
 
     decimal_array_columns = [key for key, value in columns.items() if value.sql_data_type == 'numeric[]']
     for col in decimal_array_columns:

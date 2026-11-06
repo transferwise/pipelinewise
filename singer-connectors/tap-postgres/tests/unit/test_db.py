@@ -51,15 +51,15 @@ class TestDbFunctions(unittest.TestCase):
         ])
 
     @patch('tap_postgres.db.psycopg2.connect')
-    def test_open_connection_rejects_postgres_before_11_2(self, connect):
+    def test_open_connection_rejects_postgres_before_14(self, connect):
         """Every connector connection rejects an unsupported source."""
         connection = connect.return_value
-        connection.server_version = 110001
+        connection.server_version = 130016
 
         with self.assertRaisesRegex(
                 db.UnsupportedPostgresVersionError,
-                'PostgreSQL 11.2 or later is required; '
-                'connected server reports server_version_num 110001',
+                'PostgreSQL 14 or later is required; '
+                'connected server reports server_version_num 130016',
         ):
             db.open_connection(self.conn_config)
 
@@ -68,7 +68,7 @@ class TestDbFunctions(unittest.TestCase):
     @patch('tap_postgres.db.psycopg2.connect')
     def test_open_connection_accepts_supported_versions(self, connect):
         """The exact support floor and newer logical connections are accepted."""
-        cases = ((110002, False), (110002, True), (180000, True))
+        cases = ((140000, False), (140000, True), (180000, True))
 
         for server_version, logical_replication in cases:
             with self.subTest(

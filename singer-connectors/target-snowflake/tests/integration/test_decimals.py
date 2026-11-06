@@ -3,6 +3,7 @@
 import json
 import math
 import os
+import re
 from decimal import Decimal
 from uuid import uuid4
 
@@ -11,17 +12,18 @@ import pytest
 import target_snowflake
 from singer.decimal_support import decimal_schema
 from target_snowflake.db_sync import DbSync
+from target_snowflake.file_formats import csv as csv_file_format
 from target_snowflake.upload_clients.s3_upload_client import S3UploadClient
 from tests.integration import utils
 
+FLOAT_TOKEN_SCHEMA = {'type': ['null', 'number', 'string']}
 
-@pytest.fixture(params=['native', 'iceberg'])
-def snowflake_decimal_target(request):
+
+def target_config(table_format, run_id):
+    """Plaintext CSV loads whose staged files stay under a run-specific prefix."""
     config = utils.get_db_config()
-    run_id = uuid4().hex[:12].upper()
     config.update({
-        'default_target_schema': f'PW_DECIMAL_{run_id}',
-        'target_table_format': request.param,
+        'target_table_format': table_format,
         'file_format': config.get('file_format') or os.environ.get('TARGET_SNOWFLAKE_FILE_FORMAT'),
         'client_side_encryption_master_key': '',
         's3_key_prefix': f'decimal-integration/{run_id}/',
@@ -29,21 +31,33 @@ def snowflake_decimal_target(request):
         'validate_records': True,
         'parallelism': 1,
     })
-    if request.param == 'iceberg':
+    if table_format == 'iceberg':
         config['iceberg_version'] = 3
+    return config
+
+
+def delete_staged_files(config):
+    if config.get('s3_bucket'):
+        client = S3UploadClient(config).s3_client
+        for page in client.get_paginator('list_objects_v2').paginate(
+            Bucket=config['s3_bucket'], Prefix=config['s3_key_prefix'],
+        ):
+            objects = [{'Key': item['Key']} for item in page.get('Contents', [])]
+            if objects:
+                client.delete_objects(Bucket=config['s3_bucket'], Delete={'Objects': objects})
+
+
+@pytest.fixture(params=['native', 'iceberg'])
+def snowflake_decimal_target(request):
+    run_id = uuid4().hex[:12].upper()
+    config = target_config(request.param, run_id)
+    config['default_target_schema'] = f'PW_DECIMAL_{run_id}'
     database = DbSync(config)
     try:
         yield config, database
     finally:
         database.query(f'DROP SCHEMA IF EXISTS "{config["default_target_schema"]}" CASCADE')
-        if config.get('s3_bucket'):
-            client = S3UploadClient(config).s3_client
-            for page in client.get_paginator('list_objects_v2').paginate(
-                Bucket=config['s3_bucket'], Prefix=config['s3_key_prefix'],
-            ):
-                objects = [{'Key': item['Key']} for item in page.get('Contents', [])]
-                if objects:
-                    client.delete_objects(Bucket=config['s3_bucket'], Delete={'Objects': objects})
+        delete_staged_files(config)
 
 
 def load(config, amount_schema, records=(), id_schema=None, extra_properties=None, key_properties=('id',),
@@ -259,6 +273,72 @@ def test_bounded_nan_retains_rows_in_copy_and_merge(snowflake_decimal_target):
     assert rows == [{'ID': 1, 'AMOUNT': Decimal('2.25')}, {'ID': 2, 'AMOUNT': None}, {'ID': 3, 'AMOUNT': None}]
 
 
+def float_rows(database, query):
+    """Return rows with NaN normalized so assertions can compare them by equality."""
+    return [
+        tuple('NaN' if isinstance(value, float) and math.isnan(value) else value for value in row.values())
+        for row in database.query(query)
+    ]
+
+
+def assert_single_float_column(config, database, name):
+    columns = database.get_table_columns([config['default_target_schema']])
+    assert [column['COLUMN_NAME'] for column in columns if column['COLUMN_NAME'].startswith(name)] == [name]
+    assert next(column for column in columns if column['COLUMN_NAME'] == name)['DATA_TYPE'] == 'FLOAT'
+
+
+@pytest.mark.parametrize('route', ['copy', 'copy-select', 'merge'])
+def test_float_tokens_load_nonfinite_values_into_existing_float_column(snowflake_decimal_target, route, monkeypatch):
+    config, database = snowflake_decimal_target
+    config['primary_key_required'] = route == 'merge'
+    keys = ('id',) if route == 'merge' else ()
+    # A decimal column forces the SELECT form of COPY; floats keep their plain stage expression there.
+    extra = {'price': decimal_schema(10, 2)} if route == 'copy-select' else None
+    copies = []
+    create_copy_sql = csv_file_format.create_copy_sql
+
+    def capture_copy_sql(*args, **kwargs):
+        copies.append(create_copy_sql(*args, **kwargs))
+        return copies[-1]
+
+    monkeypatch.setattr(csv_file_format, 'create_copy_sql', capture_copy_sql)
+    load(config, {'type': ['null', 'number']}, [{'id': 3, 'amount': 0.5}], extra_properties=extra, key_properties=keys)
+    load(config, FLOAT_TOKEN_SCHEMA, [
+        {'id': 1, 'amount': 'NaN'}, {'id': 2, 'amount': 'Infinity'}, {'id': 3, 'amount': '-Infinity'},
+        {'id': 4, 'amount': 1.5}, {'id': 5, 'amount': None},
+    ], extra_properties=extra, key_properties=keys)
+
+    assert len(copies) == (0 if route == 'merge' else 2)
+    assert all(('FROM (SELECT' in sql) == (route == 'copy-select') for sql in copies)
+    expected = [(1, 'NaN'), (2, float('inf')), (3, -float('inf')), (4, 1.5), (5, None)]
+    if route != 'merge':
+        expected.insert(3, (3, 0.5))
+    table = f'"{config["default_target_schema"]}".ITEMS'
+    assert float_rows(database, f'SELECT ID, AMOUNT FROM {table} ORDER BY ID, AMOUNT') == expected
+    assert_single_float_column(config, database, 'AMOUNT')
+
+
+@pytest.mark.parametrize('snowflake_decimal_target', ['native'], indirect=True)
+def test_native_nan_float_key_loaded_twice_keeps_one_row(snowflake_decimal_target):
+    config, database = snowflake_decimal_target
+    key_schema = {'type': ['number', 'string']}
+    load(config, FLOAT_TOKEN_SCHEMA, [
+        {'id': 'NaN', 'amount': 1.5}, {'id': 'Infinity', 'amount': 'NaN'},
+        {'id': '-Infinity', 'amount': None}, {'id': 2.5, 'amount': 'Infinity'},
+    ], id_schema=key_schema)
+    load(config, FLOAT_TOKEN_SCHEMA, [
+        {'id': 'NaN', 'amount': '-Infinity'}, {'id': 'Infinity', 'amount': 3.5},
+    ], id_schema=key_schema)
+
+    table = f'"{config["default_target_schema"]}".ITEMS'
+    assert float_rows(database, f'SELECT ID, AMOUNT FROM {table} ORDER BY ID') == [
+        (-float('inf'), None), (2.5, float('inf')), (float('inf'), 3.5), ('NaN', -float('inf')),
+    ]
+    assert current_primary_keys(config, database) == {'ID'}
+    assert_single_float_column(config, database, 'ID')
+    assert_single_float_column(config, database, 'AMOUNT')
+
+
 def current_primary_keys(config, database):
     rows = database.query(f'SHOW PRIMARY KEYS IN TABLE "{config["default_target_schema"]}".ITEMS')
     return {row['column_name'].upper() for row in rows}
@@ -387,3 +467,106 @@ def test_legacy_float_decimal_keys_coalesce_collisions_and_keep_last_patch_and_d
     for row, (_first, _last, expected) in zip(rows, extremes):
         assert math.isnan(row['ID']) if math.isnan(expected) else row['ID'] == expected
         assert row['AMOUNT'] == Decimal('2.00')
+
+
+NUMERIC_ARRAY_ITEMS = {'$ref': '#/definitions/sdc_recursive_decimal_100_38_array'}
+ARRAY_DEFINITIONS = {
+    'sdc_recursive_decimal_100_38_array': {
+        'type': ['null', 'number', 'array'], 'multipleOf': 1e-38, 'exclusiveMaximum': True, 'maximum': 10 ** 62,
+        'exclusiveMinimum': True, 'minimum': -10 ** 62, 'items': NUMERIC_ARRAY_ITEMS,
+    },
+    'sdc_recursive_number_array': {
+        'type': ['null', 'number', 'string', 'array'], 'items': {'$ref': '#/definitions/sdc_recursive_number_array'},
+    },
+}
+# PostgreSQL renders numeric 1e400 as 401 plain digits; row 8 shows exponent notation behaves the same.
+BEYOND_DOUBLE = '1' + '0' * 400
+NUMERIC_ARRAY_TEXTS = {
+    1: '[1,1.10,12345678901234567890.123,0.00000012,"NaN","Infinity","-Infinity",null]',
+    2: '[[1,2],[3,4]]',
+    3: '[5,6]',
+    4: '[]',
+    5: None,
+    6: '[123456789012345678901234567890123456789.5,123456789012345678901234567890123456789]',
+    7: f'[{BEYOND_DOUBLE},-{BEYOND_DOUBLE},0.{"0" * 399}1]',
+    8: '[1e400,-1e400,1e-400]',
+}
+
+
+def load_arrays(config, table, amounts_schema, records, key_properties):
+    stream = f'public-{table.lower()}'
+    messages = [{
+        'type': 'SCHEMA', 'stream': stream, 'key_properties': list(key_properties),
+        'schema': {'type': 'object', 'definitions': ARRAY_DEFINITIONS, 'properties': {
+            'id': {'type': ['integer']}, 'amounts': amounts_schema,
+            'floats': {'type': ['null', 'array'], 'items': {'$ref': '#/definitions/sdc_recursive_number_array'}},
+        }},
+    }]
+    messages.extend({'type': 'RECORD', 'stream': stream, 'record': record} for record in records)
+    cache, file_format = target_snowflake.get_snowflake_statics(config)
+    target_snowflake.persist_lines(config, [json.dumps(message) for message in messages], cache, file_format)
+
+
+@pytest.mark.parametrize('route', ['copy', 'merge'])
+def test_numeric_array_json_text_loads_like_parse_json_without_versioning(snowflake_decimal_target, route, monkeypatch):
+    config, database = snowflake_decimal_target
+    table = 'NUMERIC_ARRAYS'
+    config['primary_key_required'] = route == 'merge'
+    keys = ('id',) if route == 'merge' else ()
+    statements = []
+
+    def capture(create_sql):
+        def create_and_capture(*args, **kwargs):
+            statements.append(create_sql(*args, **kwargs))
+            return statements[-1]
+        return create_and_capture
+
+    for name in ('create_copy_sql', 'create_merge_sql'):
+        monkeypatch.setattr(csv_file_format, name, capture(getattr(csv_file_format, name)))
+    # The unmarked schema created existing tables; the JSON text schema must reuse their VARIANT column.
+    load_arrays(config, table, {'type': ['null', 'array'], 'items': NUMERIC_ARRAY_ITEMS},
+                [{'id': 0, 'amounts': [], 'floats': [1.5]}], keys)
+    json_text_schema = {'type': ['null', 'string', 'array'], 'format': 'singer.json', 'items': NUMERIC_ARRAY_ITEMS}
+    floats = {1: [1.5, None], 2: []}
+    load_arrays(config, table, json_text_schema, [
+        {'id': row_id, 'amounts': text, 'floats': floats.get(row_id)} for row_id, text in NUMERIC_ARRAY_TEXTS.items()
+    ], keys)
+
+    schema = config['default_target_schema']
+    if route == 'copy':
+        assert [sql.split(' (', 1)[0] for sql in statements] == [f'COPY INTO {schema}."{table}"'] * 2, statements
+        assert not any('SELECT' in sql for sql in statements), statements
+    else:
+        assert len(statements) == 2, statements
+        assert all(sql.startswith('MERGE INTO') and re.search(r'parse_json\(\$\d+\) "AMOUNTS"', sql)
+                   for sql in statements), statements
+    texts = ', '.join(f'({row_id}, %(text_{row_id})s)' for row_id in NUMERIC_ARRAY_TEXTS)
+    rows = database.query(
+        'SELECT t.ID, TO_JSON(t.AMOUNTS) AS LOADED, TO_JSON(PARSE_JSON(v.TEXT)) AS PARSED, '
+        'TYPEOF(t.AMOUNTS[1]) AS SCALED, TYPEOF(t.AMOUNTS[4]) AS TOKEN, TYPEOF(t.AMOUNTS[7]) AS ELEMENT, '
+        f'TO_JSON(t.FLOATS) AS FLOATS FROM {schema}."{table}" t '
+        f'LEFT JOIN (SELECT column1 AS ID, column2 AS TEXT FROM VALUES {texts}) v ON t.ID = v.ID ORDER BY t.ID',
+        {f'text_{row_id}': text for row_id, text in NUMERIC_ARRAY_TEXTS.items()},
+    )
+
+    assert [row['LOADED'] for row in rows[1:]] == [row['PARSED'] for row in rows[1:]]
+    # TO_JSON is None only for SQL NULL; Snowflake drops 1.10's display scale but keeps its exact DECIMAL value.
+    assert [(row['ID'], row['LOADED'], row['FLOATS']) for row in rows] == [
+        (0, '[]', '[1.5]'),
+        (1, '[1,1.1,12345678901234567890.123,0.00000012,"NaN","Infinity","-Infinity",null]', '[1.5,null]'),
+        (2, '[[1,2],[3,4]]', '[]'),
+        (3, '[5,6]', None),
+        (4, '[]', None),
+        (5, None, None),
+        (6, '[1.234567890123457e+38,123456789012345678901234567890123456789]', None),
+        (7, '[Infinity,-Infinity,0.000000000000000e+00]', None),
+        (8, '[Infinity,-Infinity,0.000000000000000e+00]', None),
+    ]
+    assert (rows[1]['SCALED'], rows[1]['TOKEN'], rows[1]['ELEMENT']) == ('DECIMAL', 'VARCHAR', 'NULL_VALUE')
+    columns = [
+        column for column in database.get_table_columns([schema])
+        if column['TABLE_NAME'] == table and not column['COLUMN_NAME'].startswith('_SDC_')
+    ]
+    assert sorted((column['COLUMN_NAME'], column['DATA_TYPE']) for column in columns) == [
+        ('AMOUNTS', 'VARIANT'), ('FLOATS', 'VARIANT'), ('ID', 'NUMBER'),
+    ]
