@@ -4,7 +4,7 @@ PostgreSQL source
 =================
 
 ``tap-postgres`` extracts tables with full-table, key-based incremental, or
-wal2json logical replication from PostgreSQL 11.2 or later. This source minimum
+wal2json logical replication from PostgreSQL 14 or later. This source minimum
 applies to every Singer replication method and PipelineWise FullSync/PartialSync;
 it does not constrain PostgreSQL targets or the PipelineWise backend database.
 

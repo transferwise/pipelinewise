@@ -242,7 +242,7 @@ class TestFastSyncTapPostgres(TestCase):
         """
         Check that get connection uses the right credentials to connect to primary
         """
-        connect_mock.return_value.server_version = 110002
+        connect_mock.return_value.server_version = 140000
         creds = {
             'host': 'my_primary_host',
             'user': 'my_primary_user',
@@ -264,9 +264,9 @@ class TestFastSyncTapPostgres(TestCase):
         self.assertTrue(connect_mock.return_value.autocommit)
 
     @patch('pipelinewise.fastsync.commons.tap_postgres.psycopg2.connect')
-    def test_get_connection_rejects_postgres_before_11_2(self, connect_mock):
+    def test_get_connection_rejects_postgres_before_14(self, connect_mock):
         """Every FastSync source connection enforces the PostgreSQL floor."""
-        connect_mock.return_value.server_version = 110001
+        connect_mock.return_value.server_version = 130016
         creds = {
             'host': 'my_primary_host',
             'user': 'my_primary_user',
@@ -277,7 +277,7 @@ class TestFastSyncTapPostgres(TestCase):
 
         with self.assertRaisesRegex(
             RuntimeError,
-            'PostgreSQL 11.2 or later.*server_version_num 110001',
+            'PostgreSQL 14 or later.*server_version_num 130016',
         ) as error:
             FastSyncTapPostgres.get_connection(creds, prioritize_primary=True)
 
@@ -289,7 +289,7 @@ class TestFastSyncTapPostgres(TestCase):
         self, connect_mock
     ):
         """Removed-tap cleanup can still connect to an obsolete source."""
-        connect_mock.return_value.server_version = 110001
+        connect_mock.return_value.server_version = 130016
         creds = {
             'host': 'my_primary_host',
             'user': 'my_primary_user',
@@ -335,7 +335,7 @@ class TestFastSyncTapPostgres(TestCase):
     @patch('pipelinewise.fastsync.commons.tap_postgres.psycopg2.connect')
     def test_drop_slot_validates_version_by_default(self, connect_mock):
         """FastSync resync slot cleanup must retain source-version validation."""
-        connect_mock.return_value.server_version = 110001
+        connect_mock.return_value.server_version = 130016
         creds = {
             'host': 'my_primary_host',
             'user': 'my_primary_user',
@@ -345,7 +345,7 @@ class TestFastSyncTapPostgres(TestCase):
             'tap_id': 'my_tap',
         }
 
-        with self.assertRaisesRegex(RuntimeError, 'PostgreSQL 11.2 or later'):
+        with self.assertRaisesRegex(RuntimeError, 'PostgreSQL 14 or later'):
             FastSyncTapPostgres.drop_slot(creds)
 
         connect_mock.return_value.close.assert_called_once_with()
@@ -455,7 +455,7 @@ class TestFastSyncTapPostgres(TestCase):
         """
         Check that get connection uses the right credentials to connect to secondary if present
         """
-        connect_mock.return_value.server_version = 110002
+        connect_mock.return_value.server_version = 140000
         creds = {
             'host': 'my_primary_host',
             'replica_host': 'my_replica_host',
@@ -486,7 +486,7 @@ class TestFastSyncTapPostgres(TestCase):
         """
         Check that get connection uses the primary server credentials as a fallback
         """
-        connect_mock.return_value.server_version = 110002
+        connect_mock.return_value.server_version = 140000
         creds = {
             'host': 'my_primary_host',
             'replica_host': 'my_replica_host',
@@ -513,7 +513,7 @@ class TestFastSyncTapPostgres(TestCase):
         """
         Check that get connection uses ssl when present
         """
-        connect_mock.return_value.server_version = 110002
+        connect_mock.return_value.server_version = 140000
         creds = {
             'host': 'my_primary_host',
             'user': 'my_primary_user',
@@ -564,7 +564,7 @@ class TestFastSyncTapPostgres(TestCase):
 
         # mock PG connection instance with ability to open cursor
         pg_con = Mock()
-        pg_con.server_version = 110002
+        pg_con.server_version = 140000
         pg_con.cursor.return_value = cursor_mock
 
         connect_mock.return_value = pg_con
@@ -606,7 +606,7 @@ class TestFastSyncTapPostgres(TestCase):
 
         # mock PG connection instance with ability to open cursor
         pg_con = Mock()
-        pg_con.server_version = 110002
+        pg_con.server_version = 140000
         pg_con.cursor.return_value = cursor_mock
 
         connect_mock.return_value = pg_con

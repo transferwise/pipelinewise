@@ -702,11 +702,10 @@ def _write_lsn_state(state, logical_streams, lsn):
     return state
 
 
-def _start_replication(cur, logical_streams, slot, start_lsn, version, decimal_target=None):
-    if version >= 120000:
-        wal_sender_timeout = 10800000  # 10800000ms = 3 hours
-        LOGGER.info('Set session wal_sender_timeout = %i milliseconds', wal_sender_timeout)
-        cur.execute(f"SET SESSION wal_sender_timeout = {wal_sender_timeout}")
+def _start_replication(cur, logical_streams, slot, start_lsn, decimal_target=None):
+    wal_sender_timeout = 10800000  # 10800000ms = 3 hours
+    LOGGER.info('Set session wal_sender_timeout = %i milliseconds', wal_sender_timeout)
+    cur.execute(f"SET SESSION wal_sender_timeout = {wal_sender_timeout}")
 
     parameters = {'slot_name': slot, 'decode': True, 'start_lsn': start_lsn,
                   'status_interval': FEEDBACK_POLL_INTERVAL}
@@ -755,14 +754,13 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):  # noqa
 
     # Create replication connection and cursor
     conn = post_db.open_connection(conn_info, True, True)
-    version = conn.server_version
     cur = None
     finalize_state = False
 
     try:
         cur = conn.cursor()
         decimal_options = {'decimal_target': conn_info['decimal_target']} if conn_info.get('decimal_target') else {}
-        _start_replication(cur, logical_streams, slot, start_lsn, version, **decimal_options)
+        _start_replication(cur, logical_streams, slot, start_lsn, **decimal_options)
 
         marker_lsn = emit_wal_progress_message(conn_info)
         if marker_lsn is not None:

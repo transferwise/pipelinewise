@@ -21,7 +21,7 @@ from singer.decimal_support import postgres_numeric_scale
 from ...utils import safe_column_name
 
 LOGGER = logging.getLogger(__name__)
-MIN_SUPPORTED_POSTGRES_VERSION = 110002
+MIN_SUPPORTED_POSTGRES_VERSION = 140000
 
 
 class UnsupportedPostgresVersionError(RuntimeError):
@@ -280,7 +280,7 @@ class FastSyncTapPostgres:
                 conn.close()
             finally:
                 raise UnsupportedPostgresVersionError(
-                    'PostgreSQL 11.2 or later is required; '
+                    'PostgreSQL 14 or later is required; '
                     f'connected server reports server_version_num {server_version}'
                 )
 

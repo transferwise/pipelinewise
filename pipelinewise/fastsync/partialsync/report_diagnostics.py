@@ -74,7 +74,7 @@ def report_error(error, operation):
     reason = ('Metadata operation failed; check database access, connectivity and configuration'
               if expected else 'Unexpected report error; provide the sanitized stderr diagnostic to maintainers')
     if isinstance(error, UnsupportedPostgresVersionError):
-        reason = 'PostgreSQL 11.2 or later is required'
+        reason = 'PostgreSQL 14 or later is required'
     result = {
         'status': 'error',
         'operation': operation if operation in _OPERATIONS else 'build_report',

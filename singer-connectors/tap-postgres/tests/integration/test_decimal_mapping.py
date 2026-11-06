@@ -217,7 +217,7 @@ def test_numeric_option_retry_recovers_from_a_real_replication_server_error():
         with patch.object(logical_replication.LOGGER, 'warning') as warning:
             logical_replication._start_replication(
                 SimpleNamespace(execute=replication_cursor.execute, start_replication=start_with_old_plugin_error),
-                [stream], table, 0, connection.server_version, 'postgres',
+                [stream], table, 0, 'postgres',
             )
         assert len(calls) == 2
         assert 'numeric-data-types-as-string' not in calls[-1]['options']

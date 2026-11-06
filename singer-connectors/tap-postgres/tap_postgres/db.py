@@ -16,7 +16,7 @@ from singer.decimal_support import decimal_to_string, is_decimal_schema
 LOGGER = singer.get_logger('tap_postgres')
 
 CURSOR_ITER_SIZE = 20000
-MIN_SUPPORTED_POSTGRES_VERSION = 110002
+MIN_SUPPORTED_POSTGRES_VERSION = 140000
 
 
 class UnsupportedPostgresVersionError(RuntimeError):
@@ -24,11 +24,11 @@ class UnsupportedPostgresVersionError(RuntimeError):
 
 
 def validate_server_version(connection):
-    """Reject PostgreSQL source versions older than 11.2."""
+    """Reject PostgreSQL source versions older than 14."""
     server_version = connection.server_version
     if server_version < MIN_SUPPORTED_POSTGRES_VERSION:
         raise UnsupportedPostgresVersionError(
-            'PostgreSQL 11.2 or later is required; '
+            'PostgreSQL 14 or later is required; '
             f'connected server reports server_version_num {server_version}'
         )
 
