@@ -41,6 +41,14 @@ def is_transform_required(record: Dict, when: Optional[List[Dict]], schema: Opti
     # Evaluate every condition
     for condition in when:
         column_to_match = condition['column']
+
+        # LOG_BASED PATCH records omit unchanged columns and deletes carry only keys: no equality, not even
+        # equals '', matches an omitted column, while regex conditions search it as an empty string.
+        if 'equals' in condition and column_to_match not in record:
+            LOGGER.debug('Column "%s" is absent, so its equals condition is not met.', column_to_match)
+            transform_required = False
+            break
+
         column_value = record.get(column_to_match, "")
         field_schema = (schema or {}).get('properties', {}).get(column_to_match, {})
 
@@ -50,6 +58,7 @@ def is_transform_required(record: Dict, when: Optional[List[Dict]], schema: Opti
             break
 
         field_path_to_match = condition.get('field_path')
+        field_value = column_value
 
         # check if given field exists in the column value
         if field_path_to_match:
@@ -79,10 +88,8 @@ def is_transform_required(record: Dict, when: Optional[List[Dict]], schema: Opti
                 transform_required = _decimal_equals(column_value, cond_equals, field_schema)
             elif numeric_condition and isinstance(cond_equals, str):
                 transform_required = False
-            elif field_path_to_match:
-                transform_required = __is_condition_met('equal', cond_equals, field_value)
             else:
-                transform_required = __is_condition_met('equal', cond_equals, column_value)
+                transform_required = __is_condition_met('equal', cond_equals, field_value)
 
             # Condition isn't met, exit the loop
             if not transform_required:
@@ -98,10 +105,7 @@ def is_transform_required(record: Dict, when: Optional[List[Dict]], schema: Opti
                 transform_required = False
                 break
 
-            if field_path_to_match:
-                transform_required = __is_condition_met('regex', cond_pattern, field_value)
-            else:
-                transform_required = __is_condition_met('regex', cond_pattern, column_value)
+            transform_required = __is_condition_met('regex', cond_pattern, field_value)
 
             # Condition isn't met, exit the loop
             if not transform_required:
