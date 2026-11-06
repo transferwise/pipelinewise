@@ -1,4 +1,4 @@
-0.100.1 (2026-11-06)
+0.101.0 (2026-11-06)
 --------------------
 
 - Require PostgreSQL 14 or later for PostgreSQL sources. Singer replication,

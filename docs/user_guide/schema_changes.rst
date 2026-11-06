@@ -228,7 +228,7 @@ Floating-point values
 PostgreSQL and YugabyteDB ``REAL`` and ``DOUBLE PRECISION`` columns keep
 ``NaN``, ``Infinity``, and ``-Infinity`` on Snowflake and PostgreSQL targets.
 This includes arrays of these types. FullSync, PartialSync, and every Singer
-replication method load the same special value. Before 0.100.1, Singer loaded
+replication method load the same special value. Before 0.101.0, Singer loaded
 these values as ``NULL`` while FastSync kept them.
 
 Singer carries the special values as the strings ``NaN``, ``Infinity``, and
@@ -244,7 +244,7 @@ key instead.
 
 MariaDB and MySQL ``FLOAT`` columns load the exact stored value on every path.
 For example, a stored ``16777217`` loads as ``16777216``, and ``0.1`` loads as
-``0.10000000149011612``. Before 0.100.1, FullSync, PartialSync, and Singer
+``0.10000000149011612``. Before 0.101.0, FullSync, PartialSync, and Singer
 FULL_TABLE and INCREMENTAL loaded the server's six-digit text instead, such as
 ``16777200`` and ``0.1``. LOG_BASED replication already loaded the exact value.
 Display options such as ``FLOAT(7,4)`` and ``ZEROFILL`` no longer change loaded
@@ -266,12 +266,12 @@ PostgreSQL and YugabyteDB arrays the same way FullSync and PartialSync do.
 Column types do not change, and S3 CSV targets are unchanged.
 
 A ``NULL`` array loads as SQL ``NULL``, and an empty array loads as an empty
-JSON array. Before 0.100.1, Singer loaded a ``NULL`` array as an empty array.
+JSON array. Before 0.101.0, Singer loaded a ``NULL`` array as an empty array.
 
 ``NUMERIC`` and ``DECIMAL`` arrays keep every digit and the ``NaN``,
 ``Infinity``, and ``-Infinity`` elements. Singer carries each value as the JSON
 text the source database produces, the same text that FullSync exports. Before
-0.100.1, Singer rounded each element to a floating-point number and loaded
+0.101.0, Singer rounded each element to a floating-point number and loaded
 special values as ``null``. An array column that is part of a primary key keeps
 the earlier transport, because targets compare key values as text.
 
