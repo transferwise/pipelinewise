@@ -60,22 +60,6 @@ def snowflake_decimal_target(request):
         delete_staged_files(config)
 
 
-@pytest.fixture(params=['native', 'iceberg'])
-def snowflake_dedicated_schema_table(request):
-    """Use TARGET_SNOWFLAKE_SCHEMA itself with a unique table, dropping only that table afterwards."""
-    run_id = uuid4().hex[:12].upper()
-    config = target_config(request.param, run_id)
-    if not config.get('default_target_schema'):
-        pytest.fail('Missing Snowflake integration setting: TARGET_SNOWFLAKE_SCHEMA')
-    table = f'NUMERIC_ARRAYS_{run_id}'
-    database = DbSync(config)
-    try:
-        yield config, database, table
-    finally:
-        database.query(f'DROP TABLE IF EXISTS {config["default_target_schema"]}."{table}"')
-        delete_staged_files(config)
-
-
 def load(config, amount_schema, records=(), id_schema=None, extra_properties=None, key_properties=('id',),
          record_update_mode=None):
     properties = {'id': id_schema or {'type': ['integer']}, 'amount': amount_schema, **(extra_properties or {})}
@@ -524,9 +508,9 @@ def load_arrays(config, table, amounts_schema, records, key_properties):
 
 
 @pytest.mark.parametrize('route', ['copy', 'merge'])
-def test_numeric_array_json_text_loads_like_parse_json_without_versioning(
-        snowflake_dedicated_schema_table, route, monkeypatch):
-    config, database, table = snowflake_dedicated_schema_table
+def test_numeric_array_json_text_loads_like_parse_json_without_versioning(snowflake_decimal_target, route, monkeypatch):
+    config, database = snowflake_decimal_target
+    table = 'NUMERIC_ARRAYS'
     config['primary_key_required'] = route == 'merge'
     keys = ('id',) if route == 'merge' else ()
     statements = []
