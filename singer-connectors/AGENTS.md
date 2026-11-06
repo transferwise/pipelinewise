@@ -1,46 +1,43 @@
 # Singer Connector Instructions
 
-Read root `AGENTS.md` and relevant implementation, test, E2E, and docs guides.
+Read root `AGENTS.md`, the core contracts in `pipelinewise/AGENTS.md` and the
+relevant test, E2E and docs guides. These are vendored sources, not submodules.
 
 ## Environments and CI
 
-These are vendored sources, not submodules. The root Ruff gate checks connector
-source packages plus the tap-mysql, tap-postgres, tap-yugabyte, target-postgres,
-and target-snowflake unit suites run by connector CI. Connector tests outside
-GitHub connector CI, including integration suites, legacy tests, and spikes,
-remain excluded; root unit tests exclude connectors. Prefer the ready
-`pipelinewise` container; report host fallbacks.
+Root Ruff scope applies; root units do not collect connectors. Connector CI
+installs all connectors and runs these Python 3.12 unit gates:
 
-Connector CI installs all connectors and runs Python 3.12 units for tap-mysql
-(`make unit_test_cov`, 47%), tap-postgres (`make unit_test_cov`, 58%),
-tap-yugabyte (`make unit_test_cov`, 65%), target-postgres (`make unit_test`,
-44%), and target-snowflake (`make unit_test`, 90%).
-The shared Singer job also runs tap-mongodb's source logging regression tests in
-a separate environment without a database. Other MongoDB units remain local.
-E2E job 01 runs SQL-source and PostgreSQL-target decimal integrations; jobs 15,
-16, and 20 run Snowflake decimal and runtime integrations through
-`scripts/test_decimal_connectors.sh`.
-Other connector integration suites still require local validation; behavior
-changes need local connector tests and an available E2E route.
+| Connector | Make target | Coverage floor |
+| --- | --- | --- |
+| tap-mysql | `unit_test_cov` | 47% |
+| tap-postgres | `unit_test_cov` | 58% |
+| tap-yugabyte | `unit_test_cov` | 65% |
+| target-postgres | `unit_test` | 44% |
+| target-snowflake | `unit_test` | 90% |
+
+The shared Singer job runs MongoDB source-logging regressions in a separate,
+database-free environment; other MongoDB units remain local. E2E job 01 runs SQL
+source/PostgreSQL-target decimal integrations; jobs 15, 16 and 20 run Snowflake
+decimal/runtime integrations via `scripts/test_decimal_connectors.sh`. Inspect
+the actual workflow commands for other integration coverage: a test file or a
+green aggregate does not prove collection. Behaviour changes need the owning
+connector tests and an appropriate E2E route, subject to the root local-E2E rule.
 
 Root `make connectors -e pw_connector=<name>` creates runtime
-`.virtualenvs/<name>/`; connector Makefiles often test in `./venv/`. Never mix
-PipelineWise, runtime-connector, connector-test, host, or container interpreters.
+`.virtualenvs/<name>/`; connector Makefiles often test in `./venv/`. Keep these
+separate from PipelineWise and host environments as required by the root guide.
+Yugabyte bulk executables use isolated `.virtualenvs/fastsync-yugabyte/` with
+the forked driver; keep stock psycopg2 in the main/backend/data-diff environment.
 
 ## Validation
 
-Ruff is the only supported connector linter. Where present, the owning
-Makefile's `lint` target runs the connector environment's Ruff binary from the
-repository root so the root `pyproject.toml` applies. The tap-mysql,
-tap-postgres, tap-yugabyte, target-postgres, and target-snowflake targets lint
-source, their GitHub-tested unit suites, and shared unit helpers; other connector
-targets lint source only. Unit
-and integration targets remain the behavioral validation. Do not add
-connector-local lint configuration, another Python linter, or an automatic
-formatter. Line length, docstring quoting, lambda assignment, and complexity
-rules apply to all connector source. Keep unavoidable legacy ignores inline,
-function- or line-scoped, and rule-specific. New or modified connector Python
-must remain within the root Ruff scope.
+The owning Makefile's `lint` target uses its venv's Ruff from the repository root,
+so root `pyproject.toml` applies. The five CI-tested connectors lint source,
+CI unit suites and shared helpers; other targets lint source only. Follow root
+line-length, quotes, lambda-assignment, complexity and narrow-ignore rules. Add
+no connector-local lint configuration, other linter or automatic formatter.
+Units and integration tests provide behavioural evidence, not lint.
 
 Run available environment, lint, unit, integration, and coverage targets
 without lowering thresholds; integration may need containers or credentials.
@@ -54,47 +51,16 @@ without lowering thresholds; integration may need containers or credentials.
   without local source/tests; Salesforce has a Makefile but no tests. GitHub,
   Jira, and Zendesk lack repository E2E.
 
-Report unavailable or skipped integration/E2E coverage as unverified.
-Use distinct ``COVERAGE_FILE`` paths for overlapping coverage runs; otherwise
-unit and integration results can combine and overstate an individual suite's coverage.
+Use distinct `COVERAGE_FILE` paths for overlapping runs; report unit, integration
+and combined coverage separately. Combining suites does not satisfy either
+individual gate; unavailable/skipped integrations remain unverified. Report
+actual counts, not a historical expected total.
 
-### Target-snowflake integration tests in dev-project
-
-Run credentialed target-snowflake integration only in the ready `pipelinewise`
-container and never beside another Snowflake group. The suite drops
-`TARGET_SNOWFLAKE_SCHEMA`; dedicate it. After changing `dev-project/.env`,
-recreate the CLI container and await its current-start readiness marker:
-
-```bash
-docker compose -f dev-project/docker-compose.yml up -d --force-recreate --no-deps pipelinewise
-docker logs --follow pipelinewise
-```
-
-Require `PipelineWise Dev environment is ready in Docker container(s).`. The
-CSV suite needs standard Snowflake/S3 variables,
-`TARGET_SNOWFLAKE_SCHEMA`, and `TARGET_SNOWFLAKE_FILE_FORMAT_CSV` (which may
-reuse `TARGET_SNOWFLAKE_FILE_FORMAT`); ensure the private key is readable.
-
-Run the integration suite with plaintext upload explicitly selected and a
-separate coverage file:
-
-```bash
-docker exec -t -e CLIENT_SIDE_ENCRYPTION_MASTER_KEY= \
-  -e COVERAGE_FILE=/tmp/target-snowflake-integration.coverage pipelinewise bash -c '
-  cd /opt/pipelinewise/singer-connectors/target-snowflake
-  . ./venv/bin/activate
-  pytest tests/integration -vvx \
-    -k "not test_loading_tables_with_client_side_encryption or wrong_master_key" \
-    --cov=target_snowflake --cov-report=term-missing
-'
-```
-
-This excludes one successful client-side encryption test while retaining CSV
-external and table-stage loads plus wrong-key rejection. Expect 95 passes,
-one deselection, and zero skips. Full `make integration_test` separately requires
-a real client-side encryption master key and expects 96 passes. Report unit,
-integration, and combined coverage separately; combining them does not satisfy
-either individual gate.
+Credentialed target-snowflake integrations require the ready container and an
+isolated `TARGET_SNOWFLAKE_SCHEMA`, which they drop. Never overlap Snowflake
+groups or another session's fixtures. The complete environment, recreation,
+plaintext-upload and encryption-exclusion recipe is in
+`tests/end_to_end/README.md`; root shared-session and E2E restrictions apply.
 
 ## Versioning and upstream
 
@@ -102,19 +68,23 @@ either individual gate.
   explicit, do not bump connector versions or add versioned connector
   changelogs. Put release-visible changes in the current root release; include
   test/CI/fixture changes only when release-relevant. Jira remains an external pin.
+- The shared vendored Singer package has its own compatibility version. When its
+  API changes, bump that version and every local consumer pin together. Check a
+  clean wheel/sdist installation when packaging is affected; editable installs
+  alone cannot expose an older cached wheel satisfying an unchanged pin.
 - These are upstream-derived copies. Coordinate non-trivial divergence
   upstream; keep local fixes narrow, comments limited to why divergence is
   needed, and avoid broad formatting.
-- PostgreSQL sources require version 11.2 or later for every Singer replication
-  method and PipelineWise FullSync/PartialSync. Keep their version checks aligned;
-  this source minimum does not constrain target-postgres or the PipelineWise
-  backend database.
+- Use the core **PostgreSQL 14+** source floor across Singer/FullSync/PartialSync
+  and keep connection gates aligned. Targets and backend DBs have separate
+  requirements.
 - PostgreSQL discovery's `row-count` uses `reltuples`, which can be stale or zero
   after ANALYZE-then-load. Zero does not prove emptiness. Sum leaf estimates for
   partitioned totals without adding parent estimates.
-- PostgreSQL/Snowflake targets silently ignore retired deletion-mode options,
-  enable metadata automatically, and physically process `_SDC_DELETED_AT` before
-  acknowledging state. Keep this marker in Singer schemas and transport.
+- Follow core delete/state and decimal contracts. Keep `_SDC_DELETED_AT` through
+  schemas/transport and apply deletes before acknowledging state. Use explicit
+  decimal metadata and exact string transport; a generic JSON `number` from an
+  API tap remains approximate without that contract.
 - MySQL binlog checkpoints must retain transaction/table-map boundaries and
   each stream's acknowledged history. Preserve complete GTID sets and replay
   fences; only new complete-history captures may set `gtid_complete: true`.

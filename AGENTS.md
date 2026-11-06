@@ -1,75 +1,67 @@
 # AI Coding Agent Instructions
 
-## Scope
+## Scope and shared work
 
 PipelineWise is a Python 3.12 Singer ELT framework. Write for senior engineers
-with operational precision, edge cases, and rationale. Root rules apply
-repo-wide; scoped rules add to them, and explicit user instructions win. Read
-the guides relevant to the change:
+with operational precision, edge cases and rationale. Explicit user instructions
+win; root rules apply repo-wide and scoped guides add to them:
 
-- `pipelinewise/AGENTS.md`: orchestration, FastSync, backend migrations, data-diff.
+- `pipelinewise/AGENTS.md`: orchestration, FastSync, backend and data-diff.
 - `singer-connectors/AGENTS.md`: vendored taps and targets.
-- `tests/AGENTS.md`: units and suite boundaries.
-- `tests/end_to_end/AGENTS.md`: databases, connector routes, E2E, `dev-project/`.
+- `tests/AGENTS.md`: test boundaries and evidence.
+- `tests/end_to_end/AGENTS.md`: databases, E2E, CI and `dev-project/`.
 - `docs/AGENTS.md`: documentation.
 
-Every `CLAUDE.md` symlinks to its adjacent `AGENTS.md`; edit the latter and
-preserve the link.
+Edit `AGENTS.md`, preserving each adjacent `CLAUDE.md` symlink. Preserve dirty
+work. While another session works here, do not switch branches, reset files,
+rebuild environments, restart shared services or reset fixtures; coordinate or
+isolate disruptive work. Read-only reviews do not trigger implementation gates.
+If told not to run anything, limit work to file reads and text searches.
 
-## Architecture
+## Architecture and environment
 
 - Singer JSON flows as `tap | [transform-field] | [mbuffer] | target`; YAML
-  generates config, state, and catalog JSON.
-- `pipelinewise/cli/__init__.py` defines argparse and dispatches to
-  `PipelineWise`. Canonical `fast_sync` and `import_config` retain deprecated
-  aliases `sync_tables` and `import`.
-- FastSync optimizes native full/filtered bulk transfer; it is not a replication
-  method. Singer handles INCREMENTAL/LOG_BASED and non-FastSync FULL_TABLE streams.
-- Treat UTC as the canonical convention for replication and data-diff timestamps
-  and windows. Interpret source timezones correctly before normalizing; never
-  rely on the host or container timezone for correctness.
-
-## Environment
-
-- Default to the `dev-project` Docker stack, whose Linux runtime best matches
-  production. Use the host only to manage Docker or when the container cannot
-  run a check; report that fallback and compatibility gap.
-- The repo mounts at `/opt/pipelinewise` in `pipelinewise`.
-  `PIPELINEWISE_HOME` environments are on `PATH` under
-  `dev-project/.virtualenvs/`.
+  generates config, state and catalogs. `pipelinewise/cli/__init__.py` dispatches to
+  `PipelineWise`. Use `fast_sync` and `import_config`; `sync_tables` and `import`
+  remain deprecated aliases, not names for new docs, tests or comments.
+- FastSync optimizes full/filtered bulk transfer; it is not a replication method.
+  Singer handles INCREMENTAL, LOG_BASED and non-FastSync FULL_TABLE streams.
+- Normalize timestamps/windows to UTC after interpreting source timezones;
+  never depend on the host or container timezone.
+- Prefer dev-project Docker for production compatibility. Use the host to
+  manage Docker or when the container cannot run a check; report fallback gaps.
+  The repo mounts at `/opt/pipelinewise` in `pipelinewise`; environments under
+  `dev-project/.virtualenvs/` are on `PIPELINEWISE_HOME`'s PATH.
 - `make pipelinewise` installs the editable root and test extras. Connector
   runtimes use `.virtualenvs/<name>/`; connector Makefiles may use `venv/`.
-  Never mix host/container, root, runtime-connector, or connector-test
-  interpreters; never use repository `.venv/`.
+  Never mix host/container, root, runtime-connector or connector-test interpreters,
+  or use repository `.venv/`.
 
 ## Validation
 
-For implementation changes, run these root gates verbatim, in order, preferably
-in the ready container:
+For implementation changes, run these root gates verbatim and in order in the
+ready container; a host fallback must activate `.virtualenvs/pipelinewise/`:
 
 ```bash
 ruff check .
 pytest --cov=pipelinewise --cov-fail-under=77 -v tests/units
 ```
 
-An unavoidable host run must activate `.virtualenvs/pipelinewise/`. Keep paths
-and flags exact: Ruff checks all repository Python except connector tests outside
-existing GitHub connector CI, including integration suites, legacy tests, and
-spikes. This includes data-diff, root E2E, vendored connector source, and the
-tap-mysql, tap-postgres, tap-yugabyte, target-postgres, and target-snowflake unit
-suites run by connector CI. Never run bare `pytest tests/` because it collects
-credentialed E2E. Collect
-nested data-diff/backend-db tests from `tests/units`, narrowing with `-k` to
-avoid import failures.
+Ruff follows root `pyproject.toml`: source, data-diff, root E2E and the tap-mysql,
+tap-postgres, tap-yugabyte, target-postgres and target-snowflake CI unit suites
+are included. Connector tests outside existing GitHub CI, including integration,
+legacy tests and spikes, are excluded. Keep changed Python within this policy;
+do not escape checks through exclusions or broad ignores. Never run bare
+`pytest tests/`, which collects credentialed E2E. Collect nested data-diff and
+backend units from `tests/units`, narrowing with `-k` to avoid import failures.
 
-After implementation, schema, example-config, or connector-config changes,
-validate in Docker (Compose loads `dev-project/.env`):
+After implementation, schema, example-config or connector-config changes:
 
 ```bash
 pipelinewise validate --dir dev-project/pipelinewise-config
 ```
 
-For a host fallback, source the existing `.env` without overwriting it:
+Compose loads `dev-project/.env`. A host fallback must source, not overwrite it:
 
 ```bash
 set -a
@@ -78,74 +70,63 @@ set +a
 .virtualenvs/pipelinewise/bin/pipelinewise validate --dir dev-project/pipelinewise-config
 ```
 
-Also follow these scoped checks:
+Follow scoped connector and docs checks. Run local E2E only when explicitly
+requested; prefer PR CI and follow `tests/end_to_end/AGENTS.md`. Reviews use
+bounded, non-disruptive verification within scope. Guidance-only edits need
+text, link, symlink and diff checks, not project execution. Do not repeat passed
+checks without changed inputs, a new failure or an unresolved concern.
 
-- Database, migration, FastSync, data-diff, connector-route, or E2E:
-  `tests/end_to_end/AGENTS.md`.
-- Connector source: `singer-connectors/AGENTS.md`; the root Ruff gate checks
-  source and GitHub-tested suites, while connector-local targets provide install
-  and test coverage.
-- Docs: `docs/AGENTS.md`; warnings fail.
+## Style and diagnostics
 
-## Style and safety
-
-- Python: 120 columns, complexity 15, four spaces, Google docstrings,
-  consistent single quotes, `snake_case` names/JSON keys, `PascalCase` classes.
-- Ruff retains error, warning, quote, line-length, and complexity gates plus the
-  `PLE` family. Preview rules require explicit selection; `E301`–`E306` enforce
-  blank-line spacing. The Ruff-only migration intentionally did not enable `PLC`,
-  `PLR`, or `PLW` wholesale over legacy code; broaden rules only with a
-  scoped cleanup and regression plan.
-- Every new or modified Python file must remain in scope for `ruff check .` and
-  pass the repository `pyproject.toml` policy. Do not add or invoke another
-  Python linter or formatter.
-- Uppercase Snowflake FastSync identifiers. Scope new Ruff ignores to the
-  narrowest line or function and rule. Do not add connector-wide or
-  directory-wide rule exemptions or broaden unrelated inline suppressions.
-- Comments explain a non-obvious constraint or consequence in at most two
-  lines; do not restate code, narrate edits, argue choices, or add walkthroughs.
-- Preserve dirty-worktree changes. Never run `pre-commit run --all-files`,
-  reformat unrelated files, or broaden lint fixes.
-- Declare third-party imports in the owning `setup.py`; do not rely on
-  transitive installs.
-- Never commit secrets, `.tfvars`, private keys, or populated environment files.
-- Use `import_config` in docs, examples, tests, and comments; `import` is deprecated.
+- Python: 120 columns, complexity 15, four spaces, Google docstrings, single
+  quotes, `snake_case` names/JSON keys and `PascalCase` classes. Declare imports
+  in the owning `setup.py`; do not rely on transitive installs.
+- Use only the repository's Ruff lint tooling; add no other linter or formatter.
+  Keep error, warning, quote, line-length, complexity and `PLE` gates; preview
+  rules require explicit
+  selection and `E301`–`E306` cover spacing. Do not enable `PLC`, `PLR` or `PLW`
+  wholesale over legacy code without scoped cleanup and a regression plan.
+- Keep new ignores specific to the narrowest line/function and rule. Do not
+  add connector/directory exemptions, broaden unrelated suppressions, reformat
+  unrelated files or run `pre-commit run --all-files`.
+- Comments explain non-obvious constraints/consequences in at most two lines;
+  omit restated code, edit narratives, arguments and walkthroughs.
+- Log source hostnames consistently at INFO once per run/session through shared
+  helpers, never for every row, array or hstore value. Reuse shared redaction;
+  never log usernames, passwords, keys, tokens or raw source values, including
+  through exceptions. Metadata and aggregate evidence may support diagnosis.
+- Log column versioning at INFO with the same format across Singer and native/
+  Iceberg PartialSync. Uppercase and quote Snowflake FastSync identifiers.
+- Never commit secrets, `.tfvars`, private keys or populated environment files.
 
 ## Reviews
 
-When reviewing changes between the current state and `master`, present concerns
-as a numbered list, ordered from most to least severe. Label each concern's
-severity; if there are no concerns, say so explicitly.
+Keep reviews read-only unless fixes are requested. Verify the reviewed revision
+and base; recheck before carrying findings forward. Number findings by severity,
+highest first, with a concrete trigger, impact and code reference. Distinguish
+introduced defects, inherited limitations and operational risks. Separate
+unverified concerns and validation gaps from confirmed defects; missing tests
+alone do not establish a Medium issue. If there are no findings, say so.
 
-## Git and completion
+## Git, releases and completion
 
-- Branch from `master`; keep diffs task-scoped. Sign every commit with
+- Branch from `master`, keep scope narrow and sign every commit with
   `git commit -S`; never create or push an unsigned commit.
-- Never include internal Jira names or issue keys (such as `AP-...`) in commit
-  messages, PR titles, or PR descriptions, even when the branch name has one.
-- Never credit an AI agent in commit messages, PR titles, or PR descriptions:
-  add no `Co-authored-by` trailer naming an AI agent or model, and no
-  "Generated with" attribution line.
-- Write docs and CHANGELOG entries in plain language. Use short sentences with
-  one idea each. Lead with behaviour, defaults, or the action the operator needs.
-- Keep CHANGELOG entries to user-visible outcomes and upgrade steps. Start
-  bullets with action verbs. Put detailed rules and edge cases in linked docs.
-  Preserve exact limits, boundaries, and recovery requirements when shortening.
-- Before creating a PR or pushing to an open PR, compare the complete branch
-  diff with the current CHANGELOG entry; do not proceed if the entry omits or
-  misstates the diff or claims absent changes. Set that release to today's date
-  (never `TBD` or an earlier date) and link its CHANGELOG entry directly in the
-  PR body.
-- PipelineWise remains `0.x`; never publish `1.0.0` or above. Use a patch for
-  compatible fixes and the next `0.x` minor for features or intentional
-  compatibility changes. Document material operator impact and align `setup.py`
-  with the top CHANGELOG release.
-
-Before completion:
-
-1. Run every applicable lint, unit, config, scoped E2E, connector, and docs check.
-2. Update validated docs for user-facing behavior/config changes and the root
-   changelog for release-visible connector changes.
-3. Report pass/skip/fail counts by group; skips, failures, and unavailable checks
-   are not passing verification.
-4. Require clean `git diff --check` and only expected `git status` entries.
+- Exclude internal Jira names/keys (such as `AP-...`) from commit messages, PR
+  titles and bodies, even if the branch has one. Add no AI/model `Co-authored-by`
+  or "Generated with" attribution.
+- Write docs/CHANGELOG in plain language: short sentences, one idea each,
+  behaviour/default/operator action first. CHANGELOG bullets start with verbs
+  and cover user-visible outcomes and upgrade steps. Link detailed rules;
+  retain exact limits, boundaries and recovery requirements when shortening.
+- Before PR creation/push, reconcile the whole branch diff with its CHANGELOG
+  entry; stop if it omits/misstates changes or claims absent behaviour. Date
+  that release today, never `TBD` or an earlier date, and link its entry in the PR.
+- Remain below `1.0.0`: patches for compatible fixes, the next `0.x` minor for
+  features/intentional compatibility changes. Align `setup.py` and the top
+  CHANGELOG release and document material operator impact.
+- Finish applicable authorised lint, unit, config, connector, docs and CI checks;
+  update user-facing docs and release-visible connector CHANGELOG entries.
+  Report actual pass/skip/fail counts by group and unavailable checks; skips
+  and partial matrices are not passes. Require clean scoped `git diff --check`
+  and inspect `git status`, distinguishing your changes from pre-existing work.
