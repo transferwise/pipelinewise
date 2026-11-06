@@ -104,10 +104,10 @@ def get_database_name(catalog_entry):
 
 
 def is_float_column(catalog_entry, column_name):
-    """Return whether the catalog marks a 4-byte FLOAT that live discovery still describes as a plain number.
+    """Return whether the catalog marks a 4-byte FLOAT column whose schema is a plain number.
 
-    A run pairs the input catalog's metadata with the live schema, so a column altered from FLOAT keeps 'float'
-    metadata until re-discovery and must not be read as DOUBLE.
+    resolve_catalog takes the datatype from the discovery that built the schema; the schema check still keeps an
+    entry whose datatype and schema disagree from promoting decimals, strings, integers or formatted values.
     """
     column_metadata = metadata.to_map(catalog_entry.metadata).get(('properties', column_name), {})
     column_schema = catalog_entry.schema.properties.get(column_name)

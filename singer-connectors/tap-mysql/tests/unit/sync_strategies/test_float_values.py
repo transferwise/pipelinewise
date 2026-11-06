@@ -1,5 +1,6 @@
 """FLOAT columns read their exact stored value on every replication method."""
 
+import copy
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -113,18 +114,21 @@ def test_max_pk_without_float_metadata_keeps_the_raw_key():
 
 @pytest.mark.parametrize('decimal_target', [None, 'snowflake'])
 @pytest.mark.parametrize('altered', [
+    column('amount', 'double'),
     column('amount', 'decimal', 'decimal(18,2)', precision=18, scale=2),
     column('amount', 'varchar', 'varchar(10)', length=10),
     column('amount', 'bigint'),
-], ids=['decimal', 'varchar', 'bigint'])
+], ids=['double', 'decimal', 'varchar', 'bigint'])
 def test_columns_altered_from_float_before_rediscovery_keep_their_raw_values(altered, decimal_target):
-    """A run keeps the input catalog's 'float' metadata but takes each column's schema from live discovery."""
+    """The saved catalog still says 'float', but live discovery describes each altered column and its schema."""
     stale = discovered_entry(
         [column('id', 'float', key='PRI'), column('amount', 'float'), column('rate', 'float')], decimal_target,
     )
     live = discovered_entry([column('id', 'bigint', key='PRI'), altered, column('rate', 'float')], decimal_target)
     resolved = discover_utils.resolve_catalog(Catalog([live]), [stale], decimal_target).streams[0]
-    assert metadata.to_map(resolved.metadata)[('properties', 'amount')]['datatype'] == 'float'
+    assert metadata.to_map(resolved.metadata)[('properties', 'amount')] == {
+        'selected-by-default': True, 'datatype': altered.data_type, 'sql-datatype': altered.column_type,
+    }
     cursor = MagicMock()
     cursor.fetchone.return_value = None
 
@@ -134,6 +138,68 @@ def test_columns_altered_from_float_before_rediscovery_keep_their_raw_values(alt
     assert full_table.get_max_pk_values(cursor, resolved) == {}
     assert ' '.join(cursor.execute.call_args.args[0].split()) == (
         'SELECT `id` FROM `source`.`events` ORDER BY `id` DESC LIMIT 1'
+    )
+
+
+@pytest.mark.parametrize('decimal_target', [None, 'snowflake'])
+def test_columns_altered_to_float_before_rediscovery_are_promoted(decimal_target):
+    """Saved 'double' metadata left columns altered to FLOAT unpromoted, so they loaded six-digit text."""
+    stale = discovered_entry(
+        [column('id', 'double', key='PRI'), column('amount', 'double'), column('ratio', 'double')], decimal_target,
+    )
+    md_map = metadata.to_map(stale.metadata)
+    md_map[()].update({'replication-method': 'INCREMENTAL', 'replication-key': 'amount'})
+    stale.metadata = metadata.to_list(md_map)
+    live = discovered_entry(
+        [column('id', 'float', key='PRI'), column('amount', 'float'), column('ratio', 'double')], decimal_target,
+    )
+    resolved = discover_utils.resolve_catalog(Catalog([live]), [stale], decimal_target).streams[0]
+    cursor = MagicMock()
+    cursor.fetchone.return_value = (16777216.0,)
+
+    assert full_table.get_max_pk_values(cursor, resolved) == {'id': 16777216.0}
+    assert ' '.join(cursor.execute.call_args.args[0].split()) == (
+        'SELECT `id` * 1E0 FROM `source`.`events` ORDER BY `id` DESC LIMIT 1'
+    )
+    state = {'bookmarks': {'source-events': {'replication_key': 'amount', 'replication_key_value': 16777216.0}}}
+    with patch('tap_mysql.sync_strategies.incremental.connect_with_backoff'), \
+            patch.object(common, 'sync_query') as query, patch('singer.write_message'):
+        incremental.sync_table(MagicMock(), resolved, state, ['id', 'amount', 'ratio'])
+    assert query.call_args.args[3] == (
+        'SELECT `id` * 1E0,`amount` * 1E0,`ratio` FROM `source`.`events` '
+        'WHERE `amount` >= %(replication_key_value)s ORDER BY `amount` ASC'
+    )
+
+
+def test_resolution_takes_live_types_and_keeps_the_saved_selection_and_replication_metadata():
+    stale = discovered_entry([
+        column('id', 'int', key='PRI'), column('amount', 'double'),
+        column('note', 'varchar', 'varchar(10)', length=10), column('dropped', 'double'),
+    ], 'snowflake')
+    md_map = metadata.to_map(stale.metadata)
+    md_map[()].update({
+        'selected': True, 'replication-method': 'INCREMENTAL', 'replication-key': 'amount', 'is-view': False,
+    })
+    for name, selected in (('id', True), ('amount', True), ('note', False), ('dropped', True)):
+        md_map[('properties', name)]['selected'] = selected
+    stale.metadata = metadata.to_list(md_map)
+    saved = copy.deepcopy(stale.metadata)
+    live = discovered_entry([
+        column('id', 'int', key='PRI'), column('tenant', 'float', key='PRI'), column('amount', 'float'),
+        column('note', 'text'),
+    ], 'snowflake')
+
+    resolved = discover_utils.resolve_catalog(Catalog([live]), [stale], 'snowflake').streams[0]
+
+    assert stale.metadata == saved
+    expected = metadata.to_map(copy.deepcopy(saved))
+    expected[('properties', 'amount')].update({'datatype': 'float', 'sql-datatype': 'float'})
+    # Unresolved columns keep the saved description; a new key column takes discovery's.
+    expected[('properties', 'tenant')] = {'selected-by-default': True, 'datatype': 'float', 'sql-datatype': 'float'}
+    assert metadata.to_map(resolved.metadata) == expected
+    assert sorted(resolved.schema.properties) == ['amount', 'id', 'tenant']
+    assert common.generate_select_sql(resolved, ['id', 'tenant', 'amount']) == (
+        'SELECT `id`,`tenant` * 1E0,`amount` * 1E0 FROM `source`.`events`'
     )
 
 

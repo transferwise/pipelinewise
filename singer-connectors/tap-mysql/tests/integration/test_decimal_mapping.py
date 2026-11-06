@@ -230,14 +230,14 @@ def _float_source_config(prefix):
     return config
 
 
-def _selected_stream(config, table, **stream_metadata):
+def _selected_stream(config, table, datatype='float', **stream_metadata):
     stream = discover_catalog(MySQLConnection(config), config['database'], table).streams[0]
     md_map = singer.metadata.to_map(stream.metadata)
     md_map[()].update(stream_metadata)
     for name in stream.schema.properties:
         md_map[('properties', name)]['selected'] = True
     stream.metadata = singer.metadata.to_list(md_map)
-    assert md_map[('properties', 'amount')]['datatype'] == 'float'
+    assert md_map[('properties', 'amount')]['datatype'] == datatype
     return stream
 
 
@@ -396,7 +396,7 @@ def test_float_auto_increment_key_bounds_full_table_by_the_stored_maximum(prefix
 
 @pytest.mark.parametrize('prefix', ['TAP_MYSQL', 'TAP_ORACLE_MYSQL'])
 def test_columns_altered_from_float_before_rediscovery_load_their_new_values(prefix):
-    """The run pairs the saved catalog's 'float' metadata with live schemas, so promoting would load DOUBLEs."""
+    """The saved catalog still says 'float'; promoting these columns would load DOUBLEs instead of their values."""
     config = _float_source_config(prefix)
     table = 'float_altered_' + uuid.uuid4().hex[:12]
     qualified = f'`{config["database"]}`.`{table}`'
@@ -432,5 +432,65 @@ def test_columns_altered_from_float_before_rediscovery_load_their_new_values(pre
             {'id': 1, 'amount': '1.25', 'label': '2.5', 'total': 3, 'rate': _float32(0.1)},
             {'id': big, 'amount': '0.10', 'label': 'N/A', 'total': big, 'rate': _float32(0.1)},
         ]
+    finally:
+        _drop_table(config, qualified)
+
+
+@pytest.mark.parametrize('prefix', ['TAP_MYSQL', 'TAP_ORACLE_MYSQL'])
+@pytest.mark.parametrize('table_format', ['native', 'iceberg'])
+def test_columns_altered_to_float_before_rediscovery_load_the_stored_value(prefix, table_format):
+    """Saved 'double' metadata left FLOAT columns unpromoted: six-digit values and a 16777200 key bound."""
+    config = _float_source_config(prefix)
+    table = 'float_from_double_' + uuid.uuid4().hex[:12]
+    qualified = f'`{config["database"]}`.`{table}`'
+    # Distinct as FLOATs; six-digit text reads the stored 16777216 maximum key as 16777200 and skips its row.
+    keys = (1.1, 2.5, 1234567.8, 16777217)
+    try:
+        with connect_with_backoff(MySQLConnection(config)) as source:
+            source.autocommit(True)
+            with source.cursor() as cursor:
+                cursor.execute(
+                    f'CREATE TABLE {qualified} (id DOUBLE AUTO_INCREMENT PRIMARY KEY, amount DOUBLE, KEY (amount))')
+                cursor.executemany(f'INSERT INTO {qualified} VALUES (%s, %s)', list(zip(keys, FLOAT_INPUTS)))
+                is_mariadb = 'mariadb' in source.get_server_info().lower()
+        stale = {
+            method: _selected_stream(config, table, 'double', **{'selected': True, **stream_metadata})
+            for method, stream_metadata in (
+                ('FULL_TABLE', {'replication-method': 'FULL_TABLE'}),
+                ('INCREMENTAL', {'replication-method': 'INCREMENTAL', 'replication-key': 'amount'}),
+            )
+        }
+        with connect_with_backoff(MySQLConnection(config)) as source:
+            source.autocommit(True)
+            with source.cursor() as cursor:
+                cursor.execute(f'ALTER TABLE {qualified} MODIFY id FLOAT AUTO_INCREMENT, MODIFY amount FLOAT')
+
+        # Iceberg v3 makes MariaDB discovery detect JSON aliases; FLOAT resolution must not depend on it.
+        runtime_config = {
+            'filter_dbs': config['database'], 'decimal_target': 'snowflake',
+            'engine': 'mariadb' if is_mariadb else 'mysql',
+            **({'target_table_format': 'iceberg', 'iceberg_version': 3} if table_format == 'iceberg' else {}),
+        }
+        resolved = {
+            method: get_non_binlog_streams(MySQLConnection(config), Catalog([stream]), runtime_config, {}).streams[0]
+            for method, stream in stale.items()
+        }
+        for stream in resolved.values():
+            assert singer.metadata.to_map(stream.metadata)[('properties', 'amount')]['datatype'] == 'float'
+        rows = sorted((_float32(key), _float32(amount)) for key, amount in zip(keys, FLOAT_INPUTS))
+        assert rows[-1][0] == 16777216.0
+
+        records = _wire_records(
+            full_table.sync_table, MySQLConnection(config), resolved['FULL_TABLE'], {}, ['id', 'amount'], 1)
+        assert [(record['id'], record['amount']) for record in records] == rows
+        _assert_same_floats([record['amount'] for record in records], [amount for _, amount in rows])
+
+        state = {}
+        records = _wire_records(
+            incremental.sync_table, MySQLConnection(config), resolved['INCREMENTAL'], state, ['id', 'amount'])
+        rows.sort(key=lambda row: row[1])
+        assert [(record['id'], record['amount']) for record in records] == rows
+        _assert_same_floats([record['amount'] for record in records], [amount for _, amount in rows])
+        assert state['bookmarks'][resolved['INCREMENTAL'].tap_stream_id]['replication_key_value'] == 16777216.0
     finally:
         _drop_table(config, qualified)
