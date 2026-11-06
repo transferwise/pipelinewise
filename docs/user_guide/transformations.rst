@@ -167,9 +167,12 @@ the difference in tables that switch between FastSync and Singer.
 Other existing Singer differences also remain: ``HASH-SKIP-FIRST-n`` slices
 the hash input by UTF-8 bytes rather than characters, and regex conditions search
 within the string. Since 0.101.0, Singer evaluates equality conditions with
-``0``, ``false``, or ``null`` like FastSync; earlier releases ignored them. For
-PostgreSQL JSON object/array schemas, Singer can load a transformed ``None`` as
-JSON ``null`` rather than FastSync's SQL ``NULL``.
+``0``, ``false``, ``null``, or an empty string like FastSync; earlier releases
+ignored them. A Singer record can leave out a condition column, for example in
+a LOG_BASED update of other columns. Such a record never meets an equality
+condition on that column, while a regex condition searches it as an empty
+string. For PostgreSQL JSON object/array schemas, Singer can load a transformed
+``None`` as JSON ``null`` rather than FastSync's SQL ``NULL``.
 These differences are tested explicitly; matching column types alone does not
 guarantee identical transformation results.
 
@@ -191,8 +194,8 @@ every Singer replication method use this rule. PipelineWise rounds the configure
 number in the generated transformation file when it discovers the tap and again
 before each run, so no extra upgrade step is needed. It finds ``FLOAT`` columns
 from the saved catalog and matches their names case-insensitively; Singer
-conditions still need the exact column name. After you change the type of a
-``FLOAT`` column used in such a condition, run ``import_config`` so the condition
+conditions still need the exact column name. After you change a column used in
+such a condition to or from ``FLOAT``, run ``import_config`` so the condition
 follows the new type. A number that matched only the six-digit value earlier
 releases loaded, such as ``1234570`` for a stored ``1234567.75``, no longer
 matches; use the stored value instead.

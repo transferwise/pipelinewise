@@ -22,15 +22,19 @@
 - Match `equals` transformation conditions on MariaDB and MySQL `FLOAT` columns
   against the `FLOAT` value nearest the configured number, on every path. For
   example, `equals: 0.3` matches a stored `0.3`. Before this fix, LOG_BASED rows
-  never matched such a value, so they were not masked. After you change the type
-  of such a column, run `import_config`. See
+  never matched such a value, so they were not masked. After you change a column
+  used in such a condition to or from `FLOAT`, run `import_config`. See
   [transformations](docs/user_guide/transformations.rst)
 - Export MariaDB and MySQL `FLOAT`, `DOUBLE` and `REAL` columns used by source
   transformations with their exact value. On MySQL 8.0, FullSync and
   PartialSync could drop the last significant digit.
 - Finish every pending managed-Iceberg FullSync and PartialSync attempt of a
-  MariaDB or MySQL tap before you upgrade. After the upgrade, such an attempt
-  stops with a recovery error because its transformation contract changed. See
+  MariaDB or MySQL tap before you upgrade. After the upgrade, an attempt for a
+  table with source transformations stops with a recovery error. So does every
+  attempt of a tap whose `FLOAT` equality conditions PipelineWise rounds, because
+  the rounded rules change the recovery fingerprint. Any other attempt resumes
+  and publishes the values it staged before the upgrade, including six-digit
+  `FLOAT` values. See
   [recovery](docs/connectors/targets/snowflake_iceberg.rst#snowflake-iceberg-recovery)
 - Save the largest finite value as the FullSync handover bookmark when a
   PostgreSQL or YugabyteDB `REAL` or `DOUBLE PRECISION` INCREMENTAL key holds
@@ -39,10 +43,12 @@
   table if its state already holds one of these values.
 - Stop `archive_load_files` from failing when an INCREMENTAL replication key
   holds `NULL` or a floating-point special value.
-- Evaluate Singer `equals` transformation conditions with `0`, `false` or `null`
-  the way FullSync and PartialSync do. Before this fix, Singer ignored these
-  conditions, so a rule that depended on them alone never ran and the field
-  stayed unmasked. See [transformations](docs/user_guide/transformations.rst)
+- Evaluate Singer `equals` transformation conditions with `0`, `false`, `null`
+  or an empty string the way FullSync and PartialSync do. Before this fix,
+  Singer ignored these conditions, so a rule that depended on them alone never
+  ran and the field stayed unmasked. A record that leaves out the condition
+  column, such as a LOG_BASED update of other columns, never meets an `equals`
+  condition. See [transformations](docs/user_guide/transformations.rst)
 - Load PostgreSQL and YugabyteDB arrays through Singer the same way as
   FullSync and PartialSync on Snowflake and PostgreSQL targets. A `NULL` array
   now loads as `NULL` instead of an empty array. `NUMERIC` and `DECIMAL` arrays
