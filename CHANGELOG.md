@@ -1,3 +1,66 @@
+0.100.1 (2026-11-06)
+--------------------
+
+- Require PostgreSQL 14 or later for PostgreSQL sources. Singer replication,
+  FullSync and PartialSync refuse an older server before they read any data.
+  Upgrade older sources before you upgrade PipelineWise. YugabyteDB sources are
+  not affected.
+- Keep `NaN`, `Infinity` and `-Infinity` in PostgreSQL and YugabyteDB `REAL`
+  and `DOUBLE PRECISION` columns, including arrays, when Singer loads Snowflake
+  or PostgreSQL targets. Before this fix, Singer loaded these values as `NULL`
+  while FullSync and PartialSync kept them. LOG_BASED replication from
+  PostgreSQL needs wal2json 2.6 or later. Rows loaded earlier keep `NULL` until
+  they change or the table is resynced. See
+  [floating-point values](docs/user_guide/schema_changes.rst#floating-point-values)
+- Load the exact stored value of MariaDB and MySQL `FLOAT` columns in FullSync,
+  PartialSync and Singer FULL_TABLE and INCREMENTAL replication. Before this
+  fix, these paths loaded the server's six-digit text, while LOG_BASED
+  replication loaded the exact value. For example, an inserted `16777217` is
+  stored as `16777216`; it used to load as `16777200` and now loads as
+  `16777216`. Resync tables whose primary key, INCREMENTAL replication key or
+  PartialSync range column is `FLOAT`.
+- Match `equals` transformation conditions on MariaDB and MySQL `FLOAT` columns
+  against the `FLOAT` value nearest the configured number, on every path. For
+  example, `equals: 0.3` matches a stored `0.3`. Before this fix, LOG_BASED rows
+  never matched such a value, so they were not masked. After you change the type
+  of such a column, run `import_config`. See
+  [transformations](docs/user_guide/transformations.rst)
+- Export MariaDB and MySQL `FLOAT`, `DOUBLE` and `REAL` columns used by source
+  transformations with their exact value. On MySQL 8.0, FullSync and
+  PartialSync could drop the last significant digit.
+- Finish every pending managed-Iceberg FullSync and PartialSync attempt of a
+  MariaDB or MySQL tap before you upgrade. After the upgrade, such an attempt
+  stops with a recovery error because its transformation contract changed. See
+  [recovery](docs/connectors/targets/snowflake_iceberg.rst#snowflake-iceberg-recovery)
+- Save the largest finite value as the FullSync handover bookmark when a
+  PostgreSQL or YugabyteDB `REAL` or `DOUBLE PRECISION` INCREMENTAL key holds
+  `NaN` or an infinity. Before this fix, the saved state could not be read and
+  every later Singer run of the tap failed. Run `fast_sync` again for such a
+  table if its state already holds one of these values.
+- Stop `archive_load_files` from failing when an INCREMENTAL replication key
+  holds `NULL` or a floating-point special value.
+- Load PostgreSQL and YugabyteDB arrays through Singer the same way as
+  FullSync and PartialSync on Snowflake and PostgreSQL targets. A `NULL` array
+  now loads as `NULL` instead of an empty array. `NUMERIC` and `DECIMAL` arrays
+  keep every digit and their `NaN` and infinity elements instead of being
+  rounded to floating point. Array columns in a primary key keep the earlier
+  transport. Column types do not change, and S3 CSV loads are unchanged. Rows
+  loaded earlier keep their old value until they change or the table is
+  resynced. See
+  [PostgreSQL and YugabyteDB arrays](docs/user_guide/schema_changes.rst#postgresql-and-yugabytedb-arrays)
+- Reject transformations on PostgreSQL and YugabyteDB `NUMERIC` array columns
+  that cannot work on the array, on routes to Snowflake or PostgreSQL. Conditions
+  on these columns can only use `equals: null`, and `field_paths` work only with
+  `SET-NULL`. `import_config` and each run reject other rules after discovery;
+  `validate` cannot detect them. Remove such rules before you upgrade, otherwise
+  the tap stops at its next run. See
+  [transformations](docs/user_guide/transformations.rst)
+- Resume an interrupted YugabyteDB FULL_TABLE scan correctly when a
+  floating-point primary key holds `NaN` or an infinity, and stop scans over
+  `REAL` primary keys from skipping rows such as the one with the largest key.
+  A scan that an earlier release interrupted with such a key restarts from the
+  beginning.
+
 0.100.0 (2026-11-04)
 --------------------
 
