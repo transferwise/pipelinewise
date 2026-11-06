@@ -7,7 +7,6 @@ from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-import psycopg2.errors
 import pytest
 import singer
 from jsonschema import Draft7Validator
@@ -27,14 +26,7 @@ PROJECTIONS = {
     ' "amounts" ': ' array_to_json("amounts")::text AS "amounts" ',
     ' "scaled" ': ' array_to_json("scaled")::text AS "scaled" ',
 }
-RENDER_SQL = 'SELECT array_to_json(%s::numeric[])::text'
 DECIMAL_ROUTE = {'decimal_target': 'snowflake'}
-
-
-class InvalidText(psycopg2.errors.InvalidTextRepresentation):
-    """A driver error with the SQLSTATE the server sends; psycopg2 sets pgcode only for server errors."""
-
-    pgcode = '22P02'
 
 
 def column(name, sql_type, primary_key=False, precision=None, scale=None):
@@ -106,14 +98,6 @@ def consume(stream, payload, conn_info):
                                             datetime(2026, 1, 1, tzinfo=timezone.utc), conn_info)
     [message] = [call.args[0] for call in write.call_args_list if isinstance(call.args[0], singer.RecordMessage)]
     return message
-
-
-def render_connection(fetched=None, error=None):
-    connection = MagicMock()
-    cursor = connection.cursor.return_value.__enter__.return_value
-    cursor.fetchone.return_value = (fetched,)
-    cursor.execute.side_effect = error
-    return connection, cursor
 
 
 @pytest.mark.parametrize('decimal_target', ['snowflake', 'postgres'])
@@ -259,64 +243,58 @@ def test_wal_rows_carry_null_and_empty_arrays_like_fastsync(action):
     assert [call.args[:2] for call in create.call_args_list] == [('{}', 'text[]'), ('{}', 'uuid[]')]
 
 
-def test_wal_numeric_array_helper_skips_null_without_a_connection():
-    with patch.object(db, 'open_connection') as open_connection:
-        assert logical_replication.numeric_array_json_text(
-            None, 'numeric[]', DECIMAL_ROUTE, 'public-events', 'amounts') is None
-    open_connection.assert_not_called()
+def test_wal_numeric_array_helper_skips_null():
+    assert logical_replication.numeric_array_json_text(None, 'numeric[]', 'public-events', 'amounts') is None
 
 
 @pytest.mark.parametrize(('value', 'sql_type'), [
     ('{1.10}', 'integer[]'), ('{1.10}', 'numeric'), ([Decimal('1.10')], 'numeric[]'), (Decimal('1.10'), 'numeric[]'),
 ])
 def test_wal_numeric_array_helper_rejects_unexpected_input_naming_only_stream_and_column(value, sql_type):
-    with patch.object(db, 'open_connection') as open_connection, pytest.raises(ValueError) as raised:
-        logical_replication.numeric_array_json_text(value, sql_type, DECIMAL_ROUTE, 'public-events', 'amounts')
+    with pytest.raises(ValueError) as raised:
+        logical_replication.numeric_array_json_text(value, sql_type, 'public-events', 'amounts')
     assert str(raised.value) == 'Expected numeric[] text in WAL for stream public-events, column amounts'
+
+
+# Server pairs of arr::text and array_to_json(arr)::text, the same on PostgreSQL and YugabyteDB.
+@pytest.mark.parametrize(('literal', 'expected'), [
+    (NUMERIC_LITERAL, NUMERIC_TEXT),
+    ('{}', '[]'),
+    ('{NULL,NULL}', '[null,null]'),
+    ('{0,0.000,-0.00110,12.50}', '[0,0.000,-0.00110,12.50]'),
+    ('{{1.50,NULL},{NaN,-2}}', '[[1.50,null],["NaN",-2]]'),
+    ('{{{7}}}', '[[[7]]]'),
+    ('[-3:-2]={1,2}', '[1,2]'),
+    ('[0:1][-2:0]={{1.50,1.50,1.50},{1.50,1.50,1.50}}', '[[1.50,1.50,1.50],[1.50,1.50,1.50]]'),
+    ('{' + '9' * 60 + '.' + '0' * 40 + '}', '[' + '9' * 60 + '.' + '0' * 40 + ']'),
+])
+def test_wal_numeric_array_helper_renders_array_to_json_text_without_a_connection(literal, expected):
+    with patch.object(db, 'open_connection') as open_connection:
+        assert logical_replication.numeric_array_json_text(literal, 'numeric[]', 'public-events', 'amounts') == expected
     open_connection.assert_not_called()
 
 
-def test_wal_numeric_array_helper_binds_the_literal_on_a_primary_connection_and_closes_it():
-    connection, cursor = render_connection(NUMERIC_TEXT)
-    with patch.object(db, 'open_connection', return_value=connection) as open_connection:
-        assert logical_replication.numeric_array_json_text(
-            NUMERIC_LITERAL, 'numeric[]', DECIMAL_ROUTE, 'public-events', 'amounts') == NUMERIC_TEXT
-    open_connection.assert_called_once_with(DECIMAL_ROUTE, False, True)
-    cursor.execute.assert_called_once_with(RENDER_SQL, (NUMERIC_LITERAL,))
-    connection.close.assert_called_once_with()
-
-
-def test_wal_numeric_array_helper_reports_only_the_sqlstate_and_still_closes():
-    connection, _ = render_connection(error=InvalidText('invalid input syntax for type numeric: "secret-value"'))
-    with patch.object(db, 'open_connection', return_value=connection), pytest.raises(ValueError) as raised:
-        logical_replication.numeric_array_json_text(
-            '{secret-value}', 'numeric[]', DECIMAL_ROUTE, 'public-events', 'amounts')
-    assert str(raised.value) == \
-        'Unable to render numeric[] from WAL for stream public-events, column amounts: InvalidText (SQLSTATE 22P02)'
-    assert raised.value.__cause__ is None and raised.value.__suppress_context__
-    connection.close.assert_called_once_with()
-
-
-def test_wal_numeric_array_helper_names_a_lost_connection_without_values():
-    connection, _ = render_connection(error=psycopg2.OperationalError('server closed the connection: "secret-value"'))
-    with patch.object(db, 'open_connection', return_value=connection), pytest.raises(ValueError) as raised:
-        logical_replication.numeric_array_json_text(
-            '{secret-value}', 'numeric[]', DECIMAL_ROUTE, 'public-events', 'amounts')
-    assert str(raised.value) == \
-        'Unable to render numeric[] from WAL for stream public-events, column amounts: OperationalError'
-    connection.close.assert_called_once_with()
+# array_out never writes these; the server would respell or refuse them, so copying them could diverge.
+@pytest.mark.parametrize('literal', [
+    '', '{', '}', '{}}', '{{}', '{1,}', '{,1}', '{1,,2}', '{1}{2}', '{1},', '{1}x', 'x{1}', '[1:2]{1,2}', '[a:b]={1}',
+    '{1e5}', '{+7}', '{007}', '{.5}', '{5.}', '{-0}', '{-0.000}', '{ 1}', '{"1"}', '{null}', '{nan}', '{inf}',
+    '{secret-value}',
+])
+def test_wal_numeric_array_helper_rejects_other_text_naming_only_stream_and_column(literal):
+    with pytest.raises(ValueError) as raised:
+        logical_replication.numeric_array_json_text(literal, 'numeric[]', 'public-events', 'amounts')
+    assert str(raised.value) == 'Unable to render numeric[] from WAL for stream public-events, column amounts'
 
 
 @pytest.mark.parametrize('action', ['I', 'U', 'D'])
-def test_wal_marked_numeric_arrays_are_rendered_by_the_server_instead_of_converted(action):
+def test_wal_marked_numeric_arrays_are_rendered_without_a_connection_instead_of_converted(action):
     stream = numeric_stream()
-    connection, cursor = render_connection(NUMERIC_TEXT)
     columns = [('id', 'integer', '1'), ('amounts', 'numeric[]', NUMERIC_LITERAL), ('scaled', 'numeric(10,2)[]', None)]
-    with patch.object(db, 'open_connection', return_value=connection), \
+    with patch.object(db, 'open_connection') as open_connection, \
             patch.object(logical_replication, 'create_array_elem') as create:
         record = emitted(consume(stream, wal_payload(columns, action), DECIMAL_ROUTE), stream)
     assert (record['id'], record['amounts'], record['scaled']) == (1, NUMERIC_TEXT, None)
-    cursor.execute.assert_called_once_with(RENDER_SQL, (NUMERIC_LITERAL,))
+    open_connection.assert_not_called()
     create.assert_not_called()
 
 
