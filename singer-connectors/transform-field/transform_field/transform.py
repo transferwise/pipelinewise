@@ -9,6 +9,19 @@ from singer.decimal_support import decimal_to_string, is_decimal_schema
 from dateutil import parser
 
 LOGGER = get_logger('transform_field')
+JSON_TEXT_FORMAT = 'singer.json'
+
+
+def is_json_text_schema(schema: Any) -> bool:
+    """Return whether a property carries serialized JSON text, such as PostgreSQL numeric[] on decimal routes."""
+    if hasattr(schema, 'to_dict'):
+        schema = schema.to_dict()
+    return isinstance(schema, dict) and schema.get('format') == JSON_TEXT_FORMAT
+
+
+def is_unsupported_json_text_condition(condition: Dict) -> bool:
+    """Return whether a condition would inspect JSON text through a field path, a pattern or a non-null value."""
+    return bool(condition.get('field_path')) or 'regex_match' in condition or condition.get('equals') is not None
 
 
 def is_transform_required(record: Dict, when: Optional[List[Dict]], schema: Optional[Dict] = None) -> bool:
@@ -29,6 +42,12 @@ def is_transform_required(record: Dict, when: Optional[List[Dict]], schema: Opti
     for condition in when:
         column_to_match = condition['column']
         column_value = record.get(column_to_match, "")
+        field_schema = (schema or {}).get('properties', {}).get(column_to_match, {})
+
+        # Server-rendered JSON text would match on formatting rather than values; validation rejects these too.
+        if is_json_text_schema(field_schema) and is_unsupported_json_text_condition(condition):
+            transform_required = False
+            break
 
         field_path_to_match = condition.get('field_path')
 
@@ -50,14 +69,17 @@ def is_transform_required(record: Dict, when: Optional[List[Dict]], schema: Opti
 
         cond_equals = condition.get('equals')
         cond_pattern = condition.get('regex_match')
-        field_schema = (schema or {}).get('properties', {}).get(column_to_match, {})
         decimal_condition = is_decimal_schema(field_schema) and not field_path_to_match
+        # Float NaN and +/-Infinity arrive as strings; text conditions never match numeric fields.
+        numeric_condition = 'number' in (field_schema.get('type') or []) and not field_path_to_match
 
         # Exact condition
         if cond_equals or (decimal_condition and 'equals' in condition):
             LOGGER.debug('Equals condition found, value is: %s', cond_equals)
             if decimal_condition:
                 transform_required = _decimal_equals(column_value, cond_equals, field_schema)
+            elif numeric_condition and isinstance(cond_equals, str):
+                transform_required = False
             elif field_path_to_match:
                 transform_required = __is_condition_met('equal', cond_equals, field_value)
             else:
@@ -73,7 +95,7 @@ def is_transform_required(record: Dict, when: Optional[List[Dict]], schema: Opti
             LOGGER.debug('Regex condition found, pattern is: %s', cond_pattern)
 
             # String transport must not enable regex matching for numeric fields.
-            if decimal_condition:
+            if decimal_condition or numeric_condition:
                 transform_required = False
                 break
 

@@ -214,6 +214,8 @@ Operational notes
   mapping; legacy floating-point target columns remain unchanged unless
   ``version_legacy_float_columns`` is enabled on the tap. See
   :ref:`exact_decimal_mapping` for numeric fallback and column versioning.
+  ``FLOAT`` columns load their exact stored value on every replication method
+  and on FullSync and PartialSync; see :ref:`floating_point_values`.
   Snowflake bulk mappings use Boolean ``BIT`` values and do not preserve
   multi-bit bitsets. MySQL ``TIME`` values outside a 24-hour clock cannot be
   represented by Snowflake ``TIME``.

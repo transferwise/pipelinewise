@@ -17,6 +17,7 @@ LOGGER = singer.get_logger('tap_postgres')
 
 CURSOR_ITER_SIZE = 20000
 MIN_SUPPORTED_POSTGRES_VERSION = 140000
+JSON_TEXT_FORMAT = 'singer.json'
 
 
 class UnsupportedPostgresVersionError(RuntimeError):
@@ -88,7 +89,28 @@ def open_connection(conn_config, logical_replication=False, prioritize_primary=F
     return conn
 
 
-def prepare_columns_for_select_sql(c, md_map):
+def is_json_text_schema(schema):
+    """Recognise columns carried as the server's own JSON text, such as numeric arrays on decimal routes."""
+    return isinstance(schema, dict) and schema.get('format') == JSON_TEXT_FORMAT
+
+
+def json_text_column_sql(c):
+    """Project an array as FastSync exports it; ::text stops psycopg2's json typecaster from parsing floats."""
+    identifier = canonicalize_identifier(c)
+    return f' array_to_json("{identifier}")::text AS "{identifier}" '
+
+
+def json_text_value(value, column):
+    """Pass projected JSON text through; any other value means the column skipped json_text_column_sql."""
+    if value is None or isinstance(value, str):
+        return value
+    raise TypeError(f'Expected JSON text for column {column}')
+
+
+def prepare_columns_for_select_sql(c, md_map, properties=None):
+    if is_json_text_schema((properties or {}).get(c)):
+        return json_text_column_sql(c)
+
     column_name = f' "{canonicalize_identifier(c)}" '
 
     if ('properties', c) in md_map:
@@ -107,6 +129,13 @@ def prepare_columns_sql(c):
     return column_name
 
 
+def prepare_view_column_sql(c, properties=None):
+    """Quote a view column without clamping; JSON text columns use the table projection."""
+    if is_json_text_schema((properties or {}).get(c)):
+        return json_text_column_sql(c)
+    return prepare_columns_sql(c)
+
+
 def filter_dbs_sql_clause(sql, filter_dbs):
     in_clause = " AND datname in (" + ",".join([f"'{b.strip(' ')}'" for b in filter_dbs.split(',')]) + ")"
     return sql + in_clause
@@ -117,7 +146,23 @@ def filter_schemas_sql_clause(sql, filer_schemas):
     return sql + in_clause
 
 
-def selected_value_to_singer_value_impl(elem, sql_datatype):  # noqa: C901
+def float_to_singer_value(value, nonfinite_tokens=False):
+    """Keep finite floats; spell NaN and +/-Infinity as PostgreSQL does when tokens are enabled, else NULL."""
+    if math.isfinite(value):
+        return value
+    if not nonfinite_tokens:
+        return None
+    if math.isnan(value):
+        return 'NaN'
+    return 'Infinity' if value > 0 else '-Infinity'
+
+
+def is_nonfinite_float_token(value):
+    """Recognise the strings float_to_singer_value emits for NaN and +/-Infinity."""
+    return isinstance(value, str) and value in ('NaN', 'Infinity', '-Infinity')
+
+
+def selected_value_to_singer_value_impl(elem, sql_datatype, nonfinite_floats=False):  # noqa: C901
     sql_datatype = sql_datatype.replace('[]', '')
     if elem is None:
         cleaned_elem = elem
@@ -169,14 +214,9 @@ def selected_value_to_singer_value_impl(elem, sql_datatype):  # noqa: C901
         else:
             cleaned_elem = elem
     elif isinstance(elem, float):
-        # NB> We cast NaN's, +Inf, -Inf to NULL as wal2json does not support them and
-        # now we are at least consistent(ly wrong)
-        if math.isnan(elem):
-            cleaned_elem = None
-        elif math.isinf(elem):
-            cleaned_elem = None
-        else:
-            cleaned_elem = elem
+        # Decimal routes carry NaN and +/-Infinity as tokens; other routes keep NULL, as wal2json's
+        # default output does.
+        cleaned_elem = float_to_singer_value(elem, nonfinite_floats)
     elif isinstance(elem, dict):
         if sql_datatype == 'hstore':
             cleaned_elem = elem
@@ -189,30 +229,37 @@ def selected_value_to_singer_value_impl(elem, sql_datatype):  # noqa: C901
     return cleaned_elem
 
 
-def selected_array_to_singer_value(elem, sql_datatype):
+def selected_array_to_singer_value(elem, sql_datatype, nonfinite_floats=False):
     if isinstance(elem, list):
-        return list(map(lambda elem: selected_array_to_singer_value(elem, sql_datatype), elem))
+        return list(map(lambda elem: selected_array_to_singer_value(elem, sql_datatype, nonfinite_floats), elem))
 
-    return selected_value_to_singer_value_impl(elem, sql_datatype)
+    return selected_value_to_singer_value_impl(elem, sql_datatype, nonfinite_floats)
 
 
-def selected_value_to_singer_value(elem, sql_datatype):
+def selected_value_to_singer_value(elem, sql_datatype, nonfinite_floats=False):
     # are we dealing with an array?
     if sql_datatype.find('[]') > 0:
-        return list(map(lambda elem: selected_array_to_singer_value(elem, sql_datatype), (elem or [])))
+        return list(map(lambda elem: selected_array_to_singer_value(elem, sql_datatype, nonfinite_floats),
+                        (elem or [])))
 
-    return selected_value_to_singer_value_impl(elem, sql_datatype)
+    return selected_value_to_singer_value_impl(elem, sql_datatype, nonfinite_floats)
 
 
 def selected_row_to_singer_message(stream, row, version, columns, time_extracted, md_map):
+    decimal_route = bool(md_map.get((), {}).get('decimal-target'))
     row_to_persist = ()
     for idx, elem in enumerate(row):
         sql_datatype = md_map.get(('properties', columns[idx]))['sql-datatype']
         column_schema = stream.get('schema', {}).get('properties', {}).get(columns[idx], {})
         if is_decimal_schema(column_schema):
             cleaned_elem = decimal_to_string(elem, column_schema)
+        elif is_json_text_schema(column_schema):
+            cleaned_elem = json_text_value(elem, columns[idx])
+        elif decimal_route and elem is None and sql_datatype.endswith('[]'):
+            # FastSync exports a NULL array as SQL NULL; other routes keep the historical empty list.
+            cleaned_elem = None
         else:
-            cleaned_elem = selected_value_to_singer_value(elem, sql_datatype)
+            cleaned_elem = selected_value_to_singer_value(elem, sql_datatype, decimal_route)
         row_to_persist += (cleaned_elem,)
 
     rec = dict(zip(columns, row_to_persist))

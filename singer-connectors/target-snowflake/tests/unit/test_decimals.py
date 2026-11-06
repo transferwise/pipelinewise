@@ -690,3 +690,164 @@ def test_bounded_nan_warning_once_per_column_keeps_keyless_rows():
     assert sync.record_primary_key_string({'amount': 'NaN'}) is None
     assert sync.record_primary_key_string({'amount': 'NaN'}) is None
     assert sync.logger.warning.call_count == 1
+
+
+FLOAT_TOKEN_TYPES = [['null', 'number', 'string'], ['number', 'string']]
+
+
+@pytest.mark.parametrize('field_type', FLOAT_TOKEN_TYPES)
+@pytest.mark.parametrize('iceberg_version', [None, 3])
+def test_float_token_union_keeps_floating_column_without_versioning(field_type, iceberg_version):
+    arguments = {'is_iceberg_table': iceberg_version == 3, 'iceberg_version': iceberg_version}
+    floating_type = 'double' if iceberg_version else 'float'
+    schema = {'type': field_type}
+    keys = [] if 'null' in field_type else ['amount']
+    assert column_type(schema, **arguments, is_key=bool(keys), source='postgres') == floating_type
+    assert plan_column_changes({'amount': schema}, {}, **arguments, key_properties=keys).additions == (
+        f'"AMOUNT" {floating_type}',
+    )
+    # SHOW COLUMNS reports every floating-point column as FLOAT, including Iceberg DOUBLE.
+    for existing in ('FLOAT', 'DOUBLE') if iceberg_version else ('FLOAT',):
+        plan = plan_column_changes(
+            {'amount': schema}, {'AMOUNT': existing}, **arguments,
+            key_properties=keys, source='postgres', version_legacy_float_columns=True,
+        )
+        assert plan.additions == plan.replacements == plan.retained_decimal_types == plan.retained_column_types == ()
+
+
+@pytest.mark.parametrize('iceberg_version', [None, 3])
+def test_persist_lines_legacy_float_then_token_union_does_not_version_column(iceberg_version):
+    token_schema = {'type': ['null', 'number', 'string']}
+    columns, archives = run_cached_schema_sequence('FLOAT', [
+        {'amount': {'type': ['null', 'number']}},
+        {'amount': token_schema},
+        {'amount': token_schema, 'added': {'type': ['string']}},
+    ], iceberg_version, version_legacy_float_columns=True)
+    assert columns['AMOUNT'] == 'FLOAT'
+    assert archives == []
+    assert 'ADDED' in columns
+
+
+@pytest.mark.parametrize('keys', [[], ['id']])
+def test_float_token_columns_keep_plain_stage_expressions(keys):
+    sync = object.__new__(DbSync)
+    sync.connection_config = {'source_tap_type': 'tap-postgres'}
+    sync.stream_schema_message = {'stream': 'public-items', 'key_properties': keys}
+    sync.flatten_schema = {
+        'id': {'type': ['number', 'string']},
+        'amount': {'type': ['null', 'number', 'string']},
+        'price': decimal_schema(10, 2),
+    }
+    sync.schema_name = 'PUBLIC'
+    sync.logger = Mock()
+    sync._load_file_copy = Mock(return_value=0)
+    sync._load_file_merge = Mock(return_value=(0, 0))
+
+    sync.load_file('rows.csv', 1, 10)
+
+    loader = sync._load_file_merge if keys else sync._load_file_copy
+    columns = loader.call_args.kwargs['columns_with_trans']
+    assert [(column['name'], column['trans']) for column in columns] == [
+        ('"ID"', ''), ('"AMOUNT"', ''), ('"PRICE"', ''),
+    ]
+    assert not any('decimal_type' in column or 'retained_type' in column for column in columns[:2])
+    if keys:
+        sql = create_merge_sql('ITEMS', 'STAGE', 'rows.csv', 'FORMAT', columns, sync.primary_key_merge_condition())
+        assert 'USING (SELECT ($1) "ID", ($2) "AMOUNT", CAST(' in sql
+        assert 'ON s."ID" = t."ID"' in sql
+    else:
+        sql = create_copy_sql('ITEMS', 'STAGE', 'rows.csv', 'FORMAT', columns)
+        assert 'FROM (SELECT ($1), ($2), CAST(' in sql
+        assert create_copy_sql('ITEMS', 'STAGE', 'rows.csv', 'FORMAT', columns[:2]) == (
+            'COPY INTO ITEMS ("ID", "AMOUNT") FROM \'@STAGE/rows.csv\' FILE_FORMAT = (format_name=\'FORMAT\')'
+        )
+    assert 'DOUBLE' not in sql
+
+
+def test_float_token_keys_keep_distinct_identities():
+    sync = object.__new__(DbSync)
+    sync.connection_config = {'source_tap_type': 'tap-postgres'}
+    sync.stream_schema_message = {'stream': 'public-items', 'key_properties': ['id']}
+    sync.flatten_schema = {'id': {'type': ['number', 'string']}, 'amount': {'type': ['null', 'number', 'string']}}
+    sync.data_flattening_max_level = 0
+    assert [sync.record_primary_key_string({'id': value, 'amount': 'NaN'}) for value in (
+        'NaN', 'Infinity', '-Infinity', 1.5,
+    )] == ['["NaN"]', '["Infinity"]', '["-Infinity"]', '["1.5"]']
+
+
+@pytest.mark.parametrize(('field_type', 'values', 'expected'), [
+    (['null', 'number', 'string'], ['-Infinity', 1.5, None], ('-Infinity', 1.5)),
+    (['null', 'number', 'string'], ['-Infinity', None], ('-Infinity', '-Infinity')),
+    (['null', 'number', 'string'], [1.5, 'Infinity', None, 'NaN', -2], (-2, 'NaN')),
+    (['number', 'string'], ['NaN', 'Infinity', '-Infinity'], ('-Infinity', 'NaN')),
+    (['null', 'number'], [9007199254740993, None, 9007199254740992], (9007199254740992, 9007199254740993)),
+    (['null', 'integer'], [5, None, 1], (1, 5)),
+    (['null', 'string'], ['Zebra', 'Infinity', None, 'Apple'], ('Apple', 'Zebra')),
+])
+def test_archive_bookmark_extrema_order_float_tokens_and_ignore_nulls(field_type, values, expected):
+    messages = [
+        {'type': 'SCHEMA', 'stream': 'public-items', 'key_properties': ['id'], 'bookmark_properties': ['amount'],
+         'schema': {'properties': {'id': {'type': ['integer']}, 'amount': {'type': field_type}}}},
+        *({'type': 'RECORD', 'stream': 'public-items', 'record': {'id': index, 'amount': value}}
+          for index, value in enumerate(values)),
+    ]
+    with patch('target_snowflake.DbSync') as sync, patch('target_snowflake.flush_streams') as flush:
+        sync.return_value.record_primary_key_string.side_effect = lambda record: str(record['id'])
+        flush.return_value = None
+        target_snowflake.persist_lines({'archive_load_files': True}, [json.dumps(message) for message in messages])
+    metadata = flush.call_args.args[6]['public-items']
+    assert (metadata['min'], metadata['max']) == expected
+    assert len(flush.call_args.args[0]['public-items']) == len(values)
+
+
+NUMERIC_ARRAY_ITEMS = {'$ref': '#/definitions/sdc_recursive_decimal_100_38_array'}
+NUMERIC_ARRAY_JSON_TEXT = {'type': ['null', 'string', 'array'], 'format': 'singer.json', 'items': NUMERIC_ARRAY_ITEMS}
+
+
+@pytest.mark.parametrize('iceberg_version', [None, 3])
+def test_numeric_array_json_text_keeps_existing_variant_column(iceberg_version):
+    columns, archives = run_cached_schema_sequence('VARIANT', [
+        {'amount': {'type': ['null', 'array'], 'items': NUMERIC_ARRAY_ITEMS}},
+        {'amount': NUMERIC_ARRAY_JSON_TEXT},
+        {'amount': NUMERIC_ARRAY_JSON_TEXT, 'added': {'type': ['string']}},
+    ], iceberg_version)
+    assert columns['AMOUNT'] == 'VARIANT'
+    assert archives == []
+    assert 'ADDED' in columns
+
+
+@pytest.mark.parametrize(('keys', 'extra'), [([], {}), ([], {'price': decimal_schema(10, 2)}), (['id'], {})])
+def test_numeric_array_json_text_stage_expressions(keys, extra):
+    sync = object.__new__(DbSync)
+    sync.connection_config = {'source_tap_type': 'tap-postgres'}
+    sync.stream_schema_message = {'stream': 'public-items', 'key_properties': keys}
+    sync.flatten_schema = {'id': {'type': ['integer']}, 'amounts': NUMERIC_ARRAY_JSON_TEXT, **extra}
+    sync.schema_name = 'PUBLIC'
+    sync.logger = Mock()
+    sync._load_file_copy = Mock(return_value=0)
+    sync._load_file_merge = Mock(return_value=(0, 0))
+
+    sync.load_file('rows.csv', 1, 10)
+
+    columns = (sync._load_file_merge if keys else sync._load_file_copy).call_args.kwargs['columns_with_trans']
+    assert columns[1] == {'name': '"AMOUNTS"', 'json_element_name': '"amounts"', 'trans': 'parse_json'}
+    if keys:
+        sql = create_merge_sql('ITEMS', 'STAGE', 'rows.csv', 'FORMAT', columns, sync.primary_key_merge_condition())
+        assert 'USING (SELECT ($1) "ID", parse_json($2) "AMOUNTS" FROM' in sql
+    elif extra:
+        sql = create_copy_sql('ITEMS', 'STAGE', 'rows.csv', 'FORMAT', columns)
+        assert 'FROM (SELECT ($1), parse_json($2), CAST(' in sql
+    else:
+        # Plain COPY relies on Snowflake's CSV-to-VARIANT load; integration tests prove it matches PARSE_JSON.
+        assert create_copy_sql('ITEMS', 'STAGE', 'rows.csv', 'FORMAT', columns) == (
+            'COPY INTO ITEMS ("ID", "AMOUNTS") FROM \'@STAGE/rows.csv\' FILE_FORMAT = (format_name=\'FORMAT\')'
+        )
+
+
+def test_numeric_array_json_text_is_staged_once_and_null_stays_empty():
+    values = ['[1,1.10,"NaN",null]', '[[1,2],[3,4]]', '[]', None]
+    schema = {'id': {'type': ['integer']}, 'amounts': NUMERIC_ARRAY_JSON_TEXT}
+
+    assert [record_to_csv_line({'id': 1, 'amounts': value}, schema) for value in values] == [
+        '1,"[1,1.10,\\"NaN\\",null]"', '1,"[[1,2],[3,4]]"', '1,"[]"', '1,',
+    ]

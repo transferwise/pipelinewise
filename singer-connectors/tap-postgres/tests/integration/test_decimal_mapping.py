@@ -1,6 +1,7 @@
 """Exact SQL numeric extraction from dev-project SELECT and wal2json output."""
 
 import json
+import math
 import os
 import uuid
 from datetime import datetime, timezone
@@ -11,15 +12,46 @@ from unittest.mock import patch
 import psycopg2
 import pytest
 import singer
+from jsonschema import Draft7Validator
 from singer import metadata
 
 from tap_postgres import db
 from tap_postgres.discovery_utils import discover_db
-from tap_postgres.sync_strategies import incremental, logical_replication
+from tap_postgres.sync_strategies import full_table, incremental, logical_replication
 
 
 EXACT = '12345678901234567890.123456789012345678'
 CHANGED = '12345678901234567890.123456789012345679'
+FLOAT_ROWS = [
+    ('NaN', 'NaN', 'NaN', '{NaN,1.5}'),
+    ('Infinity', 'Infinity', 'Infinity', '{{Infinity,-Infinity},{NaN,2.5}}'),
+    ('-Infinity', '-Infinity', '-Infinity', None),
+    ('1.5', '-0', '1.25', '{-0,2.5}'),
+]
+FLOAT_RECORDS = [
+    {'id': 'NaN', 'single': 'NaN', 'double': 'NaN', 'doubles': ['NaN', 1.5]},
+    {'id': 'Infinity', 'single': 'Infinity', 'double': 'Infinity',
+     'doubles': [['Infinity', '-Infinity'], ['NaN', 2.5]]},
+    {'id': '-Infinity', 'single': '-Infinity', 'double': '-Infinity', 'doubles': None},
+    {'id': 1.5, 'single': -0.0, 'double': 1.25, 'doubles': [-0.0, 2.5]},
+]
+ARRAY_COLUMNS = ['amounts', 'doubles', 'id', 'ints', 'scaled']
+ARRAY_ROWS = [
+    (1, '{1,1.10,12345678901234567890.123,0.00000012,NaN,Infinity,-Infinity,NULL}', '{1.1,2,NaN,NULL}', None, None),
+    (2, '{{1,2},{3,4}}', '{{1.5,2},{3,4}}', '{}', '{}'),
+    (3, '[0:1]={5,6}', '[0:1]={5,6}', '{7,NULL}', '{NaN,-Infinity,2.5}'),
+    (4, '{}', '{}', None, '{}'),
+    (5, None, None, '{}', None),
+]
+# The server's own array_to_json(col)::text, which FastSync exports through COPY.
+ARRAY_TEXT = {
+    1: ('[1,1.10,12345678901234567890.123,0.00000012,"NaN","Infinity","-Infinity",null]', '[1.10,2.00,"NaN",null]'),
+    2: ('[[1,2],[3,4]]', '[[1.50,2.00],[3.00,4.00]]'),
+    3: ('[5,6]', '[5.00,6.00]'),
+    4: ('[]', '[]'),
+    5: (None, None),
+}
+ARRAY_LISTS = {1: (None, None), 2: ([], []), 3: ([7, None], ['NaN', '-Infinity', 2.5]), 4: (None, []), 5: ([], None)}
 
 
 def decimal_config():
@@ -401,6 +433,211 @@ def test_delete_first_after_decimal_type_change_refreshes_replica_identity():
                 assert emitted[1].record['_sdc_deleted_at'] is not None
                 assert state['bookmarks'][stream['tap_stream_id']]['lsn'] == 1
             finally:
+                cursor.execute(f'DROP TABLE IF EXISTS public.{table}')
+    finally:
+        connection.close()
+
+
+def _serialized_records(messages, stream=None):
+    """Round-trip records through Singer JSON and, given a stream, validate them as the targets do."""
+    records = [json.loads(singer.format_message(message))['record'] for message in messages
+               if isinstance(message, singer.RecordMessage)]
+    if stream is not None:
+        validator = Draft7Validator(stream['schema'])
+        for record in records:
+            validator.validate(record)
+    return records
+
+
+def _without_scalar_tokens(record):
+    return {name: None if value in ('NaN', 'Infinity', '-Infinity') else value for name, value in record.items()}
+
+
+@pytest.mark.parametrize('target_type', ['snowflake', 'postgres'])
+@pytest.mark.parametrize('numeric_strings', [True, False])
+def test_nonfinite_floats_survive_real_select_and_wal(target_type, numeric_strings):
+    config = decimal_config()
+    config['decimal_target'] = target_type
+    table = 'float_nonfinite_' + uuid.uuid4().hex[:12]
+    slot = table + '_slot'
+    connection = psycopg2.connect(**{key: config[key] for key in ('host', 'port', 'user', 'password', 'dbname')})
+    connection.autocommit = True
+    try:
+        with connection.cursor() as cursor:
+            try:
+                cursor.execute(f'CREATE TABLE public.{table} '
+                               '(id FLOAT8 PRIMARY KEY, single FLOAT4, double FLOAT8, doubles FLOAT8[])')
+                cursor.execute('SELECT * FROM pg_create_logical_replication_slot(%s, %s, true)', (slot, 'wal2json'))
+                cursor.executemany(f'INSERT INTO public.{table} VALUES (%s, %s, %s, %s)', FLOAT_ROWS)
+                with db.open_connection(config) as discovery_connection:
+                    stream = discover_db(discovery_connection, 'public', [table], decimal_target=target_type)[0]
+                properties = stream['schema']['properties']
+                assert properties['id']['type'] == ['number', 'string']
+                assert properties['single']['type'] == properties['double']['type'] == ['null', 'number', 'string']
+                assert stream['schema']['definitions']['sdc_recursive_number_array']['type'] == [
+                    'null', 'number', 'string', 'array']
+
+                with patch('singer.write_message') as write:
+                    full_table.sync_table(config, stream, {}, ['double', 'doubles', 'id', 'single'],
+                                          metadata.to_map(stream['metadata']))
+                selected = _serialized_records([call.args[0] for call in write.call_args_list], stream)
+                assert sorted(selected, key=lambda record: str(record['id'])) == sorted(
+                    FLOAT_RECORDS, key=lambda record: str(record['id']))
+                finite = next(record for record in selected if record['id'] == 1.5)
+                assert math.copysign(1.0, finite['single']) == math.copysign(1.0, finite['doubles'][0]) == -1.0
+
+                cursor.execute(f"UPDATE public.{table} SET single = 'NaN', double = '-Infinity' WHERE id = 'Infinity'")
+                cursor.execute(f"DELETE FROM public.{table} WHERE id = 'NaN'")
+                cursor.execute(
+                    "SELECT data FROM pg_logical_slot_get_changes(%s, NULL, NULL, 'format-version', '2', "
+                    "'include-types', 'true', 'include-typmod', 'true', 'actions', 'insert,update,delete', "
+                    "'numeric-data-types-as-string', %s, 'add-tables', %s)",
+                    (slot, str(numeric_strings).lower(), f'public.{table}'),
+                )
+                state = {'bookmarks': {stream['tap_stream_id']: {'version': 1}}}
+                with patch('singer.write_message') as write:
+                    for (payload,) in cursor.fetchall():
+                        logical_replication.consume_message(
+                            [stream], state, SimpleNamespace(payload=payload, data_start=1),
+                            datetime.now(timezone.utc), config,
+                        )
+                # Keys carry tokens only with numeric strings; old plugins send NULL, which a key schema rejects.
+                replicated = _serialized_records([call.args[0] for call in write.call_args_list],
+                                                 stream if numeric_strings else None)
+                expected = [*FLOAT_RECORDS, {**FLOAT_RECORDS[1], 'single': 'NaN', 'double': '-Infinity'}, {'id': 'NaN'}]
+                if not numeric_strings:
+                    expected = [_without_scalar_tokens(record) for record in expected]
+                assert [{name: value for name, value in record.items() if name != '_sdc_deleted_at'}
+                        for record in replicated] == expected
+                assert [record['_sdc_deleted_at'] is not None for record in replicated] == [False] * 5 + [True]
+                assert math.copysign(1.0, replicated[3]['single']) == -1.0
+            finally:
+                cursor.execute(f'DROP TABLE IF EXISTS public.{table}')
+    finally:
+        connection.close()
+
+
+def test_incremental_float_key_keeps_last_finite_bookmark_and_rereads_nonfinite_rows():
+    config = decimal_config()
+    table = 'float_resume_' + uuid.uuid4().hex[:12]
+    connection = psycopg2.connect(**{key: config[key] for key in ('host', 'port', 'user', 'password', 'dbname')})
+    connection.autocommit = True
+    try:
+        with connection.cursor() as cursor:
+            try:
+                cursor.execute(f'CREATE TABLE public.{table} (id INT PRIMARY KEY, key FLOAT8)')
+                cursor.executemany(f'INSERT INTO public.{table} VALUES (%s, %s)',
+                                   [(1, '-Infinity'), (2, '1.0'), (3, 'Infinity'), (4, 'NaN'), (5, None)])
+                with db.open_connection(config) as discovery_connection:
+                    stream = discover_db(discovery_connection, 'public', [table], decimal_target='snowflake')[0]
+                md_map = metadata.to_map(stream['metadata'])
+                md_map[()]['replication-key'] = 'key'
+
+                def sync(state):
+                    with patch('singer.write_message') as write:
+                        state = incremental.sync_table(config, stream, state, ['id', 'key'], md_map)
+                    records = _serialized_records([call.args[0] for call in write.call_args_list], stream)
+                    # The next run reads state back from JSON, as the tap does after a target acknowledgement.
+                    state = json.loads(singer.format_message(singer.StateMessage(value=state)))['value']
+                    return state['bookmarks'][stream['tap_stream_id']], [(rec['id'], rec['key']) for rec in records]
+
+                bookmark, rows = sync({})
+                assert rows == [(1, '-Infinity'), (2, 1.0), (3, 'Infinity'), (4, 'NaN'), (5, None)]
+                assert bookmark['replication_key_value'] == 1.0
+
+                bookmark, rows = sync({'bookmarks': {stream['tap_stream_id']: bookmark}})
+                assert rows == [(2, 1.0), (3, 'Infinity'), (4, 'NaN')]
+                assert bookmark['replication_key_value'] == 1.0
+
+                cursor.execute(f'INSERT INTO public.{table} VALUES (6, 2.5)')
+                bookmark, rows = sync({'bookmarks': {stream['tap_stream_id']: bookmark}})
+                assert rows == [(2, 1.0), (6, 2.5), (3, 'Infinity'), (4, 'NaN')]
+                assert bookmark['replication_key_value'] == 2.5
+            finally:
+                cursor.execute(f'DROP TABLE IF EXISTS public.{table}')
+    finally:
+        connection.close()
+
+
+def _server_array_text(cursor, table):
+    cursor.execute(f'SELECT id, array_to_json(amounts)::text, array_to_json(scaled)::text FROM public.{table} '
+                   'ORDER BY id')
+    return {row[0]: row[1:] for row in cursor.fetchall()}
+
+
+def _array_record(key, texts, lists):
+    return {'id': key, 'amounts': texts[0], 'scaled': texts[1], 'ints': lists[0], 'doubles': lists[1]}
+
+
+def _sync_records(sync, config, stream, md_map):
+    with patch('singer.write_message') as write:
+        sync(config, stream, {}, ARRAY_COLUMNS, md_map)
+    records = _serialized_records([call.args[0] for call in write.call_args_list], stream)
+    return sorted(records, key=lambda record: record['id'])
+
+
+@pytest.mark.parametrize('target_type', ['snowflake', 'postgres'])
+@pytest.mark.parametrize('numeric_strings', [True, False])
+def test_numeric_and_null_arrays_match_fastsync_through_select_incremental_and_wal(target_type, numeric_strings):
+    config = decimal_config()
+    config['decimal_target'] = target_type
+    table = 'array_parity_' + uuid.uuid4().hex[:12]
+    view = table + '_view'
+    slot = table + '_slot'
+    connection = psycopg2.connect(**{key: config[key] for key in ('host', 'port', 'user', 'password', 'dbname')})
+    connection.autocommit = True
+    try:
+        with connection.cursor() as cursor:
+            try:
+                cursor.execute(f'CREATE TABLE public.{table} (id INT PRIMARY KEY, amounts NUMERIC[], '
+                               'scaled NUMERIC(10,2)[], ints INT[], doubles FLOAT8[])')
+                cursor.execute(f'ALTER TABLE public.{table} REPLICA IDENTITY FULL')
+                cursor.execute(f'CREATE VIEW public.{view} AS SELECT * FROM public.{table}')
+                cursor.execute('SELECT * FROM pg_create_logical_replication_slot(%s, %s, true)', (slot, 'wal2json'))
+                cursor.executemany(f'INSERT INTO public.{table} VALUES (%s, %s, %s, %s, %s)', ARRAY_ROWS)
+                assert _server_array_text(cursor, table) == ARRAY_TEXT
+                with db.open_connection(config) as discovery_connection:
+                    streams = {stream['table_name']: stream for stream in discover_db(
+                        discovery_connection, 'public', [table, view], decimal_target=target_type)}
+                for discovered in streams.values():
+                    for name in ('amounts', 'scaled'):
+                        assert discovered['schema']['properties'][name]['type'] == ['null', 'string', 'array']
+                        assert discovered['schema']['properties'][name]['format'] == 'singer.json'
+
+                stream, view_stream = streams[table], streams[view]
+                expected = [_array_record(key, ARRAY_TEXT[key], ARRAY_LISTS[key]) for key in sorted(ARRAY_TEXT)]
+                assert _sync_records(full_table.sync_table, config, stream, metadata.to_map(stream['metadata'])) \
+                    == expected
+                assert _sync_records(full_table.sync_view, config, view_stream,
+                                     metadata.to_map(view_stream['metadata'])) == expected
+                md_map = metadata.to_map(stream['metadata'])
+                md_map[()]['replication-key'] = 'id'
+                assert _sync_records(incremental.sync_table, config, stream, md_map) == expected
+
+                cursor.execute(f"UPDATE public.{table} SET amounts = '{{7.70,NaN}}', ints = NULL WHERE id = 2")
+                cursor.execute(f'DELETE FROM public.{table} WHERE id = 3')
+                updated = _server_array_text(cursor, table)[2]
+                assert updated == ('[7.70,"NaN"]', ARRAY_TEXT[2][1])
+                cursor.execute(
+                    "SELECT data FROM pg_logical_slot_get_changes(%s, NULL, NULL, 'format-version', '2', "
+                    "'include-types', 'true', 'include-typmod', 'true', 'actions', 'insert,update,delete', "
+                    "'numeric-data-types-as-string', %s, 'add-tables', %s)",
+                    (slot, str(numeric_strings).lower(), f'public.{table}'),
+                )
+                state = {'bookmarks': {stream['tap_stream_id']: {'version': 1}}}
+                with patch('singer.write_message') as write:
+                    for (payload,) in cursor.fetchall():
+                        logical_replication.consume_message(
+                            [stream], state, SimpleNamespace(payload=payload, data_start=1),
+                            datetime.now(timezone.utc), config,
+                        )
+                replicated = _serialized_records([call.args[0] for call in write.call_args_list], stream)
+                # REPLICA IDENTITY FULL puts the deleted row's old arrays in the DELETE event.
+                assert [{name: value for name, value in record.items() if name != '_sdc_deleted_at'}
+                        for record in replicated] == [*expected, _array_record(2, updated, (None, [])), expected[2]]
+                assert [record['_sdc_deleted_at'] is not None for record in replicated] == [False] * 6 + [True]
+            finally:
+                cursor.execute(f'DROP VIEW IF EXISTS public.{view}')
                 cursor.execute(f'DROP TABLE IF EXISTS public.{table}')
     finally:
         connection.close()

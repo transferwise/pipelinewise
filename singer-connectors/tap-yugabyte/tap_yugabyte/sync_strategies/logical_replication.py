@@ -19,7 +19,8 @@ from functools import reduce
 import tap_yugabyte.db as yb_db
 import tap_yugabyte.sync_strategies.common as sync_common
 from tap_yugabyte.stream_utils import refresh_streams_schema
-from tap_yugabyte.discovery_utils import Column, schema_for_column
+from tap_yugabyte.discovery_utils import (
+    FLOAT_ARRAY_TYPES, Column, allow_nonfinite_float_array_items, schema_for_column)
 
 LOGGER = singer.get_logger('tap_yugabyte')
 
@@ -208,6 +209,34 @@ def create_array_elem(elem, sql_datatype, conn_info):  # noqa: C901
             return res
 
 
+def numeric_array_json_text(elem, sql_datatype, conn_info, stream_id, column):
+    """Render a CDC numeric[] literal as the server's array_to_json text, which FastSync exports."""
+    if elem is None:
+        return None
+    if sql_datatype != 'numeric[]' or not isinstance(elem, str):
+        raise ValueError(f'Expected numeric[] text in WAL for stream {stream_id}, column {column}')
+    conn = yb_db.open_connection(conn_info)
+    try:
+        with conn.cursor() as cur:
+            # ::text keeps psycopg2's json typecaster from parsing the digits as floats.
+            cur.execute('SELECT array_to_json(%s::numeric[])::text', (elem,))
+            return cur.fetchone()[0]
+    except psycopg2.Error as exc:
+        # Name the error class and SQLSTATE only: driver messages can quote the source literal.
+        sqlstate = f' (SQLSTATE {exc.pgcode})' if exc.pgcode else ''
+        raise ValueError(f'Unable to render numeric[] from WAL for stream {stream_id}, column {column}: '
+                         f'{type(exc).__name__}{sqlstate}') from None
+    finally:
+        conn.close()
+
+
+def _float_to_singer_value(elem, conn_info):
+    """Spell nonfinite floats as YSQL tokens on decimal routes; other routes keep the float."""
+    if (conn_info or {}).get('decimal_target'):
+        return yb_db.float_to_singer_value(elem, nonfinite_tokens=True)
+    return elem
+
+
 def selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info):  # noqa: C901
     sql_datatype = og_sql_datatype.replace('[]', '')
 
@@ -330,7 +359,7 @@ def selected_value_to_singer_value_impl(elem, og_sql_datatype, conn_info):  # no
     if isinstance(elem, int):
         return elem
     if isinstance(elem, float):
-        return elem
+        return _float_to_singer_value(elem, conn_info)
     if isinstance(elem, str):
         return elem
 
@@ -347,6 +376,9 @@ def selected_array_to_singer_value(elem, sql_datatype, conn_info):
 def selected_value_to_singer_value(elem, sql_datatype, conn_info):
     # are we dealing with an array?
     if sql_datatype.find('[]') > 0:
+        if elem is None and (conn_info or {}).get('decimal_target'):
+            # FastSync exports a NULL array as SQL NULL; other routes keep the historical empty list.
+            return None
         cleaned_elem = create_array_elem(elem, sql_datatype, conn_info)
         return list(map(lambda elem: selected_array_to_singer_value(elem, sql_datatype, conn_info),
                         (cleaned_elem or [])))
@@ -369,6 +401,9 @@ def row_to_singer_message(stream, row, version, columns, time_extracted, md_map,
         column_schema = stream.get('schema', {}).get('properties', {}).get(columns[idx], {})
         if is_decimal_schema(column_schema):
             cleaned_elem = decimal_to_string(elem, column_schema)
+        elif yb_db.is_json_text_schema(column_schema):
+            cleaned_elem = numeric_array_json_text(elem, sql_datatype, conn_info, stream['tap_stream_id'],
+                                                   columns[idx])
         else:
             if (conn_info or {}).get('decimal_target') and elem is not None:
                 if sql_datatype in {'real', 'double precision'}:
@@ -442,6 +477,8 @@ def reconcile_wal_decimal_schema(payload, stream, previous_metadata, decimal_tar
                              key_properties.index(name) if name in key_properties else None)
         column_schema = schema_for_column(description, decimal_target)
         stream['schema']['properties'][name] = column_schema or {'type': ['null', 'string']}
+        if sql_type in FLOAT_ARRAY_TYPES:
+            allow_nonfinite_float_array_items(stream['schema'])
         field_metadata = md_map.setdefault(('properties', name), dict(previous_metadata.get(('properties', name), {})))
         field_metadata.setdefault('inclusion', 'available')
         field_metadata['sql-datatype'] = sql_type

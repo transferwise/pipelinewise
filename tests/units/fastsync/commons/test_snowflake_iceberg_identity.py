@@ -235,6 +235,60 @@ def test_legacy_transformed_attempt_is_rejected_before_recovery(tmp_path, source
     assert attempt.source_bookmark == {'position': 42}
 
 
+def _source_select_v1_identity(args, source_engine):
+    """Build the identity that releases before exact MySQL float transformations recorded."""
+    build_identity = snowflake_iceberg_routes.build_recovery_identity
+
+    def build_v1(scope, identity, **kwargs):
+        previous = copy.deepcopy(identity)
+        previous['source']['transformation_execution'] = 'source_select_v1'
+        return build_identity(scope, previous, **kwargs)
+
+    with patch.object(snowflake_iceberg_routes, 'build_recovery_identity', side_effect=build_v1):
+        return _identity(args, source_engine)
+
+
+@pytest.mark.parametrize('source_engine', ('mysql', 'mariadb'))
+def test_mysql_source_select_v1_attempt_is_rejected_before_recovery(tmp_path, source_engine):
+    """MySQL staging from the inexact float projection cannot publish under the exact one."""
+    args = _args()
+    args.transform['transformations'][0]['tap_stream_name'] = 'SOURCE_DB-ORDERS'
+    previous_identity = _source_select_v1_identity(args, source_engine)
+    current_identity = _identity(args, source_engine)
+    assert current_identity['fingerprint'] != previous_identity['fingerprint']
+    assert current_identity['transformation_fingerprint'] == previous_identity['transformation_fingerprint']
+
+    snowflake = Mock()
+    snowflake.connection_config = {'dbname': 'TARGET_DB'}
+    snowflake.query.return_value = []
+    publisher = SnowflakeIcebergPublisher(snowflake, str(tmp_path))
+    spec = _spec()
+    publisher.prepare_partial_sync(
+        spec,
+        {'position': 42},
+        PartialSyncBoundary('ID', 1),
+        recovery_identity=previous_identity,
+        staging_config=STAGING_CONFIG,
+    )
+    snowflake.reset_mock()
+
+    with pytest.raises(RecoveryManifestError, match='transformation contract'):
+        publisher.load_attempt(
+            spec,
+            expected_kind='partial',
+            recovery_identity=current_identity,
+            staging_config=STAGING_CONFIG,
+        )
+    snowflake.query.assert_not_called()
+
+
+def test_postgres_source_select_v1_attempt_remains_compatible():
+    """PostgreSQL transformation semantics are unchanged, so its pending attempts stay valid."""
+    args = _args()
+    args.transform['transformations'][0]['tap_stream_name'] = 'SOURCE_DB-ORDERS'
+    assert _identity(args, 'postgres') == _source_select_v1_identity(args, 'postgres')
+
+
 @pytest.mark.parametrize('transformations', ([], [{'tap_stream_name': 'source_db-other', 'type': 'HASH'}]))
 def test_source_projection_contract_keeps_unaffected_recovery_compatible(transformations):
     """An unrelated stream's masking rules do not invalidate safe staging."""

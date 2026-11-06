@@ -18,11 +18,12 @@ installs all connectors and runs these Python 3.12 unit gates:
 
 The shared Singer job runs MongoDB source-logging regressions in a separate,
 database-free environment; other MongoDB units remain local. E2E job 01 runs SQL
-source/PostgreSQL-target decimal integrations; jobs 15, 16 and 20 run Snowflake
-decimal/runtime integrations via `scripts/test_decimal_connectors.sh`. Inspect
-the actual workflow commands for other integration coverage: a test file or a
-green aggregate does not prove collection. Behaviour changes need the owning
-connector tests and an appropriate E2E route, subject to the root local-E2E rule.
+source/PostgreSQL-target decimal integrations; Snowflake shards with
+`connector_test_paths` run Snowflake decimal/runtime integrations via
+`scripts/test_decimal_connectors.sh`. Inspect the actual workflow commands for
+other integration coverage: a test file or a green aggregate does not prove
+collection. Behaviour changes need the owning connector tests and an appropriate
+E2E route, subject to the root local-E2E rule.
 
 Root `make connectors -e pw_connector=<name>` creates runtime
 `.virtualenvs/<name>/`; connector Makefiles often test in `./venv/`. Keep these

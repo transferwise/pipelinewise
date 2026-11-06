@@ -14,7 +14,10 @@ mapping; legacy floating-point target columns remain unchanged unless
 ``version_legacy_float_columns`` is enabled on the tap. Snowflake
 stores PostgreSQL numeric primary keys as canonical text to preserve ``NaN``
 identities. See :ref:`exact_decimal_mapping` for this key exception, numeric
-fallback, exact Singer transport, and column versioning.
+fallback, exact Singer transport, and column versioning. ``REAL`` and
+``DOUBLE PRECISION`` values keep ``NaN`` and infinities; see
+:ref:`floating_point_values`. Arrays load the same way through FullSync and Singer;
+see :ref:`postgres_arrays`.
 
 .. list-table:: Support
    :header-rows: 1
@@ -46,9 +49,10 @@ LOG_BASED replication also requires:
   version 2 support; and
 - permission to create and consume a logical replication slot.
 
-For LOG_BASED tables with numeric primary keys that can contain ``NaN`` or
-infinity, use wal2json 2.6 or later. Older versions convert these values to
-NULL before PipelineWise can preserve the key. See :ref:`exact_decimal_mapping`.
+For LOG_BASED tables whose numeric or floating-point columns can contain
+``NaN`` or infinity, use wal2json 2.6 or later. Older versions convert these
+values to NULL before PipelineWise can preserve them, including primary keys.
+See :ref:`exact_decimal_mapping` and :ref:`floating_point_values`.
 
 PipelineWise creates one tap-specific slot in the source database. PostgreSQL retains WAL needed
 by that slot, so monitor retained WAL and do not remove the slot while the tap is

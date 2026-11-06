@@ -213,7 +213,10 @@ def fastsync_recovery_identity(
         source_identity['ssl'] = source_config.get('ssl')
 
     if _uses_source_transformations(args.transform or {}, source_table):
-        source_identity['transformation_execution'] = 'source_select_v1'
+        # MySQL v2 reads FLOAT/DOUBLE/REAL exactly and rounds FLOAT equality literals to FLOAT.
+        source_identity['transformation_execution'] = (
+            'source_select_v2' if source_route == 'mysql_to_snowflake' else 'source_select_v1'
+        )
 
     target_identity = {
         'account': target_config.get('account'),

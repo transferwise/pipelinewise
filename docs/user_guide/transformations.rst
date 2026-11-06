@@ -184,6 +184,28 @@ conditions accept text and integer columns; equality requires matching string,
 numeric, or Boolean values, or ``NULL``. Implicit date/string/numeric coercions
 and floating-point regex rendering are rejected.
 
+An equality condition on a MariaDB or MySQL ``FLOAT`` column compares with the
+``FLOAT`` value nearest the configured number. For example, ``equals: 0.3``
+matches a stored ``0.3``, which loads as ``0.30000001192092896``. FastSync and
+every Singer replication method use this rule. PipelineWise rounds the configured
+number in the generated transformation file when it discovers the tap and again
+before each run, so no extra upgrade step is needed. It finds ``FLOAT`` columns
+from the saved catalog and matches their names case-insensitively; Singer
+conditions still need the exact column name. After you change the type of a
+``FLOAT`` column used in such a condition, run ``import_config`` so the condition
+follows the new type. A number that matched only the six-digit value earlier
+releases loaded, such as ``1234570`` for a stored ``1234567.75``, no longer
+matches; use the stored value instead.
+
+On PostgreSQL and YugabyteDB routes to Snowflake or PostgreSQL, Singer carries
+``NUMERIC`` and ``DECIMAL`` array columns as JSON text; see :ref:`postgres_arrays`.
+On these columns, conditions can only use ``equals: null``. ``import_config``
+and each run reject ``regex_match``, other ``equals`` values, and ``field_path``
+after discovery; ``validate`` cannot detect them because it does not discover
+columns. ``field_paths`` work only with ``SET-NULL``, which clears the whole
+array. Other transformations stay rejected, as before. Remove such rules before
+you upgrade; otherwise the tap stops at its next run.
+
 Regex conditions match the whole string, are case-sensitive, and ``.`` does not match
 a newline. Source execution accepts a portable regex subset: literals, character
 ranges, groups, alternation, ordinary repetitions, and bounded repetitions up to

@@ -9,6 +9,7 @@ from pipelinewise.fastsync.commons.transform_utils import TransformationType
 from pipelinewise.fastsync.commons.source_transformations import (
     UnsupportedSourceTransformation,
     compile_source_select,
+    float32_literal,
     requires_regex_support,
     validate_bookmark_column,
     validate_source_transformation_config,
@@ -301,15 +302,82 @@ def test_literal_closing_bracket_regex_classes_fail_closed(dialect, pattern):
         compile_rules([rule(when=[{'column': 'secret', 'regex_match': pattern}])], dialect=dialect)
 
 
-@pytest.mark.parametrize('dialect', ['postgres', 'mysql', 'mariadb'])
-def test_float_conditions_use_export_text_instead_of_promoting_source_float_bits(dialect):
+def test_postgres_float_conditions_use_export_text_instead_of_promoting_source_float_bits():
     cols = [column(), column('fraction', data_type='real', target_type='FLOAT')]
-    sql = compile_rules([rule(when=[{'column': 'fraction', 'equals': 0.3}])], cols, dialect)
-    expected = '("fraction")::text::double precision' if dialect == 'postgres' else (
-        '(CAST(("fraction") AS CHAR CHARACTER SET utf8mb4) + 0e0)'
-    )
-    assert expected in sql
+    sql = compile_rules([rule(when=[{'column': 'fraction', 'equals': 0.3}])], cols)
+    assert '("fraction")::text::double precision' in sql
     assert '= 0.3)' in sql
+
+
+@pytest.mark.parametrize('dialect', ['mysql', 'mariadb'])
+@pytest.mark.parametrize('data_type', ['float', 'double', 'real', 'FLOAT'])
+@pytest.mark.parametrize('target_type', ['FLOAT', 'DOUBLE'])
+def test_mysql_float_conditions_promote_the_stored_value_exactly(dialect, data_type, target_type):
+    # MySQL 8.0 CAST(double AS CHAR) drops the 17th significant digit of some values.
+    cols = [column(), column('fraction', data_type=data_type, target_type=target_type)]
+    sql = compile_rules([rule(when=[{'column': 'fraction', 'equals': 0.5}])], cols, dialect)
+    assert '(("fraction") * 1E0) AS `fraction`' in sql
+    assert 'CAST(("fraction") AS CHAR' not in sql
+    assert '(`fraction` = 0.5)' in sql
+
+
+@pytest.mark.parametrize('dialect', ['mysql', 'mariadb'])
+def test_unreferenced_mysql_float_keeps_its_exact_export_projection(dialect):
+    promoted = column('amount', data_type='float', target_type='FLOAT')
+    promoted['safe_sql_value'] = '`amount` * 1E0 AS `amount`'
+    sql = compile_rules([rule()], [column(), promoted], dialect)
+    assert 'SELECT CONVERT(("secret") USING utf8mb4) AS `secret`, `amount` * 1E0 AS `amount` FROM' in sql
+    assert '((`amount` * 1E0) * 1E0)' not in sql
+
+
+@pytest.mark.parametrize('dialect', ['mysql', 'mariadb'])
+def test_mysql_decimal_float_conditions_keep_exact_decimal_text(dialect):
+    cols = [column(), column('amount', data_type='decimal', target_type='FLOAT')]
+    sql = compile_rules([rule(when=[{'column': 'amount', 'equals': 0.3}])], cols, dialect)
+    assert '(CAST(("amount") AS CHAR CHARACTER SET utf8mb4) + 0e0) AS `amount`' in sql
+    assert '* 1E0' not in sql
+    assert '(`amount` = 0.3)' in sql
+
+
+@pytest.mark.parametrize('dialect', ['mysql', 'mariadb'])
+@pytest.mark.parametrize('value,expected', [
+    (0.3, '= 0.30000001192092896)'),
+    (16777217, '= 16777216.0)'),
+    (0.30000001192092896, '= 0.30000001192092896)'),
+    (0.5, '= 0.5)'),
+    (16777216, '= 16777216)'),
+    (-0.0, '= -0.0)'),
+    (1e39, '= 1e+39)'),
+    (10 ** 40, f'= {10 ** 40})'),
+])
+def test_mysql_float_equality_compares_with_the_nearest_float(dialect, value, expected):
+    cols = [column(), column('fraction', data_type='float', target_type='FLOAT')]
+    sql = compile_rules([rule(when=[{'column': 'fraction', 'equals': value}])], cols, dialect)
+    assert f'(`fraction` {expected}' in sql
+
+
+@pytest.mark.parametrize('dialect,data_type', [
+    ('mysql', 'double'), ('mariadb', 'decimal'), ('postgres', 'real'), ('postgres', 'float'),
+])
+def test_float_equality_rounding_is_limited_to_mysql_float_columns(dialect, data_type):
+    cols = [column(), column('fraction', data_type=data_type, target_type='FLOAT')]
+    sql = compile_rules([rule(when=[{'column': 'fraction', 'equals': 0.3}])], cols, dialect)
+    assert '= 0.3)' in sql
+    assert '0.30000001192092896' not in sql
+
+
+@pytest.mark.parametrize('value,expected', [
+    (0.3, 0.30000001192092896), (16777217, 16777216.0), (1e-50, 0.0), (-1e-50, -0.0),
+    (0.5, 0.5), (16777216, 16777216), (1e39, 1e39), (10 ** 400, 10 ** 400),
+])
+def test_float32_literal_returns_the_nearest_float_or_the_unrepresentable_literal(value, expected):
+    # repr distinguishes the value, its type and the sign of zero.
+    assert repr(float32_literal(value)) == repr(expected)
+
+
+@pytest.mark.parametrize('value', [float('nan'), float('inf'), float('-inf')])
+def test_float32_literal_keeps_nonfinite_literals(value):
+    assert float32_literal(value) is value
 
 
 def test_postgres_numeric_float_conditions_saturate_before_casting():

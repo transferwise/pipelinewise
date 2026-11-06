@@ -382,6 +382,27 @@ def test_connector_executes_shared_mariadb_json_transport_case():
     assert fields[-1] == ''
 
 
+def test_connector_executes_shared_postgres_numeric_array_transport_case():
+    case = _v3_behavior_cases()['postgres_numeric_array_transport']
+    schema = case['schema']
+
+    for table_format in ({}, {'is_iceberg_table': True, 'iceberg_version': 3}):
+        assert managed_iceberg.column_type(schema, **table_format).upper() == case['expected_physical_type']
+    assert db_sync.column_trans(schema) == case['expected_transform']
+    for max_level in (0, 10):
+        assert flattening.flatten_schema({'properties': {'VALUE': schema}}, max_level=max_level) == {'VALUE': schema}
+
+    record = {f'value_{index}': value for index, value in enumerate(case['serialized_values'])}
+    record['sql_null'] = None
+    line = csv_file_format.record_to_csv_line(record, {name: schema for name in record})
+    fields = next(csv_module.reader([line], escapechar='\\'))
+
+    # FastSync loads the same server-rendered array_to_json text, so both writers hand PARSE_JSON identical input.
+    assert fields[:-1] == case['serialized_values']
+    assert all(isinstance(json.loads(value), list) for value in fields[:-1])
+    assert line.endswith(',"[]",')
+
+
 def test_sql_string_literal_escapes_backslashes_before_quotes():
     for value, expected in (
         ('TABLE\\ARCHIVE', "'TABLE\\\\ARCHIVE'"),
