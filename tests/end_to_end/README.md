@@ -8,7 +8,7 @@ these recipes aligned when the matrix changes.
 ## Shard recipes
 
 These groups mirror `.github/workflows/e2e_tests.yml` in required-check order
-`e2e_tests_01` through `e2e_tests_22`; update both together. CI runs twenty-one
+`e2e_tests_01` through `e2e_tests_23`; update both together. CI runs twenty-two
 Snowflake groups concurrently on isolated runners; local groups share/reset
 fixtures/config and must run serially:
 
@@ -27,12 +27,11 @@ run_e2e \
 
 run_e2e \
   tests/end_to_end/target_snowflake/tap_postgres/test_auto_native_to_iceberg_pg_to_sf.py \
-  tests/end_to_end/target_snowflake/tap_mongodb/test_auto_native_to_iceberg_mongodb_to_sf.py \
-  tests/end_to_end/data_diff/test_mysql_to_snowflake.py
+  tests/end_to_end/data_diff/test_mysql_to_snowflake.py \
+  tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_replica_to_sf.py
 
 run_e2e \
-  tests/end_to_end/target_snowflake/tap_postgres/test_snowflake_iceberg_publisher.py \
-  tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_replica_to_sf.py
+  tests/end_to_end/target_snowflake/tap_postgres/test_snowflake_iceberg_publisher.py
 
 run_sf_decimal \
   tests/integration/test_decimals.py::test_numeric_array_json_text_loads_like_parse_json_without_versioning \
@@ -46,6 +45,9 @@ run_e2e \
 run_e2e \
   tests/end_to_end/target_snowflake/tap_mariadb/test_partial_sync_mariadb_to_sf.py \
   tests/end_to_end/target_snowflake/tap_yugabyte/test_replicate_yugabyte_to_sf.py
+
+run_sf_decimal \
+  tests/integration/test_decimals.py::test_decimal_primary_keys_coalesce_equal_numeric_values
 
 run_e2e \
   tests/end_to_end/target_snowflake/tap_postgres/test_iceberg_v3_postgres_to_sf.py \
@@ -68,18 +70,21 @@ run_e2e \
   tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf_with_archive_load_files.py \
   'tests/end_to_end/test_numeric_replication.py::test_legacy_decimal_float_migration_requires_opt_in[postgres-native]'
 
+run_sf_decimal \
+  tests/integration/test_decimals.py::test_postgres_bounded_numeric_key_keeps_nan_and_canonical_identity
+
 run_e2e \
   tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_table_size_check.py \
   tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf.py \
   tests/end_to_end/target_snowflake/tap_mariadb/test_multiline_native_mariadb_to_sf.py \
   tests/end_to_end/target_snowflake/tap_mariadb/test_defined_partial_sync_mariadb_to_sf.py \
-  tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_with_split_large_files.py
+  tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_with_split_large_files.py \
+  'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[mariadb-native]'
 
 run_e2e \
   'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[postgres-native]' \
   'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[yugabyte-native]' \
-  tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_transformations_are_private_through_publication \
-  tests/end_to_end/test_numeric_replication.py::test_postgres_float_nonfinite_snowflake
+  tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_transformations_are_private_through_publication
 
 run_e2e \
   'tests/end_to_end/test_numeric_replication.py::test_legacy_decimal_float_migration_requires_opt_in[mysql-native]' \
@@ -96,25 +101,18 @@ run_e2e \
   tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_with_custom_buffer_size.py \
   'tests/end_to_end/test_numeric_replication.py::test_legacy_decimal_float_migration_requires_opt_in[postgres-v3]'
 
-run_sf_decimal \
-  tests/integration/test_decimals.py::test_decimal_primary_keys_coalesce_equal_numeric_values
-
 run_e2e \
   tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_singer_and_fastsync_preserve_mapped_types_and_values \
   tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_existing_singer_semantic_differences_remain_explicit \
   tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_ambiguous_regex_is_rejected_before_export \
   tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_bit_varying_conditions_match_snowflake
 
-run_sf_decimal \
-  tests/integration/test_decimals.py::test_postgres_bounded_numeric_key_keeps_nan_and_canonical_identity \
-  tests/integration/test_decimals.py::test_bounded_nan_retains_rows_in_copy_and_merge
-
 run_e2e \
-  tests/end_to_end/test_numeric_replication.py::test_postgres_bounded_numeric_key_snowflake \
   tests/end_to_end/test_numeric_replication.py::test_yugabyte_bounded_numeric_key_snowflake \
   tests/end_to_end/test_numeric_replication.py::test_mysql_bounded_decimal_key_snowflake \
   tests/end_to_end/test_numeric_replication.py::test_mysql_extended_types_snowflake \
-  tests/end_to_end/test_numeric_replication.py::test_mysql_legacy_binary_width_partial_sync_snowflake
+  tests/end_to_end/test_numeric_replication.py::test_mysql_legacy_binary_width_partial_sync_snowflake \
+  tests/end_to_end/target_snowflake/tap_mongodb/test_auto_native_to_iceberg_mongodb_to_sf.py
 
 run_sf_decimal \
   tests/integration/test_decimals.py::test_opt_in_exact_decimal_load_versions_history_and_retries_without_reversion \
@@ -124,13 +122,13 @@ run_sf_decimal \
   tests/integration/test_runtime_contracts.py::test_cli_rejects_invalid_file_format_before_loading \
   tests/integration/test_runtime_contracts.py::test_rejects_managed_text_variant_changes_without_versioning \
   tests/integration/test_decimals.py::test_float_fallback_keys_preserve_distinct_rows_across_batches \
-  tests/integration/test_runtime_contracts.py::test_rejects_managed_merge_on_read_before_schema_changes
+  tests/integration/test_runtime_contracts.py::test_rejects_managed_merge_on_read_before_schema_changes \
+  tests/integration/test_decimals.py::test_bounded_nan_retains_rows_in_copy_and_merge
 
 run_e2e \
   tests/end_to_end/target_snowflake/test_native_to_iceberg_converter.py
 
 run_sf_decimal \
-  tests/integration/test_decimals.py::test_decimal_key_change_retains_existing_type_and_adds_other_columns \
   tests/integration/test_decimals.py::test_legacy_text_binary_key_matches_uppercase_fastsync_hex \
   tests/integration/test_runtime_contracts.py::test_rejects_managed_v2_before_schema_changes
 
@@ -152,7 +150,6 @@ run_sf_decimal \
 run_e2e \
   'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[mysql-native]' \
   'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[mysql-v3]' \
-  'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[mariadb-native]' \
   'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[mariadb-v3]'
 
 run_sf_decimal \
@@ -163,7 +160,7 @@ run_e2e \
 
 run_sf_decimal \
   tests/integration/test_decimals.py::test_float_fallback_retains_overflow_rows_nulls_and_stable_column \
-  tests/integration/test_decimals.py::test_legacy_float_decimal_keys_coalesce_collisions_and_keep_last_patch_and_delete
+  tests/integration/test_decimals.py::test_decimal_key_change_retains_existing_type_and_adds_other_columns
 
 run_e2e \
   tests/end_to_end/target_snowflake/tap_yugabyte/test_partial_sync_yugabyte_to_sf.py \
@@ -175,9 +172,16 @@ run_e2e \
 run_sf_decimal \
   tests/integration/test_decimals.py::test_mysql_extended_composite_key_upgrade_preserves_historical_updates_and_deletes \
   tests/integration/test_runtime_contracts.py::test_rejects_table_format_change_without_altering_rows
+
+run_e2e \
+  tests/end_to_end/test_numeric_replication.py::test_postgres_float_nonfinite_snowflake \
+  tests/end_to_end/test_numeric_replication.py::test_postgres_bounded_numeric_key_snowflake
+
+run_sf_decimal \
+  tests/integration/test_decimals.py::test_legacy_float_decimal_keys_coalesce_collisions_and_keep_last_patch_and_delete
 ```
 
-Run all twenty-two only for a full suite; otherwise run every affected group. MariaDB,
+Run all twenty-three only for a full suite; otherwise run every affected group. MariaDB,
 PostgreSQL, and genuine MySQL cover native and explicit v3.
 Do not infer one format from another. `SHOW PRIMARY KEYS` does not prove Iceberg
 identifier fields; compare raw-metadata `identifier-field-ids` with current

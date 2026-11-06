@@ -109,13 +109,12 @@ jobs:
             check_name: e2e_tests_02
             test_paths: >-
               tests/end_to_end/target_snowflake/tap_postgres/test_auto_native_to_iceberg_pg_to_sf.py
-              tests/end_to_end/target_snowflake/tap_mongodb/test_auto_native_to_iceberg_mongodb_to_sf.py
               tests/end_to_end/data_diff/test_mysql_to_snowflake.py
+              tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_replica_to_sf.py
           - shard: publication
             check_name: e2e_tests_03
             test_paths: >-
               tests/end_to_end/target_snowflake/tap_postgres/test_snowflake_iceberg_publisher.py
-              tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_replica_to_sf.py
             connector_test_paths: >-
               tests/integration/test_decimals.py::test_numeric_array_json_text_loads_like_parse_json_without_versioning
               tests/integration/test_decimals.py::test_native_nan_float_key_loaded_twice_keeps_one_row
@@ -130,6 +129,8 @@ jobs:
             test_paths: >-
               tests/end_to_end/target_snowflake/tap_mariadb/test_partial_sync_mariadb_to_sf.py
               tests/end_to_end/target_snowflake/tap_yugabyte/test_replicate_yugabyte_to_sf.py
+            connector_test_paths: >-
+              tests/integration/test_decimals.py::test_decimal_primary_keys_coalesce_equal_numeric_values
           - shard: pg-iceberg
             check_name: e2e_tests_06
             test_paths: >-
@@ -154,6 +155,8 @@ jobs:
               tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf.py
               tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf_with_archive_load_files.py
               tests/end_to_end/test_numeric_replication.py::test_legacy_decimal_float_migration_requires_opt_in[postgres-native]
+            connector_test_paths: >-
+              tests/integration/test_decimals.py::test_postgres_bounded_numeric_key_keeps_nan_and_canonical_identity
           - shard: mariadb-native
             check_name: e2e_tests_09
             test_paths: >-
@@ -162,13 +165,13 @@ jobs:
               tests/end_to_end/target_snowflake/tap_mariadb/test_multiline_native_mariadb_to_sf.py
               tests/end_to_end/target_snowflake/tap_mariadb/test_defined_partial_sync_mariadb_to_sf.py
               tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_with_split_large_files.py
+              tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[mariadb-native]
           - shard: decimal-fastsync-postgres
             check_name: e2e_tests_10
             test_paths: >-
               tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[postgres-native]
               tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[yugabyte-native]
               tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_transformations_are_private_through_publication
-              tests/end_to_end/test_numeric_replication.py::test_postgres_float_nonfinite_snowflake
           - shard: decimal-migration
             check_name: e2e_tests_11
             test_paths: >-
@@ -185,8 +188,6 @@ jobs:
               tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[postgres-v3]
               tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_with_custom_buffer_size.py
               tests/end_to_end/test_numeric_replication.py::test_legacy_decimal_float_migration_requires_opt_in[postgres-v3]
-            connector_test_paths: >-
-              tests/integration/test_decimals.py::test_decimal_primary_keys_coalesce_equal_numeric_values
           - shard: transformation-parity
             check_name: e2e_tests_13
             test_paths: >-
@@ -194,17 +195,14 @@ jobs:
               tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_existing_singer_semantic_differences_remain_explicit
               tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_ambiguous_regex_is_rejected_before_export
               tests/end_to_end/target_snowflake/test_source_transformation_publication.py::test_bit_varying_conditions_match_snowflake
-            connector_test_paths: >-
-              tests/integration/test_decimals.py::test_postgres_bounded_numeric_key_keeps_nan_and_canonical_identity
-              tests/integration/test_decimals.py::test_bounded_nan_retains_rows_in_copy_and_merge
           - shard: numeric-boundaries
             check_name: e2e_tests_14
             test_paths: >-
-              tests/end_to_end/test_numeric_replication.py::test_postgres_bounded_numeric_key_snowflake
               tests/end_to_end/test_numeric_replication.py::test_yugabyte_bounded_numeric_key_snowflake
               tests/end_to_end/test_numeric_replication.py::test_mysql_bounded_decimal_key_snowflake
               tests/end_to_end/test_numeric_replication.py::test_mysql_extended_types_snowflake
               tests/end_to_end/test_numeric_replication.py::test_mysql_legacy_binary_width_partial_sync_snowflake
+              tests/end_to_end/target_snowflake/tap_mongodb/test_auto_native_to_iceberg_mongodb_to_sf.py
           - shard: connector-evolution
             check_name: e2e_tests_15
             test_paths: ''
@@ -217,12 +215,12 @@ jobs:
               tests/integration/test_runtime_contracts.py::test_rejects_managed_text_variant_changes_without_versioning
               tests/integration/test_decimals.py::test_float_fallback_keys_preserve_distinct_rows_across_batches
               tests/integration/test_runtime_contracts.py::test_rejects_managed_merge_on_read_before_schema_changes
+              tests/integration/test_decimals.py::test_bounded_nan_retains_rows_in_copy_and_merge
           - shard: connector-keys
             check_name: e2e_tests_16
             test_paths: >-
               tests/end_to_end/target_snowflake/test_native_to_iceberg_converter.py
             connector_test_paths: >-
-              tests/integration/test_decimals.py::test_decimal_key_change_retains_existing_type_and_adds_other_columns
               tests/integration/test_decimals.py::test_legacy_text_binary_key_matches_uppercase_fastsync_hex
               tests/integration/test_runtime_contracts.py::test_rejects_managed_v2_before_schema_changes
           - shard: postgres-maintenance
@@ -246,7 +244,6 @@ jobs:
             test_paths: >-
               tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[mysql-native]
               tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[mysql-v3]
-              tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[mariadb-native]
               tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[mariadb-v3]
             connector_test_paths: >-
               tests/integration/test_runtime_contracts.py::test_failed_copy_or_merge_does_not_acknowledge_state
@@ -256,7 +253,7 @@ jobs:
               tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py::TestIcebergV3MySQLToSnowflake::test_iceberg_replication_preserves_keys_and_supplementary_unicode
             connector_test_paths: >-
               tests/integration/test_decimals.py::test_float_fallback_retains_overflow_rows_nulls_and_stable_column
-              tests/integration/test_decimals.py::test_legacy_float_decimal_keys_coalesce_collisions_and_keep_last_patch_and_delete
+              tests/integration/test_decimals.py::test_decimal_key_change_retains_existing_type_and_adds_other_columns
           - shard: yugabyte-partial
             check_name: e2e_tests_21
             test_paths: >-
@@ -269,6 +266,13 @@ jobs:
             connector_test_paths: >-
               tests/integration/test_decimals.py::test_mysql_extended_composite_key_upgrade_preserves_historical_updates_and_deletes
               tests/integration/test_runtime_contracts.py::test_rejects_table_format_change_without_altering_rows
+          - shard: postgres-float-parity
+            check_name: e2e_tests_23
+            test_paths: >-
+              tests/end_to_end/test_numeric_replication.py::test_postgres_float_nonfinite_snowflake
+              tests/end_to_end/test_numeric_replication.py::test_postgres_bounded_numeric_key_snowflake
+            connector_test_paths: >-
+              tests/integration/test_decimals.py::test_legacy_float_decimal_keys_coalesce_collisions_and_keep_last_patch_and_delete
     env:
       E2E_TEST_PATHS: ${{ matrix.test_paths }}
       PIPELINEWISE_E2E_NAMESPACE: >-
