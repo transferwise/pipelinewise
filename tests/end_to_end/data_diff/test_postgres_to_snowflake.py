@@ -7,6 +7,7 @@ adapters agree.
 """
 
 import json
+import hashlib
 import math
 import os
 import random
@@ -21,9 +22,9 @@ import pytest
 
 from pipelinewise.data_diff.adapters import DatabaseAdapter
 from pipelinewise.data_diff.engine import (
-    DataDiffExecutionError, HistoricalWindowNotReady, connect_source, connect_target, run_check,
+    DataDiffExecutionError, HistoricalWindowNotReady, build_metric_query, connect_source, connect_target, run_check,
 )
-from pipelinewise.data_diff.float64 import float64_projection
+from pipelinewise.data_diff.float64 import FLOAT_NORMALIZATION_ERRORS
 from pipelinewise.fastsync.commons.snowflake_iceberg_versions import MANAGED_ICEBERG_V3_TABLE_OPTIONS
 
 from ..helpers import tasks
@@ -118,9 +119,8 @@ def _project_float64_probe(adapter: DatabaseAdapter, query: str, conversion: str
         'name': 'X' if dialect == 'snowflake' else 'x', 'checksum_kind': 'float64',
         'checksum_float_conversion': conversion,
     }
-    stages, columns = float64_projection([column], adapter.quote, dialect)
-    for stage in stages:
-        query = f"SELECT q.*, {', '.join(stage)} FROM ({query}) q"
+    stages, columns = adapter.checksum_projection([column])
+    query = adapter.project_checksum_relation(query, stages)
     return (
         f"SELECT i, {columns[0]['checksum_float_token']} AS token, "
         f"{columns[0]['checksum_float_invalid']} AS invalid FROM ({query}) q ORDER BY i"
@@ -265,6 +265,120 @@ def test_decimal_float_rounding_on_real_engine(engine: str, record_property: Cal
         adapter.close()
     record_property('decimal_vector_size', total_cases)
     record_property('decimal_query_seconds', total_seconds)
+
+
+def _varying_float_relation(adapter: DatabaseAdapter, row_count: int) -> str:
+    """Generate varying rows without a UNION barrier between normalization stages."""
+    digits = ' UNION ALL '.join(f'SELECT {value} AS n' for value in range(16))
+    integers = f'SELECT a.n * 16 + b.n AS i FROM ({digits}) a CROSS JOIN ({digits}) b'
+    value = 'CASE WHEN MOD(i, 11) = 0 THEN NULL ELSE (MOD(i, 21) - 10) * 0.25E0 END'
+    if adapter.checksum_dialect == 'postgres':
+        value = f'({value})::double precision'
+    fields = [
+        f'CASE WHEN MOD(i, 17) = 0 THEN NULL ELSE MOD(i, 13) END AS {adapter.quote("_ppw_f64_0_value")}',
+        'CASE WHEN MOD(i, 7) = 0 THEN NULL ELSE MOD(i, 3) END AS updated_at',
+        f'{value} AS x',
+    ]
+    if adapter.checksum_dialect == 'mysql':
+        fields.append(
+            "CASE WHEN MOD(i, 19) = 0 THEN NULL ELSE "
+            "CAST('16777216.000000001862645149230957031250' AS DECIMAL(65,30)) "
+            "+ (i - 128) * CAST('0.000000000000000000000000000001' AS DECIMAL(65,30)) END AS amount"
+        )
+    return (
+        f'SELECT {", ".join(fields)} FROM ({integers}) numbers '
+        f'CROSS JOIN (SELECT 0 AS copy UNION ALL SELECT 1 AS copy) copies WHERE i < {row_count}'
+    )
+
+
+def _reference_float_aggregate(row_count: int, include_decimal: bool) -> dict[str, int | None]:
+    """Calculate framing, IEEE tokens and all key metrics without SQL normalization arithmetic."""
+    keys = []
+    checksum = 0
+    for index in range(row_count):
+        if index % 7 == 0 or index % 3 != 1:
+            continue
+        key = None if index % 17 == 0 else index % 13
+        keys.extend((key, key))
+        values = [None if index % 11 == 0 else (index % 21 - 10) * 0.25]
+        if include_decimal:
+            with localcontext() as context:
+                context.prec = 100
+                amount = Decimal('16777216.000000001862645149230957031250') + Decimal(index - 128) * Decimal('1e-30')
+            values.append(None if index % 19 == 0 else float(amount))
+        field_hashes = []
+        for value in values:
+            token = _reference_float64_token(value)
+            payload = 'N' if token is None else f'V{token}'
+            field_hashes.append(hashlib.md5(payload.encode()).hexdigest())
+        row_hash = int(hashlib.md5(''.join(field_hashes).encode()).hexdigest()[-12:], 16) - (2**48 - 1) // 2
+        checksum += 2 * row_hash
+    nonnull_keys = [key for key in keys if key is not None]
+    return {
+        'row_count': len(keys), 'distinct_key_count': len(set(nonnull_keys)),
+        'null_key_count': len(keys) - len(nonnull_keys),
+        'duplicate_key_count': len(nonnull_keys) - len(set(nonnull_keys)),
+        'min_key': min(nonnull_keys), 'max_key': max(nonnull_keys),
+        'row_checksum': checksum, FLOAT_NORMALIZATION_ERRORS: 0,
+    }
+
+
+def _float_plan_boundary_depth(plan: object) -> int:
+    """Count a nested boundary chain so unrelated input UNION plans cannot satisfy the regression."""
+    if isinstance(plan, list):
+        return max((_float_plan_boundary_depth(item) for item in plan), default=0)
+    if isinstance(plan, dict):
+        boundary = (plan.get('Node Type') == 'Subquery Scan'
+                    or 'materialized_from_subquery' in plan or 'materialized' in plan)
+        return int(boundary) + max((_float_plan_boundary_depth(value) for value in plan.values()), default=0)
+    return 0
+
+
+@pytest.mark.parametrize('engine', ['postgres', 'yugabyte', 'mysql', 'mariadb'])
+@pytest.mark.parametrize('row_count', [32, 256])
+def test_float_aggregate_retains_optimizer_boundaries(
+    engine: str, row_count: int, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Run the production aggregate with duplicates, NULLs, alias collisions and excluded window boundaries."""
+    adapter = _connect_float64_probe(engine)
+    include_decimal = adapter.checksum_dialect == 'mysql'
+    columns = [{
+        'name': 'x', 'checksum_kind': 'float64',
+        'checksum_float_conversion': 'mysql_numeric' if include_decimal else 'postgres_float_text',
+    }]
+    if include_decimal:
+        columns.append({'name': 'amount', 'checksum_kind': 'float64', 'checksum_float_conversion': 'mysql_decimal'})
+    relation = _varying_float_relation(adapter, row_count)
+    monkeypatch.setattr(adapter, 'qualified_table', lambda _schema, _table: f'({relation}) AS fixture')
+    # Synthetic SELECTs have no table metadata; the real half-open predicates remain in build_metric_query.
+    monkeypatch.setattr(adapter, 'window_predicates', lambda *_args: [])
+    checks = ('row_count', 'distinct_key_count', 'null_key_count', 'duplicate_key_count',
+              'min_key', 'max_key', 'row_checksum')
+    query = build_metric_query(
+        adapter, 'synthetic', 'varying_rows', '_ppw_f64_0_value', 'updated_at', checks,
+        checksum_columns_for_query=columns,
+    )
+    try:
+        with adapter.connection.cursor() as cursor:
+            explain = 'EXPLAIN FORMAT=JSON ' if include_decimal else 'EXPLAIN (VERBOSE, FORMAT JSON) '
+            cursor.execute(explain + query, (1, 2))
+            plan_row = cursor.fetchone()
+            plan = next(iter(plan_row.values())) if isinstance(plan_row, dict) else plan_row[0]
+            if isinstance(plan, str):
+                plan = json.loads(plan)
+            depth = _float_plan_boundary_depth(plan)
+            stages, _columns = adapter.checksum_projection(columns, reserved_names=('_ppw_f64_0_value', 'updated_at'))
+            # PostgreSQL can remove the first, alias-only stage; arithmetic stages must remain separated.
+            minimum_depth = len(stages) if include_decimal else len(stages) - 1
+            assert depth >= minimum_depth, (engine, depth, minimum_depth)
+            cursor.execute(query, (1, 2))
+            row = cursor.fetchone()
+            if not isinstance(row, dict):
+                row = dict(zip([description[0] for description in cursor.description], row))
+        actual = {str(name).lower(): None if value is None else int(value) for name, value in row.items()}
+        assert actual == _reference_float_aggregate(row_count, include_decimal), (engine, row_count)
+    finally:
+        adapter.close()
 
 
 @pytest.fixture(params=['postgres', 'yugabyte', 'mysql', 'mariadb'])

@@ -182,6 +182,23 @@ class DatabaseAdapter:
         """Plan database-side FLOAT normalization without downloading table rows."""
         return float64_projection(columns, self.quote, self.checksum_dialect, reserved_names)
 
+    def project_checksum_relation(self, relation: str, stages: list[list[str]]) -> str:
+        """Keep normalization stages from expanding into repeated expressions.
+
+        PostgreSQL/YSQL retain an OFFSET subquery boundary; MySQL/MariaDB
+        materialize a derived table with LIMIT. Their maximum unsigned LIMIT
+        denotes an unlimited result, preserving every filtered row and duplicate.
+        Put the window filter inside ``relation`` before adding these boundaries.
+        """
+        fence = {
+            'postgres': ' OFFSET 0',
+            'mysql': ' LIMIT 18446744073709551615',
+            'snowflake': '',
+        }[self.checksum_dialect]
+        for stage in stages:
+            relation = f"SELECT ppw_rows.*, {', '.join(stage)} FROM ({relation}) AS ppw_rows{fence}"
+        return relation
+
     def checksum_integer(self, payload: str) -> str:
         """Convert the low 48 bits of an MD5 value to a centred integer."""
         return (

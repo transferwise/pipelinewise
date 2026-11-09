@@ -45,7 +45,9 @@ def float64_projection(
 
     Callers initially project only the selected columns. Internal names avoid
     those columns, so user identifiers cannot shadow intermediate expressions.
-    Every stage has linear size in the number of FLOAT columns.
+    SQL text grows linearly with the number of FLOAT columns. Callers must use
+    ``project_checksum_relation`` to keep source planners from expanding stage
+    references into repeated calculations.
     """
     float_columns = [(index, column) for index, column in enumerate(columns)
                      if column['checksum_kind'] == 'float64']

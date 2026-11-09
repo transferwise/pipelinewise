@@ -68,6 +68,29 @@ Any nonzero normalization error count raises an execution error instead of
 allowing a passing checksum. This adds no UDF, database object, privilege,
 runtime dependency, persisted state, or user configuration.
 
+## Query evaluation boundaries
+
+Plain derived tables are not evaluation boundaries: source optimizers can
+inline their expressions and repeat earlier casts and arithmetic for every later
+reference. Both production queries and engine probes use
+`DatabaseAdapter.project_checksum_relation` in [adapters.py](adapters.py).
+It adds `OFFSET 0` to each PostgreSQL/YugabyteDB stage and
+`LIMIT 18446744073709551615` to each MySQL/MariaDB stage, including the final
+tokens consumed by the aggregate. These boundaries retain every filtered row
+and duplicate. The timestamp window and other source predicates stay inside the
+first stage, so normalization operates only on that window.
+
+PostgreSQL/YSQL can stream these subqueries. MySQL/MariaDB materialize internal
+derived tables, which can use temporary disk space under the server's existing
+limits. No session optimizer settings, user-created temporary tables or new
+privileges are needed. Snowflake keeps its existing projection SQL; this fix
+does not claim that its optimizer evaluates each expression exactly once.
+The existing statement timeout still bounds the combined metrics query.
+
+References: [PostgreSQL subquery pull-up rules](https://github.com/postgres/postgres/blob/REL_14_STABLE/src/backend/optimizer/prep/prepjointree.c),
+[MySQL derived-table materialization](https://dev.mysql.com/doc/refman/8.0/en/derived-table-optimization.html),
+and [MariaDB derived-table merging](https://mariadb.com/docs/server/ha-and-performance/optimization-and-tuning/query-optimizations/optimizations-for-derived-tables/derived-table-merge-optimization).
+
 ## Acceptance evidence
 
 - [Unit safeguards](../../tests/units/data_diff/test_float_checksum.py) cover
@@ -81,6 +104,10 @@ runtime dependency, persisted state, or user configuration.
   CI exercises PostgreSQL, YugabyteDB, MySQL, MariaDB, and Snowflake.
   Decimal engine cases also cover midpoint rounding and tiny values at the
   supported MySQL/MariaDB scales.
+- Real-source aggregate regressions inspect optimizer plans for retained stage
+  boundaries and compare checksums and key metrics against an independent
+  reference. They cover mixed FLOAT/DECIMAL columns, duplicates, NULLs, alias
+  collisions and timestamp-window edges without timing-dependent assertions.
 - [Replication E2E](../../tests/end_to_end/test_numeric_replication.py) checks
   actual FullSync, PartialSync, and Singer output before DataDiff comparisons.
   It covers native/v3 tables, REAL text conversion, exact FLOAT promotion,

@@ -1,10 +1,12 @@
 """FLOAT planning and aggregate safeguards independent of database credentials."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from pipelinewise.data_diff.adapters import DataDiffExecutionError, MySQLAdapter, PostgresAdapter, SnowflakeAdapter
+from pipelinewise.data_diff.adapters import (
+    DataDiffExecutionError, MySQLAdapter, PostgresAdapter, SnowflakeAdapter, YugabyteAdapter,
+)
 from pipelinewise.data_diff.comparison import UnsupportedComparisonError, checksum_columns
 from pipelinewise.data_diff.engine import build_metric_query
 from pipelinewise.data_diff.float64 import FLOAT_NORMALIZATION_ERRORS, expected_float_sql, float64_projection
@@ -95,6 +97,42 @@ def test_actual_target_float_is_never_clamped_or_rounded_to_source_scale():
     assert stages[0] == ['"AMOUNT" AS "_ppw_f64_0_value"']
     assert 'checksum_float_invalid' in columns[0]
     assert not any('ROUND(' in expression for stage in stages for expression in stage)
+
+
+@pytest.mark.parametrize(('adapter_type', 'conversion'), [
+    (PostgresAdapter, 'identity'), (YugabyteAdapter, 'identity'),
+    (MySQLAdapter, 'identity'), (MySQLAdapter, 'mysql_decimal'), (SnowflakeAdapter, 'identity'),
+])
+def test_metric_query_uses_adapter_projection_wrapper(adapter_type, conversion):
+    """Keep production aggregates on the same optimizer-fenced path as real-engine probes."""
+    adapter = adapter_type(None, 30)
+    columns = [{'name': 'amount', 'checksum_kind': 'float64', 'checksum_float_conversion': conversion}]
+    with (
+        patch.object(adapter, 'window_predicates', return_value=[]),
+        patch.object(adapter, 'project_checksum_relation', return_value='SELECT fenced_columns') as project,
+    ):
+        sql = build_metric_query(
+            adapter, 'public', 'payments', 'id', 'updated_at', ('row_count', 'row_checksum'),
+            checksum_columns_for_query=columns,
+        )
+
+    project.assert_called_once()
+    relation, stages = project.call_args.args
+    assert f'{adapter.quote("updated_at")} >= %s' in relation
+    assert f'{adapter.quote("updated_at")} < %s' in relation
+    assert adapter.qualified_table('public', 'payments') in relation
+    assert stages == adapter.checksum_projection(columns, reserved_names=('id', 'updated_at'))[0]
+    assert sql.endswith('FROM (SELECT fenced_columns) AS ppw_rows')
+
+
+@pytest.mark.parametrize('adapter_type', [PostgresAdapter, MySQLAdapter, SnowflakeAdapter])
+def test_non_float_metric_query_keeps_direct_filtered_aggregate(adapter_type):
+    adapter = adapter_type(None, 30)
+    with patch.object(adapter, 'project_checksum_relation') as project:
+        sql = build_metric_query(adapter, 'public', 'payments', 'id', 'updated_at', ('row_count',))
+
+    project.assert_not_called()
+    assert sql.count('%s') == 2
 
 
 def test_mysql_decimal_rounding_does_not_use_the_inexact_decimal_to_double_parser():

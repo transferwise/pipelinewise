@@ -7,6 +7,9 @@
   a tolerance or extra decimal rounding. Rows loaded with earlier precision or
   special-value bugs can fail until they change or are resynced. See
   [floating-point checksums](docs/user_guide/data_diff.rst#floating-point-checksums).
+- Avoid repeated source casts and arithmetic in floating-point checksums by
+  keeping normalization stages separate in PostgreSQL, YugabyteDB, MySQL and
+  MariaDB query plans. Existing statement timeouts still apply.
 
 0.101.0 (2026-11-06)
 --------------------

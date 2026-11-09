@@ -166,8 +166,7 @@ def build_metric_query(
             f"SELECT {', '.join(adapter.quote(name) for name in requested)} "
             f"FROM {adapter.qualified_table(schema, table)} WHERE {' AND '.join(predicates)}"
         )
-        for stage in projection_stages:
-            relation = f"SELECT ppw_rows.*, {', '.join(stage)} FROM ({relation}) AS ppw_rows"
+        relation = adapter.project_checksum_relation(relation, projection_stages)
         return f"SELECT {', '.join(expressions)} FROM ({relation}) AS ppw_rows"
     return (
         f"SELECT {', '.join(expressions)} "

@@ -158,6 +158,11 @@ They keep their old values until they change or are resynced. The check does not
 hide those differences or repair the target. Compare settled data as described
 under :ref:`data_diff`.
 
+Floating-point checksums need more work than row counts. MySQL and MariaDB can
+use internal temporary storage for the filtered window. The statement timeout
+applies to the combined metrics query, including counts and key checks. Use
+smaller windows if a check exceeds the timeout.
+
 
 Check configuration
 -------------------
