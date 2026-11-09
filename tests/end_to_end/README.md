@@ -31,7 +31,8 @@ run_e2e \
   tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_replica_to_sf.py
 
 run_e2e \
-  tests/end_to_end/target_snowflake/tap_postgres/test_snowflake_iceberg_publisher.py
+  tests/end_to_end/target_snowflake/tap_postgres/test_snowflake_iceberg_publisher.py \
+  'tests/end_to_end/test_numeric_replication.py::test_mysql_float_exact_snowflake[mariadb-v3]'
 
 run_sf_decimal \
   tests/integration/test_decimals.py::test_numeric_array_json_text_loads_like_parse_json_without_versioning \
@@ -55,12 +56,14 @@ run_e2e \
 run_e2e \
   tests/end_to_end/target_snowflake/tap_postgres/test_iceberg_v3_postgres_to_sf.py::TestIcebergV3PostgresToSnowflake::test_full_and_bounded_partial_sync_preserve_multiline_bytes \
   tests/end_to_end/target_snowflake/tap_postgres/test_iceberg_v3_postgres_to_sf.py::TestIcebergV3PostgresToSnowflake::test_fullsync_hands_over_to_singer_on_managed_iceberg_v3 \
-  tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py::TestIcebergV3MySQLToSnowflake::test_fullsync_hands_over_to_singer_on_managed_iceberg_v3
+  tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py::TestIcebergV3MySQLToSnowflake::test_fullsync_hands_over_to_singer_on_managed_iceberg_v3 \
+  'tests/end_to_end/test_numeric_replication.py::test_postgres_float_nonfinite_snowflake[postgres-v3]'
 
 run_e2e \
   tests/end_to_end/target_snowflake/tap_mariadb/test_iceberg_v3_mariadb_to_sf.py \
   tests/end_to_end/target_snowflake/tap_mongodb/test_replicate_mongodb_to_sf.py \
-  tests/end_to_end/test_numeric_replication.py::test_mysql_float_exact_snowflake
+  'tests/end_to_end/test_numeric_replication.py::test_mysql_float_exact_snowflake[mysql-v3]' \
+  'tests/end_to_end/test_numeric_replication.py::test_mysql_float_exact_snowflake[mariadb-native]'
 
 run_e2e \
   tests/end_to_end/target_snowflake/test_source_transformation_exports.py \
@@ -139,7 +142,9 @@ run_sf_decimal \
 run_e2e \
   tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_table_size_check.py \
   tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf.py \
-  'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[postgres-v3]'
+  'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[postgres-v3]' \
+  'tests/end_to_end/test_numeric_replication.py::test_mysql_float_exact_snowflake[mysql-native]' \
+  'tests/end_to_end/test_numeric_replication.py::test_postgres_float_nonfinite_snowflake[yugabyte-native]'
 
 run_e2e \
   'tests/end_to_end/test_numeric_replication.py::test_decimal_fastsync_snowflake[mysql-native]' \
@@ -180,7 +185,7 @@ run_sf_decimal \
   tests/integration/test_runtime_contracts.py::test_rejects_table_format_change_without_altering_rows
 
 run_e2e \
-  tests/end_to_end/test_numeric_replication.py::test_postgres_float_nonfinite_snowflake \
+  'tests/end_to_end/test_numeric_replication.py::test_postgres_float_nonfinite_snowflake[postgres-native]' \
   tests/end_to_end/test_numeric_replication.py::test_postgres_bounded_numeric_key_snowflake
 
 run_sf_decimal \
