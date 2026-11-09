@@ -42,6 +42,7 @@ from .comparison import (
     schema_compatibility_result,
 )
 from .credentials import pem_to_der
+from .float64 import FLOAT_NORMALIZATION_ERRORS
 
 SOURCE_ROW_LIMIT = 100_000
 SOURCE_INDEX_WARNING_ROWS = 50_000
@@ -132,6 +133,9 @@ def build_metric_query(
 ) -> str:
     """Build a parameterized aggregate query over a half-open timestamp window."""
     key = adapter.quote(key_column)
+    projection_stages, checksum_columns_for_query = adapter.checksum_projection(
+        checksum_columns_for_query or [], reserved_names=(key_column, timestamp_column),
+    )
     expressions = []
     for check in checks:
         if check == CHECKSUM_CHECK:
@@ -139,12 +143,32 @@ def build_metric_query(
         else:
             expression = METRIC_EXPRESSIONS[check].format(key=key)
         expressions.append(f"{expression} AS {adapter.quote(check)}")
+    invalid_float_columns = [
+        column['checksum_float_invalid'] for column in checksum_columns_for_query
+        if 'checksum_float_invalid' in column
+    ]
+    if invalid_float_columns:
+        invalid = ' OR '.join(invalid_float_columns)
+        expressions.append(
+            f'SUM(CASE WHEN {invalid} THEN 1 ELSE 0 END) AS {adapter.quote(FLOAT_NORMALIZATION_ERRORS)}'
+        )
     timestamp = adapter.quote(timestamp_column)
     predicates = [
         f"{timestamp} >= %s",
         f"{timestamp} < %s",
         *adapter.window_predicates(schema, table, timestamp_column),
     ]
+    if projection_stages:
+        requested = _unique_columns([key_column, timestamp_column, *[
+            column['name'] for column in checksum_columns_for_query
+        ]])
+        relation = (
+            f"SELECT {', '.join(adapter.quote(name) for name in requested)} "
+            f"FROM {adapter.qualified_table(schema, table)} WHERE {' AND '.join(predicates)}"
+        )
+        for stage in projection_stages:
+            relation = f"SELECT ppw_rows.*, {', '.join(stage)} FROM ({relation}) AS ppw_rows"
+        return f"SELECT {', '.join(expressions)} FROM ({relation}) AS ppw_rows"
     return (
         f"SELECT {', '.join(expressions)} "
         f"FROM {adapter.qualified_table(schema, table)} "
@@ -561,7 +585,7 @@ def run_check(
         if CHECKSUM_CHECK in metric_checks:
             try:
                 source_checksum_columns, target_checksum_columns = checksum_columns(
-                    column_pairs
+                    column_pairs, source_type=check.get('source_type'), target_type=check.get('target_type'),
                 )
             except UnsupportedComparisonError as exc:
                 metric_checks.remove(CHECKSUM_CHECK)

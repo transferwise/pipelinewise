@@ -5,6 +5,7 @@ import math
 import os
 import subprocess
 from argparse import Namespace
+from datetime import datetime, timezone
 from decimal import Decimal, localcontext
 from pathlib import Path
 from uuid import uuid4
@@ -13,6 +14,7 @@ import pytest
 
 from pipelinewise.cli import mysql_float_conditions
 from pipelinewise.cli.config import Config
+from pipelinewise.data_diff.engine import run_check
 from pipelinewise.fastsync import (
     mysql_to_postgres, mysql_to_snowflake, postgres_to_postgres, postgres_to_snowflake, yugabyte_to_postgres,
     yugabyte_to_snowflake,
@@ -23,7 +25,9 @@ from pipelinewise.fastsync.commons.source_numeric import postgres_float_expressi
 from pipelinewise.fastsync.partialsync import mysql_to_snowflake as partial_mysql
 from pipelinewise.fastsync.partialsync import postgres_to_snowflake as partial_postgres
 from pipelinewise.fastsync.partialsync import yugabyte_to_snowflake as partial_yugabyte
-from tests.end_to_end.target_snowflake.test_source_transformation_exports import RAW_SECRET, SOURCE_MODES, float32
+from tests.end_to_end.target_snowflake.test_source_transformation_exports import (
+    RAW_SECRET, SOURCE_MODES, _SourceExport, float32,
+)
 from tests.end_to_end.target_snowflake.test_source_transformation_exports import source_export as source_export
 from tests.end_to_end.target_snowflake.test_source_transformation_publication import (
     _connector_python, _remove_s3_prefix, _target_config,
@@ -90,6 +94,73 @@ def test_postgres_decimal_float_underflow(source_export):
     assert [row['amount'] for row in rows] == [float(value) if value is not None else None for value in values]
 
 
+def _add_data_diff_window(source: _SourceExport) -> None:
+    """Replicate a settled UTC timestamp with the numeric fixture, using its own index."""
+    source.execute(
+        f'ALTER TABLE {source.quoted_table} ADD COLUMN updated_at TIMESTAMP '
+        "DEFAULT '2026-01-01 00:00:00'"
+    )
+    order = ' ASC' if source.engine == 'yugabyte' else ''
+    source.execute(f'CREATE INDEX {source.table_name}_dd_time ON {source.quoted_table} (updated_at{order})')
+
+
+def _assert_float_data_diff(
+    source: _SourceExport, config: dict, target: FastSyncTargetSnowflake, compare_columns: list[str],
+    *, key: str = 'id', mutation: tuple[str, int] | None = None,
+) -> None:
+    """Check actual replicated values, then detect an independent one-ULP target mutation."""
+    schema = config['default_target_schema']
+    table = f'"{schema}"."{source.table_name.upper()}"'
+    check = {
+        'check_id': str(uuid4()),
+        'source_type': {'postgres': 'tap-postgres', 'yugabyte': 'tap-yugabyte'}.get(source.engine, 'tap-mysql'),
+        'target_type': 'target-snowflake',
+        'source_schema': source.schema, 'source_table': source.table_name,
+        'target_schema': schema, 'target_table': source.table_name.upper(),
+        'source_key_column': key, 'target_key_column': key.upper(),
+        'source_timestamp_column': 'updated_at', 'target_timestamp_column': 'UPDATED_AT',
+        'source_compare_columns': list(compare_columns),
+        'target_compare_columns': [column.upper() for column in compare_columns],
+        'statement_timeout_seconds': 60,
+        'checks': ('schema_compatibility', 'row_count', 'row_checksum'),
+    }
+
+    def compare(start_day: int = 1, end_day: int = 2) -> tuple[dict[str, dict], str | None]:
+        preflight, results, status = run_check(
+            check, source.source.connection_config, config,
+            datetime(2026, 1, start_day, tzinfo=timezone.utc), datetime(2026, 1, end_day, tzinfo=timezone.utc),
+        )
+        assert preflight['status'] == 'PASS', preflight
+        return {result['check_type']: result for result in results}, status
+
+    results, status = compare()
+    assert status == 'PASS', results
+    assert all(result['status'] == 'PASS' for result in results.values()), results
+    if mutation is None:
+        return
+    column, row_key = mutation
+    selected = f'"{column.upper()}"'
+    predicate = f'"{key.upper()}" = %s'
+    original = target.query(f'SELECT {selected} AS VALUE FROM {table} WHERE {predicate}', (row_key,))[0]['VALUE']
+    assert isinstance(original, float) and math.isfinite(original)
+    changed = math.nextafter(original, math.inf)
+    assert changed != original
+    try:
+        target.query(f'UPDATE {table} SET {selected} = %s WHERE {predicate}', (changed, row_key))
+        stored = target.query(f'SELECT {selected} AS VALUE FROM {table} WHERE {predicate}', (row_key,))[0]['VALUE']
+        assert stored == changed
+        results, status = compare()
+        assert status == 'FAIL', results
+        assert results['row_checksum']['status'] == 'FAIL', results
+        assert results['row_count']['status'] == 'PASS', results
+        assert results['schema_compatibility']['status'] == 'PASS', results
+        results, status = compare(2, 3)
+        assert status == 'PASS', results
+        assert results['row_count']['source_value'] == results['row_count']['target_value'] == '0'
+    finally:
+        target.query(f'UPDATE {table} SET {selected} = %s WHERE {predicate}', (original, row_key))
+
+
 def _args(source, config, tmp_path, namespace, replication_key='amount'):
     runtime = tmp_path / namespace
     runtime.mkdir()
@@ -112,8 +183,10 @@ def _catalog_path(args):
     return Path(args.state).with_name('tap_catalog.json')
 
 
-def _tap_extract(source, target_type, args, *, dimensions=(38, 18), start=EXACT, end=NEXT):
-    """Discover and run the installed SQL tap from FastSync's saved bookmark."""
+def _tap_extract(
+    source, target_type, args, *, dimensions=(38, 18), start=EXACT, end=NEXT, replication_method='INCREMENTAL',
+):
+    """Discover and run the installed SQL tap, using FastSync's bookmark for incremental reads."""
     tap_type = {'postgres': 'tap-postgres', 'yugabyte': 'tap-yugabyte'}.get(source.engine, 'tap-mysql')
     tap = {'type': tap_type, 'db_conn': source.source.connection_config}
     config = Config.generate_tap_connection_config(tap, {}, f'target-{target_type}')
@@ -142,21 +215,30 @@ def _tap_extract(source, target_type, args, *, dimensions=(38, 18), start=EXACT,
     for entry in stream['metadata']:
         entry['metadata']['selected'] = True
         if not entry['breadcrumb']:
-            entry['metadata'].update({'replication-method': 'INCREMENTAL', 'replication-key': replication_key})
+            entry['metadata']['replication-method'] = replication_method
+            if replication_method == 'INCREMENTAL':
+                entry['metadata']['replication-key'] = replication_key
+            else:
+                entry['metadata'].pop('replication-key', None)
     if dimensions is not None:
         assert stream['schema']['properties'][replication_key]['decimal'] == {
             'precision': dimensions[0], 'scale': dimensions[1],
         }
-    bookmark = json.loads(Path(args.state).read_text(encoding='utf-8'))['bookmarks'][stream['tap_stream_id']]
-    assert bookmark['replication_key_value'] == start
+    if replication_method == 'INCREMENTAL':
+        bookmark = json.loads(Path(args.state).read_text(encoding='utf-8'))['bookmarks'][stream['tap_stream_id']]
+        assert bookmark['replication_key_value'] == start
     catalog_path.write_text(json.dumps({'streams': selected}), encoding='utf-8')
-    messages = [json.loads(line) for line in run('--catalog', str(catalog_path), '--state', args.state).splitlines()]
+    options = ['--catalog', str(catalog_path)]
+    if replication_method == 'INCREMENTAL':
+        options.extend(('--state', args.state))
+    messages = [json.loads(line) for line in run(*options).splitlines()]
     records = [message['record'] for message in messages if message['type'] == 'RECORD']
     assert records
     if dimensions is not None:
         assert all(isinstance(record[replication_key], str) for record in records)
-    final_state = [message['value'] for message in messages if message['type'] == 'STATE'][-1]
-    assert final_state['bookmarks'][stream['tap_stream_id']]['replication_key_value'] == end
+    if replication_method == 'INCREMENTAL':
+        final_state = [message['value'] for message in messages if message['type'] == 'STATE'][-1]
+        assert final_state['bookmarks'][stream['tap_stream_id']]['replication_key_value'] == end
     return messages
 
 
@@ -270,6 +352,7 @@ def test_legacy_decimal_float_migration_requires_opt_in(source_export, tmp_path)
         [('id', 'INTEGER PRIMARY KEY'), ('amount', 'DECIMAL(65,30)'), ('position', 'INTEGER')],
         [(1, '12.34', 1), (2, '56.78', 2)],
     )
+    _add_data_diff_window(source)
     args = _args(source, config, tmp_path, namespace, replication_key='position')
     full = SNOWFLAKE_FULL.get(source.engine, mysql_to_snowflake)
     partial = SNOWFLAKE_PARTIAL.get(source.engine, partial_mysql)
@@ -291,6 +374,7 @@ def test_legacy_decimal_float_migration_requires_opt_in(source_export, tmp_path)
         assert len(columns) == 1
         assert columns[0]['COLUMN_NAME'] == 'AMOUNT'
         assert columns[0]['DATA_TYPE'] == 'FLOAT'
+        _assert_float_data_diff(source, config, target, ['amount', 'position'])
 
         alter = 'ALTER COLUMN amount TYPE' if source.postgres_dialect else 'MODIFY COLUMN amount'
         source.execute(f'ALTER TABLE {source.quoted_table} {alter} DECIMAL(18,2)')
@@ -300,6 +384,7 @@ def test_legacy_decimal_float_migration_requires_opt_in(source_export, tmp_path)
         assert len(columns) == 1
         assert columns[0]['COLUMN_NAME'] == 'AMOUNT'
         assert columns[0]['DATA_TYPE'] == 'FLOAT'
+        _assert_float_data_diff(source, config, target, ['amount', 'position'], mutation=('amount', 1))
 
         config['version_legacy_float_columns'] = True
         result = partial.partial_sync_table(request, args)
@@ -721,7 +806,7 @@ def _assert_fallback_values(target, table, keys, *, postgres=False):
     rows = target.query(f'SELECT "DECIMAL_ID", "AMOUNT" FROM {table} ORDER BY "DECIMAL_ID"')
     assert [row['DECIMAL_ID'] for row in rows] == keys
     assert all(isinstance(row['AMOUNT'], float) for row in rows)
-    assert all(row['AMOUNT'] == pytest.approx(float(Decimal(keys[0]))) for row in rows)
+    assert all(row['AMOUNT'] == float(Decimal(keys[0])) for row in rows)
     if postgres:
         values = target.query(
             'SELECT "HUGE", "NEGATIVE_HUGE", "TINY", "NEGATIVE_TINY" '
@@ -758,20 +843,44 @@ def test_decimal_fallback_snowflake(source_export, tmp_path):
     canonical_keys = [key.rstrip('0') for key in keys]
     assert float(keys[0]) == float(keys[1]) == float(keys[2])
     columns = [('decimal_id', 'NUMERIC(65,30) PRIMARY KEY'), ('amount', 'NUMERIC(65,30)'), ('position', 'INTEGER')]
-    rows = [(keys[0], keys[0], 1), (keys[1], keys[1], 2)]
+    # 2^24 + 2^-29 is exactly halfway between adjacent binary64 values; NUMERIC(65,30)
+    # preserves the values one decimal quantum either side of that midpoint.
+    midpoints = (
+        '16777216.000000001862645149230957031249',
+        '16777216.000000001862645149230957031250',
+        '16777216.000000001862645149230957031251',
+    )
+    midpoint_columns = ['midpoint_below', 'midpoint', 'midpoint_above']
+    columns.extend((name, 'NUMERIC(65,30)') for name in midpoint_columns)
+    rows = [(keys[0], keys[0], 1, *midpoints), (keys[1], keys[1], 2, *midpoints)]
     postgres = source.engine == 'postgres'
     if postgres:
         columns.extend((name, 'NUMERIC') for name in ('huge', 'negative_huge', 'tiny', 'negative_tiny'))
         rows = [(*rows[0], '1e1000', '-1e1000', '1e-1000', '-1e-1000'), (*rows[1], None, None, None, None)]
     source.create(columns, rows)
+    _add_data_diff_window(source)
+    compare_columns = [
+        'amount', *midpoint_columns, *(['huge', 'negative_huge', 'tiny', 'negative_tiny'] if postgres else []),
+    ]
     args = _args(source, config, tmp_path, namespace, replication_key='decimal_id')
     full = postgres_to_snowflake if postgres else mysql_to_snowflake
     partial = partial_postgres if postgres else partial_mysql
     table = f'"{schema}"."{source.table_name.upper()}"'
+
+    def assert_midpoints():
+        expected = [float(Decimal(value)) for value in midpoints]
+        assert expected[0] == expected[1] == 16777216.0
+        assert expected[2] == math.nextafter(expected[1], math.inf)
+        names = ', '.join(f'"{name.upper()}"' for name in midpoint_columns)
+        for row in target.query(f'SELECT {names} FROM {table}'):
+            assert [row[name.upper()] for name in midpoint_columns] == expected
+
     try:
         result = full.sync_table(source.table, args)
         assert result is True, result
         _assert_fallback_values(target, table, canonical_keys[:2], postgres=postgres)
+        assert_midpoints()
+        _assert_float_data_diff(source, config, target, compare_columns, key='position')
         original_columns = _fallback_columns(target, schema, source.table_name)
         types = {column['COLUMN_NAME']: column['DATA_TYPE'] for column in original_columns}
         assert types['AMOUNT'] == 'FLOAT'
@@ -783,6 +892,8 @@ def test_decimal_fallback_snowflake(source_export, tmp_path):
             result = partial.partial_sync_table(request, args)
             assert result is True, result
             _assert_fallback_values(target, table, canonical_keys[:2], postgres=postgres)
+            assert_midpoints()
+            _assert_float_data_diff(source, config, target, compare_columns, key='position')
             assert _fallback_columns(target, schema, source.table_name) == original_columns
         if postgres:
             source.execute(
@@ -790,12 +901,17 @@ def test_decimal_fallback_snowflake(source_export, tmp_path):
                 'WHERE decimal_id=%s', ('1e1000', '-1e1000', '1e-1000', '-1e-1000', keys[1]),
             )
         placeholders = ','.join('%s' for _ in columns)
-        new_row = (keys[2], keys[2], 3, None, None, None, None) if postgres else (keys[2], keys[2], 3)
-        source.execute(f'INSERT INTO {source.quoted_table} VALUES ({placeholders})', new_row)
+        new_row = (keys[2], keys[2], 3, *midpoints, *([None] * 4 if postgres else []))
+        names = ', '.join(source.quoted(name) for name, _ in columns)
+        source.execute(f'INSERT INTO {source.quoted_table} ({names}) VALUES ({placeholders})', new_row)
         messages = _tap_extract(source, 'snowflake', args, dimensions=(65, 30), start=keys[1], end=keys[2])
         assert {message['record']['decimal_id'] for message in messages if message['type'] == 'RECORD'} == set(keys[1:])
         _load_singer(config, 'snowflake', messages)
         _assert_fallback_values(target, table, canonical_keys, postgres=postgres)
+        assert_midpoints()
+        _assert_float_data_diff(
+            source, config, target, compare_columns, key='position', mutation=('amount', 1),
+        )
         _delete_from_singer(config, source, messages, keys[1])
         _assert_fallback_values(target, table, [canonical_keys[0], canonical_keys[2]], postgres=postgres)
     finally:
@@ -856,12 +972,21 @@ def test_postgres_float_nonfinite_snowflake(source_export, tmp_path):
             _float_token(key), _float_token(value), _float_token(value),
             None if doubles is None else [_float_token(item) for item in doubles], numerics_json,
         )
+    finite_doubles = (
+        1.0, math.nextafter(1.0, math.inf), float(2**53), float(2**53 + 2),
+        float.fromhex('0x0.0000000000001p-1022'), float.fromhex('0x1.fffffffffffffp+1023'), -0.0, None,
+    )
+    finite_reals = (0.1, 0.3, 16777217, 16777215, 1.17549435e-38, 1.40129846e-45, -0.0, None)
+    rows = [(*row, double, real, None) for row, double, real in zip(rows, finite_doubles, finite_reals)]
     loaded_expected = {row_id: (*row[:4], _variant_json(row[4])) for row_id, row in expected.items()}
     source.create([
         ('id', 'INTEGER PRIMARY KEY'), ('position', 'DOUBLE PRECISION'), ('real_value', 'REAL'),
         ('double_value', 'DOUBLE PRECISION'), ('double_values', 'DOUBLE PRECISION[]'),
-        ('numeric_values', 'NUMERIC[]'),
+        ('numeric_values', 'NUMERIC[]'), ('finite_double', 'DOUBLE PRECISION'), ('finite_real', 'REAL'),
+        ('null_double', 'DOUBLE PRECISION'),
     ], rows[:4])
+    _add_data_diff_window(source)
+    compare_columns = ['position', 'real_value', 'double_value', 'finite_double', 'finite_real', 'null_double']
     args = _args(source, config, tmp_path, namespace, replication_key='position')
     table = f'"{schema}"."{source.table_name.upper()}"'
 
@@ -885,6 +1010,15 @@ def test_postgres_float_nonfinite_snowflake(source_export, tmp_path):
         return [column for column in _fallback_columns(target, schema, source.table_name)
                 if not column['COLUMN_NAME'].startswith('_SDC_')]
 
+    def assert_real_values():
+        # PostgreSQL/YSQL export REAL as decimal text, unlike MySQL's direct binary32 promotion.
+        source_values = source.source.query(
+            'SELECT CAST(CAST(finite_real AS TEXT) AS DOUBLE PRECISION) AS value '
+            f'FROM {source.quoted_table} ORDER BY id',
+        )
+        target_values = target.query(f'SELECT "FINITE_REAL" AS VALUE FROM {table} ORDER BY "ID"')
+        assert [row['VALUE'] for row in target_values] == [row['value'] for row in source_values]
+
     try:
         result = SNOWFLAKE_FULL[source.engine].sync_table(source.table, args)
         assert result is True, result
@@ -897,9 +1031,18 @@ def test_postgres_float_nonfinite_snowflake(source_export, tmp_path):
         types = {column['COLUMN_NAME']: column['DATA_TYPE'] for column in columns}
         assert [types[name] for name in ('POSITION', 'REAL_VALUE', 'DOUBLE_VALUE')] == ['FLOAT'] * 3
         assert [types[name] for name in ('DOUBLE_VALUES', 'NUMERIC_VALUES')] == ['VARIANT'] * 2
+        assert [row['FINITE_DOUBLE'] for row in target.query(
+            f'SELECT "FINITE_DOUBLE" FROM {table} ORDER BY "ID"',
+        )] == list(finite_doubles[:4])
+        assert_real_values()
+        _assert_float_data_diff(source, config, target, compare_columns)
 
         for row in rows[4:]:
-            source.execute(f'INSERT INTO {source.quoted_table} VALUES (%s, %s, %s, %s, %s, %s)', row)
+            source.execute(
+                f'INSERT INTO {source.quoted_table} '
+                '(id, position, real_value, double_value, double_values, numeric_values, '
+                'finite_double, finite_real, null_double) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)', row,
+            )
         # Rows arrive in key order, Infinity and NaN last, so ending on 8.0 shows their tokens were not bookmarked.
         messages = _tap_extract(source, 'snowflake', args, dimensions=None, start=2.0, end=8.0)
         records = [message['record'] for message in messages if message['type'] == 'RECORD']
@@ -916,26 +1059,50 @@ def test_postgres_float_nonfinite_snowflake(source_export, tmp_path):
             row_id: fastsync[(row_id - 1) % 4 + 1][3:] for row_id in range(1, 9)
         }
         assert source_columns() == columns
+        assert [row['FINITE_DOUBLE'] for row in target.query(
+            f'SELECT "FINITE_DOUBLE" FROM {table} ORDER BY "ID"',
+        )] == list(finite_doubles)
+        assert_real_values()
+        _assert_float_data_diff(source, config, target, compare_columns, mutation=('finite_double', 1))
 
-        if source.iceberg:
-            # Iceberg PartialSync publishes with MERGE INTO rather than FullSync's CREATE ... AS SELECT.
-            partial_rows = [(row[0] + 8, float(row[0] + 8), *row[2:]) for row in rows[:4]]
-            for row in partial_rows:
-                source.execute(f'INSERT INTO {source.quoted_table} VALUES (%s, %s, %s, %s, %s, %s)', row)
-            request = (source.table, {
-                'column': 'id', 'start_value': '<S>9', 'end_value': '<S>12', 'drop_target_table': False,
-            })
-            result = SNOWFLAKE_PARTIAL[source.engine].partial_sync_table(request, args)
-            assert result is True, result
-            partial = loaded_rows()
-            assert {row_id: row[1:] for row_id, row in decoded(partial).items() if row_id > 8} == {
-                row_id + 8: loaded_expected[row_id][1:] for row_id in range(1, 5)
-            }
-            assert {row_id: row[3:] for row_id, row in partial.items() if row_id > 8} == {
-                row_id + 8: fastsync[row_id][3:] for row_id in range(1, 5)
-            }
-            assert {row_id: row for row_id, row in partial.items() if row_id <= 8} == singer
-            assert source_columns() == columns
+        if source.engine == 'postgres':
+            messages = _tap_extract(
+                source, 'snowflake', args, dimensions=None, replication_method='FULL_TABLE',
+            )
+            assert {message['record']['id'] for message in messages if message['type'] == 'RECORD'} == set(range(1, 9))
+            _load_singer(config, 'snowflake', messages)
+            assert decoded(loaded_rows()) == loaded_expected
+            assert [row['FINITE_DOUBLE'] for row in target.query(
+                f'SELECT "FINITE_DOUBLE" FROM {table} ORDER BY "ID"',
+            )] == list(finite_doubles)
+            assert_real_values()
+            _assert_float_data_diff(source, config, target, compare_columns)
+
+        # Exercise the ordinary floating payload through each format's PartialSync publisher.
+        partial_rows = [(row[0] + 8, float(row[0] + 8), *row[2:]) for row in rows[:4]]
+        for row in partial_rows:
+            source.execute(
+                f'INSERT INTO {source.quoted_table} '
+                '(id, position, real_value, double_value, double_values, numeric_values, '
+                'finite_double, finite_real, null_double) '
+                'VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)', row,
+            )
+        request = (source.table, {
+            'column': 'id', 'start_value': '<S>9', 'end_value': '<S>12', 'drop_target_table': False,
+        })
+        result = SNOWFLAKE_PARTIAL[source.engine].partial_sync_table(request, args)
+        assert result is True, result
+        partial = loaded_rows()
+        assert {row_id: row[1:] for row_id, row in decoded(partial).items() if row_id > 8} == {
+            row_id + 8: loaded_expected[row_id][1:] for row_id in range(1, 5)
+        }
+        assert {row_id: row[3:] for row_id, row in partial.items() if row_id > 8} == {
+            row_id + 8: fastsync[row_id][3:] for row_id in range(1, 5)
+        }
+        assert {row_id: row for row_id, row in partial.items() if row_id <= 8} == singer
+        assert source_columns() == columns
+        assert_real_values()
+        _assert_float_data_diff(source, config, target, compare_columns)
     finally:
         try:
             target.query(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
@@ -989,9 +1156,17 @@ def test_mysql_float_exact_snowflake(source_export, tmp_path):
         row_id: (float32(key), float32(amount), 'hidden' if secret == RAW_SECRET else secret)
         for row_id, key, amount, secret in rows
     }
+    double_values = (
+        1.0, math.nextafter(1.0, math.inf), float(2**53), float(2**53 + 2),
+        float.fromhex('0x0.0000000000001p-1022'), 1e300, -0.0, None,
+    )
+    rows = [(*row, value) for row, value in zip(rows, double_values)]
     source.create([
         ('id', 'INTEGER PRIMARY KEY'), ('position', 'FLOAT'), ('amount', 'FLOAT'), ('secret', 'TEXT'),
+        ('double_value', 'DOUBLE'),
     ], rows[:4])
+    _add_data_diff_window(source)
+    compare_columns = ['position', 'amount', 'double_value']
     args = _args(source, config, tmp_path, namespace, replication_key='position')
     args.transform = source.source.source_transformations = _mysql_float_mask(source, namespace)
     table = f'"{schema}"."{source.table_name.upper()}"'
@@ -1010,9 +1185,13 @@ def test_mysql_float_exact_snowflake(source_export, tmp_path):
         assert result is True, result
         fastsync = loaded_rows()
         assert fastsync == {row_id: expected[row_id] for row_id in range(1, 5)}
+        _assert_float_data_diff(source, config, target, compare_columns)
 
         for row in rows[4:]:
-            source.execute(f'INSERT INTO {source.quoted_table} VALUES (%s, %s, %s, %s)', row)
+            source.execute(
+                f'INSERT INTO {source.quoted_table} (id, position, amount, secret, double_value) '
+                'VALUES (%s, %s, %s, %s, %s)', row,
+            )
         # A six-digit FastSync bookmark, 1234570, would make Singer skip rows 4-8 entirely.
         messages = _tap_extract(source, 'snowflake', args, dimensions=None, start=expected[4][0], end=expected[8][0])
         records = {
@@ -1026,30 +1205,38 @@ def test_mysql_float_exact_snowflake(source_export, tmp_path):
         _load_singer(config, 'snowflake', messages, transformations)
         singer = loaded_rows()
         assert singer == expected
+        assert [row['DOUBLE_VALUE'] for row in target.query(
+            f'SELECT "DOUBLE_VALUE" FROM {table} ORDER BY "ID"',
+        )] == list(double_values)
+        _assert_float_data_diff(source, config, target, compare_columns, mutation=('amount', 1))
         # == ignores the sign of zero and Snowflake may normalise -0.0, so both paths must store the same sign.
         assert math.copysign(1.0, singer[8][1]) == math.copysign(1.0, fastsync[4][1])
 
-        if source.iceberg:
-            # Iceberg PartialSync publishes with MERGE INTO; the FLOAT range re-merges rows 5-8 and adds rows 9-12.
-            partial_rows = [
-                (row_id, key, amount, RAW_SECRET if amount == 0.1 else 'public')
-                for row_id, (key, amount) in enumerate(zip(
-                    (1234568.25, 1234568.75, 1234569.25, 1234569.75), (16777217, 1234567.8, 0.1, -0.0)), 9)
-            ]
-            for row in partial_rows:
-                source.execute(f'INSERT INTO {source.quoted_table} VALUES (%s, %s, %s, %s)', row)
-            request = (source.table, {
-                'column': 'position', 'start_value': '<S>1234568', 'end_value': '<S>1234570',
-                'drop_target_table': False,
-            })
-            result = partial_mysql.partial_sync_table(request, args)
-            assert result is True, result
-            partial = loaded_rows()
-            assert partial == {**expected, **{
-                row_id: (float32(key), float32(amount), 'hidden' if secret == RAW_SECRET else secret)
-                for row_id, key, amount, secret in partial_rows
-            }}
-            assert math.copysign(1.0, partial[12][1]) == math.copysign(1.0, fastsync[4][1])
+        # The FLOAT range re-merges rows 5-8 and adds rows 9-12 through both PartialSync publishers.
+        partial_rows = [
+            (row_id, key, amount, RAW_SECRET if amount == 0.1 else 'public')
+            for row_id, (key, amount) in enumerate(zip(
+                (1234568.25, 1234568.75, 1234569.25, 1234569.75), (16777217, 1234567.8, 0.1, -0.0)), 9)
+        ]
+        partial_rows = [(*row, value) for row, value in zip(partial_rows, double_values[:4])]
+        for row in partial_rows:
+            source.execute(
+                f'INSERT INTO {source.quoted_table} (id, position, amount, secret, double_value) '
+                'VALUES (%s, %s, %s, %s, %s)', row,
+            )
+        request = (source.table, {
+            'column': 'position', 'start_value': '<S>1234568', 'end_value': '<S>1234570',
+            'drop_target_table': False,
+        })
+        result = partial_mysql.partial_sync_table(request, args)
+        assert result is True, result
+        partial = loaded_rows()
+        assert partial == {**expected, **{
+            row_id: (float32(key), float32(amount), 'hidden' if secret == RAW_SECRET else secret)
+            for row_id, key, amount, secret, _ in partial_rows
+        }}
+        assert math.copysign(1.0, partial[12][1]) == math.copysign(1.0, fastsync[4][1])
+        _assert_float_data_diff(source, config, target, compare_columns)
     finally:
         try:
             target.query(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')

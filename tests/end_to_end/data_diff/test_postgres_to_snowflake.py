@@ -7,13 +7,22 @@ adapters agree.
 """
 
 import json
+import math
 import os
+import random
+import struct
+from collections.abc import Callable
+from time import perf_counter
 from datetime import datetime, timezone
 from uuid import uuid4
 
 import pytest
 
-from pipelinewise.data_diff.engine import DataDiffExecutionError, HistoricalWindowNotReady, run_check
+from pipelinewise.data_diff.adapters import DatabaseAdapter
+from pipelinewise.data_diff.engine import (
+    DataDiffExecutionError, HistoricalWindowNotReady, connect_source, connect_target, run_check,
+)
+from pipelinewise.data_diff.float64 import float64_projection
 from pipelinewise.fastsync.commons.snowflake_iceberg_versions import MANAGED_ICEBERG_V3_TABLE_OPTIONS
 
 from ..helpers import tasks
@@ -35,6 +44,129 @@ EXPECTED_CHECKS = {
     'max_key',
     'row_checksum',
 }
+
+
+def _float64_probe_values(include_nonfinite: bool) -> list[float | None]:
+    """Cover every binary exponent and its neighbors, plus fixed random bit patterns."""
+    values = [
+        None, 0.0, -0.0, 0.1, math.nextafter(0.1, math.inf), float(2**24), float(2**24 + 1),
+        float(2**53), math.nextafter(float(2**53), math.inf), float.fromhex('0x1.fffffffffffffp+1023'),
+        -0.1, -float(2**53), -float.fromhex('0x0.0000000000001p-1022'),
+        -float.fromhex('0x1.fffffffffffffp+1023'),
+    ]
+    for exponent in range(-1074, 1024):
+        power = 2.0**exponent
+        values.extend((math.nextafter(power, 0.0), power, math.nextafter(power, math.inf)))
+    generator = random.Random(831)
+    for _ in range(80):
+        value = struct.unpack('>d', generator.randbytes(8))[0]
+        if math.isfinite(value):
+            values.append(value)
+    if include_nonfinite:
+        values.extend((math.nan, math.inf, -math.inf))
+    return values
+
+
+def _reference_float64_token(value: float | None) -> str | None:
+    """Decode IEEE-754 bytes independently of the SQL logarithm and power arithmetic."""
+    if value is None:
+        return None
+    if math.isnan(value):
+        return 'nan'
+    if math.isinf(value):
+        return '+inf' if value > 0 else '-inf'
+    if value == 0:
+        return '0'
+    bits = int.from_bytes(struct.pack('>d', value), 'big')
+    sign = '-' if bits >> 63 else '+'
+    exponent_bits = (bits >> 52) & 2047
+    exponent = exponent_bits - 1023 if exponent_bits else -1022
+    significand = bits & ((1 << 52) - 1)
+    if exponent_bits:
+        significand |= 1 << 52
+    return f'{sign}{exponent}:{significand >> 26}:{significand & ((1 << 26) - 1)}'
+
+
+def _float64_probe_query(adapter: DatabaseAdapter, values: list[float | None]) -> str:
+    """Project a bounded synthetic relation through the actual normalizer SQL."""
+    dialect = adapter.checksum_dialect
+    literals = ['NULL' if value is None else f"'{value!r}'" for value in values]
+    if dialect == 'snowflake':
+        rows = ', '.join(f'({position}, {literal})' for position, literal in enumerate(literals))
+        query = f'SELECT column1 AS i, TO_DOUBLE(column2) AS x FROM VALUES {rows}'
+    elif dialect == 'postgres':
+        query = ' UNION ALL '.join(
+            f'SELECT {position} AS i, {literal}::double precision AS x'
+            for position, literal in enumerate(literals)
+        )
+    else:
+        # Scientific notation forces a DOUBLE literal rather than a DECIMAL literal in MySQL/MariaDB.
+        query = ' UNION ALL '.join(
+            f'SELECT {position} AS i, '
+            + ('NULL' if value is None else (repr(value) if 'e' in repr(value) else f'{value!r}E0'))
+            + ' AS x'
+            for position, value in enumerate(values)
+        )
+    column = {'name': 'X' if dialect == 'snowflake' else 'x', 'checksum_kind': 'float64'}
+    stages, columns = float64_projection([column], adapter.quote, dialect)
+    for stage in stages:
+        query = f"SELECT q.*, {', '.join(stage)} FROM ({query}) q"
+    return f"SELECT i, {columns[0]['checksum_float_token']} AS token FROM ({query}) q ORDER BY i"
+
+
+def _connect_float64_probe(engine: str) -> DatabaseAdapter:
+    """Use DataDiff's normal bounded, read-only connections without touching source fixtures."""
+    e2e = E2EEnv(PROJECT_DIR)
+    check = {'check_id': str(uuid4()), 'statement_timeout_seconds': 60}
+    if engine == 'snowflake':
+        if not e2e.env['TARGET_SNOWFLAKE']['is_configured']:
+            pytest.skip('TARGET_SNOWFLAKE credentials are not configured')
+        config = {
+            key.lower(): e2e.get_conn_env_var('TARGET_SNOWFLAKE', key)
+            for key in ('ACCOUNT', 'DBNAME', 'USER', 'PRIVATE_KEY', 'WAREHOUSE')
+        }
+        return connect_target({**check, 'target_type': 'target-snowflake'}, config)
+    connector = {
+        'postgres': 'TAP_POSTGRES', 'yugabyte': 'TAP_YUGABYTE',
+        'mysql': 'TAP_ORACLE_MYSQL', 'mariadb': 'TAP_MYSQL',
+    }[engine]
+    if not e2e.env[connector]['is_configured']:
+        pytest.skip(f'{connector} credentials are not configured')
+    config = {key.lower(): e2e.get_conn_env_var(connector, key) for key in ('HOST', 'PORT', 'USER', 'PASSWORD')}
+    config.update(dbname=e2e.get_conn_env_var(connector, 'DB'), engine=engine)
+    source_type = {'postgres': 'tap-postgres', 'yugabyte': 'tap-yugabyte'}.get(engine, 'tap-mysql')
+    return connect_source({**check, 'source_type': source_type}, config)
+
+
+@pytest.mark.parametrize('engine', ['postgres', 'yugabyte', 'mysql', 'mariadb', 'snowflake'])
+def test_float64_projection_on_real_engine(engine: str, record_property: Callable[[str, object], None]) -> None:
+    """Check every exponent against raw IEEE-754 bits using only synthetic SELECT statements."""
+    adapter = _connect_float64_probe(engine)
+    values = _float64_probe_values(include_nonfinite=engine not in ('mysql', 'mariadb'))
+    # Small UNION batches avoid source parser limits; Snowflake VALUES handles this fixed vector in one query.
+    batch_size = len(values) if engine == 'snowflake' else 80
+    query_seconds = 0.0
+    try:
+        for offset in range(0, len(values), batch_size):
+            batch = values[offset:offset + batch_size]
+            query = _float64_probe_query(adapter, batch)
+            started = perf_counter()
+            with adapter.connection.cursor() as cursor:
+                cursor.execute(query)
+                rows = cursor.fetchall()
+                names = [description[0] for description in cursor.description]
+            query_seconds += perf_counter() - started
+            assert len(rows) == len(batch)
+            for position, row in enumerate(rows):
+                if not isinstance(row, dict):
+                    row = dict(zip(names, row))
+                row = {str(name).lower(): value for name, value in row.items()}
+                assert row['i'] == position
+                assert row['token'] == _reference_float64_token(batch[position]), (engine, offset + position)
+    finally:
+        adapter.close()
+    record_property('float64_vector_size', len(values))
+    record_property('float64_query_seconds', query_seconds)
 
 
 @pytest.fixture(params=['postgres', 'yugabyte', 'mysql', 'mariadb'])
