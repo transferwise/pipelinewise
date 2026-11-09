@@ -149,8 +149,21 @@ alone do not establish a Medium issue. If there are no findings, say so.
 - Branch from `master`, keep scope narrow and sign every commit with
   `git commit -S`; never create or push an unsigned commit.
 - Exclude internal Jira names/keys (such as `AP-...`) from commit messages, PR
-  titles and bodies, even if the branch has one. Add no AI/model `Co-authored-by`
-  or "Generated with" attribution.
+  titles and bodies, even if the branch has one, except bot-required links in
+  `Context` below. Add no AI/model `Co-authored-by` or "Generated with" attribution.
+- Follow [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md) and
+  [Wise's description rules](https://github.com/transferwise/wise-github-bot/wiki/good-description).
+  Always include the exact level-two heading `## Context` with more than 70
+  characters explaining the problem and operational consequence, even if a link
+  would satisfy the bot. Retain the template's Changes, Type of change,
+  Compatibility and operations, Validation, and Checklist sections; check only
+  verified items and explain anything not applicable.
+- Check PR labels and `.github/tw-rules.yaml` before publishing: `change:impactful`
+  requires a non-empty Jira ticket or Confluence link in Context;
+  `alwaysRequiresJiraTicket: true` requires a Jira ticket, not just Confluence.
+  Use the `https://transferwise.atlassian.net/browse/...` or `/wiki/...` URLs;
+  a ticket counts only if the bot can fetch its description. Recheck the rendered
+  description after creating or updating the PR.
 - Write docs/CHANGELOG in plain language: short sentences, one idea each,
   behaviour/default/operator action first. CHANGELOG bullets start with verbs
   and cover user-visible outcomes and upgrade steps. Link detailed rules;
