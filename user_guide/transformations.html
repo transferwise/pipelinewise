@@ -250,6 +250,8 @@
 <li class="toctree-l2"><a class="reference internal" href="schema_changes.html#column-versioning">Column versioning</a></li>
 <li class="toctree-l2"><a class="reference internal" href="schema_changes.html#operational-procedure">Operational procedure</a></li>
 <li class="toctree-l2"><a class="reference internal" href="schema_changes.html#decimal-mapping">Decimal mapping</a></li>
+<li class="toctree-l2"><a class="reference internal" href="schema_changes.html#floating-point-values">Floating-point values</a></li>
+<li class="toctree-l2"><a class="reference internal" href="schema_changes.html#postgresql-and-yugabytedb-arrays">PostgreSQL and YugabyteDB arrays</a></li>
 </ul>
 </li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Load-time transformations</a><ul>
@@ -555,11 +557,14 @@ regardless of their position among the conditional rules in the configuration.</
 <p>This differs from Singer’s sequential configuration order. Avoid depending on
 the difference in tables that switch between FastSync and Singer.</p>
 <p>Other existing Singer differences also remain: <code class="docutils literal notranslate"><span class="pre">HASH-SKIP-FIRST-n</span></code> slices
-the hash input by UTF-8 bytes rather than characters; regex conditions search
-within the string; and equality conditions with <code class="docutils literal notranslate"><span class="pre">0</span></code>, <code class="docutils literal notranslate"><span class="pre">false</span></code>, or <code class="docutils literal notranslate"><span class="pre">null</span></code>
-are ignored and do not trigger a rule on their own. For PostgreSQL JSON
-object/array schemas, Singer can load a
-transformed <code class="docutils literal notranslate"><span class="pre">None</span></code> as JSON <code class="docutils literal notranslate"><span class="pre">null</span></code> rather than FastSync’s SQL <code class="docutils literal notranslate"><span class="pre">NULL</span></code>.
+the hash input by UTF-8 bytes rather than characters, and regex conditions search
+within the string. Since 0.101.0, Singer evaluates equality conditions with
+<code class="docutils literal notranslate"><span class="pre">0</span></code>, <code class="docutils literal notranslate"><span class="pre">false</span></code>, <code class="docutils literal notranslate"><span class="pre">null</span></code>, or an empty string like FastSync; earlier releases
+ignored them. A Singer record can leave out a condition column, for example in
+a LOG_BASED update of other columns. Such a record never meets an equality
+condition on that column, while a regex condition searches it as an empty
+string. For PostgreSQL JSON object/array schemas, Singer can load a transformed
+<code class="docutils literal notranslate"><span class="pre">None</span></code> as JSON <code class="docutils literal notranslate"><span class="pre">null</span></code> rather than FastSync’s SQL <code class="docutils literal notranslate"><span class="pre">NULL</span></code>.
 These differences are tested explicitly; matching column types alone does not
 guarantee identical transformation results.</p>
 <p>String operations count characters, not UTF-8 bytes. Hashes remain hexadecimal
@@ -571,6 +576,26 @@ MySQL/MariaDB NUL removal and invalid-date handling, happens before transformati
 conditions accept text and integer columns; equality requires matching string,
 numeric, or Boolean values, or <code class="docutils literal notranslate"><span class="pre">NULL</span></code>. Implicit date/string/numeric coercions
 and floating-point regex rendering are rejected.</p>
+<p>An equality condition on a MariaDB or MySQL <code class="docutils literal notranslate"><span class="pre">FLOAT</span></code> column compares with the
+<code class="docutils literal notranslate"><span class="pre">FLOAT</span></code> value nearest the configured number. For example, <code class="docutils literal notranslate"><span class="pre">equals:</span> <span class="pre">0.3</span></code>
+matches a stored <code class="docutils literal notranslate"><span class="pre">0.3</span></code>, which loads as <code class="docutils literal notranslate"><span class="pre">0.30000001192092896</span></code>. FastSync and
+every Singer replication method use this rule. PipelineWise rounds the configured
+number in the generated transformation file when it discovers the tap and again
+before each run, so no extra upgrade step is needed. It finds <code class="docutils literal notranslate"><span class="pre">FLOAT</span></code> columns
+from the saved catalog and matches their names case-insensitively; Singer
+conditions still need the exact column name. After you change a column used in
+such a condition to or from <code class="docutils literal notranslate"><span class="pre">FLOAT</span></code>, run <code class="docutils literal notranslate"><span class="pre">import_config</span></code> so the condition
+follows the new type. A number that matched only the six-digit value earlier
+releases loaded, such as <code class="docutils literal notranslate"><span class="pre">1234570</span></code> for a stored <code class="docutils literal notranslate"><span class="pre">1234567.75</span></code>, no longer
+matches; use the stored value instead.</p>
+<p>On PostgreSQL and YugabyteDB routes to Snowflake or PostgreSQL, Singer carries
+<code class="docutils literal notranslate"><span class="pre">NUMERIC</span></code> and <code class="docutils literal notranslate"><span class="pre">DECIMAL</span></code> array columns as JSON text; see <a class="reference internal" href="schema_changes.html#postgres-arrays"><span class="std std-ref">PostgreSQL and YugabyteDB arrays</span></a>.
+On these columns, conditions can only use <code class="docutils literal notranslate"><span class="pre">equals:</span> <span class="pre">null</span></code>. <code class="docutils literal notranslate"><span class="pre">import_config</span></code>
+and each run reject <code class="docutils literal notranslate"><span class="pre">regex_match</span></code>, other <code class="docutils literal notranslate"><span class="pre">equals</span></code> values, and <code class="docutils literal notranslate"><span class="pre">field_path</span></code>
+after discovery; <code class="docutils literal notranslate"><span class="pre">validate</span></code> cannot detect them because it does not discover
+columns. <code class="docutils literal notranslate"><span class="pre">field_paths</span></code> work only with <code class="docutils literal notranslate"><span class="pre">SET-NULL</span></code>, which clears the whole
+array. Other transformations stay rejected, as before. Remove such rules before
+you upgrade; otherwise the tap stops at its next run.</p>
 <p>Regex conditions match the whole string, are case-sensitive, and <code class="docutils literal notranslate"><span class="pre">.</span></code> does not match
 a newline. Source execution accepts a portable regex subset: literals, character
 ranges, groups, alternation, ordinary repetitions, and bounded repetitions up to

@@ -250,6 +250,8 @@
 <li class="toctree-l2"><a class="reference internal" href="#column-versioning">Column versioning</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#operational-procedure">Operational procedure</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#decimal-mapping">Decimal mapping</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#floating-point-values">Floating-point values</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#postgresql-and-yugabytedb-arrays">PostgreSQL and YugabyteDB arrays</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="transformations.html">Load-time transformations</a><ul>
@@ -463,6 +465,7 @@ targets yet. This applies to Singer and supported FullSync/PartialSync routes. N
 columns always use this mapping. Snowflake reports <code class="docutils literal notranslate"><span class="pre">NUMERIC</span></code> as its equivalent
 <code class="docutils literal notranslate"><span class="pre">NUMBER</span></code> type.
 Approximate <code class="docutils literal notranslate"><span class="pre">FLOAT</span></code>, <code class="docutils literal notranslate"><span class="pre">DOUBLE</span></code>, and <code class="docutils literal notranslate"><span class="pre">REAL</span></code> columns keep their existing mapping.
+See <a class="reference internal" href="#floating-point-values"><span class="std std-ref">Floating-point values</span></a> for how their values are loaded.
 Other sources and destination combinations keep their existing behavior.
 PostgreSQL numeric primary keys use canonical text on Snowflake so a <code class="docutils literal notranslate"><span class="pre">NaN</span></code>
 key remains representable; other supported decimal columns use the mapping
@@ -497,10 +500,11 @@ their declared precision and scale. This preserves <code class="docutils literal
 keys without relying on floating-point identity. MariaDB/MySQL decimal keys
 retain supported numeric mappings.
 PostgreSQL logical replication requests numeric string output from wal2json 2.6
-or later to preserve nonfinite values. Older plugins fall back with a warning
-and retain their existing conversion of these values to NULL. LOG_BASED tables
-with numeric primary keys need wal2json 2.6 or later if those keys can contain
-<code class="docutils literal notranslate"><span class="pre">NaN</span></code> or infinity; an older plugin cannot recover an identity it emits as NULL.</p>
+or later to preserve nonfinite numeric and floating-point values. Older plugins
+fall back with a warning and retain their existing conversion of these values
+to NULL. LOG_BASED tables with numeric or floating-point primary keys need
+wal2json 2.6 or later if those keys can contain <code class="docutils literal notranslate"><span class="pre">NaN</span></code> or infinity; an older
+plugin cannot recover an identity it emits as NULL.</p>
 <p>PostgreSQL retains supported declarations, including unconstrained <code class="docutils literal notranslate"><span class="pre">NUMERIC</span></code>.
 Targets older than PostgreSQL 15 use unconstrained <code class="docutils literal notranslate"><span class="pre">NUMERIC</span></code> for negative scale
 or scale greater than precision. This preserves values without requiring syntax
@@ -586,6 +590,60 @@ keeps its existing full-table replacement behavior and recreates the current
 source schema, removing historical versions. Existing recovery manifests retain
 the planned archive names and expected historical column types so retries between
 rename and add do not rename twice and publication detects unexpected schema drift.</p>
+</section>
+<section id="floating-point-values">
+<span id="id2"></span><h2>Floating-point values<a class="headerlink" href="#floating-point-values" title="Link to this heading"></a></h2>
+<p>PostgreSQL and YugabyteDB <code class="docutils literal notranslate"><span class="pre">REAL</span></code> and <code class="docutils literal notranslate"><span class="pre">DOUBLE</span> <span class="pre">PRECISION</span></code> columns keep
+<code class="docutils literal notranslate"><span class="pre">NaN</span></code>, <code class="docutils literal notranslate"><span class="pre">Infinity</span></code>, and <code class="docutils literal notranslate"><span class="pre">-Infinity</span></code> on Snowflake and PostgreSQL targets.
+This includes arrays of these types. FullSync, PartialSync, and every Singer
+replication method load the same special value. Before 0.101.0, Singer loaded
+these values as <code class="docutils literal notranslate"><span class="pre">NULL</span></code> while FastSync kept them.</p>
+<p>Singer carries the special values as the strings <code class="docutils literal notranslate"><span class="pre">NaN</span></code>, <code class="docutils literal notranslate"><span class="pre">Infinity</span></code>, and
+<code class="docutils literal notranslate"><span class="pre">-Infinity</span></code>. Finite values stay JSON numbers. The target column type does not
+change. S3 CSV targets still receive <code class="docutils literal notranslate"><span class="pre">NULL</span></code>. LOG_BASED replication from
+PostgreSQL needs wal2json 2.6 or later; older plugins still send <code class="docutils literal notranslate"><span class="pre">NULL</span></code>.</p>
+<p>An INCREMENTAL bookmark never stores <code class="docutils literal notranslate"><span class="pre">NaN</span></code> or an infinity. Rows whose
+replication key is <code class="docutils literal notranslate"><span class="pre">NaN</span></code> or <code class="docutils literal notranslate"><span class="pre">Infinity</span></code> are read again on every run, as
+before. Rows whose key is <code class="docutils literal notranslate"><span class="pre">-Infinity</span></code> are read only until a finite bookmark
+exists. When FastSync hands a table over to Singer, it saves the largest finite
+key instead.</p>
+<p>MariaDB and MySQL <code class="docutils literal notranslate"><span class="pre">FLOAT</span></code> columns load the exact stored value on every path.
+For example, a stored <code class="docutils literal notranslate"><span class="pre">16777217</span></code> loads as <code class="docutils literal notranslate"><span class="pre">16777216</span></code>, and <code class="docutils literal notranslate"><span class="pre">0.1</span></code> loads as
+<code class="docutils literal notranslate"><span class="pre">0.10000000149011612</span></code>. Before 0.101.0, FullSync, PartialSync, and Singer
+FULL_TABLE and INCREMENTAL loaded the server’s six-digit text instead, such as
+<code class="docutils literal notranslate"><span class="pre">16777200</span></code> and <code class="docutils literal notranslate"><span class="pre">0.1</span></code>. LOG_BASED replication already loaded the exact value.
+Display options such as <code class="docutils literal notranslate"><span class="pre">FLOAT(7,4)</span></code> and <code class="docutils literal notranslate"><span class="pre">ZEROFILL</span></code> no longer change loaded
+values. <code class="docutils literal notranslate"><span class="pre">DOUBLE</span></code> and <code class="docutils literal notranslate"><span class="pre">DECIMAL</span></code> columns are unchanged.</p>
+<p>Existing target rows are not repaired. A row keeps its old <code class="docutils literal notranslate"><span class="pre">NULL</span></code> or rounded
+value until the row changes in the source or the table is resynced. Resync a
+MariaDB or MySQL table whose primary key, INCREMENTAL replication key, or
+PartialSync range column is <code class="docutils literal notranslate"><span class="pre">FLOAT</span></code>. Otherwise old rounded keys can leave
+duplicate or missed rows.</p>
+</section>
+<section id="postgresql-and-yugabytedb-arrays">
+<span id="postgres-arrays"></span><h2>PostgreSQL and YugabyteDB arrays<a class="headerlink" href="#postgresql-and-yugabytedb-arrays" title="Link to this heading"></a></h2>
+<p>On Snowflake and PostgreSQL targets, every Singer replication method loads
+PostgreSQL and YugabyteDB arrays the same way FullSync and PartialSync do.
+Column types do not change, and S3 CSV targets are unchanged.</p>
+<p>A <code class="docutils literal notranslate"><span class="pre">NULL</span></code> array loads as SQL <code class="docutils literal notranslate"><span class="pre">NULL</span></code>, and an empty array loads as an empty
+JSON array. Before 0.101.0, Singer loaded a <code class="docutils literal notranslate"><span class="pre">NULL</span></code> array as an empty array.</p>
+<p><code class="docutils literal notranslate"><span class="pre">NUMERIC</span></code> and <code class="docutils literal notranslate"><span class="pre">DECIMAL</span></code> arrays keep every digit and the <code class="docutils literal notranslate"><span class="pre">NaN</span></code>,
+<code class="docutils literal notranslate"><span class="pre">Infinity</span></code>, and <code class="docutils literal notranslate"><span class="pre">-Infinity</span></code> elements. Singer carries each value as the JSON
+text the source database produces, the same text that FullSync exports. Before
+0.101.0, Singer rounded each element to a floating-point number and loaded
+special values as <code class="docutils literal notranslate"><span class="pre">null</span></code>. An array column that is part of a primary key keeps
+the earlier transport, because targets compare key values as text.</p>
+<p>The target stores the JSON as it normally would. PostgreSQL <code class="docutils literal notranslate"><span class="pre">JSONB</span></code> keeps the
+exact text, including trailing zeros. Snowflake <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> drops trailing zeros,
+so <code class="docutils literal notranslate"><span class="pre">1.10</span></code> becomes <code class="docutils literal notranslate"><span class="pre">1.1</span></code>. Snowflake stores a number with more than 38
+significant digits, or a scale above 37, as a double. It stores magnitudes beyond
+double range as <code class="docutils literal notranslate"><span class="pre">Infinity</span></code>, <code class="docutils literal notranslate"><span class="pre">-Infinity</span></code>, or <code class="docutils literal notranslate"><span class="pre">0</span></code>. FullSync and Singer get the
+same result.</p>
+<p>Only <code class="docutils literal notranslate"><span class="pre">SET-NULL</span></code> transformations apply to <code class="docutils literal notranslate"><span class="pre">NUMERIC</span></code> array columns, and a
+condition on such a column can only use <code class="docutils literal notranslate"><span class="pre">equals:</span> <span class="pre">null</span></code>. See
+<a class="reference internal" href="transformations.html#transformations"><span class="std std-ref">Load-time transformations</span></a>.</p>
+<p>Existing target rows are not repaired. A row keeps its old value until the row
+changes in the source or the table is resynced.</p>
 </section>
 </section>
 

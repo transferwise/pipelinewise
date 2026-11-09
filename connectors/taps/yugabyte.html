@@ -250,6 +250,8 @@
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#column-versioning">Column versioning</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#operational-procedure">Operational procedure</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#decimal-mapping">Decimal mapping</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#floating-point-values">Floating-point values</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#postgresql-and-yugabytedb-arrays">PostgreSQL and YugabyteDB arrays</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/transformations.html">Load-time transformations</a><ul>
@@ -637,6 +639,10 @@ exact strings, so no digits are lost to floating point.</p>
 YugabyteDB rejects <code class="docutils literal notranslate"><span class="pre">NaN</span></code> in decimal columns, so these keys never need the
 text mapping that PostgreSQL keys use. See <a class="reference internal" href="../../user_guide/schema_changes.html#exact-decimal-mapping"><span class="std std-ref">Decimal mapping</span></a> for the
 fallback used by wider or unconstrained declarations.</p>
+<p><code class="docutils literal notranslate"><span class="pre">REAL</span></code> and <code class="docutils literal notranslate"><span class="pre">DOUBLE</span> <span class="pre">PRECISION</span></code> values, including arrays, keep <code class="docutils literal notranslate"><span class="pre">NaN</span></code> and
+infinities on every replication method and on FullSync and PartialSync. See
+<a class="reference internal" href="../../user_guide/schema_changes.html#floating-point-values"><span class="std std-ref">Floating-point values</span></a>. Arrays, including <code class="docutils literal notranslate"><span class="pre">NUMERIC</span></code> arrays, load the same
+way through FullSync and Singer; see <a class="reference internal" href="../../user_guide/schema_changes.html#postgres-arrays"><span class="std std-ref">PostgreSQL and YugabyteDB arrays</span></a>.</p>
 <p>Arrays are discovered as array columns and are synced. FullSync loads them
 into Snowflake <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> or PostgreSQL <code class="docutils literal notranslate"><span class="pre">JSONB</span></code>. Enums are discovered as
 strings and are synced. Composite types and other user-defined types are

@@ -184,7 +184,7 @@ const runMermaid = async (rerun) => {
                                     // Apply zoom to the now-rendered diagram, matching
                                     // the decoration visible diagrams receive.
                                     if (true) {
-                                        addZoomToSvgs(d3.selectAll(".mermaid[data-zoom-id=id-849a3f70-e48f-4a5e-88b8-fd92511b7fb0]").select(function() {
+                                        addZoomToSvgs(d3.selectAll(".mermaid[data-zoom-id=id-af800230-73f3-4773-ae5c-a1bfd36c584c]").select(function() {
                                             return this.querySelector("svg");
                                         }));
                                     }
@@ -210,7 +210,7 @@ const runMermaid = async (rerun) => {
     if (true) {
         const mermaids_to_add_zoom = 1 === -1 ? mermaids_active.length : 1;
         if(mermaids_to_add_zoom > 0) {
-            var svgs = d3.selectAll(".mermaid[data-zoom-id=id-849a3f70-e48f-4a5e-88b8-fd92511b7fb0]").select(function() {
+            var svgs = d3.selectAll(".mermaid[data-zoom-id=id-af800230-73f3-4773-ae5c-a1bfd36c584c]").select(function() {
                 return this.querySelector("svg");
             });
             // Wait until every active (visible) diagram has rendered. Deferred
@@ -609,6 +609,8 @@ window.runMermaid = runMermaid;</script>
 <li class="toctree-l2"><a class="reference internal" href="schema_changes.html#column-versioning">Column versioning</a></li>
 <li class="toctree-l2"><a class="reference internal" href="schema_changes.html#operational-procedure">Operational procedure</a></li>
 <li class="toctree-l2"><a class="reference internal" href="schema_changes.html#decimal-mapping">Decimal mapping</a></li>
+<li class="toctree-l2"><a class="reference internal" href="schema_changes.html#floating-point-values">Floating-point values</a></li>
+<li class="toctree-l2"><a class="reference internal" href="schema_changes.html#postgresql-and-yugabytedb-arrays">PostgreSQL and YugabyteDB arrays</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="transformations.html">Load-time transformations</a><ul>
@@ -780,7 +782,7 @@ To share one role, set both credential pairs to that role.</p>
 <section id="schema">
 <h2>Schema<a class="headerlink" href="#schema" title="Link to this heading"></a></h2>
 <figure class="align-center" id="id1">
-<pre data-zoom-id="id-849a3f70-e48f-4a5e-88b8-fd92511b7fb0" class="mermaid">
+<pre data-zoom-id="id-af800230-73f3-4773-ae5c-a1bfd36c584c" class="mermaid">
         %%{init: {&quot;er&quot;: {&quot;diagramPadding&quot;: 8, &quot;entityPadding&quot;: 8}}}%%
 erDiagram
     direction LR
