@@ -2,6 +2,7 @@ import datetime
 import decimal
 import glob
 import logging
+import math
 import os
 import re
 import sys
@@ -21,7 +22,7 @@ from singer.decimal_support import postgres_numeric_scale
 from ...utils import safe_column_name
 
 LOGGER = logging.getLogger(__name__)
-MIN_SUPPORTED_POSTGRES_VERSION = 110002
+MIN_SUPPORTED_POSTGRES_VERSION = 140000
 
 
 class UnsupportedPostgresVersionError(RuntimeError):
@@ -280,7 +281,7 @@ class FastSyncTapPostgres:
                 conn.close()
             finally:
                 raise UnsupportedPostgresVersionError(
-                    'PostgreSQL 11.2 or later is required; '
+                    'PostgreSQL 14 or later is required; '
                     f'connected server reports server_version_num {server_version}'
                 )
 
@@ -441,6 +442,16 @@ class FastSyncTapPostgres:
             )
 
         postgres_key_value = result[0].get('key_value')
+
+        if isinstance(postgres_key_value, float) and not math.isfinite(postgres_key_value):
+            # Tap state loaders reject NaN/Infinity JSON; NaN sorts above Infinity, so this range yields the
+            # finite maximum and Singer re-reads nonfinite keys above it.
+            column = quote_source_identifier(replication_key, 'postgres')
+            source_table = '.'.join(quote_source_identifier(part, 'postgres') for part in (schema_name, table_name))
+            postgres_key_value = self.query(
+                f'SELECT MAX({column}) AS key_value FROM {source_table} '
+                f"WHERE {column} > '-Infinity' AND {column} < 'Infinity'"
+            )[0].get('key_value')
 
         if postgres_key_value is None:
             LOGGER.warning('No replication value found for table %s, returning empty bookmark', table)

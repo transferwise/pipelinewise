@@ -57,13 +57,13 @@ def test_discovery_decodes_postgres_signed_numeric_scale(encoded, expected):
     assert schema['decimal'] == {'precision': 10, 'scale': expected}
 
 
-def test_disabled_and_approximate_schema_are_unchanged():
+def test_disabled_schema_is_unchanged_and_approximate_schema_only_adds_string_tokens():
     legacy = discovery_utils.schema_for_column(column())
     assert legacy['type'] == ['null', 'number']
     assert legacy['multipleOf'] == 1e-18
     assert 'decimal' not in legacy
     assert discovery_utils.schema_for_column(column(sql_type='double precision'), 'snowflake') == {
-        'type': ['null', 'number'],
+        'type': ['null', 'number', 'string'],
     }
 
 

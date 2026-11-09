@@ -37,6 +37,7 @@ logging.getLogger('snowflake.connector').setLevel(logging.WARNING)
 DEFAULT_BATCH_SIZE_ROWS = 100000
 DEFAULT_PARALLELISM = 0  # 0 The number of threads used to flush tables
 DEFAULT_MAX_PARALLELISM = 16  # Don't use more than this number of threads by default when flushing streams in parallel
+_NONFINITE_FLOAT_RANKS = {'-Infinity': 0, 'Infinity': 2, 'NaN': 3}
 
 
 def add_metadata_columns_to_schema(schema_message):
@@ -182,24 +183,11 @@ def persist_lines(config, lines, table_cache=None, file_format_type: FileFormatT
                 stream_archive_load_files_values = archive_load_files_data[stream]
                 if 'column' in stream_archive_load_files_values:
                     incremental_key_column_name = stream_archive_load_files_values['column']
-                    incremental_key_value = o['record'][incremental_key_column_name]
-                    comparison_value = incremental_key_value
-                    min_value = stream_archive_load_files_values['min']
-                    max_value = stream_archive_load_files_values['max']
-                    decimal_bookmark = is_decimal_schema(schemas[stream]['properties'].get(incremental_key_column_name))
-                    if decimal_bookmark:
-                        comparison_value = (
-                            decimal_sort_key(incremental_key_value) if incremental_key_value is not None else None
-                        )
-                        min_value = decimal_sort_key(min_value) if min_value is not None else None
-                        max_value = decimal_sort_key(max_value) if max_value is not None else None
-
-                    if not decimal_bookmark or comparison_value is not None:
-                        if min_value is None or min_value > comparison_value:
-                            stream_archive_load_files_values['min'] = incremental_key_value
-
-                        if max_value is None or max_value < comparison_value:
-                            stream_archive_load_files_values['max'] = incremental_key_value
+                    update_archive_bounds(
+                        stream_archive_load_files_values,
+                        o['record'][incremental_key_column_name],
+                        schemas[stream]['properties'].get(incremental_key_column_name),
+                    )
 
             flush = False
             if row_count[stream] >= batch_size_rows:
@@ -449,6 +437,28 @@ def store_record(records, primary_key_string, record, db_sync):
         records[primary_key_string].update(record)
     else:
         records[primary_key_string] = record
+
+
+def archive_bound_key(value, property_schema):
+    """Return the archive-bound sort key; numeric NaN sorts above positive infinity, as in PostgreSQL."""
+    if is_decimal_schema(property_schema):
+        return decimal_sort_key(value)
+    if 'number' in ((property_schema or {}).get('type') or []):
+        # Float keys carry -Infinity, Infinity and NaN as strings; finite JSON numbers keep their exact order.
+        rank = _NONFINITE_FLOAT_RANKS.get(value, 1) if isinstance(value, str) else 1
+        return (rank, value) if rank == 1 else (rank, 0)
+    return value
+
+
+def update_archive_bounds(bounds, value, property_schema):
+    """Widen the archived load file's replication-key range; NULL keys never become a bound."""
+    if value is None:
+        return
+    value_key = archive_bound_key(value, property_schema)
+    if bounds['min'] is None or archive_bound_key(bounds['min'], property_schema) > value_key:
+        bounds['min'] = value
+    if bounds['max'] is None or archive_bound_key(bounds['max'], property_schema) < value_key:
+        bounds['max'] = value
 
 
 def group_records_by_update_columns(records, db_sync):

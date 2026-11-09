@@ -8,7 +8,7 @@
 
 This is a [PipelineWise](https://transferwise.github.io/pipelinewise) compatible tap connector.
 
-PostgreSQL 11.2 or later is required for every Singer replication method and for
+PostgreSQL 14 or later is required for every Singer replication method and for
 PipelineWise FullSync/PartialSync. This source minimum does not constrain
 PostgreSQL targets or the PipelineWise backend database.
 

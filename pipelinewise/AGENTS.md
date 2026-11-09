@@ -50,7 +50,8 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
 - Data-diff suffixes encode lifecycle: `_definitions` versioned config,
   `_attempts` executions, `_results` execution detail, `_state` mutable
   materialized projections, `_events`/`_log` append-only history.
-- `public` is fixed across Alembic, runtime, tests, ERDs, and docs. Changing it requires a forward migration plan and synchronized updates.
+- `public` is fixed across Alembic, runtime, tests, ERDs and docs; changing it
+  requires a forward migration plan and synchronized updates.
 - Every `NNN_*.py` revision needs a matching `NNN_schema.erd.mmd` Mermaid ERD
   of the resulting `public` schema. Preserve old ERDs; show FKs on the tables diagram.
 - Migration 001 shipped in `0.78.0`; its `0.82.0` schema finalization is an
@@ -60,10 +61,12 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
 - History is append-oriented: insert preflight logs, results, and watermark
   events; control updates to definitions, run attempts, run-slot state, and
   watermark state. The database does not enforce immutability.
+- Separate backend app roles receive schema/sequence access plus SELECT, INSERT
+  and UPDATE, not DELETE/DDL. A shared app/DDL identity removes that separation.
 
 ## Runtime and data-diff constraints
 
-- PostgreSQL replication sources require 11.2 or later across Singer,
+- PostgreSQL replication sources require **14+** across Singer,
   FullSync, and PartialSync. Keep the Singer and FastSync connection gates
   aligned; only deleted-tap slot cleanup may bypass the floor. PostgreSQL
   targets, the backend, and data-diff connections are separate.
@@ -75,9 +78,6 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
   double literal tokens, e.g. `DATE_FORMAT(t, '%%Y')`.
 - SIGTERM normally does not raise `SystemExit`; durable handling needs an
   installed signal handler, and injected `SystemExit` is not proof.
-- Separate backend app roles receive schema/sequence access plus `SELECT`,
-  `INSERT`, and `UPDATE`, but no `DELETE`/DDL. A shared app/DDL identity removes
-  that separation intentionally.
 - Source preflight accepts a usable index whose first column is the timestamp
   column without counting rows. Otherwise use an exact count capped at 100,000:
   allow fewer rows, warn once per physical tap/source/table/timestamp identity
@@ -86,6 +86,21 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
   exempt. Use neither query plans nor row estimates, and require a statement
   timeout. Treat `min_key`/`max_key` values in `dd_run_results` as sensitive;
   avoid casual logging.
+
+## Decimal precision
+
+- Preserve declared NUMERIC/DECIMAL precision and scale through discovery,
+  Singer schemas, string transport, transformations, FastSync and bookmarks;
+  never round-trip exact values through float. Reuse shared decimal helpers and
+  the target limits in `docs/user_guide/schema_changes.rst`.
+- New columns use the current precise mapping. Retain legacy FLOAT columns by
+  default; `version_legacy_float_columns` versions eligible non-key columns.
+  Keep existing key types and matching staging/MERGE types rather than stopping
+  the tap. FullSync rebuilds use current mappings.
+- Prefer documented lossy fallbacks to skipping rows/columns or failing for
+  unsupported decimal dimensions/values. Preserve key identity as specified by
+  the mapping and keep unaffected routes unchanged. This fallback policy does
+  not relax conversion fidelity, transaction boundaries or recovery safety.
 
 ## Snowflake and Iceberg contract
 
@@ -130,6 +145,9 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
   semantics before export. Keep range filtering on raw source columns and
   reject transformed INCREMENTAL keys before reading bookmarks. Version recovery
   identity when transformation execution semantics change.
+
+## Publication and recovery
+
 - Key recovery by stable source stream, index active attempts by physical
   target, and hold both locks throughout; reject source, target, staging, role,
   transformation, or boundary drift. `RecoveryCoordinator` owns target runtime
@@ -169,35 +187,13 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
   values, and unreplayable grants before any manifest or DDL. Ownership,
   comments, and tags match exactly; source grants are a required subset, and
   extra Iceberg grants are logged, never rolled back.
-- Tap-root `native_to_iceberg_conversion` (core-only, never in target config)
-  runs one `run_tap` step inside the pidfile, in a child whose signal handlers
-  only exit (stop_tap stops the whole tap run), before FastSync/Singer. It plans with target-snowflake
-  naming and blocks FastSync/Singer name disagreement, classifies with one
-  `SHOW TABLES` per schema plus lock-free manifest peeks, resumes every pending
-  `eventual=iceberg` attempt first (interrupted cutovers first, continuing past
-  a failure), preflights every native table (including catalog TEXT/VARIANT
-  classes merged across a table's streams, also checked for resumed attempts
-  before cutover), converts smallest first, then requires every table new or
-  Iceberg; any failure stops the tap. De-duplicate only the physical work, never
-  another stream's blockers. Never call `convert()` for a table classified
-  `iceberg` without a manifest. A reason that stops a table (planning blocker,
-  reserved-name collision, another tap writing it, a class conflict, a stale
-  catalog) blocks a native or promoted primary, but an interrupted cutover is
-  still resumed with the reasons as `refusals`: the converter restores the name,
-  then refuses before another cutover. Block a native primary with an
-  unmanifested `_ICEBERG` companion, and any table whose reserved companion
-  names collide with another planned or existing table, or with another tap's
-  destination. Block a table that another imported tap writes unless that tap is
-  Iceberg v3 with conversion enabled under the same target, so its run converts
-  or waits on the shared lock before its writers start; taps under other targets
-  with the same account and dbname always block. Merge those taps' TEXT/VARIANT
-  classes. Manual conversion skips the top-level objects that a deeper-flattening
-  imported tap splits into child columns.
-  A blocked stream holds back its table unless the name is absent, and a class
-  conflict on a new or Iceberg table also stops the run. Refuse before any Snowflake
-  work unless the tap's generated files carry Iceberg v3 and level 0, and refuse
-  conversions while the catalog is older than `inheritable_config.json`. Manual
-  conversion applies the classes of every imported tap writing the table and
-  passes conflicts as refusals. `--preflight-only` takes no lock, manifest, or
-  DDL. `fast_sync` never converts and refuses native targets before a slot
-  reset; it may rebuild a missing primary beside leftover companions.
+- Automatic conversion is tap-root/core-only, inside the PID lock and before
+  writers. Resume pending attempts, restoring interrupted names before refusals;
+  block unsafe names, stale catalogs, incompatible classes and uncoordinated
+  shared writers. Preflight every native candidate before new conversions;
+  preserve completed conversions and stop replication on any failure.
+- `--preflight-only` takes no lock, manifest or DDL. `fast_sync` never converts
+  and refuses native targets before a slot reset, but may rebuild a missing
+  target beside leftover companions. Before changing conversion, read
+  `fastsync/commons/CONVERSION.md` for planning, signals, names, catalogs and
+  shared writers, and `docs/connectors/targets/snowflake_iceberg.rst` for operations.

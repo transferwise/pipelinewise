@@ -1,5 +1,6 @@
 """Exact SQL decimal transport and PostgreSQL schema evolution."""
 
+import csv
 import json
 from datetime import datetime, timezone
 from unittest.mock import Mock, patch
@@ -48,6 +49,32 @@ def test_mysql_year_uses_the_same_smallint_type_as_fastsync():
     assert column_type({
         'type': ['null', 'integer'], 'format': 'singer.year', 'minimum': 0, 'maximum': 2155,
     }) == 'smallint'
+
+
+@pytest.mark.parametrize('field_type', [['null', 'number', 'string'], ['number', 'string']])
+def test_float_token_union_keeps_existing_double_precision_columns(field_type):
+    assert column_type({'type': field_type}) == 'double precision'
+    sync = make_sync({'id': {'type': field_type}, 'amount': {'type': field_type}}, [
+        {'column_name': 'id', 'data_type': 'double precision'},
+        {'column_name': 'amount', 'data_type': 'double precision'},
+    ])
+
+    sync.update_columns()
+
+    sync.query.assert_not_called()
+    assert sync.retained_column_types == {}
+
+
+def test_float_tokens_stage_as_quoted_csv_and_distinct_key_identities():
+    sync = make_sync({'id': {'type': ['number', 'string']}, 'amount': {'type': ['null', 'number', 'string']}}, [])
+    values = ['NaN', 'Infinity', '-Infinity', 1.5, -0.0, None]
+
+    assert [sync.record_to_csv_line({'id': 1, 'amount': value}) for value in values] == [
+        '1,"NaN"', '1,"Infinity"', '1,"-Infinity"', '1,1.5', '1,-0.0', '1,',
+    ]
+    assert [sync.record_primary_key_string({'id': value}) for value in values[:4]] == [
+        'NaN', 'Infinity', '-Infinity', '1.5',
+    ]
 
 
 @pytest.mark.parametrize(('data_type', 'precision', 'scale'), [
@@ -318,3 +345,27 @@ def test_old_postgres_uses_unbounded_numeric_and_retains_it(precision, scale):
     sync.query.assert_called_once_with('SHOW server_version_num')
     assert '"amount" NUMERIC' in sync.create_table_query()
     assert f'NUMERIC({precision},{scale})' not in sync.create_table_query()
+
+
+NUMERIC_ARRAY_JSON_TEXT = {
+    'type': ['null', 'string', 'array'], 'format': 'singer.json',
+    'items': {'$ref': '#/definitions/sdc_recursive_decimal_100_38_array'},
+}
+
+
+def test_numeric_array_json_text_is_staged_once_and_null_stays_null():
+    assert column_type(NUMERIC_ARRAY_JSON_TEXT) == 'jsonb'
+    sync = make_sync({'id': {'type': ['integer']}, 'amounts': NUMERIC_ARRAY_JSON_TEXT}, [
+        {'column_name': 'id', 'data_type': 'numeric'}, {'column_name': 'amounts', 'data_type': 'jsonb'},
+    ])
+    values = ['[1,1.10,"NaN",null]', '[[1,2],[3,4]]', '[]', None]
+
+    lines = [sync.record_to_csv_line({'id': 1, 'amounts': value}) for value in values]
+
+    assert lines == ['1,"[1,1.10,\\"NaN\\",null]"', '1,"[[1,2],[3,4]]"', '1,"[]"', '1,']
+    # COPY ... (FORMAT CSV, ESCAPE '\\') hands jsonb the original text; an unquoted empty field is SQL NULL.
+    assert [next(csv.reader([line], escapechar='\\', doublequote=False))[1] for line in lines] == [
+        '[1,1.10,"NaN",null]', '[[1,2],[3,4]]', '[]', '',
+    ]
+    sync.update_columns()
+    sync.query.assert_not_called()

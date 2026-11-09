@@ -6,6 +6,7 @@ import hashlib
 import io
 import os
 import re
+import struct
 from argparse import Namespace
 from dataclasses import dataclass
 from datetime import datetime
@@ -32,6 +33,11 @@ SOURCE_MODES = [
 
 def _sha256(value):
     return hashlib.sha256(value.encode('utf-8')).hexdigest()
+
+
+def float32(value):
+    """Return the single-precision value a MySQL/MariaDB FLOAT column stores for ``value``."""
+    return struct.unpack('<f', struct.pack('<f', value))[0]
 
 
 def _expected_transformation(transformation, value):
@@ -372,8 +378,13 @@ def test_mask_date_preserves_early_years_and_fractional_time(source_export, tmp_
 
 
 def test_float_conditions_compare_the_legacy_csv_value(source_export, tmp_path):
-    """A REAL/FLOAT rounding artifact must not bypass conditional masking."""
-    float_type = 'REAL' if source_export.engine == 'postgres' else 'FLOAT'
+    """A REAL/FLOAT rounding artifact must not bypass conditional masking.
+
+    PostgreSQL REAL exports its legacy text value. MySQL/MariaDB FLOAT exports the exact stored value
+    and compares each equality literal rounded to FLOAT.
+    """
+    postgres = source_export.engine == 'postgres'
+    float_type = 'REAL' if postgres else 'FLOAT'
     values = (0.3, -0.3, 0.1, None)
     source_export.create(
         [('id', 'INTEGER PRIMARY KEY'), ('floating_gate', float_type), ('secret', 'TEXT')],
@@ -391,7 +402,7 @@ def test_float_conditions_compare_the_legacy_csv_value(source_export, tmp_path):
 
     assert RAW_SECRET not in contents
     assert sorted(row[:3] for row in exported_rows) == [
-        [str(index), '' if value is None else str(value), 'hidden']
+        [str(index), '' if value is None else str(value if postgres else float32(value)), 'hidden']
         for index, value in enumerate(values)
     ]
 

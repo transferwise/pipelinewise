@@ -241,6 +241,11 @@ YugabyteDB rejects ``NaN`` in decimal columns, so these keys never need the
 text mapping that PostgreSQL keys use. See :ref:`exact_decimal_mapping` for the
 fallback used by wider or unconstrained declarations.
 
+``REAL`` and ``DOUBLE PRECISION`` values, including arrays, keep ``NaN`` and
+infinities on every replication method and on FullSync and PartialSync. See
+:ref:`floating_point_values`. Arrays, including ``NUMERIC`` arrays, load the same
+way through FullSync and Singer; see :ref:`postgres_arrays`.
+
 Arrays are discovered as array columns and are synced. FullSync loads them
 into Snowflake ``VARIANT`` or PostgreSQL ``JSONB``. Enums are discovered as
 strings and are synced. Composite types and other user-defined types are

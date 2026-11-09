@@ -633,27 +633,19 @@ class TestLogicalReplication(unittest.TestCase):
             'SELECT pg_current_wal_lsn() AS current_lsn'
         )
 
-    def test_start_replication_sets_wal_sender_timeout_from_postgres_12(self):
-        """PostgreSQL 11.2 remains valid without the PostgreSQL 12 setting."""
-        for version, sets_timeout in ((110002, False), (120000, True)):
-            with self.subTest(version=version):
-                cursor = Mock()
+    def test_start_replication_sets_wal_sender_timeout(self):
+        """Every supported source sets the session timeout before replication starts."""
+        cursor = Mock()
 
-                logical_replication._start_replication(
-                    cursor,
-                    self.logical_streams,
-                    'pipelinewise_slot',
-                    42,
-                    version,
-                )
+        logical_replication._start_replication(
+            cursor,
+            self.logical_streams,
+            'pipelinewise_slot',
+            42,
+        )
 
-                if sets_timeout:
-                    cursor.execute.assert_called_once_with(
-                        'SET SESSION wal_sender_timeout = 10800000'
-                    )
-                else:
-                    cursor.execute.assert_not_called()
-                cursor.start_replication.assert_called_once()
+        cursor.execute.assert_called_once_with('SET SESSION wal_sender_timeout = 10800000')
+        cursor.start_replication.assert_called_once()
 
     @patch('tap_postgres.sync_strategies.logical_replication.post_db.open_connection')
     def test_emit_wal_progress_message(self, mocked_open_connection):
@@ -827,7 +819,7 @@ class TestLogicalReplication(unittest.TestCase):
     @patch("psycopg2.connect")
     def test_create_hstore_elem(self, mocked_connect):
         """Test if the output of create_hstore_elem is as expected"""
-        mocked_connect.return_value.server_version = 110002
+        mocked_connect.return_value.server_version = 140000
         mocked_cursor = mocked_connect.return_value.__enter__.return_value.cursor
         mocked_fetchone = mocked_cursor.return_value.__enter__.return_value.fetchone
         mocked_fetchone.return_value = (['foo', 'bar'],)
@@ -839,7 +831,7 @@ class TestLogicalReplication(unittest.TestCase):
     @patch("psycopg2.connect")
     def test_create_array_elem(self, mocked_connect):
         """Test if the output of create_array_elem is as expected"""
-        mocked_connect.return_value.server_version = 110002
+        mocked_connect.return_value.server_version = 140000
         mocked_cursor = mocked_connect.return_value.__enter__.return_value.cursor
         mocked_fetchone = mocked_cursor.return_value.__enter__.return_value.fetchone
         test_values = [('foo', '{bar}', ['bar']),
@@ -886,7 +878,7 @@ class TestLogicalReplication(unittest.TestCase):
     @patch("psycopg2.connect")
     def test_selected_value_to_singer_value(self, mocked_connect):
         """Test if selected_value_to_singer_value returns expected value"""
-        mocked_connect.return_value.server_version = 110002
+        mocked_connect.return_value.server_version = 140000
         mocked_cursor = mocked_connect.return_value.__enter__.return_value.cursor
         mocked_fetchone = mocked_cursor.return_value.__enter__.return_value.fetchone
         mocked_fetchone.return_value = (['foo'],)
@@ -933,7 +925,7 @@ class TestLogicalReplication(unittest.TestCase):
     @patch("psycopg2.connect")
     def test_locate_replication_slot(self, mocked_connect):
         """Test locate_replication_slot returns excpected value"""
-        mocked_connect.return_value.server_version = 110002
+        mocked_connect.return_value.server_version = 140000
         mocked_cursor = mocked_connect.return_value.__enter__.return_value.cursor
         mocked_fetchall = mocked_cursor.return_value.__enter__.return_value.fetchall
         mocked_fetchall.return_value = ['foo']
@@ -1053,7 +1045,7 @@ class TestLogicalReplication(unittest.TestCase):
     @patch("psycopg2.connect")
     def test_impl_with_sql_datatype_is_hstore(self, mocked_connect):
         """Test selected_value_to_singer_value_impl if datatype is hstore"""
-        mocked_connect.return_value.server_version = 110002
+        mocked_connect.return_value.server_version = 140000
         mocked_cursor = mocked_connect.return_value.__enter__.return_value.cursor
         mocked_fetchone = mocked_cursor.return_value.__enter__.return_value.fetchone
         mocked_fetchone.return_value = (['1', '0', '2', '1'],)

@@ -1,10 +1,10 @@
-FROM docker.io/bitnami/postgresql:12
+FROM docker.io/bitnamilegacy/postgresql:14
 
 USER root
 
 RUN apt-get update \
     && apt-get -y install git build-essential \
-    && git clone --depth 1 --branch wal2json_2_3 https://github.com/eulerto/wal2json.git \
+    && git clone --depth 1 --branch wal2json_2_6 https://github.com/eulerto/wal2json.git \
     && cd /wal2json \
     && make && make install \
     && cd / \

@@ -345,9 +345,6 @@ interval before changing timeouts or state.
 * **If the source or network terminated the connection,** correct that cause and
   restart the same tap without advancing state.
 
-* **For PostgreSQL 11, consider upgrading.** PostgreSQL 12 and
-  later support the session-level ``wal_sender_timeout`` that PipelineWise sets.
-
 * **If the PostgreSQL log reports a sender timeout,** check the effective value:
 
   .. code-block:: sql
@@ -392,8 +389,8 @@ LOG_BASED replication is slow or falling behind
 """""""""""""""""""""""""""""""""""""""""""""""
 
 *Why it happens:*
-On PostgreSQL 13 and later, ``logical_decoding_work_mem`` limits the memory used
-by each logical replication connection. When decoded changes exceed the limit,
+``logical_decoding_work_mem`` limits the memory used by each logical replication
+connection. When decoded changes exceed the limit,
 PostgreSQL writes them to local disk. A value that is too low for the source
 workload can therefore cause frequent disk spill and substantially reduce
 LOG_BASED throughput.
@@ -403,8 +400,7 @@ or concurrent transactions, or several PipelineWise replications consuming slots
 on the same PostgreSQL cluster can increase both spill I/O and total memory demand.
 
 *How to diagnose:*
-Check the configured value. PostgreSQL 11 and 12 return no row because they do
-not provide this setting:
+Check the configured value:
 
 .. code-block:: sql
 

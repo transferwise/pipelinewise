@@ -21,7 +21,7 @@ services:
       -  ./db_setup/config:/bitnami/postgresql/conf
 
   db_replica:
-    image: "docker.io/bitnami/postgresql:12"
+    image: "docker.io/bitnamilegacy/postgresql:14"
     container_name: replica
     ports:
       - "5433:5432"

@@ -1,6 +1,7 @@
 """Real PostgreSQL decimal loads, retries and retained column history."""
 
 import json
+import math
 import os
 from decimal import Decimal
 from uuid import uuid4
@@ -30,12 +31,15 @@ def postgres_decimal_target():
         database.query(f'DROP SCHEMA IF EXISTS {config["default_target_schema"]} CASCADE')
 
 
-def load(config, amount_schema, records=(), id_schema=None, extra_properties=None, key_properties=('id',)):
+def load(config, amount_schema, records=(), id_schema=None, extra_properties=None, key_properties=('id',),
+         definitions=None):
     properties = {'id': id_schema or {'type': ['integer']}, 'amount': amount_schema, **(extra_properties or {})}
     messages = [{
         'type': 'SCHEMA', 'stream': 'public-items', 'key_properties': list(key_properties),
         'schema': {'type': 'object', 'properties': properties},
     }]
+    if definitions:
+        messages[0]['schema']['definitions'] = definitions
     messages.extend({'type': 'RECORD', 'stream': 'public-items', 'record': record} for record in records)
     target_postgres.persist_lines(config, [json.dumps(message) for message in messages])
 
@@ -319,3 +323,96 @@ def test_bounded_numeric_nan_is_preserved_on_repeat_load(postgres_decimal_target
     assert len(rows) == 2
     assert rows[0]['amount'].is_nan()
     assert rows[1]['amount'] == Decimal('1.25')
+
+
+def test_float_tokens_load_nonfinite_values_into_existing_double_precision_key(postgres_decimal_target):
+    config, database = postgres_decimal_target
+    schema = config['default_target_schema']
+    token_schema, key_schema = {'type': ['null', 'number', 'string']}, {'type': ['number', 'string']}
+    load(config, {'type': ['null', 'number']}, [{'id': 0.5, 'amount': 0.5}], id_schema={'type': ['number']})
+    load(config, token_schema, [
+        {'id': 'NaN', 'amount': 'NaN'}, {'id': 'Infinity', 'amount': 'Infinity'},
+        {'id': '-Infinity', 'amount': '-Infinity'}, {'id': 0.5, 'amount': 1.5}, {'id': 2.5, 'amount': None},
+    ], id_schema=key_schema)
+    load(config, token_schema, [{'id': 'NaN', 'amount': -0.0}], id_schema=key_schema)
+
+    rows = [
+        tuple('NaN' if isinstance(value, float) and math.isnan(value) else value for value in row)
+        for row in database.query(f'SELECT id, amount FROM {schema}.items ORDER BY id')
+    ]
+    assert rows == [
+        (-math.inf, -math.inf), (0.5, 1.5), (2.5, None), (math.inf, math.inf), ('NaN', 0.0),
+    ]
+    assert math.copysign(1.0, rows[-1][1]) == -1.0
+    columns = database.query(
+        'SELECT column_name, data_type FROM information_schema.columns '
+        'WHERE table_schema = %s AND table_name = %s', (schema, 'items'),
+    )
+    types = {column['column_name']: column['data_type'] for column in columns}
+    assert (types['id'], types['amount']) == ('double precision', 'double precision')
+    assert not any(name.startswith(('id_', 'amount_')) for name in types)
+
+
+NUMERIC_ARRAY_ITEMS = {'$ref': '#/definitions/sdc_recursive_decimal_100_38_array'}
+ARRAY_DEFINITIONS = {
+    'sdc_recursive_decimal_100_38_array': {
+        'type': ['null', 'number', 'array'], 'multipleOf': 1e-38, 'exclusiveMaximum': True, 'maximum': 10 ** 62,
+        'exclusiveMinimum': True, 'minimum': -10 ** 62, 'items': NUMERIC_ARRAY_ITEMS,
+    },
+    'sdc_recursive_number_array': {
+        'type': ['null', 'number', 'string', 'array'], 'items': {'$ref': '#/definitions/sdc_recursive_number_array'},
+    },
+}
+BEYOND_DOUBLE = '1' + '0' * 400
+NUMERIC_ARRAY_TEXTS = {
+    1: '[1,1.10,12345678901234567890.123,0.00000012,"NaN","Infinity","-Infinity",null]',
+    2: '[[1,2],[3,4]]',
+    3: '[5,6]',
+    4: '[]',
+    5: None,
+    6: '[123456789012345678901234567890123456789.5,123456789012345678901234567890123456789]',
+    7: f'[{BEYOND_DOUBLE},-{BEYOND_DOUBLE},0.{"0" * 399}1]',
+}
+
+
+@pytest.mark.parametrize('key_properties', [('id',), ()])
+def test_numeric_array_json_text_loads_into_jsonb_exactly(postgres_decimal_target, key_properties):
+    config, database = postgres_decimal_target
+    config['primary_key_required'] = bool(key_properties)
+    schema = config['default_target_schema']
+    extra = {'floats': {'type': ['null', 'array'], 'items': {'$ref': '#/definitions/sdc_recursive_number_array'}}}
+    # The unmarked schema created existing tables; the JSON text schema must reuse their jsonb column.
+    load(config, {'type': ['null', 'array'], 'items': NUMERIC_ARRAY_ITEMS}, [{'id': 0, 'amount': [], 'floats': [1.5]}],
+         extra_properties=extra, key_properties=key_properties, definitions=ARRAY_DEFINITIONS)
+    floats = {1: [1.5, None], 2: []}
+    load(config, {'type': ['null', 'string', 'array'], 'format': 'singer.json', 'items': NUMERIC_ARRAY_ITEMS}, [
+        {'id': row_id, 'amount': text, 'floats': floats.get(row_id)} for row_id, text in NUMERIC_ARRAY_TEXTS.items()
+    ], extra_properties=extra, key_properties=key_properties, definitions=ARRAY_DEFINITIONS)
+
+    texts = ', '.join(['(%s, %s)'] * len(NUMERIC_ARRAY_TEXTS))
+    rows = database.query(
+        'SELECT t.id, t.amount::text AS loaded, t.amount::text = v.text::jsonb::text AS same, '
+        't.floats::text AS floats '
+        f'FROM {schema}.items t LEFT JOIN (VALUES {texts}) AS v(id, text) ON t.id = v.id ORDER BY t.id',
+        [value for row_id, text in NUMERIC_ARRAY_TEXTS.items() for value in (row_id, text)],
+    )
+
+    # jsonb keeps every digit and display scale; amount::text is NULL only for SQL NULL, never for '[]'.
+    assert [tuple(row) for row in rows] == [
+        (0, '[]', None, '[1.5]'),
+        (1, '[1, 1.10, 12345678901234567890.123, 0.00000012, "NaN", "Infinity", "-Infinity", null]', True,
+         '[1.5, null]'),
+        (2, '[[1, 2], [3, 4]]', True, '[]'),
+        (3, '[5, 6]', True, None),
+        (4, '[]', True, None),
+        (5, None, None, None),
+        (6, '[123456789012345678901234567890123456789.5, 123456789012345678901234567890123456789]', True, None),
+        (7, f'[{BEYOND_DOUBLE}, -{BEYOND_DOUBLE}, 0.{"0" * 399}1]', True, None),
+    ]
+    columns = database.query(
+        'SELECT column_name, data_type FROM information_schema.columns '
+        'WHERE table_schema = %s AND table_name = %s', (schema, 'items'),
+    )
+    types = {column['column_name']: column['data_type'] for column in columns}
+    assert (types['amount'], types['floats']) == ('jsonb', 'jsonb')
+    assert not any(name.startswith(('amount_', 'floats_')) for name in types)

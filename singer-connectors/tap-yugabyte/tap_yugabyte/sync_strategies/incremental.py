@@ -43,6 +43,7 @@ from singer.decimal_support import decimal_bookmark, is_decimal_schema
 
 import tap_yugabyte.db as yb_db
 import tap_yugabyte.keyset as keyset
+from tap_yugabyte.discovery_utils import FLOAT_TYPES
 from tap_yugabyte.retry import retry_read
 
 
@@ -104,7 +105,8 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
     # (...)`. That is SQLSTATE 42601, which the retry policy correctly calls
     # permanent -- so the first retry would have turned a recoverable fault into
     # a hard syntax failure. The column list is fixed for the whole run.
-    escaped_columns = list(map(partial(yb_db.prepare_columns_for_select_sql, md_map=md_map),
+    escaped_columns = list(map(partial(yb_db.prepare_columns_for_select_sql, md_map=md_map,
+                                       properties=stream.get('schema', {}).get('properties')),
                                desired_columns))
 
     activate_version_message = singer.ActivateVersionMessage(
@@ -121,6 +123,7 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
     # report that as a stall.
     replication_key_value = singer.get_bookmark(state, stream['tap_stream_id'], 'replication_key_value')
     replication_key_sql_datatype = md_map.get(('properties', replication_key)).get('sql-datatype')
+    float_key = replication_key_sql_datatype in FLOAT_TYPES
     state, replication_key_value, replication_key_sql_datatype = _decimal_bookmark_boundary(
         stream, state, replication_key, replication_key_value, replication_key_sql_datatype)
 
@@ -273,7 +276,7 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
 
                         #Picking a replication_key with NULL values will result in it ALWAYS been synced
                         #which is not great event worse would be allowing the NULL value to enter into the state
-                        if record_message.record[replication_key] is not None:
+                        if _is_bookmark_value(record_message.record[replication_key], float_key):
                             state = singer.write_bookmark(state,
                                                           stream['tap_stream_id'],
                                                           'replication_key_value',
@@ -290,6 +293,11 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
                               replication_key_value, rows_saved,
                               conn_info['limit'])
     return state
+
+
+def _is_bookmark_value(value, float_key):
+    """Keep the last finite float bookmark, so rows with nonfinite keys are read again on every run."""
+    return value is not None and not (float_key and yb_db.is_nonfinite_float_token(value))
 
 
 def _decimal_bookmark_boundary(stream, state, replication_key, value, sql_datatype):

@@ -99,6 +99,11 @@ A condition is a combination of:
 }
 ```
 
+A record can omit a condition's column. LOG_BASED PATCH updates leave out unchanged columns, and deletes carry
+only key columns. Such a record never meets an `equals` condition on that column, whatever its value, including
+`""` and `null`. A `regex_match` condition searches an omitted column as an empty string, so a pattern such as
+`^$` or `.*` matches it.
+
 ### Configuration
 
 You need to define which columns have to be transformed by which method and in which condition the transformation needs to be applied.

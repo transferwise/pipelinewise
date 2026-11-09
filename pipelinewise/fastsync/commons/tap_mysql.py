@@ -546,8 +546,12 @@ class FastSyncTapMySql:
         Get the actual incremental key position in the table
         """
         validate_bookmark_column(table, replication_key, self.source_transformations)
+        key_value_sql = f'MAX({replication_key})'
+        if self._column_data_type(table, replication_key) == 'float':
+            # A six-digit FLOAT bookmark can skip rows; promoting MAX's result keeps the index serving MAX.
+            key_value_sql += ' * 1E0'
         result = self.query(
-            f'SELECT MAX({replication_key}) AS key_value FROM {table}'
+            f'SELECT {key_value_sql} AS key_value FROM {table}'
         )
         if not result:
             raise Exception(
@@ -572,6 +576,17 @@ class FastSyncTapMySql:
             'replication_key_value': key_value,
             'version': 1,
         }
+
+    def _column_data_type(self, table_name, column_name):
+        """Return one column's information_schema data type, or None when it is not found."""
+        table_dict = utils.tablename_to_dict(table_name)
+        result = self.query(
+            'SELECT data_type AS data_type FROM information_schema.columns '
+            'WHERE table_schema = %s AND table_name = %s AND column_name = %s',
+            params=(table_dict['schema_name'], table_dict['table_name'], column_name),
+        )
+        data_type = result[0].get('data_type') if result else None
+        return str(data_type).lower() if data_type else None
 
     def get_primary_keys(self, table_name):
         """
@@ -603,11 +618,16 @@ class FastSyncTapMySql:
             integer_format = """
               CONCAT('`', column_name, '`')
             """
+            float_format = decimal_format
         else:
             decimal_format = """
               CONCAT('`', column_name, '`')
             """
             integer_format = decimal_format
+            # The text protocol rounds FLOAT to six significant digits; DOUBLE promotion is exact, like binlog.
+            float_format = """
+              CONCAT('`', column_name, '` * 1E0 AS `', column_name, '`')
+            """
 
         schema_name = table_dict.get('schema_name')
         table_name = table_dict.get('table_name')
@@ -664,7 +684,9 @@ class FastSyncTapMySql:
                                     THEN concat('ST_AsGeoJSON(', column_name, ')')
                             WHEN column_name = 'raw_data_hash'
                                     THEN concat('REPLACE(REPLACE(hex(`', column_name, '`)', ", '\n', ' '), '\r', '')")
-                            WHEN data_type IN ('double', 'numeric', 'float', 'decimal', 'real')
+                            WHEN data_type = 'float'
+                                    THEN {float_format}
+                            WHEN data_type IN ('double', 'numeric', 'decimal', 'real')
                                     THEN {decimal_format}
                             WHEN data_type IN ('smallint', 'integer', 'bigint', 'mediumint', 'int')
                                     THEN {integer_format}
