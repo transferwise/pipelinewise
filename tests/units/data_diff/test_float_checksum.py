@@ -19,7 +19,10 @@ from pipelinewise.data_diff.float64 import FLOAT_NORMALIZATION_ERRORS, expected_
     ('tap-postgres', 'bigint', 'postgres_numeric'),
     ('tap-mysql', 'float', 'mysql_numeric'),
     ('tap-mysql', 'double', 'mysql_numeric'),
-    ('tap-mysql', 'decimal', 'mysql_numeric'),
+    ('tap-mysql', 'decimal', 'mysql_decimal'),
+    ('tap-mysql', 'numeric', 'mysql_decimal'),
+    ('tap-mysql', 'dec', 'mysql_decimal'),
+    ('tap-mysql', 'fixed', 'mysql_decimal'),
     ('tap-mysql', 'bigint', 'mysql_numeric'),
 ])
 def test_float_plan_uses_source_contract_and_actual_target_type(source_type, physical_type, conversion):
@@ -92,6 +95,22 @@ def test_actual_target_float_is_never_clamped_or_rounded_to_source_scale():
     assert stages[0] == ['"AMOUNT" AS "_ppw_f64_0_value"']
     assert 'checksum_float_invalid' in columns[0]
     assert not any('ROUND(' in expression for stage in stages for expression in stage)
+
+
+def test_mysql_decimal_rounding_does_not_use_the_inexact_decimal_to_double_parser():
+    source, _target = checksum_columns([
+        ('amount', {'name': 'amount', 'data_type': 'decimal', 'numeric_precision': 65, 'numeric_scale': 30},
+         {'name': 'AMOUNT', 'data_type': 'FLOAT'}),
+    ], source_type='tap-mysql', target_type='target-snowflake')
+    stages, columns = MySQLAdapter(None, 30).checksum_projection(source)
+    sql = ' '.join(expression for stage in stages for expression in stage)
+
+    assert source[0]['checksum_float_conversion'] == 'mysql_decimal'
+    assert 'DIV' in sql and 'MOD(' in sql
+    assert 'AS `_ppw_f64_0_remainder`' in sql
+    assert 'AS `_ppw_f64_0_denominator`' in sql
+    assert 'MOD(`_ppw_f64_0_integer`, 2) = 1' in sql
+    assert columns[0]['checksum_float_token'] == '`_ppw_f64_0_token`'
 
 
 @pytest.mark.parametrize('adapter_type', [PostgresAdapter, MySQLAdapter, SnowflakeAdapter])

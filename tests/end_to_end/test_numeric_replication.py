@@ -852,7 +852,8 @@ def test_decimal_fallback_snowflake(source_export, tmp_path):
     )
     midpoint_columns = ['midpoint_below', 'midpoint', 'midpoint_above']
     columns.extend((name, 'NUMERIC(65,30)') for name in midpoint_columns)
-    rows = [(keys[0], keys[0], 1, *midpoints), (keys[1], keys[1], 2, *midpoints)]
+    negative_midpoints = tuple(f'-{value}' for value in midpoints)
+    rows = [(keys[0], keys[0], 1, *midpoints), (keys[1], keys[1], 2, *negative_midpoints)]
     postgres = source.engine == 'postgres'
     if postgres:
         columns.extend((name, 'NUMERIC') for name in ('huge', 'negative_huge', 'tiny', 'negative_tiny'))
@@ -868,11 +869,15 @@ def test_decimal_fallback_snowflake(source_export, tmp_path):
     table = f'"{schema}"."{source.table_name.upper()}"'
 
     def assert_midpoints():
-        expected = [float(Decimal(value)) for value in midpoints]
-        assert expected[0] == expected[1] == 16777216.0
-        assert expected[2] == math.nextafter(expected[1], math.inf)
+        positive = [float(Decimal(value)) for value in midpoints]
+        negative = [float(Decimal(value)) for value in negative_midpoints]
+        assert positive[0] == positive[1] == 16777216.0
+        assert positive[2] == math.nextafter(positive[1], math.inf)
+        assert negative[0] == negative[1] == -16777216.0
+        assert negative[2] == math.nextafter(negative[1], -math.inf)
         names = ', '.join(f'"{name.upper()}"' for name in midpoint_columns)
-        for row in target.query(f'SELECT {names} FROM {table}'):
+        for row in target.query(f'SELECT "POSITION", {names} FROM {table}'):
+            expected = negative if row['POSITION'] == 2 else positive
             assert [row[name.upper()] for name in midpoint_columns] == expected
 
     try:

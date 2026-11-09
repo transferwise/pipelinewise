@@ -152,7 +152,10 @@ def checksum_columns(
                 )
             checksum_kind = 'float64'
             if source_type == 'tap-mysql':
-                source_float_conversion = 'mysql_numeric'
+                source_float_conversion = (
+                    'mysql_decimal' if column_type_name(source_column) in {'decimal', 'numeric', 'dec', 'fixed'}
+                    else 'mysql_numeric'
+                )
             elif source_family == 'approximate_numeric':
                 source_float_conversion = 'postgres_float_text'
             else:

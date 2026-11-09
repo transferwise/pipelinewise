@@ -25,8 +25,8 @@ unsupported comparisons retain their previous behavior.
 Integer sources retained in FLOAT keys also receive the expected binary64 cast.
 Only source expressions receive replication conversions. The actual target
 value is never saturated or rounded to a source scale, which would conceal drift.
-The implementation is [expected_float_sql](float64.py); it does not import
-Singer or FastSync execution code.
+Source conversion and normalization live in [float64.py](float64.py); they do
+not import Singer or FastSync execution code.
 
 ## Canonicalization decision
 
@@ -44,6 +44,13 @@ leading bit for normal values. Power-of-two arithmetic preserves all 53
 significand bits. Convert the chunks through DECIMAL(10,0) before text conversion
 to keep integer conversions small and avoid default FLOAT text formatting.
 This changes the representation without rounding the compared values.
+
+MySQL/MariaDB DECIMAL sources need a separate exact path: their native casts
+and text-to-DOUBLE parsers can misround immediately beside a binary midpoint.
+Use exact decimal quotient and remainder to round nearest-even and emit the
+same token directly. Assemble powers from exact integer factors. Scale tiny
+decimals in small multiplication steps so the engine retains their fractional
+digits instead of truncating an intermediate result.
 
 SQL NULL keeps the existing NULL frame. Both zero signs use one zero token.
 All NaNs use one NaN token, distinct from NULL. Positive and negative infinity
@@ -72,6 +79,8 @@ runtime dependency, persisted state, or user configuration.
   independent IEEE-754 byte decoder across every exponent and neighboring
   values, fixed random patterns, subnormals, signed zero, and special values.
   CI exercises PostgreSQL, YugabyteDB, MySQL, MariaDB, and Snowflake.
+  Decimal engine cases also cover midpoint rounding and tiny values at the
+  supported MySQL/MariaDB scales.
 - [Replication E2E](../../tests/end_to_end/test_numeric_replication.py) checks
   actual FullSync, PartialSync, and Singer output before DataDiff comparisons.
   It covers native/v3 tables, REAL text conversion, exact FLOAT promotion,

@@ -55,10 +55,18 @@ def float64_projection(
     prefix = '_ppw_f64_'
     while any(name.startswith(prefix) for name in occupied):
         prefix = f'_{prefix}'
-    stages = [[] for _ in range(6)]
+    has_mysql_decimal = any(column.get('checksum_float_conversion') == 'mysql_decimal' for _, column in float_columns)
+    stages = [[] for _ in range(7 if has_mysql_decimal else 6)]
     descriptors = [dict(column) for column in columns]
     for index, column in float_columns:
         stem = f'{prefix}{index}_'
+        if column.get('checksum_float_conversion') == 'mysql_decimal':
+            decimal_stages = _mysql_decimal_projection(column['name'], stem, quote)
+            for stage, additions in zip(stages, decimal_stages):
+                stage.extend(additions)
+            descriptors[index]['checksum_float_token'] = quote(f'{stem}token')
+            descriptors[index]['checksum_float_invalid'] = quote(f'{stem}invalid')
+            continue
         value = quote(f'{stem}value')
         name = quote(column['name'])
         expression = expected_float_sql(name, column.get('checksum_float_conversion', 'identity'))
@@ -112,6 +120,75 @@ def float64_projection(
         descriptors[index]['checksum_float_token'] = normalized
         descriptors[index]['checksum_float_invalid'] = invalid
     return stages, descriptors
+
+
+def _mysql_exact_power_of_two(exponent: str) -> str:
+    """Build an exact DECIMAL power; casting a large DOUBLE power loses digits."""
+    return (
+        f'(CASE WHEN {exponent} >= 128 THEN 340282366920938463463374607431768211456 ELSE 1 END '
+        f'* CASE WHEN MOD({exponent}, 128) >= 64 THEN 18446744073709551616 ELSE 1 END '
+        f'* CASE WHEN MOD({exponent}, 64) >= 32 THEN 4294967296 ELSE 1 END '
+        f'* CAST(POWER(2, MOD({exponent}, 32)) AS DECIMAL(10, 0)))'
+    )
+
+
+def _mysql_scale_decimal(value: str, exponent: str) -> str:
+    """Scale in small steps so MySQL preserves the complete fractional operand."""
+    factors = [
+        f'CASE WHEN {exponent} >= {threshold} THEN 4294967296 ELSE 1 END'
+        for threshold in (32, 64, 96, 128, 160)
+    ]
+    factors.append(f'CAST(POWER(2, MOD({exponent}, 32)) AS DECIMAL(10, 0))')
+    return f"({value} * {' * '.join(factors)})"
+
+
+def _mysql_decimal_projection(name: str, stem: str, quote: Callable[[str], str]) -> list[list[str]]:
+    """Round exact MySQL/MariaDB decimals to binary64 using quotient/remainder.
+
+    Their decimal-to-DOUBLE parsers can misround immediately beside a binary
+    midpoint, including when parsing decimal text. Native DECIMAL arithmetic
+    preserves the discarded remainder and implements nearest-even explicitly.
+    The supported DECIMAL domain needs at most 215-bit integer powers of two;
+    scaled significands and exact remainders fit its 65-digit arithmetic.
+    """
+    name = quote(name)
+    a, estimate, scale, ratio, exponent, factor, integer, remainder, denominator, rounded = (
+        quote(f'{stem}{suffix}') for suffix in (
+            'magnitude', 'estimate', 'scale', 'ratio', 'exponent', 'factor',
+            'integer', 'remainder', 'denominator', 'rounded',
+        )
+    )
+    magnitude = f'ABS(NULLIF({name}, 0))'
+    correction = f'CASE WHEN {ratio} < 1 THEN -1 WHEN {ratio} >= 2 THEN 1 ELSE 0 END'
+    binary_exponent = f'({estimate} + {correction})'
+    scaled = _mysql_scale_decimal(a, f'(52 - {exponent})')
+    exponent_ratio = _mysql_scale_decimal(a, f'(-{estimate})')
+    stages = [
+        [f'{magnitude} AS {a}', f'FLOOR(LN({magnitude} * 1E0) / LN(2E0)) AS {estimate}'],
+        [f'{_mysql_exact_power_of_two(f"ABS({estimate})")} AS {scale}'],
+        [f'CASE WHEN {estimate} >= 0 THEN {a} DIV {scale} ELSE {exponent_ratio} END AS {ratio}'],
+        [f'{binary_exponent} AS {exponent}',
+         f'{_mysql_exact_power_of_two(f"ABS({binary_exponent} - 52)")} AS {factor}'],
+        [f'CASE WHEN {exponent} <= 52 THEN FLOOR({scaled}) ELSE {a} DIV {factor} END AS {integer}',
+         f'CASE WHEN {exponent} <= 52 THEN {scaled} - FLOOR({scaled}) '
+         f'ELSE MOD({a}, {factor}) END AS {remainder}',
+         f'CASE WHEN {exponent} <= 52 THEN 1 ELSE {factor} END AS {denominator}'],
+        [f'{integer} + CASE WHEN {remainder} * 2 > {denominator} '
+         f'OR ({remainder} * 2 = {denominator} AND MOD({integer}, 2) = 1) THEN 1 ELSE 0 END AS {rounded}'],
+    ]
+    significand = f'CASE WHEN {rounded} = 9007199254740992 THEN 4503599627370496 ELSE {rounded} END'
+    normalized_exponent = f'{exponent} + CASE WHEN {rounded} = 9007199254740992 THEN 1 ELSE 0 END'
+    token = (
+        f"CASE WHEN {name} IS NULL THEN NULL WHEN {name} = 0 THEN '0' "
+        f"ELSE CONCAT(CASE WHEN {name} < 0 THEN '-' ELSE '+' END, "
+        f"CAST(CAST({normalized_exponent} AS SIGNED) AS CHAR), ':', "
+        f"CAST(({significand}) DIV 67108864 AS CHAR), ':', CAST(MOD(({significand}), 67108864) AS CHAR)) END"
+    )
+    stages.append([
+        f'{token} AS {quote(f"{stem}token")}',
+        f'({rounded} < 4503599627370496 OR {rounded} > 9007199254740992) AS {quote(f"{stem}invalid")}',
+    ])
+    return stages
 
 
 def _float_literal(value: float, dialect: str) -> str:

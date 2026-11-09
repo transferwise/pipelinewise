@@ -14,6 +14,7 @@ import struct
 from collections.abc import Callable
 from time import perf_counter
 from datetime import datetime, timezone
+from decimal import Decimal, localcontext
 from uuid import uuid4
 
 import pytest
@@ -107,11 +108,23 @@ def _float64_probe_query(adapter: DatabaseAdapter, values: list[float | None]) -
             + ' AS x'
             for position, value in enumerate(values)
         )
-    column = {'name': 'X' if dialect == 'snowflake' else 'x', 'checksum_kind': 'float64'}
+    return _project_float64_probe(adapter, query)
+
+
+def _project_float64_probe(adapter: DatabaseAdapter, query: str, conversion: str = 'identity') -> str:
+    """Apply the production projection to either a DOUBLE or declared DECIMAL input relation."""
+    dialect = adapter.checksum_dialect
+    column = {
+        'name': 'X' if dialect == 'snowflake' else 'x', 'checksum_kind': 'float64',
+        'checksum_float_conversion': conversion,
+    }
     stages, columns = float64_projection([column], adapter.quote, dialect)
     for stage in stages:
         query = f"SELECT q.*, {', '.join(stage)} FROM ({query}) q"
-    return f"SELECT i, {columns[0]['checksum_float_token']} AS token FROM ({query}) q ORDER BY i"
+    return (
+        f"SELECT i, {columns[0]['checksum_float_token']} AS token, "
+        f"{columns[0]['checksum_float_invalid']} AS invalid FROM ({query}) q ORDER BY i"
+    )
 
 
 def _connect_float64_probe(engine: str) -> DatabaseAdapter:
@@ -163,10 +176,95 @@ def test_float64_projection_on_real_engine(engine: str, record_property: Callabl
                 row = {str(name).lower(): value for name, value in row.items()}
                 assert row['i'] == position
                 assert row['token'] == _reference_float64_token(batch[position]), (engine, offset + position)
+                assert not row['invalid'], (engine, offset + position)
     finally:
         adapter.close()
     record_property('float64_vector_size', len(values))
     record_property('float64_query_seconds', query_seconds)
+
+
+def _decimal_coefficient_text(coefficient: int, scale: int) -> str:
+    """Write an exact scaled integer without applying the Decimal context's precision."""
+    sign = '-' if coefficient < 0 else ''
+    digits = str(abs(coefficient)).zfill(scale + 1)
+    return sign + (f'{digits[:-scale]}.{digits[-scale:]}' if scale else digits)
+
+
+def _decimal_probe_values(scale: int) -> list[str | None]:
+    """Keep a fixed, bounded sample of exact DECIMAL rounding boundaries and extreme coefficients."""
+    values = [None, '0', '-0']
+    values.extend(_decimal_coefficient_text(value, scale) for value in (1, -1, 10**65 - 1, 1 - 10**65))
+    generator = random.Random(18473 + scale)
+    for _ in range(64):
+        magnitude = generator.randrange(1, 10**generator.randrange(1, 66))
+        coefficient = -magnitude if generator.randrange(2) else magnitude
+        values.append(_decimal_coefficient_text(coefficient, scale))
+    with localcontext() as context:
+        context.prec = 300
+        unit = Decimal(10)**-scale
+        exponents = {-1, 0, 24, 52, 53, 100, 200, math.floor(-scale * math.log2(10)),
+                     math.floor((65 - scale) * math.log2(10)) - 1}
+        for exponent in sorted(exponents):
+            power = Decimal(2)**exponent
+            midpoint = power + Decimal(2)**(exponent - 53)
+            for value in (power, midpoint):
+                center = int((value / unit).to_integral_value())
+                for offset in (-1, 0, 1):
+                    coefficient = center + offset
+                    if 0 < coefficient < 10**65:
+                        values.extend(_decimal_coefficient_text(sign * coefficient, scale) for sign in (1, -1))
+    if scale >= 30:
+        midpoint_neighbors = (
+            '16777216.000000001862645149230957031249',
+            '16777216.000000001862645149230957031250',
+            '16777216.000000001862645149230957031251',
+            '0.000000000000000000000000000001',
+        )
+        values.extend(midpoint_neighbors)
+        values.extend(f'-{value}' for value in midpoint_neighbors)
+    return list(dict.fromkeys(values))
+
+
+@pytest.mark.parametrize('engine', ['mysql', 'mariadb'])
+def test_decimal_float_rounding_on_real_engine(engine: str, record_property: Callable[[str, object], None]) -> None:
+    """Match exact decimal-to-binary64 rounding using read-only synthetic DECIMAL(65, scale) rows."""
+    adapter = _connect_float64_probe(engine)
+    scales = (0, 1, 6, 18, 30, 38) if engine == 'mariadb' else (0, 1, 6, 18, 30)
+    batch_size = 60
+    total_cases = 0
+    total_seconds = 0.0
+    try:
+        for scale in scales:
+            values = _decimal_probe_values(scale)
+            query_seconds = 0.0
+            for offset in range(0, len(values), batch_size):
+                batch = values[offset:offset + batch_size]
+                literals = ['NULL' if value is None else f"'{value}'" for value in batch]
+                relation = ' UNION ALL '.join(
+                    f'SELECT {position} AS i, CAST({literal} AS DECIMAL(65,{scale})) AS x'
+                    for position, literal in enumerate(literals)
+                )
+                query = _project_float64_probe(adapter, relation, conversion='mysql_decimal')
+                started = perf_counter()
+                with adapter.connection.cursor() as cursor:
+                    cursor.execute(query)
+                    rows = cursor.fetchall()
+                query_seconds += perf_counter() - started
+                assert len(rows) == len(batch)
+                for position, row in enumerate(rows):
+                    assert row['i'] == position
+                    value = batch[position]
+                    expected = _reference_float64_token(None if value is None else float(Decimal(value)))
+                    assert row['token'] == expected, (engine, scale, offset + position)
+                    assert not row['invalid'], (engine, scale, offset + position)
+            record_property(f'decimal_scale_{scale}_vector_size', len(values))
+            record_property(f'decimal_scale_{scale}_query_seconds', query_seconds)
+            total_cases += len(values)
+            total_seconds += query_seconds
+    finally:
+        adapter.close()
+    record_property('decimal_vector_size', total_cases)
+    record_property('decimal_query_seconds', total_seconds)
 
 
 @pytest.fixture(params=['postgres', 'yugabyte', 'mysql', 'mariadb'])
