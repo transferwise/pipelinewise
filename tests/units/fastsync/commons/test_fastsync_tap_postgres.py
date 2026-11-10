@@ -440,9 +440,10 @@ class TestFastSyncTapPostgres(TestCase):
         connection.close.assert_called_once_with()
 
     def test_reset_slot_name_length_boundary(self):
-        """Accept exactly 63 characters; reject a longer name before SQL or state changes."""
+        """Accept exactly 63 characters; assert a longer name receives the shortened prefix until it too exceeds 63 chars."""
         slot_prefix = FastSyncTapPostgres.generate_replication_slot_name('my_db') + '_'
-        for length in (63, 64):
+        shortened_prefix_char_difference = len('pipelinewise') - len('ppw')
+        for length in (63, 63 + shortened_prefix_char_difference, 64 + shortened_prefix_char_difference):
             with self.subTest(length=length):
                 config = {'dbname': 'my_db', 'tap_id': 't' * (length - len(slot_prefix))}
                 connection = MagicMock()
@@ -450,18 +451,23 @@ class TestFastSyncTapPostgres(TestCase):
                 cursor.fetchall.return_value = []
                 before_reset = MagicMock(return_value=None)
                 with patch.object(FastSyncTapPostgres, 'get_connection', return_value=connection):
-                    if length == 64:
-                        with self.assertRaisesRegex(RuntimeError, 'at most 63 characters'):
-                            FastSyncTapPostgres.reset_slot(config, before_reset=before_reset)
-                        cursor.execute.assert_not_called()
-                        before_reset.assert_not_called()
-                    else:
+                    if length == 63:
                         FastSyncTapPostgres.reset_slot(config, before_reset=before_reset)
                         before_reset.assert_called_once_with()
                         cursor.execute.assert_called_with(
                             'SELECT * FROM pg_create_logical_replication_slot(%s, %s)',
                             (slot_prefix + config['tap_id'], 'wal2json'),
                         )
+                    elif length == 63 + shortened_prefix_char_difference:
+                        FastSyncTapPostgres.reset_slot(config, before_reset=before_reset)
+                        create_call = cursor.execute.call_args_list[-1]
+                        slot_name = create_call.args[1][0]
+                        self.assertTrue(slot_name.startswith('ppw_'))
+                    else:
+                        with self.assertRaisesRegex(RuntimeError, 'at most 63 characters'):
+                            FastSyncTapPostgres.reset_slot(config, before_reset=before_reset)
+                        cursor.execute.assert_not_called()
+                        before_reset.assert_not_called()
                 connection.close.assert_called_once_with()
 
     @patch('pipelinewise.fastsync.commons.tap_postgres.psycopg2.connect')
