@@ -6,8 +6,9 @@
   stops at a complete WAL progress-marker transaction.
   Keep the replication session open while downstream stages finish, persist
   target checkpoints immediately, and confirm PostgreSQL received the final
-  feedback before closing. Final acknowledgement can wait up to ten minutes;
-  a failure retains the durable target checkpoint for retry. No YAML or state
+  feedback before closing. Final acknowledgement can wait up to ten minutes.
+  If it is not confirmed, the tap logs a warning instead of failing the run, and
+  the next run resumes from the durable target checkpoint. No YAML or state
   migration is required. PostgreSQL can still require older WAL to reconstruct
   decoding state. See
   [acknowledgement and recovery](docs/connectors/taps/postgres.rst#acknowledgement-and-recovery).

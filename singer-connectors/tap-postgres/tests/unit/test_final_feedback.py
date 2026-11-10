@@ -343,6 +343,28 @@ def test_main_finishes_only_after_sync_and_closes_on_failure(monkeypatch, fails)
         assert events == ['first_group', 'second_group', 'finish', 'close']
 
 
+def test_main_unconfirmed_final_feedback_does_not_fail_the_run(monkeypatch):
+    coordinator = Mock()
+    coordinator.finish.side_effect = feedback.FinalFeedbackError(
+        'Timed out waiting for durable target state and PostgreSQL final feedback')
+    args = SimpleNamespace(config={'host': 'host', 'user': 'user', 'password': 'password', 'port': 5432,
+                                   'dbname': 'source'}, discover=False, properties={'streams': []},
+                           catalog=None, state={}, state_file='state.json')
+    warning = Mock()
+    monkeypatch.setattr(tap_postgres, 'parse_args', lambda _: args)
+    monkeypatch.setattr(feedback.FinalFeedbackCoordinator, 'from_environment', lambda _: coordinator)
+    monkeypatch.setattr(tap_postgres, 'do_sync', Mock())
+    monkeypatch.setattr(tap_postgres.LOGGER, 'warning', warning)
+
+    # Durable target state is unchanged; the previous lifecycle must not become a failed run.
+    tap_postgres.main_impl()
+
+    coordinator.finish.assert_called_once_with()
+    coordinator.close.assert_called_once_with()
+    warning.assert_called_once_with('%s. The next run resumes from the durable target state.',
+                                    coordinator.finish.side_effect)
+
+
 @pytest.mark.parametrize('database_names', [('first_database',), ('first_database', 'second_database')])
 def test_sync_hands_off_only_single_database_catalogs(monkeypatch, database_names):
     streams = [{'tap_stream_id': name, 'metadata': [{'breadcrumb': [], 'metadata': {'database-name': name}}]}

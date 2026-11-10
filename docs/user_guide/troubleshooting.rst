@@ -400,8 +400,9 @@ checkpoint to PostgreSQL. See :ref:`postgres_final_feedback`.
 Compare target load completion, state-file write errors and source feedback
 confirmation in the same UTC interval. Check connectivity to the writable
 primary if the target has acknowledged its state but source confirmation fails.
-Finalization has a ten-minute deadline. Retry the same tap with its durable
-target state after correcting a failure.
+Finalization has a ten-minute deadline. An unconfirmed acknowledgement logs a
+warning but does not fail the run. The next run resumes from the durable target
+state.
 
 A PostgreSQL startup message can report ``reading WAL from`` an earlier LSN
 than the requested resume point. The server reconstructs logical-decoding

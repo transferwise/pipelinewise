@@ -16,7 +16,7 @@ from tap_postgres.sync_strategies import logical_replication
 from tap_postgres.sync_strategies import full_table
 from tap_postgres.sync_strategies import incremental
 from tap_postgres.discovery_utils import discover_db
-from tap_postgres.final_feedback import FinalFeedbackCoordinator
+from tap_postgres.final_feedback import FinalFeedbackCoordinator, FinalFeedbackError
 from tap_postgres.stream_utils import (
     dump_catalog, clear_state_on_replication_change,
     is_selected_via_metadata, refresh_streams_schema, any_logical_streams)
@@ -467,7 +467,12 @@ def main_impl():
             do_sync(conn_config, args.catalog.to_dict() if args.catalog else args.properties,
                     args.config.get('default_replication_method'), state, state_file, **feedback_options)
             if final_feedback is not None:
-                final_feedback.finish()
+                try:
+                    final_feedback.finish()
+                except FinalFeedbackError as exc:
+                    # Durable target state is unchanged, so an unconfirmed acknowledgement only repeats the
+                    # previous lifecycle. A failed target still fails the pipeline through its own exit status.
+                    LOGGER.warning('%s. The next run resumes from the durable target state.', exc)
         finally:
             if final_feedback is not None:
                 final_feedback.close()

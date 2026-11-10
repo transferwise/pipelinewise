@@ -176,9 +176,11 @@ target's acknowledged state, sends final feedback up to the completed boundary,
 and checks that PostgreSQL received it before closing the connection. This
 avoids leaving the final durable checkpoint unreported until another run.
 
-Final acknowledgement has a ten-minute deadline. A timeout, failed target,
-unreadable state, or lost PostgreSQL connection fails finalization and retains
-the durable target checkpoint for retry. Consumed or buffered records alone
+Final acknowledgement has a ten-minute deadline. After a timeout, failed target,
+unreadable state, or lost PostgreSQL connection, the tap logs a warning and
+closes without final feedback, as earlier releases did. This alone does not
+fail the run; a failed target still fails it. The next run resumes from the
+durable target checkpoint. Consumed or buffered records alone
 never justify advancing feedback. This finalization requires the managed
 PipelineWise state channel and a completed progress-marker transaction. It adds
 no YAML setting or state migration.
