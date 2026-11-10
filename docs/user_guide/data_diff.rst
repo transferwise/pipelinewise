@@ -7,6 +7,10 @@ Data-diff compares source tables with their PostgreSQL or Snowflake replicas.
 Define checks in the tap YAML. The backend stores each definition revision and
 its results.
 
+Compare data at rest: replication must have caught up, and the rows in the
+comparison window must stop changing while the check runs. Source and target
+queries use separate snapshots, so concurrent changes can cause a mismatch.
+
 
 Supported routes
 ----------------
@@ -89,13 +93,75 @@ Check types
 
    - ``row_checksum`` is probabilistic. A mismatch identifies a window, not the
      individual rows that differ.
-   - JSON/VARIANT and floating-point checksum columns are unsupported. They
-     produce ``ERROR``, not ``FAIL``. Cross-database ordering and numeric
-     representations can differ.
+   - JSON/VARIANT checksum columns are unsupported. Floating-point checksums
+     require a Snowflake target; see :ref:`data_diff_float_checksums`.
    - Exact numeric checksums use the wider source/target scale to detect lost
      precision. Both columns need known scales.
-   - Missing or incompatible checksum columns also produce ``ERROR``. Other
+   - Unsupported, missing or incompatible checksum columns produce ``ERROR``. Other
      check types in the run still execute.
+
+
+.. _data_diff_float_checksums:
+
+Floating-point checksums
+------------------------
+
+``row_checksum`` can compare source columns with Snowflake ``FLOAT`` columns
+in native tables and ``DOUBLE`` columns in managed Iceberg v3 tables. Add these
+columns to ``compare_columns``; no extra setting is needed.
+
+The check compares the value replication should load after its normal casts.
+It does not round values to a fixed number of decimal digits or allow a
+tolerance. Distinct finite values after the replication cast remain distinct
+inputs to the checksum.
+
+.. list-table:: Source conversion before comparison
+    :header-rows: 1
+    :widths: 35 65
+
+    * - Source column
+      - Expected Snowflake value
+    * - PostgreSQL / YugabyteDB ``DOUBLE PRECISION`` and ``REAL``
+      - Convert the server's floating-point text to double precision, as
+        replication does. ``REAL`` does not use the same conversion as MySQL
+        ``FLOAT``.
+    * - MySQL / MariaDB ``FLOAT``
+      - Promote the exact stored single-precision value to double precision.
+        For example, ``0.1`` becomes ``0.10000000149011612``.
+    * - MySQL / MariaDB ``DOUBLE``
+      - Keep the double-precision value. Type aliases follow the physical type
+        reported by the source.
+    * - ``NUMERIC`` / ``DECIMAL`` loaded into ``FLOAT``
+      - Apply the :ref:`decimal fallback <exact_decimal_mapping>`, including
+        rounding, finite overflow saturation and underflow. This includes
+        retained legacy ``FLOAT`` columns.
+
+YugabyteDB uses its existing native Snowflake FullSync and PartialSync routes.
+
+The actual target column type determines which comparison applies. A retained
+``FLOAT`` column is compared as floating point even when a newly created column
+would use ``NUMBER``. A passing check confirms the expected replicated value;
+it does not prove that a lossy conversion preserved the original decimal.
+
+Positive and negative zero compare equally. All ``NaN`` values compare equally,
+but remain distinct from ``NULL`` and infinities. Positive and negative infinity
+remain distinct.
+
+PostgreSQL and YugabyteDB floating-point text depends on ``extra_float_digits``.
+Use the same output settings for replication and data-diff connections, including
+replicas. Older YugabyteDB defaults can round the exported value. PostgreSQL
+LOG_BASED replication needs wal2json 2.6 or later to preserve special values.
+See :ref:`floating_point_values`.
+
+Rows loaded with earlier precision or special-value bugs can fail these checks.
+They keep their old values until they change or are resynced. The check does not
+hide those differences or repair the target. Compare settled data as described
+under :ref:`data_diff`.
+
+Floating-point checksums need more work than row counts. MySQL and MariaDB can
+use internal temporary storage for the filtered window. The statement timeout
+applies to the combined metrics query, including counts and key checks. Use
+smaller windows if a check exceeds the timeout.
 
 
 Check configuration

@@ -16,6 +16,8 @@ from time import perf_counter
 import psycopg2.extras
 from singer.snowflake_errors import sanitize_snowflake_errors
 
+from .float64 import FLOAT_NORMALIZATION_ERRORS, float64_projection
+
 
 # Distinguishes "probed, no visibility column" from "not probed yet"; None is a real
 # result here, so it cannot double as the sentinel.
@@ -49,6 +51,12 @@ YB_BUCKET_EXPRESSION = re.compile(r"^\(yb_hash_code\((?P<columns>[^()]*)\) % (?P
 
 class DataDiffExecutionError(RuntimeError):
     """Raised for unsafe plans, missing metadata, or execution failures."""
+
+
+def _validate_float_normalization(values: dict) -> None:
+    errors = values.get(FLOAT_NORMALIZATION_ERRORS)
+    if errors is not None and errors != 0:
+        raise DataDiffExecutionError('FLOAT checksum could not normalize finite binary64 values exactly')
 
 
 @dataclass
@@ -116,6 +124,7 @@ class DatabaseAdapter:
     """Common SQL and result behavior for one check-side connection."""
 
     quote_character = '"'
+    checksum_dialect = 'postgres'
 
     def __init__(self, connection, statement_timeout_seconds: int):
         self.connection = connection
@@ -148,6 +157,8 @@ class DatabaseAdapter:
         """Return a stable textual representation for one checksum column."""
         name = self.quote(column["name"])
         kind = column["checksum_kind"]
+        if kind == 'float64':
+            return column['checksum_float_token']
         if kind == "string":
             return f"CAST({name} AS TEXT)"
         if kind == "exact_numeric":
@@ -164,6 +175,29 @@ class DatabaseAdapter:
         if kind == "binary":
             return f"ENCODE({name}, 'hex')"
         raise DataDiffExecutionError(f"Unsupported checksum kind: {kind}")
+
+    def checksum_projection(
+        self, columns: list[dict], *, reserved_names: tuple[str, ...] = (),
+    ) -> tuple[list[list[str]], list[dict]]:
+        """Plan database-side FLOAT normalization without downloading table rows."""
+        return float64_projection(columns, self.quote, self.checksum_dialect, reserved_names)
+
+    def project_checksum_relation(self, relation: str, stages: list[list[str]]) -> str:
+        """Keep normalization stages from expanding into repeated expressions.
+
+        PostgreSQL/YSQL retain an OFFSET subquery boundary; MySQL/MariaDB
+        materialize a derived table with LIMIT. Their maximum unsigned LIMIT
+        denotes an unlimited result, preserving every filtered row and duplicate.
+        Put the window filter inside ``relation`` before adding these boundaries.
+        """
+        fence = {
+            'postgres': ' OFFSET 0',
+            'mysql': ' LIMIT 18446744073709551615',
+            'snowflake': '',
+        }[self.checksum_dialect]
+        for stage in stages:
+            relation = f"SELECT ppw_rows.*, {', '.join(stage)} FROM ({relation}) AS ppw_rows{fence}"
+        return relation
 
     def checksum_integer(self, payload: str) -> str:
         """Convert the low 48 bits of an MD5 value to a centred integer."""
@@ -241,6 +275,7 @@ class DatabaseAdapter:
             if not isinstance(row, dict):
                 row = dict(zip((description[0] for description in cursor.description), row))
         values_by_name = {str(key).lower(): value for key, value in row.items()}
+        _validate_float_normalization(values_by_name)
         return MetricQueryResult(
             values={check: canonical_value(values_by_name[check]) for check in checks},
             duration_seconds=perf_counter() - started,
@@ -488,6 +523,7 @@ class MySQLAdapter(DatabaseAdapter):
     """MySQL and MariaDB metadata, plan, and aggregate operations."""
 
     quote_character = "`"
+    checksum_dialect = 'mysql'
 
     def __init__(self, connection, statement_timeout_seconds: int):
         super().__init__(connection, statement_timeout_seconds)
@@ -518,6 +554,8 @@ class MySQLAdapter(DatabaseAdapter):
     def normalize_checksum_value(self, column):
         name = self.quote(column["name"])
         kind = column["checksum_kind"]
+        if kind == 'float64':
+            return column['checksum_float_token']
         if kind == "string":
             return f"CAST({name} AS CHAR)"
         if kind == "exact_numeric":
@@ -622,6 +660,8 @@ class MySQLAdapter(DatabaseAdapter):
 class SnowflakeAdapter(DatabaseAdapter):
     """Snowflake metadata and aggregate operations."""
 
+    checksum_dialect = 'snowflake'
+
     @sanitize_snowflake_errors
     def resolve_columns(self, schema, table, requested, *, allow_missing=False):
         import snowflake.connector
@@ -649,6 +689,8 @@ class SnowflakeAdapter(DatabaseAdapter):
     def normalize_checksum_value(self, column):
         name = self.quote(column["name"])
         kind = column["checksum_kind"]
+        if kind == 'float64':
+            return column['checksum_float_token']
         if kind == "string":
             return f"CAST({name} AS VARCHAR)"
         if kind == "exact_numeric":
@@ -685,6 +727,7 @@ class SnowflakeAdapter(DatabaseAdapter):
             if row is None:
                 raise DataDiffExecutionError("Aggregate query returned no row")
         values_by_name = {str(key).lower(): value for key, value in row.items()}
+        _validate_float_normalization(values_by_name)
         return MetricQueryResult(
             values={check: canonical_value(values_by_name[check]) for check in checks},
             duration_seconds=perf_counter() - started,

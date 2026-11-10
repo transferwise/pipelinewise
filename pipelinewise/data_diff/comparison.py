@@ -127,7 +127,9 @@ def _numeric_scale(column: dict):
     return int(scale) if scale is not None else None
 
 
-def checksum_columns(column_pairs: list) -> tuple:
+def checksum_columns(
+    column_pairs: list, *, source_type: str | None = None, target_type: str | None = None,
+) -> tuple:
     """Return dialect-independent checksum descriptors or raise on unsafe types."""
     source_descriptors = []
     target_descriptors = []
@@ -142,7 +144,23 @@ def checksum_columns(column_pairs: list) -> tuple:
 
         checksum_kind = source_family
         scale = 0
-        if checksum_kind == "exact_numeric":
+        source_float_conversion = None
+        if target_family == 'approximate_numeric' and target_type == 'target-snowflake':
+            if source_type not in {'tap-postgres', 'tap-yugabyte', 'tap-mysql'}:
+                raise UnsupportedComparisonError(
+                    f"row_checksum column '{logical_name}' has no supported source-to-FLOAT conversion"
+                )
+            checksum_kind = 'float64'
+            if source_type == 'tap-mysql':
+                source_float_conversion = (
+                    'mysql_decimal' if column_type_name(source_column) in {'decimal', 'numeric', 'dec', 'fixed'}
+                    else 'mysql_numeric'
+                )
+            elif source_family == 'approximate_numeric':
+                source_float_conversion = 'postgres_float_text'
+            else:
+                source_float_conversion = 'postgres_numeric'
+        elif checksum_kind == "exact_numeric":
             source_scale = _numeric_scale(source_column)
             target_scale = _numeric_scale(target_column)
             if source_scale is None or target_scale is None:
@@ -165,6 +183,8 @@ def checksum_columns(column_pairs: list) -> tuple:
         common = {"checksum_kind": checksum_kind, "checksum_scale": scale}
         source_descriptors.append({**source_column, **common})
         target_descriptors.append({**target_column, **common})
+        if source_float_conversion is not None:
+            source_descriptors[-1]['checksum_float_conversion'] = source_float_conversion
     return source_descriptors, target_descriptors
 
 
