@@ -176,6 +176,7 @@
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Data-diff checks</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#supported-routes">Supported routes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#check-types">Check types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#floating-point-checksums">Floating-point checksums</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#check-configuration">Check configuration</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#tap-yaml">Tap YAML</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#choosing-a-frequency-and-window">Choosing a frequency and window</a></li>
@@ -395,6 +396,9 @@
 <p>Data-diff compares source tables with their PostgreSQL or Snowflake replicas.
 Define checks in the tap YAML. The backend stores each definition revision and
 its results.</p>
+<p>Compare data at rest: replication must have caught up, and the rows in the
+comparison window must stop changing while the check runs. Source and target
+queries use separate snapshots, so concurrent changes can cause a mismatch.</p>
 <section id="supported-routes">
 <h2>Supported routes<a class="headerlink" href="#supported-routes" title="Link to this heading"></a></h2>
 <table class="docutils align-default">
@@ -509,15 +513,77 @@ checks, including the initial historical scan.</p>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">row_checksum</span></code> is probabilistic. A mismatch identifies a window, not the
 individual rows that differ.</p></li>
-<li><p>JSON/VARIANT and floating-point checksum columns are unsupported. They
-produce <code class="docutils literal notranslate"><span class="pre">ERROR</span></code>, not <code class="docutils literal notranslate"><span class="pre">FAIL</span></code>. Cross-database ordering and numeric
-representations can differ.</p></li>
+<li><p>JSON/VARIANT checksum columns are unsupported. Floating-point checksums
+require a Snowflake target; see <a class="reference internal" href="#data-diff-float-checksums"><span class="std std-ref">Floating-point checksums</span></a>.</p></li>
 <li><p>Exact numeric checksums use the wider source/target scale to detect lost
 precision. Both columns need known scales.</p></li>
-<li><p>Missing or incompatible checksum columns also produce <code class="docutils literal notranslate"><span class="pre">ERROR</span></code>. Other
+<li><p>Unsupported, missing or incompatible checksum columns produce <code class="docutils literal notranslate"><span class="pre">ERROR</span></code>. Other
 check types in the run still execute.</p></li>
 </ul>
 </div>
+</section>
+<section id="floating-point-checksums">
+<span id="data-diff-float-checksums"></span><h2>Floating-point checksums<a class="headerlink" href="#floating-point-checksums" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">row_checksum</span></code> can compare source columns with Snowflake <code class="docutils literal notranslate"><span class="pre">FLOAT</span></code> columns
+in native tables and <code class="docutils literal notranslate"><span class="pre">DOUBLE</span></code> columns in managed Iceberg v3 tables. Add these
+columns to <code class="docutils literal notranslate"><span class="pre">compare_columns</span></code>; no extra setting is needed.</p>
+<p>The check compares the value replication should load after its normal casts.
+It does not round values to a fixed number of decimal digits or allow a
+tolerance. Distinct finite values after the replication cast remain distinct
+inputs to the checksum.</p>
+<table class="docutils align-default" id="id3">
+<caption><span class="caption-text">Source conversion before comparison</span><a class="headerlink" href="#id3" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 35.0%" />
+<col style="width: 65.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Source column</p></th>
+<th class="head"><p>Expected Snowflake value</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>PostgreSQL / YugabyteDB <code class="docutils literal notranslate"><span class="pre">DOUBLE</span> <span class="pre">PRECISION</span></code> and <code class="docutils literal notranslate"><span class="pre">REAL</span></code></p></td>
+<td><p>Convert the server’s floating-point text to double precision, as
+replication does. <code class="docutils literal notranslate"><span class="pre">REAL</span></code> does not use the same conversion as MySQL
+<code class="docutils literal notranslate"><span class="pre">FLOAT</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p>MySQL / MariaDB <code class="docutils literal notranslate"><span class="pre">FLOAT</span></code></p></td>
+<td><p>Promote the exact stored single-precision value to double precision.
+For example, <code class="docutils literal notranslate"><span class="pre">0.1</span></code> becomes <code class="docutils literal notranslate"><span class="pre">0.10000000149011612</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p>MySQL / MariaDB <code class="docutils literal notranslate"><span class="pre">DOUBLE</span></code></p></td>
+<td><p>Keep the double-precision value. Type aliases follow the physical type
+reported by the source.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">NUMERIC</span></code> / <code class="docutils literal notranslate"><span class="pre">DECIMAL</span></code> loaded into <code class="docutils literal notranslate"><span class="pre">FLOAT</span></code></p></td>
+<td><p>Apply the <a class="reference internal" href="schema_changes.html#exact-decimal-mapping"><span class="std std-ref">decimal fallback</span></a>, including
+rounding, finite overflow saturation and underflow. This includes
+retained legacy <code class="docutils literal notranslate"><span class="pre">FLOAT</span></code> columns.</p></td>
+</tr>
+</tbody>
+</table>
+<p>YugabyteDB uses its existing native Snowflake FullSync and PartialSync routes.</p>
+<p>The actual target column type determines which comparison applies. A retained
+<code class="docutils literal notranslate"><span class="pre">FLOAT</span></code> column is compared as floating point even when a newly created column
+would use <code class="docutils literal notranslate"><span class="pre">NUMBER</span></code>. A passing check confirms the expected replicated value;
+it does not prove that a lossy conversion preserved the original decimal.</p>
+<p>Positive and negative zero compare equally. All <code class="docutils literal notranslate"><span class="pre">NaN</span></code> values compare equally,
+but remain distinct from <code class="docutils literal notranslate"><span class="pre">NULL</span></code> and infinities. Positive and negative infinity
+remain distinct.</p>
+<p>PostgreSQL and YugabyteDB floating-point text depends on <code class="docutils literal notranslate"><span class="pre">extra_float_digits</span></code>.
+Use the same output settings for replication and data-diff connections, including
+replicas. Older YugabyteDB defaults can round the exported value. PostgreSQL
+LOG_BASED replication needs wal2json 2.6 or later to preserve special values.
+See <a class="reference internal" href="schema_changes.html#floating-point-values"><span class="std std-ref">Floating-point values</span></a>.</p>
+<p>Rows loaded with earlier precision or special-value bugs can fail these checks.
+They keep their old values until they change or are resynced. The check does not
+hide those differences or repair the target. Compare settled data as described
+under <a class="reference internal" href="#data-diff"><span class="std std-ref">Data-diff checks</span></a>.</p>
+<p>Floating-point checksums need more work than row counts. MySQL and MariaDB can
+use internal temporary storage for the filtered window. The statement timeout
+applies to the combined metrics query, including counts and key checks. Use
+smaller windows if a check exceeds the timeout.</p>
 </section>
 <section id="check-configuration">
 <h2>Check configuration<a class="headerlink" href="#check-configuration" title="Link to this heading"></a></h2>
@@ -854,8 +920,8 @@ PipelineWise reports the error and continues with other checks.</p>
 <p>Before each data check, PipelineWise looks for a usable source index whose first
 column is <code class="docutils literal notranslate"><span class="pre">timestamp_column</span></code>. With that index, preflight does not count rows.
 Without it, a bounded source count applies these fixed rules:</p>
-<table class="docutils align-default" id="id3">
-<caption><span class="caption-text">Source tables without a qualifying timestamp index</span><a class="headerlink" href="#id3" title="Link to this table"></a></caption>
+<table class="docutils align-default" id="id4">
+<caption><span class="caption-text">Source tables without a qualifying timestamp index</span><a class="headerlink" href="#id4" title="Link to this table"></a></caption>
 <colgroup>
 <col style="width: 30.0%" />
 <col style="width: 70.0%" />

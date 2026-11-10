@@ -184,7 +184,7 @@ const runMermaid = async (rerun) => {
                                     // Apply zoom to the now-rendered diagram, matching
                                     // the decoration visible diagrams receive.
                                     if (true) {
-                                        addZoomToSvgs(d3.selectAll(".mermaid[data-zoom-id=id-af800230-73f3-4773-ae5c-a1bfd36c584c]").select(function() {
+                                        addZoomToSvgs(d3.selectAll(".mermaid[data-zoom-id=id-e7a779a5-7bb3-4411-ac96-c999abd57e10]").select(function() {
                                             return this.querySelector("svg");
                                         }));
                                     }
@@ -210,7 +210,7 @@ const runMermaid = async (rerun) => {
     if (true) {
         const mermaids_to_add_zoom = 1 === -1 ? mermaids_active.length : 1;
         if(mermaids_to_add_zoom > 0) {
-            var svgs = d3.selectAll(".mermaid[data-zoom-id=id-af800230-73f3-4773-ae5c-a1bfd36c584c]").select(function() {
+            var svgs = d3.selectAll(".mermaid[data-zoom-id=id-e7a779a5-7bb3-4411-ac96-c999abd57e10]").select(function() {
                 return this.querySelector("svg");
             });
             // Wait until every active (visible) diagram has rendered. Deferred
@@ -535,6 +535,7 @@ window.runMermaid = runMermaid;</script>
 <li class="toctree-l1"><a class="reference internal" href="data_diff.html">Data-diff checks</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="data_diff.html#supported-routes">Supported routes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="data_diff.html#check-types">Check types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data_diff.html#floating-point-checksums">Floating-point checksums</a></li>
 <li class="toctree-l2"><a class="reference internal" href="data_diff.html#check-configuration">Check configuration</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="data_diff.html#tap-yaml">Tap YAML</a></li>
 <li class="toctree-l3"><a class="reference internal" href="data_diff.html#choosing-a-frequency-and-window">Choosing a frequency and window</a></li>
@@ -782,7 +783,7 @@ To share one role, set both credential pairs to that role.</p>
 <section id="schema">
 <h2>Schema<a class="headerlink" href="#schema" title="Link to this heading"></a></h2>
 <figure class="align-center" id="id1">
-<pre data-zoom-id="id-af800230-73f3-4773-ae5c-a1bfd36c584c" class="mermaid">
+<pre data-zoom-id="id-e7a779a5-7bb3-4411-ac96-c999abd57e10" class="mermaid">
         %%{init: {&quot;er&quot;: {&quot;diagramPadding&quot;: 8, &quot;entityPadding&quot;: 8}}}%%
 erDiagram
     direction LR
