@@ -7,6 +7,7 @@ import json
 import re
 import singer
 import warnings
+import hashlib
 
 from select import select
 from psycopg2 import sql
@@ -672,7 +673,14 @@ def generate_replication_slot_name(dbname, tap_id=None, prefix='pipelinewise'):
     slot_name = f'{prefix}_{dbname}{tap_id}'.lower()
 
     # Replace invalid characters to ensure replication slot name is in accordance with Postgres spec
-    return re.sub('[^a-z0-9_]', '_', slot_name)
+    slot_name = re.sub('[^a-z0-9_]', '_', slot_name)
+
+    if len(slot_name) > 63:
+        suffix = hashlib.sha256(slot_name.encode('utf-8')).hexdigest()[:8]
+        slot_name = f'{slot_name[:54]}_{suffix}'
+
+    # Replace invalid characters to ensure replication slot name is in accordance with Postgres spec
+    return slot_name
 
 
 def locate_replication_slot_by_cur(cursor, dbname, tap_id=None):

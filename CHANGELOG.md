@@ -1,3 +1,7 @@
+0.102.1 (2026-11-10)
+--------------------
+- Fix for tap-postgres slot name for the names greater than 63 characters.
+
 0.102.0 (2026-11-09)
 --------------------
 
@@ -10,6 +14,7 @@
 - Avoid repeated source casts and arithmetic in floating-point checksums by
   keeping normalization stages separate in PostgreSQL, YugabyteDB, MySQL and
   MariaDB query plans. Existing statement timeouts still apply.
+
 
 0.101.0 (2026-11-06)
 --------------------
