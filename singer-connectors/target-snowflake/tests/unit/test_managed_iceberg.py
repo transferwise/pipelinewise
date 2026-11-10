@@ -7,7 +7,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from target_snowflake import db_sync, managed_iceberg
+from target_snowflake import db_sync, flattening, managed_iceberg
 from target_snowflake.exceptions import (
     TableFormatDiscoveryException,
     TableFormatMismatchException,
@@ -311,6 +311,48 @@ def test_connector_emits_shared_create_and_add_column_cases():
         )
 
 
+def test_connector_matches_shared_text_variant_classes():
+    for case in _v3_behavior_cases()['singer_text_variant_classes']:
+        flattened = flattening.flatten_schema(
+            {'properties': {'VALUE': case['schema']}},
+            max_level=0,
+        )
+        physical_type = managed_iceberg.column_type(
+            flattened['VALUE'],
+            is_iceberg_table=True,
+            iceberg_version=3,
+        ).upper()
+        if physical_type == 'VARIANT':
+            column_class = 'VARIANT'
+        elif physical_type.startswith('VARCHAR'):
+            column_class = 'TEXT'
+        else:
+            column_class = None
+
+        assert column_class == case['expected_class'], case
+
+
+def test_connector_matches_shared_top_level_splits():
+    for case in _v3_behavior_cases()['top_level_splits']:
+        flattened = flattening.flatten_schema(
+            {'properties': {'VALUE': case['schema']}},
+            max_level=case['max_level'],
+        )
+
+        assert ('VALUE' not in flattened) is case['expected_split'], case
+
+
+def test_connector_matches_shared_level_zero_column_names():
+    for case in _v3_behavior_cases()['level_zero_column_names']:
+        name = case['name_repeat'] * case['name_times']
+        flattened = flattening.flatten_schema(
+            {'properties': {name: {'type': ['null', 'string']}}},
+            max_level=0,
+        )
+
+        assert [column.upper() for column in flattened] == [case['expected_column']], case
+
+
 def test_connector_executes_shared_mariadb_json_transport_case():
     case = _v3_behavior_cases()['mariadb_json_transport']
     schema = case['schema']
@@ -338,6 +380,27 @@ def test_connector_executes_shared_mariadb_json_transport_case():
         case['expected_decoded_roots']
     )
     assert fields[-1] == ''
+
+
+def test_connector_executes_shared_postgres_numeric_array_transport_case():
+    case = _v3_behavior_cases()['postgres_numeric_array_transport']
+    schema = case['schema']
+
+    for table_format in ({}, {'is_iceberg_table': True, 'iceberg_version': 3}):
+        assert managed_iceberg.column_type(schema, **table_format).upper() == case['expected_physical_type']
+    assert db_sync.column_trans(schema) == case['expected_transform']
+    for max_level in (0, 10):
+        assert flattening.flatten_schema({'properties': {'VALUE': schema}}, max_level=max_level) == {'VALUE': schema}
+
+    record = {f'value_{index}': value for index, value in enumerate(case['serialized_values'])}
+    record['sql_null'] = None
+    line = csv_file_format.record_to_csv_line(record, {name: schema for name in record})
+    fields = next(csv_module.reader([line], escapechar='\\'))
+
+    # FastSync loads the same server-rendered array_to_json text, so both writers hand PARSE_JSON identical input.
+    assert fields[:-1] == case['serialized_values']
+    assert all(isinstance(json.loads(value), list) for value in fields[:-1])
+    assert line.endswith(',"[]",')
 
 
 def test_sql_string_literal_escapes_backslashes_before_quotes():

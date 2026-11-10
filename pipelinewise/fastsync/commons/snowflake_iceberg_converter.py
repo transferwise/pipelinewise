@@ -2,7 +2,7 @@
 
 import logging
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from pipelinewise.fastsync.commons.snowflake_iceberg import (
     PHASE_FINALIZED,
@@ -28,13 +28,18 @@ from pipelinewise.fastsync.commons.snowflake_iceberg_inspection import (
     physical_table_format,
 )
 from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_evidence import (
+    ContentEvidenceMismatchError,
     SnowflakeConversionEvidenceService,
+)
+from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_plan import (
+    text_variant_blockers,
 )
 from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_recovery import (
     SnowflakeConversionFinalizationValidator,
 )
 from pipelinewise.fastsync.commons.snowflake_iceberg_validation import (
     CONVERSION_CUTOVER_OUTAGE_WARNING,
+    SUB_MICROSECOND_TYPES,
     ConversionMetadata,
     ConversionTableState,
     NativeColumn,
@@ -43,9 +48,11 @@ from pipelinewise.fastsync.commons.snowflake_iceberg_validation import (
     assert_iceberg_table_spec,
     assert_managed_v3,
     assert_supported_metadata,
+    grant_replay_blockers,
     grantee_sql as _grantee_sql,
     manual_recovery_identity as _manual_recovery_identity,
     parse_native_columns,
+    representation_blockers,
     snowflake_boolean as _snowflake_boolean,
     stream_references_table,
     _value as _row_value,
@@ -121,6 +128,8 @@ class SnowflakeNativeToIcebergConverter:
         self.recovery_coordinator = RecoveryCoordinator(runtime_dir)
         self.evidence_service = SnowflakeConversionEvidenceService(self)
         self._query_tag_context = {}
+        self._writer_types = {}
+        self._refusals = ()
         self.finalization_validator = SnowflakeConversionFinalizationValidator(
             self._query,
             self._inspect_source,
@@ -140,8 +149,14 @@ class SnowflakeNativeToIcebergConverter:
         fqtn: str,
         eventual: str = EVENTUAL_NATIVE,
         iceberg_version: int = ICEBERG_V3,
+        writer_types: Optional[Mapping[str, str]] = None,
+        refusals: Sequence[str] = (),
     ) -> None:
-        """Convert one target table while retaining a native rollback point."""
+        """Convert one target table while retaining a native rollback point.
+
+        Refusals stop the attempt before any new manifest or cutover, but only after an
+        interrupted cutover has its table name back.
+        """
         if eventual not in (EVENTUAL_NATIVE, EVENTUAL_ICEBERG):
             raise ValueError('eventual must be native or iceberg')
         if not is_exact_integer(iceberg_version) or iceberg_version != ICEBERG_V3:
@@ -151,6 +166,9 @@ class SnowflakeNativeToIcebergConverter:
         self._validate_companion_names(table)
         self._validate_database(table)
         self._query_tag_context = {}
+        # A tap's catalog classes join every pre-cutover check, including resumed attempts.
+        self._writer_types = dict(writer_types or {})
+        self._refusals = tuple(refusals)
         recovery_identity = _manual_recovery_identity(
             self.snowflake.connection_config
         )
@@ -167,7 +185,8 @@ class SnowflakeNativeToIcebergConverter:
                     f'A FastSync Iceberg attempt is pending recovery for {table.quoted}'
                 )
             manifest = store.load()
-            if manifest is not None:
+            resumed = manifest is not None
+            if resumed:
                 self._validate_manifest(
                     manifest,
                     table,
@@ -189,7 +208,78 @@ class SnowflakeNativeToIcebergConverter:
                 'schema': table.schema,
                 'table': table.table,
             }
-            self._run_attempt(table, manifest)
+            self._run_attempt(table, manifest, resumed=resumed)
+
+    def preflight(
+        self,
+        fqtn: str,
+        writer_types: Optional[Mapping[str, str]] = None,
+    ) -> Tuple[str, ...]:
+        """Return the first metadata refusal, or every conversion blocker, without changing anything."""
+        table = SnowflakeTableName.parse(fqtn)
+        self._query_tag_context = {}
+        self._writer_types = dict(writer_types or {})
+        try:
+            self._validate_companion_names(table)
+            self._validate_database(table)
+            metadata = self._inspect_source(table)
+        except NativeToIcebergConversionError as exc:
+            return (str(exc),)
+        return tuple(self._conversion_blockers(table, metadata))
+
+    def _conversion_blockers(
+        self,
+        table: SnowflakeTableName,
+        metadata: ConversionMetadata,
+    ) -> List[str]:
+        blockers = representation_blockers(metadata.columns)
+        blockers.extend(grant_replay_blockers(metadata.grants))
+        blockers.extend(self._sub_microsecond_blockers(table, metadata.columns))
+        blockers.extend(text_variant_blockers(metadata.columns, self._writer_types))
+        return blockers
+
+    def _assert_convertible(
+        self,
+        table: SnowflakeTableName,
+        metadata: ConversionMetadata,
+    ) -> None:
+        # Known refusals already stop the attempt, so the full-table probe is skipped.
+        blockers = list(self._refusals) or self._conversion_blockers(table, metadata)
+        if blockers:
+            raise NativeToIcebergConversionError(
+                f'Cannot convert {table.quoted}: ' + '; '.join(blockers)
+            )
+
+    def _sub_microsecond_blockers(
+        self,
+        table: SnowflakeTableName,
+        columns: Tuple[NativeColumn, ...],
+    ) -> List[str]:
+        # The content evidence compares projected values, so v3 truncation must be found first.
+        temporal = [column for column in columns if column.data_type in SUB_MICROSECOND_TYPES]
+        if not temporal:
+            return []
+        # COUNT_IF returns NULL for an empty table, where no value can be truncated.
+        probes = ', '.join(
+            f'COALESCE(COUNT_IF(MOD(DATE_PART(NANOSECOND, {quote_identifier(column.name)}), 1000) <> 0), 0) '
+            f'AS "SUB_MICROSECOND_{index}"'
+            for index, column in enumerate(temporal)
+        )
+        rows = self._query(f'SELECT {probes} FROM {table.quoted}', phase='metadata')
+        counts = [
+            _row_value(rows[0], f'SUB_MICROSECOND_{index}') if len(rows) == 1 else None
+            for index in range(len(temporal))
+        ]
+        if any(count is None for count in counts):
+            raise NativeToIcebergConversionError(
+                f'Snowflake did not return sub-microsecond evidence for {table.quoted}'
+            )
+        return [
+            f'Column {column.name} has {int(count)} value(s) with sub-microsecond '
+            'precision that managed Iceberg v3 would truncate'
+            for column, count in zip(temporal, counts)
+            if int(count) > 0
+        ]
 
     def _query(self, sql: str, params=None, phase: str = None):
         query_tag = {
@@ -318,6 +408,7 @@ class SnowflakeNativeToIcebergConverter:
         )
         if manifest is None:
             metadata = self._inspect_source(table)
+            self._assert_convertible(table, metadata)
             manifest = _new_conversion_attempt(
                 table,
                 eventual,
@@ -340,6 +431,7 @@ class SnowflakeNativeToIcebergConverter:
             TABLE_FORMAT_MISSING,
         ):
             metadata = self._inspect_source(table)
+            self._assert_convertible(table, metadata)
             assert_managed_v3(self._query, table.with_suffix('_ICEBERG'))
             self._assert_equal_contents(table, table.with_suffix('_ICEBERG'), metadata.columns)
             return _new_conversion_attempt(
@@ -370,6 +462,7 @@ class SnowflakeNativeToIcebergConverter:
         self,
         table: SnowflakeTableName,
         manifest: IcebergPublicationAttempt,
+        resumed: bool = False,
     ) -> None:
         state = self._table_state(table)
         payload = manifest.manifest_payload
@@ -438,6 +531,9 @@ class SnowflakeNativeToIcebergConverter:
             raise NativeToIcebergConversionError(
                 f'The schema of {table.quoted} changed after conversion started'
             )
+        if resumed:
+            # A resumed attempt may predate these checks; its projected evidence cannot prove exactness.
+            self._assert_convertible(table, metadata)
 
         if state.staging == TABLE_FORMAT_MISSING:
             self._create_staging(table, metadata, manifest)
@@ -446,11 +542,7 @@ class SnowflakeNativeToIcebergConverter:
         staging = table.with_suffix('_ICEBERG')
         assert_iceberg_table_spec(self._query, staging, manifest.table_spec)
 
-        row_count, row_hash = self._assert_equal_contents(
-            table,
-            staging,
-            metadata.columns,
-        )
+        row_count, row_hash = self._assert_staging_contents(table, staging, metadata.columns)
         manifest.expected_row_count = row_count
         manifest.expected_row_fingerprint = str(row_hash)
 
@@ -467,6 +559,23 @@ class SnowflakeNativeToIcebergConverter:
             return
 
         self._cut_over(table, manifest)
+
+    def _assert_staging_contents(
+        self,
+        table: SnowflakeTableName,
+        staging: SnowflakeTableName,
+        columns: Tuple[NativeColumn, ...],
+    ) -> Tuple[int, int]:
+        """Compare the copy with the native primary, and name the fix when they differ."""
+        try:
+            return self._assert_equal_contents(table, staging, columns)
+        except ContentEvidenceMismatchError as exc:
+            # Before cutover the native primary holds every row, so a fresh copy is always safe.
+            raise NativeToIcebergConversionError(
+                f'{exc}. If {table.quoted} changed after {staging.quoted} was copied, stop every '
+                f'writer to it, drop {staging.quoted}, and rerun; the manifest stays, and the '
+                'next attempt copies the table again'
+            ) from exc
 
     def _create_staging(
         self,

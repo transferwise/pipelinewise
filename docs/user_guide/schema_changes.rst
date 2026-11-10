@@ -81,6 +81,7 @@ targets yet. This applies to Singer and supported FullSync/PartialSync routes. N
 columns always use this mapping. Snowflake reports ``NUMERIC`` as its equivalent
 ``NUMBER`` type.
 Approximate ``FLOAT``, ``DOUBLE``, and ``REAL`` columns keep their existing mapping.
+See :ref:`floating_point_values` for how their values are loaded.
 Other sources and destination combinations keep their existing behavior.
 PostgreSQL numeric primary keys use canonical text on Snowflake so a ``NaN``
 key remains representable; other supported decimal columns use the mapping
@@ -118,10 +119,11 @@ their declared precision and scale. This preserves ``NaN`` and distinct finite
 keys without relying on floating-point identity. MariaDB/MySQL decimal keys
 retain supported numeric mappings.
 PostgreSQL logical replication requests numeric string output from wal2json 2.6
-or later to preserve nonfinite values. Older plugins fall back with a warning
-and retain their existing conversion of these values to NULL. LOG_BASED tables
-with numeric primary keys need wal2json 2.6 or later if those keys can contain
-``NaN`` or infinity; an older plugin cannot recover an identity it emits as NULL.
+or later to preserve nonfinite numeric and floating-point values. Older plugins
+fall back with a warning and retain their existing conversion of these values
+to NULL. LOG_BASED tables with numeric or floating-point primary keys need
+wal2json 2.6 or later if those keys can contain ``NaN`` or infinity; an older
+plugin cannot recover an identity it emits as NULL.
 
 PostgreSQL retains supported declarations, including unconstrained ``NUMERIC``.
 Targets older than PostgreSQL 15 use unconstrained ``NUMERIC`` for negative scale
@@ -217,3 +219,72 @@ keeps its existing full-table replacement behavior and recreates the current
 source schema, removing historical versions. Existing recovery manifests retain
 the planned archive names and expected historical column types so retries between
 rename and add do not rename twice and publication detects unexpected schema drift.
+
+.. _floating_point_values:
+
+Floating-point values
+---------------------
+
+PostgreSQL and YugabyteDB ``REAL`` and ``DOUBLE PRECISION`` columns keep
+``NaN``, ``Infinity``, and ``-Infinity`` on Snowflake and PostgreSQL targets.
+This includes arrays of these types. FullSync, PartialSync, and every Singer
+replication method load the same special value. Before 0.101.0, Singer loaded
+these values as ``NULL`` while FastSync kept them.
+
+Singer carries the special values as the strings ``NaN``, ``Infinity``, and
+``-Infinity``. Finite values stay JSON numbers. The target column type does not
+change. S3 CSV targets still receive ``NULL``. LOG_BASED replication from
+PostgreSQL needs wal2json 2.6 or later; older plugins still send ``NULL``.
+
+An INCREMENTAL bookmark never stores ``NaN`` or an infinity. Rows whose
+replication key is ``NaN`` or ``Infinity`` are read again on every run, as
+before. Rows whose key is ``-Infinity`` are read only until a finite bookmark
+exists. When FastSync hands a table over to Singer, it saves the largest finite
+key instead.
+
+MariaDB and MySQL ``FLOAT`` columns load the exact stored value on every path.
+For example, a stored ``16777217`` loads as ``16777216``, and ``0.1`` loads as
+``0.10000000149011612``. Before 0.101.0, FullSync, PartialSync, and Singer
+FULL_TABLE and INCREMENTAL loaded the server's six-digit text instead, such as
+``16777200`` and ``0.1``. LOG_BASED replication already loaded the exact value.
+Display options such as ``FLOAT(7,4)`` and ``ZEROFILL`` no longer change loaded
+values. ``DOUBLE`` and ``DECIMAL`` columns are unchanged.
+
+Existing target rows are not repaired. A row keeps its old ``NULL`` or rounded
+value until the row changes in the source or the table is resynced. Resync a
+MariaDB or MySQL table whose primary key, INCREMENTAL replication key, or
+PartialSync range column is ``FLOAT``. Otherwise old rounded keys can leave
+duplicate or missed rows.
+
+.. _postgres_arrays:
+
+PostgreSQL and YugabyteDB arrays
+--------------------------------
+
+On Snowflake and PostgreSQL targets, every Singer replication method loads
+PostgreSQL and YugabyteDB arrays the same way FullSync and PartialSync do.
+Column types do not change, and S3 CSV targets are unchanged.
+
+A ``NULL`` array loads as SQL ``NULL``, and an empty array loads as an empty
+JSON array. Before 0.101.0, Singer loaded a ``NULL`` array as an empty array.
+
+``NUMERIC`` and ``DECIMAL`` arrays keep every digit and the ``NaN``,
+``Infinity``, and ``-Infinity`` elements. Singer carries each value as the JSON
+text the source database produces, the same text that FullSync exports. Before
+0.101.0, Singer rounded each element to a floating-point number and loaded
+special values as ``null``. An array column that is part of a primary key keeps
+the earlier transport, because targets compare key values as text.
+
+The target stores the JSON as it normally would. PostgreSQL ``JSONB`` keeps the
+exact text, including trailing zeros. Snowflake ``VARIANT`` drops trailing zeros,
+so ``1.10`` becomes ``1.1``. Snowflake stores a number with more than 38
+significant digits, or a scale above 37, as a double. It stores magnitudes beyond
+double range as ``Infinity``, ``-Infinity``, or ``0``. FullSync and Singer get the
+same result.
+
+Only ``SET-NULL`` transformations apply to ``NUMERIC`` array columns, and a
+condition on such a column can only use ``equals: null``. See
+:ref:`transformations`.
+
+Existing target rows are not repaired. A row keeps its old value until the row
+changes in the source or the table is resynced.

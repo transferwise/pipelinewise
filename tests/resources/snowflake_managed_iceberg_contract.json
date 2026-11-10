@@ -354,7 +354,83 @@
           false,
           null
         ]
-      }
+      },
+      "postgres_numeric_array_transport": {
+        "schema": {
+          "type": ["null", "string", "array"],
+          "format": "singer.json",
+          "items": {"$ref": "#/definitions/sdc_recursive_decimal_100_38_array"}
+        },
+        "expected_physical_type": "VARIANT",
+        "expected_transform": "parse_json",
+        "serialized_values": [
+          "[1,1.10,12345678901234567890.123,0.00000012,\"NaN\",\"Infinity\",\"-Infinity\",null]",
+          "[[1,2],[3,4]]",
+          "[5,6]",
+          "[]"
+        ]
+      },
+      "singer_text_variant_classes": [
+        {"schema": {"type": ["null", "object"], "properties": {}}, "expected_class": "VARIANT"},
+        {
+          "schema": {
+            "type": ["null", "object", "array", "string", "number", "boolean"],
+            "format": "mariadb-json"
+          },
+          "expected_class": "VARIANT"
+        },
+        {
+          "schema": {
+            "type": ["null", "string", "array"],
+            "format": "singer.json",
+            "items": {"$ref": "#/definitions/sdc_recursive_decimal_100_38_array"}
+          },
+          "expected_class": "VARIANT"
+        },
+        {"schema": {"type": ["null", "array"], "items": {}}, "expected_class": "VARIANT"},
+        {"schema": {"type": "object"}, "expected_class": "VARIANT"},
+        {"schema": {"anyOf": [{"type": "array", "items": {}}, {"type": "null"}]}, "expected_class": "VARIANT"},
+        {"schema": {"oneOf": [{"type": "object"}, {"type": "string"}]}, "expected_class": "VARIANT"},
+        {"schema": {"type": ["null", "string"]}, "expected_class": "TEXT"},
+        {"schema": {"type": ["null", "integer", "string"]}, "expected_class": "TEXT"},
+        {"schema": {"anyOf": [{"type": "integer"}, {"type": "null"}]}, "expected_class": "TEXT"},
+        {"schema": {}, "expected_class": "TEXT"},
+        {"schema": {"type": ["null", "string"], "format": "date-time"}, "expected_class": null},
+        {"schema": {"type": ["null", "string"], "format": "binary"}, "expected_class": null},
+        {"schema": {"type": ["null", "integer"]}, "expected_class": null},
+        {"schema": {"type": ["null", "number"]}, "expected_class": null},
+        {"schema": {"type": ["null", "number", "string"]}, "expected_class": null},
+        {"schema": {"type": ["number", "string"]}, "expected_class": null},
+        {"schema": {"type": ["null", "boolean"]}, "expected_class": null},
+        {"schema": {"type": ["null", "integer"], "format": "singer.year"}, "expected_class": null},
+        {
+          "schema": {
+            "type": ["null", "string"],
+            "format": "singer.decimal",
+            "decimal": {"precision": 10, "scale": 2}
+          },
+          "expected_class": null
+        }
+      ],
+      "level_zero_column_names": [
+        {"name_repeat": "Email", "name_times": 1, "expected_column": "EMAIL"},
+        {"name_repeat": "c", "name_times": 254, "expected_column": "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC"},
+        {"name_repeat": "c", "name_times": 255, "expected_column": "CCC"},
+        {"name_repeat": "very_long_property_name_", "name_times": 12, "expected_column": "VLPNVLPNVLPNVLPNVLPNVLPNVLPNVLPNVLPNVLPNVLPNVLPN_"},
+        {"name_repeat": "field_1_", "name_times": 40, "expected_column": "F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1_"},
+        {"name_repeat": "SomeCamelCaseName", "name_times": 16, "expected_column": "SCCNSCCNSCCNSCCNSCCNSCCNSCCNSCCNSCCNSCCNSCCNSCCNSCCNSCCNSCCNSCCN"}
+      ],
+      "top_level_splits": [
+        {"schema": {"type": ["null", "object"], "properties": {"city": {"type": ["null", "string"]}}}, "max_level": 10, "expected_split": true},
+        {"schema": {"type": ["null", "object"], "properties": {"city": {"type": ["null", "string"]}}}, "max_level": 0, "expected_split": false},
+        {"schema": {"type": ["null", "object"]}, "max_level": 10, "expected_split": false},
+        {"schema": {"type": ["null", "array", "object"], "properties": {"city": {"type": ["null", "string"]}}}, "max_level": 10, "expected_split": false},
+        {"schema": {"type": ["null", "string"]}, "max_level": 10, "expected_split": false},
+        {"schema": {"type": ["null", "string", "array"], "format": "singer.json", "items": {"$ref": "#/definitions/sdc_recursive_decimal_100_38_array"}}, "max_level": 10, "expected_split": false},
+        {"schema": {"anyOf": [{"type": "null"}, {"type": "object", "properties": {"city": {"type": ["null", "string"]}}}]}, "max_level": 1, "expected_split": true},
+        {"schema": {"anyOf": [{"type": "string"}, {"type": "object", "properties": {"city": {"type": ["null", "string"]}}}]}, "max_level": 1, "expected_split": false},
+        {"schema": {"oneOf": [{"type": "object", "properties": {"city": {"type": ["null", "string"]}}}]}, "max_level": 10, "expected_split": false}
+      ]
     }
   }
 }

@@ -65,6 +65,10 @@ def get_max_pk_values(cursor, catalog_entry):
 
     key_properties = common.get_key_properties(catalog_entry)
     escaped_columns = [common.escape(c) for c in key_properties]
+    select_columns = [
+        common.float_select_expression(escaped) if common.is_float_column(catalog_entry, key) else escaped
+        for key, escaped in zip(key_properties, escaped_columns)
+    ]
 
     sql = """SELECT {}
                FROM {}.{}
@@ -72,7 +76,7 @@ def get_max_pk_values(cursor, catalog_entry):
               LIMIT 1
     """
 
-    select_column_clause = ", ".join(escaped_columns)
+    select_column_clause = ", ".join(select_columns)
     order_column_clause = ", ".join([primary_key + " DESC" for primary_key in escaped_columns])
 
     cursor.execute(sql.format(select_column_clause,

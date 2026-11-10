@@ -57,13 +57,13 @@ def test_discovery_decodes_postgres_signed_numeric_scale(encoded, expected):
     assert schema['decimal'] == {'precision': 10, 'scale': expected}
 
 
-def test_disabled_and_approximate_schema_are_unchanged():
+def test_disabled_schema_is_unchanged_and_approximate_schema_only_adds_string_tokens():
     legacy = discovery_utils.schema_for_column(column())
     assert legacy['type'] == ['null', 'number']
     assert legacy['multipleOf'] == 1e-18
     assert 'decimal' not in legacy
     assert discovery_utils.schema_for_column(column(sql_type='double precision'), 'snowflake') == {
-        'type': ['null', 'number'],
+        'type': ['null', 'number', 'string'],
     }
 
 
@@ -109,7 +109,7 @@ def test_wal_numeric_strings_restore_ordinary_types_and_keep_json_boolean_null()
 @pytest.mark.parametrize('target', ['snowflake', 'postgres', None])
 def test_numeric_wal_strings_are_requested_only_for_enabled_routes(target):
     cursor = MagicMock()
-    logical_replication._start_replication(cursor, [stream()], 'slot', 123, 160000, target)
+    logical_replication._start_replication(cursor, [stream()], 'slot', 123, target)
     options = cursor.start_replication.call_args.kwargs['options']
     assert options.get('numeric-data-types-as-string') is (True if target else None)
 
@@ -120,7 +120,7 @@ def test_old_wal2json_numeric_option_retries_once_without_discarding_other_optio
         psycopg2.errors.InvalidParameterValue('unbekannte Ausgabeoption'), None,
     ]
     with patch.object(logical_replication.LOGGER, 'warning') as warning:
-        logical_replication._start_replication(cursor, [stream()], 'slot', 123, 160000, 'postgres')
+        logical_replication._start_replication(cursor, [stream()], 'slot', 123, 'postgres')
     first, second = [call.kwargs for call in cursor.start_replication.call_args_list]
     assert first['options']['numeric-data-types-as-string'] is True
     assert second['options'] == {key: value for key, value in first['options'].items()
@@ -134,7 +134,7 @@ def test_other_replication_errors_do_not_trigger_numeric_compatibility_retry():
     cursor = MagicMock()
     cursor.start_replication.side_effect = error
     with pytest.raises(type(error)):
-        logical_replication._start_replication(cursor, [stream()], 'slot', 123, 160000, 'postgres')
+        logical_replication._start_replication(cursor, [stream()], 'slot', 123, 'postgres')
     cursor.start_replication.assert_called_once()
 
 
@@ -144,7 +144,7 @@ def test_invalid_parameter_retry_failure_is_propagated_after_one_retry():
     second = psycopg2.errors.InvalidParameterValue('opzione ancora non valida')
     cursor.start_replication.side_effect = [first, second]
     with pytest.raises(psycopg2.errors.InvalidParameterValue) as error:
-        logical_replication._start_replication(cursor, [stream()], 'slot', 123, 160000, 'postgres')
+        logical_replication._start_replication(cursor, [stream()], 'slot', 123, 'postgres')
     assert error.value is second
     assert cursor.start_replication.call_count == 2
 

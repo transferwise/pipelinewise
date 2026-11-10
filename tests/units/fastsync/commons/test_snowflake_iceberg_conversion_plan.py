@@ -1,0 +1,537 @@
+"""Planning and classification of a tap's tables for native-to-Iceberg conversion."""
+
+from types import SimpleNamespace
+from unittest.mock import patch
+
+import pytest
+import snowflake.connector as snowflake_connector
+
+from pipelinewise.fastsync.commons import snowflake_iceberg_conversion_plan as plan
+from pipelinewise.fastsync.commons.snowflake_iceberg_converter import EVENTUAL_ICEBERG
+from pipelinewise.fastsync.commons.snowflake_iceberg_coordination import RecoveryCoordinator
+from pipelinewise.fastsync.commons.snowflake_iceberg_inspection import (
+    SHOW_COMMAND_ROW_LIMIT,
+    SnowflakeTableInspector,
+)
+from pipelinewise.fastsync.commons.snowflake_iceberg_model import (
+    IcebergColumn,
+    IcebergTableSpec,
+    SnowflakeObjectName,
+)
+from pipelinewise.fastsync.commons.snowflake_iceberg_recovery import (
+    TableFormatDiscoveryError,
+)
+from tests.units.fastsync.commons.snowflake_iceberg_test_helpers import (
+    FakeSnowflake as ScriptedSnowflake,
+    make_attempt,
+)
+from tests.units.fastsync.commons.test_snowflake_iceberg_converter import (
+    FakeSnowflake,
+    _converter,
+    _manifest_files,
+)
+
+
+TARGET_CONFIG = {
+    'dbname': 'database',
+    'schema_mapping': {'public': {'target_schema': 'schema'}},
+}
+
+
+def _stream(stream_id, properties=None, selected=True):
+    return {
+        'tap_stream_id': stream_id,
+        'schema': {'properties': properties or {}},
+        'metadata': [{'breadcrumb': [], 'metadata': {'selected': selected}}],
+    }
+
+
+def _row(name, is_iceberg=False, rows='10', bytes_='2048'):
+    return {'name': name, 'is_iceberg': 'Y' if is_iceberg else 'N', 'rows': rows, 'bytes': bytes_}
+
+
+def _classify(tmp_path, targets, listing):
+    snowflake = ScriptedSnowflake([listing])
+    classified = plan.classify_conversion_targets(
+        targets,
+        SnowflakeTableInspector(snowflake),
+        RecoveryCoordinator(str(tmp_path)),
+    )
+    return snowflake, classified
+
+
+def _target(table):
+    return plan.ConversionTarget(f'public-{table.lower()}', SnowflakeObjectName('DATABASE', 'SCHEMA', table))
+
+
+@pytest.mark.parametrize(
+    ('stream_id', 'config', 'expected'),
+    [
+        ('public-orders', TARGET_CONFIG, ('DATABASE', 'SCHEMA', 'ORDERS')),
+        ('orders', {'dbname': 'database', 'default_target_schema': ' raw '}, ('DATABASE', 'RAW', 'ORDERS')),
+        ('db-public-order_items', TARGET_CONFIG, ('DATABASE', 'SCHEMA', 'ORDER_ITEMS')),
+        ('public-my.table', TARGET_CONFIG, ('DATABASE', 'SCHEMA', 'MY_TABLE')),
+        (
+            'other-orders',
+            {**TARGET_CONFIG, 'default_target_schema': 'fallback'},
+            ('DATABASE', 'FALLBACK', 'ORDERS'),
+        ),
+        ('public-orders', {**TARGET_CONFIG, 'dbname': '"Mixed""Db"'}, ('Mixed"Db', 'SCHEMA', 'ORDERS')),
+    ],
+)
+def test_singer_target_table_mirrors_target_snowflake(stream_id, config, expected):
+    """Stream parsing, schema mapping, and table names match the connector; a quoted dbname follows the converter."""
+    table = plan.singer_target_table(stream_id, config)
+
+    assert (table.database, table.schema, table.table) == expected
+
+
+def test_missing_target_schema_blocks_planning():
+    """A stream without a configured target schema cannot be planned."""
+    targets = plan.plan_conversion_targets(
+        {'streams': [_stream('other-orders')]},
+        TARGET_CONFIG,
+        ['other-orders'],
+        fastsync_capable=False,
+    )
+
+    assert targets[0].table is None
+    assert 'No target schema is configured for stream other-orders' in targets[0].blockers[0]
+
+
+@pytest.mark.parametrize('fastsync_capable', [True, False])
+def test_writer_name_disagreement_blocks_only_fastsync_taps(fastsync_capable):
+    """A stream whose FastSync and Singer tables differ cannot be converted safely."""
+    targets = plan.plan_conversion_targets(
+        {'streams': [_stream('public-my.table')]},
+        {**TARGET_CONFIG, 'default_target_schema': 'fallback'},
+        ['public-my.table'],
+        fastsync_capable,
+    )
+
+    assert targets[0].table.key == 'DATABASE.SCHEMA.MY_TABLE'
+    if fastsync_capable:
+        assert targets[0].blockers == (
+            'FastSync writes DATABASE.FALLBACK.TABLE but Singer writes DATABASE.SCHEMA.MY_TABLE; '
+            'conversion cannot choose between them',
+        )
+    else:
+        assert targets[0].blockers == ()
+
+
+def test_a_fastsync_naming_failure_keeps_the_singer_table():
+    """A table Singer can name stays planned, so its recovery state is found and restored before refusing."""
+    targets = plan.plan_conversion_targets(
+        {'streams': [_stream('public-my.table')]}, TARGET_CONFIG, ['public-my.table'], fastsync_capable=True,
+    )
+
+    assert targets[0].table.key == 'DATABASE.SCHEMA.MY_TABLE'
+    assert len(targets[0].blockers) == 1
+    assert targets[0].blockers[0].startswith('FastSync cannot name the table of stream public-my.table: ')
+
+
+def test_a_singer_naming_failure_keeps_the_fastsync_table():
+    """A table only FastSync can name stays planned, with the Singer failure as its blocker."""
+    config = {'dbname': 'database', 'schema_mapping': {'db': {'target_schema': 'raw'}}}
+
+    targets = plan.plan_conversion_targets({}, config, ['db-public-orders'], fastsync_capable=True)
+
+    assert targets[0].table.key == 'DATABASE.RAW.PUBLIC-ORDERS'
+    assert targets[0].blockers == ('No target schema is configured for stream db-public-orders',)
+
+
+def test_written_tables_keep_every_name_a_writer_can_resolve():
+    """Another tap's Singer destination still counts when its FastSync name cannot be resolved."""
+    targets = plan.plan_written_tables({}, TARGET_CONFIG, ['public-my.table'], fastsync_capable=True)
+
+    assert [target.table.key for target in targets] == ['DATABASE.SCHEMA.MY_TABLE']
+
+
+@pytest.mark.parametrize('fastsync_capable', [True, False])
+def test_written_tables_cover_every_name_another_tap_writes(fastsync_capable):
+    """Another tap writes both its FastSync and Singer tables; an unnamed stream writes nothing."""
+    targets = plan.plan_written_tables(
+        {'streams': [_stream('public-my.table', {'doc': {'type': ['null', 'object']}})]},
+        {**TARGET_CONFIG, 'default_target_schema': 'fallback'},
+        ['public-my.table', 'public-my.table'],
+        fastsync_capable,
+    )
+    unnamed = plan.plan_written_tables({}, {'dbname': 'database'}, ['other-orders'], fastsync_capable)
+
+    expected = ['DATABASE.FALLBACK.TABLE', 'DATABASE.SCHEMA.MY_TABLE'] if fastsync_capable else [
+        'DATABASE.SCHEMA.MY_TABLE'
+    ]
+    assert [(target.stream_id, target.table.key) for target in targets] == [
+        ('public-my.table', key) for key in expected
+    ]
+    assert all(target.writer_types == {'DOC': 'VARIANT'} for target in targets)
+    assert unnamed == []
+
+
+@pytest.mark.parametrize(
+    ('second', 'expected'),
+    [
+        ({'account': 'ACC', 'dbname': 'analytics'}, True),
+        ({'account': 'acc', 'dbname': '"ANALYTICS"'}, True),
+        ({'account': 'acc', 'dbname': '"analytics"'}, False),
+        ({'account': 'other', 'dbname': 'analytics'}, False),
+        ({'account': 'acc'}, False),
+    ],
+)
+def test_same_snowflake_database_compares_account_and_database(second, expected):
+    """Targets share a database when the account and the resolved database name match."""
+    assert plan.same_snowflake_database({'account': 'acc', 'dbname': 'ANALYTICS'}, second) is expected
+
+
+def test_plan_records_catalog_text_and_variant_columns():
+    """Level-0 catalog properties become the TEXT/VARIANT classes the writers expect."""
+    catalog = {'streams': [_stream('public-orders', {
+        'id': {'type': ['integer']},
+        'note': {'type': ['null', 'string']},
+        'attributes': {'type': ['null', 'object'], 'properties': {}},
+        'updated_at': {'type': ['null', 'string'], 'format': 'date-time'},
+    })]}
+
+    targets = plan.plan_conversion_targets(catalog, TARGET_CONFIG, ['public-orders'], True)
+
+    assert targets[0].writer_types == {'NOTE': plan.TEXT, 'ATTRIBUTES': plan.VARIANT}
+
+
+def test_plan_records_shortened_column_names_for_long_properties():
+    """A property name of 255 or more characters is checked under the column the connector writes."""
+    long_name = 'very_long_property_name_' * 12
+    catalog = {'streams': [_stream('public-orders', {long_name: {'type': ['null', 'object'], 'properties': {}}})]}
+
+    targets = plan.plan_conversion_targets(catalog, TARGET_CONFIG, ['public-orders'], True)
+
+    assert targets[0].writer_types == {'VLPN' * 12 + '_': plan.VARIANT}
+
+
+def test_selected_stream_ids_use_root_metadata():
+    """Only streams selected at the root breadcrumb are planned."""
+    catalog = {'streams': [
+        _stream('public-orders'),
+        _stream('public-users', selected=False),
+        {'tap_stream_id': 'public-events', 'metadata': []},
+    ]}
+
+    assert plan.selected_stream_ids(catalog) == ['public-orders']
+
+
+def test_text_variant_blockers_compare_native_classes():
+    """A native TEXT column the catalog now maps to VARIANT is reported, and vice versa."""
+    columns = [
+        SimpleNamespace(name='ATTRIBUTES', data_type='TEXT'),
+        SimpleNamespace(name='PAYLOAD', data_type='VARIANT'),
+        SimpleNamespace(name='NOTE', data_type='TEXT'),
+        SimpleNamespace(name='ID', data_type='NUMBER'),
+    ]
+    writer_types = {'ATTRIBUTES': plan.VARIANT, 'PAYLOAD': plan.TEXT, 'NOTE': plan.TEXT, 'ID': plan.TEXT}
+
+    assert plan.text_variant_blockers(columns, writer_types) == [
+        'Column ATTRIBUTES is TEXT but the tap catalog maps it to VARIANT; '
+        'the Iceberg writers would refuse the converted table',
+        'Column PAYLOAD is VARIANT but the tap catalog maps it to TEXT; '
+        'the Iceberg writers would refuse the converted table',
+    ]
+
+
+def test_classification_uses_one_listing_per_schema(tmp_path):
+    """Each planned table is classified from one SHOW TABLES and no local locks."""
+    listing = [
+        _row('ORDERS'),
+        _row('USERS', is_iceberg=True, rows='5', bytes_='1024'),
+        _row('STAGED'),
+        _row('STAGED_ICEBERG', is_iceberg=True),
+        _row('BACKED'),
+        _row('BACKED_NATIVE'),
+        _row('GHOST_NATIVE'),
+    ]
+    targets = [_target(name) for name in ('ORDERS', 'USERS', 'NEW_TABLE', 'STAGED', 'BACKED', 'GHOST')]
+
+    snowflake, classified = _classify(tmp_path, targets, listing)
+
+    assert [query for query, _, _ in snowflake.queries] == [
+        'SHOW TABLES IN SCHEMA "DATABASE"."SCHEMA" LIMIT 10000'
+    ]
+    assert [(item.target.table.table, item.state, item.primary) for item in classified] == [
+        ('ORDERS', plan.STATE_NATIVE, 'native'),
+        ('USERS', plan.STATE_ICEBERG, 'iceberg'),
+        ('NEW_TABLE', plan.STATE_NEW, 'missing'),
+        ('STAGED', plan.STATE_BLOCKED, 'native'),
+        ('BACKED', plan.STATE_BLOCKED, 'native'),
+        ('GHOST', plan.STATE_BLOCKED, 'missing'),
+    ]
+    assert (classified[1].rows, classified[1].bytes) == (5, 1024)
+    assert (classified[2].rows, classified[2].bytes) == (None, None)
+    assert 'STAGED_ICEBERG" is an Iceberg table without a conversion manifest' in classified[3].reasons[0]
+    assert 'BACKED_NATIVE" already exists' in classified[4].reasons[0]
+    assert 'companion exists without a conversion manifest' in classified[5].reasons[0]
+    assert not list(tmp_path.iterdir())
+
+
+def test_fastsync_rebuilds_a_missing_table_beside_leftover_companions(tmp_path):
+    """FastSync reloads a missing table from its source, so companions do not block it."""
+    snowflake = ScriptedSnowflake([[_row('GHOST_NATIVE'), _row('GHOST_ICEBERG', is_iceberg=True)]])
+
+    classified = plan.classify_conversion_targets(
+        [_target('GHOST')],
+        SnowflakeTableInspector(snowflake),
+        RecoveryCoordinator(str(tmp_path)),
+        fastsync_rebuild=True,
+    )
+
+    assert classified[0].state == plan.STATE_NEW
+
+
+def test_missing_schema_classifies_every_table_as_new(tmp_path):
+    """Tables in a schema that does not exist yet are created by the writers."""
+    snowflake = ScriptedSnowflake([
+        snowflake_connector.errors.ProgrammingError(msg='Schema does not exist', errno=2043),
+        [],
+    ])
+
+    classified = plan.classify_conversion_targets(
+        [_target('ORDERS')],
+        SnowflakeTableInspector(snowflake),
+        RecoveryCoordinator(str(tmp_path)),
+    )
+
+    assert classified[0].state == plan.STATE_NEW
+
+
+@pytest.mark.parametrize(
+    ('eventual', 'state'),
+    [(EVENTUAL_ICEBERG, plan.STATE_PENDING), ('native', plan.STATE_BLOCKED)],
+)
+def test_pending_manifest_classification(tmp_path, eventual, state):
+    """An eventual=iceberg manifest resumes; an eventual=native one needs the operator."""
+    snowflake = FakeSnowflake()
+    snowflake.staging_evidence = (2, 54321)
+    with pytest.raises(Exception, match='does not match'):
+        _converter(tmp_path, snowflake).convert('database.schema.table', eventual=eventual)
+    assert len(_manifest_files(tmp_path)) == 1
+
+    _, classified = _classify(
+        tmp_path,
+        [_target('TABLE')],
+        [_row('TABLE'), _row('TABLE_ICEBERG', is_iceberg=True)],
+    )
+
+    assert classified[0].state == state
+    if state == plan.STATE_BLOCKED:
+        assert 'with --eventual native is pending' in classified[0].reasons[0]
+
+
+def test_unreadable_manifest_blocks(tmp_path):
+    """Recovery state that cannot be read stops classification for that table."""
+    snowflake = FakeSnowflake()
+    snowflake.staging_evidence = (2, 54321)
+    with pytest.raises(Exception, match='does not match'):
+        _converter(tmp_path, snowflake).convert('database.schema.table')
+    _manifest_files(tmp_path)[0].write_text('{', encoding='utf-8')
+
+    _, classified = _classify(tmp_path, [_target('TABLE')], [_row('TABLE')])
+
+    assert classified[0].state == plan.STATE_BLOCKED
+    assert 'Cannot read Iceberg recovery manifest' in classified[0].reasons[0]
+
+
+def test_fastsync_pointer_on_native_table_blocks(tmp_path):
+    """A pending FastSync attempt on a native table is inconsistent and needs inspection."""
+    store = SimpleNamespace(peek=lambda: (None, object()))
+    with patch.object(RecoveryCoordinator, 'recovery_store', return_value=store):
+        _, classified = _classify(tmp_path, [_target('TABLE')], [_row('TABLE')])
+
+    assert classified[0].state == plan.STATE_BLOCKED
+    assert 'FastSync Iceberg attempt is pending' in classified[0].reasons[0]
+
+
+def test_truncated_schema_listing_falls_back_to_each_table(tmp_path):
+    """A schema at Snowflake's SHOW limit is read per table, including its companions."""
+    truncated = [{'name': f'T{index}', 'is_iceberg': 'N'} for index in range(SHOW_COMMAND_ROW_LIMIT)]
+    snowflake = ScriptedSnowflake([truncated, [_row('ORDERS'), _row('ORDERS_ICEBERG', is_iceberg=True)], []])
+
+    classified = plan.classify_conversion_targets(
+        [_target('ORDERS'), _target('USERS')],
+        SnowflakeTableInspector(snowflake),
+        RecoveryCoordinator(str(tmp_path)),
+    )
+
+    assert [query for query, _, _ in snowflake.queries] == [
+        'SHOW TABLES IN SCHEMA "DATABASE"."SCHEMA" LIMIT 10000',
+        'SHOW TABLES IN SCHEMA "DATABASE"."SCHEMA" STARTS WITH \'ORDERS\' LIMIT 10000',
+        'SHOW TABLES IN SCHEMA "DATABASE"."SCHEMA" STARTS WITH \'USERS\' LIMIT 10000',
+    ]
+    assert [item.state for item in classified] == [plan.STATE_BLOCKED, plan.STATE_NEW]
+
+
+def test_truncated_table_listing_fails_closed(tmp_path):
+    """A table whose own prefix listing is truncated cannot be classified safely."""
+    truncated = [{'name': f'T{index}', 'is_iceberg': 'N'} for index in range(SHOW_COMMAND_ROW_LIMIT)]
+    inspector = SnowflakeTableInspector(ScriptedSnowflake([truncated, truncated]))
+
+    with pytest.raises(TableFormatDiscoveryError, match='too many tables starting with'):
+        plan.classify_conversion_targets([_target('T')], inspector, RecoveryCoordinator(str(tmp_path)))
+
+
+def test_peek_reads_recovery_state_without_a_lock(tmp_path):
+    """Read-only reports see the manifest without creating lock files."""
+    snowflake = FakeSnowflake()
+    snowflake.staging_evidence = (2, 54321)
+    with pytest.raises(Exception, match='does not match'):
+        _converter(tmp_path, snowflake).convert('database.schema.table')
+    for lock in tmp_path.glob('*.lock'):
+        lock.unlink()
+
+    store = RecoveryCoordinator(str(tmp_path)).recovery_store(SnowflakeObjectName('DATABASE', 'SCHEMA', 'TABLE'))
+    manifest, pointer = store.peek()
+
+    assert manifest.kind == 'manual_conversion'
+    assert pointer is None
+    assert not list(tmp_path.glob('*.lock'))
+
+
+def test_companion_names_of_planned_tables_block_conversion(tmp_path):
+    """Two streams whose tables are T and T_NATIVE can never convert into each other."""
+    _, classified = _classify(
+        tmp_path,
+        [_target('ADS'), _target('ADS_NATIVE')],
+        [_row('ADS'), _row('ADS_NATIVE')],
+    )
+
+    assert [item.state for item in classified] == [plan.STATE_BLOCKED, plan.STATE_BLOCKED]
+    assert classified[0].reasons[0].startswith(
+        '"DATABASE"."SCHEMA"."ADS_NATIVE" is the table of stream public-ads_native'
+    )
+    assert classified[1].reasons[0].startswith(
+        '"DATABASE"."SCHEMA"."ADS_NATIVE" uses the _NATIVE name that conversion reserves'
+    )
+
+
+def test_a_retained_backup_selected_later_is_never_converted(tmp_path):
+    """A new stream that maps onto another table's native backup is blocked, not converted."""
+    _, classified = _classify(
+        tmp_path,
+        [_target('ADS_NATIVE')],
+        [_row('ADS', is_iceberg=True), _row('ADS_NATIVE')],
+    )
+
+    assert classified[0].state == plan.STATE_BLOCKED
+    assert 'reserves for "DATABASE"."SCHEMA"."ADS"' in classified[0].reasons[0]
+
+
+def test_an_unmanifested_iceberg_copy_needs_inspection_before_any_drop(tmp_path):
+    """Advice to drop or promote an Iceberg copy comes only after finding out what it holds."""
+    _, classified = _classify(
+        tmp_path, [_target('EVENTS')], [_row('EVENTS'), _row('EVENTS_ICEBERG', is_iceberg=True)],
+    )
+
+    assert classified[0].state == plan.STATE_BLOCKED
+    assert classified[0].reasons[0].startswith(
+        '"DATABASE"."SCHEMA"."EVENTS_ICEBERG" is an Iceberg table without a conversion manifest. '
+        'Find out what it holds.'
+    )
+
+
+def test_another_streams_live_table_is_never_advised_to_be_dropped(tmp_path):
+    """When a planned table holds the _ICEBERG name, only the collision is reported."""
+    _, classified = _classify(
+        tmp_path,
+        [_target('EVENTS'), _target('EVENTS_ICEBERG')],
+        [_row('EVENTS'), _row('EVENTS_ICEBERG', is_iceberg=True)],
+    )
+
+    assert classified[0].state == plan.STATE_BLOCKED
+    assert len(classified[0].reasons) == 1
+    assert classified[0].reasons[0].startswith(
+        '"DATABASE"."SCHEMA"."EVENTS_ICEBERG" is the table of stream public-events_iceberg'
+    )
+
+
+def test_an_interrupted_cutover_stays_resumable_behind_planning_blockers(tmp_path):
+    """A blocked stream's interrupted cutover is still resumed, so its name returns before it stops."""
+    snowflake = FakeSnowflake()
+    snowflake.fail_promotion = RuntimeError('promotion rejected')
+    with pytest.raises(RuntimeError, match='promotion rejected'):
+        _converter(tmp_path, snowflake).convert('database.schema.table', eventual=EVENTUAL_ICEBERG)
+    target = plan.ConversionTarget(
+        'public-table', SnowflakeObjectName('DATABASE', 'SCHEMA', 'TABLE'), blockers=('names differ',),
+    )
+
+    _, absent = _classify(tmp_path, [target], [_row('TABLE_NATIVE'), _row('TABLE_ICEBERG', is_iceberg=True)])
+    _, present = _classify(tmp_path, [target], [_row('TABLE'), _row('TABLE_ICEBERG', is_iceberg=True)])
+
+    assert (absent[0].state, absent[0].reasons, absent[0].primary) == (plan.STATE_PENDING, ('names differ',), 'missing')
+    assert (present[0].state, present[0].reasons) == (plan.STATE_BLOCKED, ('names differ',))
+
+
+@pytest.mark.parametrize('kind', ['manifest', 'pointer'])
+def test_peek_treats_recovery_state_deleted_mid_read_as_absent(tmp_path, kind):
+    """A writer that deletes a recovery file between the check and the read never blocks the table."""
+    store = RecoveryCoordinator(str(tmp_path)).recovery_store(SnowflakeObjectName('DATABASE', 'SCHEMA', 'TABLE'))
+    path = store.path if kind == 'manifest' else store.fastsync_target_pointer_path
+    with open(path, 'w', encoding='utf-8') as recovery_file:
+        recovery_file.write('{}')
+
+    with patch(
+        'pipelinewise.fastsync.commons.snowflake_iceberg_model.open', create=True, side_effect=FileNotFoundError(path),
+    ):
+        assert store.peek() == (None, None)
+
+
+@pytest.mark.parametrize(
+    ('state', 'primary', 'expected_state'),
+    [
+        (plan.STATE_PENDING, 'missing', plan.STATE_PENDING),
+        (plan.STATE_PENDING, 'native', plan.STATE_BLOCKED),
+        (plan.STATE_PENDING, 'iceberg', plan.STATE_BLOCKED),
+        (plan.STATE_NATIVE, 'native', plan.STATE_BLOCKED),
+        (plan.STATE_BLOCKED, 'missing', plan.STATE_BLOCKED),
+    ],
+)
+def test_refusals_block_every_table_except_an_interrupted_cutover(state, primary, expected_state):
+    """Only an absent name stays resumable, so the converter can restore it before refusing."""
+    item = plan.ClassifiedTarget(_target('T'), state, ('earlier',), None, None, primary)
+
+    refused = plan.with_refusals(item, ['first', 'earlier'])
+
+    assert (refused.state, refused.reasons) == (expected_state, ('first', 'earlier'))
+    assert plan.with_refusals(item, []) is item
+
+
+def test_a_native_iceberg_named_table_is_never_called_stale(tmp_path):
+    """A native table at the _ICEBERG name is not a conversion copy, so it is never dropped."""
+    _, classified = _classify(tmp_path, [_target('EVENTS')], [_row('EVENTS'), _row('EVENTS_ICEBERG')])
+
+    assert classified[0].state == plan.STATE_BLOCKED
+    assert classified[0].reasons == (
+        '"DATABASE"."SCHEMA"."EVENTS_ICEBERG" is a native table, and conversion needs that name '
+        'for its Iceberg copy. Find out what it holds before renaming it',
+    )
+
+
+@pytest.mark.parametrize(
+    ('listing', 'expected'),
+    [([_row('TABLE', is_iceberg=True)], plan.STATE_ICEBERG), ([], plan.STATE_NEW)],
+)
+@pytest.mark.parametrize('fastsync_rebuild', [True, False])
+def test_interrupted_fastsync_publication_can_resume(tmp_path, listing, expected, fastsync_rebuild):
+    """A FastSync pointer beside a missing or Iceberg primary never blocks its own resume."""
+    spec = IcebergTableSpec(
+        SnowflakeObjectName('DATABASE', 'SCHEMA', 'TABLE'),
+        (IcebergColumn('ID', 'NUMBER(38,0)', False),),
+        ('ID',),
+    )
+    RecoveryCoordinator(str(tmp_path)).persist_new_attempt(make_attempt(spec))
+    store = RecoveryCoordinator(str(tmp_path)).recovery_store(spec.name)
+    assert store.peek()[1] is not None
+
+    classified = plan.classify_conversion_targets(
+        [_target('TABLE')],
+        SnowflakeTableInspector(ScriptedSnowflake([listing])),
+        RecoveryCoordinator(str(tmp_path)),
+        fastsync_rebuild=fastsync_rebuild,
+    )
+
+    assert classified[0].state == expected

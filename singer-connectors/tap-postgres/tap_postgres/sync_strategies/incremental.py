@@ -9,6 +9,7 @@ from singer import metrics
 from singer.decimal_support import decimal_bookmark, is_decimal_schema
 
 import tap_postgres.db as post_db
+from tap_postgres.discovery_utils import FLOAT_TYPES
 
 
 LOGGER = singer.get_logger('tap_postgres')
@@ -46,7 +47,9 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
 
     schema_name = md_map.get(()).get('schema-name')
 
-    escaped_columns = map(partial(post_db.prepare_columns_for_select_sql, md_map=md_map), desired_columns)
+    properties = stream.get('schema', {}).get('properties')
+    escaped_columns = map(partial(post_db.prepare_columns_for_select_sql, md_map=md_map, properties=properties),
+                          desired_columns)
 
     activate_version_message = singer.ActivateVersionMessage(
         stream=post_db.calculate_destination_stream_name(stream, md_map),
@@ -57,6 +60,7 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
     replication_key = md_map.get((), {}).get('replication-key')
     replication_key_value = singer.get_bookmark(state, stream['tap_stream_id'], 'replication_key_value')
     replication_key_sql_datatype = md_map.get(('properties', replication_key)).get('sql-datatype')
+    float_key = replication_key_sql_datatype in FLOAT_TYPES
     key_schema = stream.get('schema', {}).get('properties', {}).get(replication_key, {})
     if replication_key_value is not None and is_decimal_schema(key_schema):
         # A stored exact bookmark can remain outside a later, narrower typmod.
@@ -123,7 +127,7 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
 
                     #Picking a replication_key with NULL values will result in it ALWAYS been synced which is not great
                     #event worse would be allowing the NULL value to enter into the state
-                    if record_message.record[replication_key] is not None:
+                    if _is_bookmark_value(record_message.record[replication_key], float_key):
                         state = singer.write_bookmark(state,
                                                       stream['tap_stream_id'],
                                                       'replication_key_value',
@@ -135,6 +139,11 @@ def sync_table(conn_info, stream, state, desired_columns, md_map):
                     counter.increment()
 
     return state
+
+
+def _is_bookmark_value(value, float_key):
+    """Keep the last finite float bookmark, so rows with nonfinite keys are read again on every run."""
+    return value is not None and not (float_key and post_db.is_nonfinite_float_token(value))
 
 
 def _get_select_sql(params):

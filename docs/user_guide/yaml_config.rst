@@ -183,6 +183,24 @@ Tap configuration
      - No
      - Global channel
      - Adds a tap-specific Slack destination; must start with ``#``.
+   * - ``native_to_iceberg_conversion``
+     - No
+     - Omitted
+     - Object with a Boolean ``enabled`` and an optional
+       ``conversion_warehouse``. With ``enabled: true``, ``run_tap`` converts
+       the tap's existing native Snowflake tables to managed Iceberg v3 before
+       it replicates. ``enabled: true`` is valid only with
+       ``target_table_format: iceberg``, ``iceberg_version: 3``, a
+       ``target-snowflake`` target, and an effective
+       ``data_flattening_max_level`` of ``0``. Any tap accepts
+       ``enabled: false``, for example to run the report on
+       ``conversion_warehouse`` before the switch. ``conversion_warehouse`` runs
+       only the conversion work and the tap's report on another Snowflake
+       warehouse. With ``enabled: false``, ``run_tap`` neither converts nor
+       resumes a pending conversion. Only PipelineWise reads the setting, from
+       its main configuration; it never reaches the target connector or
+       ``inheritable_config.json``. Configure it at the tap root, not in
+       ``db_conn`` or the target. See :ref:`snowflake_iceberg_auto_conversion`.
    * - ``add_metadata_columns``
      - No
      - ``false``
@@ -284,8 +302,9 @@ wait for the corresponding loads to finish before acknowledging their state.
    FastSync-capable taps require ``data_flattening_max_level: 0``. Singer-only
    sources retain their normal flattening setting, including Salesforce's
    default level ``10``.
-   Native remains the default, and PipelineWise does not convert an existing
-   table when the requested format conflicts. Every managed Iceberg version
+   Native remains the default. PipelineWise converts an existing native table
+   only when the tap enables ``native_to_iceberg_conversion``; otherwise a
+   conflicting format fails before mutation. Every managed Iceberg version
    other than v3 is rejected before mutation. See :ref:`snowflake_iceberg`.
 
    Managed Iceberg selection is tap-level. Target YAML rejects these keys and

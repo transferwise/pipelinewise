@@ -390,6 +390,33 @@ def create_column_metadata(cols: List[Column]):
     return metadata.to_list(mdata)
 
 
+def _with_live_column_types(saved_metadata, discovered_metadata, columns):
+    """Describe the resolved columns with live discovery's types, keeping all other saved metadata.
+
+    The resolved schema is live, so a saved type can describe an earlier column version: a column altered from
+    DOUBLE to FLOAT before rediscovery would keep 'double' and load six-digit FLOAT text.
+
+    Args:
+        saved_metadata: Metadata list of the input catalog entry; it is not modified.
+        discovered_metadata: Metadata list from live discovery of the same table.
+        columns: Column names the resolved schema keeps.
+
+    Returns:
+        A new metadata list.
+    """
+    resolved = {breadcrumb: dict(values) for breadcrumb, values in metadata.to_map(saved_metadata).items()}
+    discovered = metadata.to_map(discovered_metadata)
+    for column in columns:
+        breadcrumb = ('properties', column)
+        live = discovered.get(breadcrumb, {})
+        if breadcrumb in resolved:
+            resolved[breadcrumb].update({key: live[key] for key in ('datatype', 'sql-datatype') if key in live})
+        elif live:
+            # A column the saved catalog never described, such as a new primary key, has no selection to keep.
+            resolved[breadcrumb] = dict(live)
+    return metadata.to_list(resolved)
+
+
 def resolve_catalog(discovered_catalog, streams_to_sync, decimal_target=None):
     result = Catalog(streams=[])
 
@@ -420,7 +447,7 @@ def resolve_catalog(discovered_catalog, streams_to_sync, decimal_target=None):
 
         result.streams.append(CatalogEntry(
             tap_stream_id=catalog_entry.tap_stream_id,
-            metadata=catalog_entry.metadata,
+            metadata=_with_live_column_types(catalog_entry.metadata, discovered_table.metadata, columns),
             stream=catalog_entry.tap_stream_id,
             table=catalog_entry.table,
             schema=Schema(

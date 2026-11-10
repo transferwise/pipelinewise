@@ -159,6 +159,15 @@ class TestCsv(unittest.TestCase):
             '1,1.5,false',
         )
 
+    def test_record_to_csv_line_quotes_nonfinite_float_tokens(self):
+        values = {'nan': 'NaN', 'inf': 'Infinity', 'ninf': '-Infinity', 'finite': 1.5, 'zero': -0.0, 'none': None}
+        schema = {name: {'type': ['null', 'number', 'string']} for name in values}
+
+        csv_line = csv.record_to_csv_line(values, schema)
+
+        self.assertEqual(csv_line, '"NaN","Infinity","-Infinity",1.5,-0.0,')
+        self.assertEqual(_read_csv_row(csv_line), ['NaN', 'Infinity', '-Infinity', '1.5', '-0.0', ''])
+
     def test_record_to_csv_line_preserves_multiline_and_escaped_characters(self):
         record = {
             'lf': 'line one\nline two',

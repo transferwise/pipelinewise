@@ -2,6 +2,7 @@
 
 import math
 import re
+import struct
 
 from .transform_utils import TransformationType
 from .snowflake_types import canonical_native_type
@@ -30,6 +31,7 @@ _INTEGER_SOURCE_TYPES = {
     'smallint', 'integer', 'bigint', 'int', 'tinyint', 'mediumint', 'smallserial', 'serial', 'bigserial',
     'bit varying', 'varbit',
 }
+_MYSQL_FLOAT_SOURCE_TYPES = {'float', 'double', 'real'}
 # Minimum VARCHAR width each operation's output needs; anything absent imposes no minimum.
 _REQUIRED_VARCHAR_WIDTH = {
     'HASH': 64,
@@ -155,11 +157,15 @@ def _base_expression(column, dialect):
         # Snowflake reads the exported bit-string digits as decimal, not binary.
         return f'({expression})::text::numeric(38, 0)'
     if column.get('target_type', '').upper().split('(', 1)[0] in {'FLOAT', 'DOUBLE', 'REAL'}:
-        if dialect == 'postgres' and column['data_type'].lower() in {'numeric', 'decimal'}:
-            return postgres_float_expression(expression)
-        return f'({expression})::text::double precision' if dialect == 'postgres' else (
-            f'(CAST(({expression}) AS CHAR CHARACTER SET utf8mb4) + 0e0)'
-        )
+        data_type = column['data_type'].lower()
+        if dialect == 'postgres':
+            if data_type in {'numeric', 'decimal'}:
+                return postgres_float_expression(expression)
+            return f'({expression})::text::double precision'
+        if data_type in _MYSQL_FLOAT_SOURCE_TYPES:
+            # Exact DOUBLE promotion: MySQL 8.0 CAST(double AS CHAR) can drop the 17th significant digit.
+            return f'(({expression}) * 1E0)'
+        return f'(CAST(({expression}) AS CHAR CHARACTER SET utf8mb4) + 0e0)'
     return expression
 
 
@@ -256,8 +262,24 @@ def _equals(expression, column, value, dialect):
     if kind == 'boolean' and isinstance(value, bool):
         return f'({expression} = {str(value).upper()})'
     if kind == 'number' and isinstance(value, (int, float)) and not isinstance(value, bool):
+        if dialect in {'mysql', 'mariadb'} and column['data_type'].lower() == 'float':
+            value = float32_literal(value)
         return f'({expression} = {value!r})'
     raise UnsupportedSourceTransformation(f'Unsupported equality type for column {column["column_name"]!r}')
+
+
+def float32_literal(value):
+    """Return the MariaDB/MySQL FLOAT nearest a numeric literal, promoted exactly to double.
+
+    Literals that rounding keeps, non-finite literals and literals beyond FLOAT's range are returned
+    unchanged; an out-of-range literal never equals a stored FLOAT.
+    """
+    try:
+        # float() first: struct reports out-of-range integers as struct.error, not OverflowError.
+        rounded = struct.unpack('<f', struct.pack('<f', float(value)))[0]
+    except OverflowError:
+        return value
+    return rounded if rounded != value and math.isfinite(rounded) else value
 
 
 def _hash(expression, dialect):

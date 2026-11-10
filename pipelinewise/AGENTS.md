@@ -50,7 +50,8 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
 - Data-diff suffixes encode lifecycle: `_definitions` versioned config,
   `_attempts` executions, `_results` execution detail, `_state` mutable
   materialized projections, `_events`/`_log` append-only history.
-- `public` is fixed across Alembic, runtime, tests, ERDs, and docs. Changing it requires a forward migration plan and synchronized updates.
+- `public` is fixed across Alembic, runtime, tests, ERDs and docs; changing it
+  requires a forward migration plan and synchronized updates.
 - Every `NNN_*.py` revision needs a matching `NNN_schema.erd.mmd` Mermaid ERD
   of the resulting `public` schema. Preserve old ERDs; show FKs on the tables diagram.
 - Migration 001 shipped in `0.78.0`; its `0.82.0` schema finalization is an
@@ -60,10 +61,12 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
 - History is append-oriented: insert preflight logs, results, and watermark
   events; control updates to definitions, run attempts, run-slot state, and
   watermark state. The database does not enforce immutability.
+- Separate backend app roles receive schema/sequence access plus SELECT, INSERT
+  and UPDATE, not DELETE/DDL. A shared app/DDL identity removes that separation.
 
 ## Runtime and data-diff constraints
 
-- PostgreSQL replication sources require 11.2 or later across Singer,
+- PostgreSQL replication sources require **14+** across Singer,
   FullSync, and PartialSync. Keep the Singer and FastSync connection gates
   aligned; only deleted-tap slot cleanup may bypass the floor. PostgreSQL
   targets, the backend, and data-diff connections are separate.
@@ -75,9 +78,6 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
   double literal tokens, e.g. `DATE_FORMAT(t, '%%Y')`.
 - SIGTERM normally does not raise `SystemExit`; durable handling needs an
   installed signal handler, and injected `SystemExit` is not proof.
-- Separate backend app roles receive schema/sequence access plus `SELECT`,
-  `INSERT`, and `UPDATE`, but no `DELETE`/DDL. A shared app/DDL identity removes
-  that separation intentionally.
 - Source preflight accepts a usable index whose first column is the timestamp
   column without counting rows. Otherwise use an exact count capped at 100,000:
   allow fewer rows, warn once per physical tap/source/table/timestamp identity
@@ -86,6 +86,21 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
   exempt. Use neither query plans nor row estimates, and require a statement
   timeout. Treat `min_key`/`max_key` values in `dd_run_results` as sensitive;
   avoid casual logging.
+
+## Decimal precision
+
+- Preserve declared NUMERIC/DECIMAL precision and scale through discovery,
+  Singer schemas, string transport, transformations, FastSync and bookmarks;
+  never round-trip exact values through float. Reuse shared decimal helpers and
+  the target limits in `docs/user_guide/schema_changes.rst`.
+- New columns use the current precise mapping. Retain legacy FLOAT columns by
+  default; `version_legacy_float_columns` versions eligible non-key columns.
+  Keep existing key types and matching staging/MERGE types rather than stopping
+  the tap. FullSync rebuilds use current mappings.
+- Prefer documented lossy fallbacks to skipping rows/columns or failing for
+  unsupported decimal dimensions/values. Preserve key identity as specified by
+  the mapping and keep unaffected routes unchanged. This fallback policy does
+  not relax conversion fidelity, transaction boundaries or recovery safety.
 
 ## Snowflake and Iceberg contract
 
@@ -100,9 +115,9 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
   Retain both through Singer
   handover/evolution. Route compatible Singer taps through target-snowflake and
   MySQL/PostgreSQL FastSync through the shared publisher; retain native
-  `SWAP WITH`. Only FastSync-capable MySQL/PostgreSQL need
-  `data_flattening_max_level: 0` (keep Singer-only defaults such as Salesforce
-  level 10).
+  `SWAP WITH`. Only FastSync-capable MySQL/PostgreSQL and taps enabling
+  `native_to_iceberg_conversion` need `data_flattening_max_level: 0` (keep
+  Singer-only defaults such as Salesforce level 10).
 - Carry `iceberg_version` through tap/generated config, publication/recovery,
   and conversion; reject non-v3 before mutation. Future versions need explicit
   branches/tests. Through executable hooks, `snowflake_iceberg_versions.py`
@@ -130,6 +145,9 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
   semantics before export. Keep range filtering on raw source columns and
   reject transformed INCREMENTAL keys before reading bookmarks. Version recovery
   identity when transformation execution semantics change.
+
+## Publication and recovery
+
 - Key recovery by stable source stream, index active attempts by physical
   target, and hold both locks throughout; reject source, target, staging, role,
   transformation, or boundary drift. `RecoveryCoordinator` owns target runtime
@@ -165,3 +183,17 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
   conversion manifest must load. Copy/validate the whole row multiset,
   including duplicate keys and representable flaws, without filtering, repair,
   or deduplication; fail before cutover if v3 cannot represent it exactly.
+  Evidence hashes projected values, so refuse `TIMESTAMP_TZ`, sub-microsecond
+  values, and unreplayable grants before any manifest or DDL. Ownership,
+  comments, and tags match exactly; source grants are a required subset, and
+  extra Iceberg grants are logged, never rolled back.
+- Automatic conversion is tap-root/core-only, inside the PID lock and before
+  writers. Resume pending attempts, restoring interrupted names before refusals;
+  block unsafe names, stale catalogs, incompatible classes and uncoordinated
+  shared writers. Preflight every native candidate before new conversions;
+  preserve completed conversions and stop replication on any failure.
+- `--preflight-only` takes no lock, manifest or DDL. `fast_sync` never converts
+  and refuses native targets before a slot reset, but may rebuild a missing
+  target beside leftover companions. Before changing conversion, read
+  `fastsync/commons/CONVERSION.md` for planning, signals, names, catalogs and
+  shared writers, and `docs/connectors/targets/snowflake_iceberg.rst` for operations.

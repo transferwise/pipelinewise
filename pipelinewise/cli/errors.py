@@ -39,3 +39,7 @@ class PartialSyncNotSupportedTypeException(Exception):
 
 class PreRunChecksException(Exception):
     """Raised if a pre check for running the commands fails"""
+
+
+class NativeToIcebergConversionException(Exception):
+    """Raised if run_tap cannot leave every selected Snowflake table new or Iceberg"""

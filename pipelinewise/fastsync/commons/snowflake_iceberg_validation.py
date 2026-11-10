@@ -2,8 +2,9 @@
 
 import hashlib
 import json
+import logging
 from dataclasses import asdict, dataclass
-from typing import Any, Callable, Dict, Iterable, Optional, Tuple
+from typing import Any, Callable, Dict, FrozenSet, Iterable, List, Optional, Tuple
 
 from pipelinewise.fastsync.commons.snowflake_iceberg import (
     IcebergColumn,
@@ -26,6 +27,19 @@ from pipelinewise.fastsync.commons.snowflake_types import SNOWFLAKE_MAX_VARCHAR_
 
 ICEBERG_V3 = MANAGED_ICEBERG_V3_SPEC.version
 ICEBERG_VARCHAR_LENGTH = SNOWFLAKE_MAX_VARCHAR_LENGTH
+# Table privileges that Snowflake also accepts on a managed Iceberg table.
+REPLAYABLE_ICEBERG_PRIVILEGES = frozenset({
+    'APPLYBUDGET',
+    'DELETE',
+    'EVOLVE SCHEMA',
+    'INSERT',
+    'REFERENCES',
+    'SELECT',
+    'TRUNCATE',
+    'UPDATE',
+})
+SUB_MICROSECOND_TYPES = ('TIME', 'TIMESTAMP_LTZ', 'TIMESTAMP_NTZ')
+LOGGER = logging.getLogger(__name__)
 CONVERSION_CUTOVER_OUTAGE_WARNING = (
     'eventual=iceberg conversion requires a controlled reader-and-writer outage '
     'for %s. The primary table name is temporarily absent during promotion and '
@@ -352,12 +366,15 @@ def _grant_signature(grant: Dict[str, Any]) -> Optional[Tuple[Any, ...]]:
     )
 
 
-def _supported_metadata_signature(metadata) -> Tuple[Any, ...]:
-    grants = tuple(sorted(
+def _grant_signatures(metadata) -> FrozenSet[Tuple[Any, ...]]:
+    return frozenset(
         signature
         for signature in (_grant_signature(grant) for grant in metadata.grants)
         if signature is not None
-    ))
+    )
+
+
+def _exact_metadata_signature(metadata) -> Tuple[Any, ...]:
     tags = []
     for tag in metadata.tags:
         signature = tuple(
@@ -372,18 +389,71 @@ def _supported_metadata_signature(metadata) -> Tuple[Any, ...]:
         metadata.owner,
         metadata.owner_role_type,
         metadata.table_comment,
-        grants,
         tuple(sorted(tags)),
     )
 
 
 def assert_supported_metadata(table, expected, actual) -> None:
-    """Require exact ownership, comments, grants, and direct table tags."""
-    if _supported_metadata_signature(actual) != _supported_metadata_signature(expected):
+    """Require exact ownership, comments, and direct tags, and every source grant."""
+    expected_grants = _grant_signatures(expected)
+    actual_grants = _grant_signatures(actual)
+    if (
+        _exact_metadata_signature(actual) != _exact_metadata_signature(expected)
+        or not expected_grants.issubset(actual_grants)
+    ):
         raise NativeToIcebergConversionError(
             f'{table.quoted} ownership, comments, grants, or tags do not match '
             'the conversion source'
         )
+    extra_grants = sorted(actual_grants - expected_grants)
+    if extra_grants:
+        # Account automation may grant access to new Iceberg tables; no source grant was lost.
+        LOGGER.info(
+            '%s has grants that its native source does not: %s',
+            table.quoted,
+            ', '.join(
+                f'{privilege} to {grantee_type} {grantee}'
+                for privilege, grantee_type, grantee, _ in extra_grants
+            ),
+        )
+
+
+def representation_blockers(columns: Iterable[NativeColumn]) -> List[str]:
+    """Return columns whose type managed Iceberg v3 cannot represent exactly."""
+    blockers = []
+    for column in columns:
+        if column.data_type == 'TIMESTAMP_TZ':
+            blockers.append(
+                f'Column {column.name} is TIMESTAMP_TZ; managed Iceberg v3 would '
+                'drop its time-zone offsets'
+            )
+            continue
+        try:
+            column.iceberg_type
+        except NativeToIcebergConversionError as exc:
+            blockers.append(str(exc))
+    return blockers
+
+
+def grant_replay_blockers(grants: Iterable[Dict[str, Any]]) -> List[str]:
+    """Return source grants that cannot be replayed onto a managed Iceberg table."""
+    blockers = []
+    for grant in grants:
+        privilege = str(_value(grant, 'privilege', '')).upper()
+        if privilege == 'OWNERSHIP':
+            continue
+        grantee_type = str(_value(grant, 'granted_to', '')).upper()
+        grantee = _value(grant, 'grantee_name')
+        try:
+            if privilege not in REPLAYABLE_ICEBERG_PRIVILEGES:
+                raise NativeToIcebergConversionError(privilege)
+            grantee_sql(grantee_type, grantee if isinstance(grantee, str) else '')
+        except NativeToIcebergConversionError:
+            blockers.append(
+                f'The {privilege or "unnamed"} grant to {grantee_type} {grantee} '
+                'cannot be replayed onto a managed Iceberg table'
+            )
+    return blockers
 
 
 def assert_managed_v3(query: Callable, table: SnowflakeObjectName) -> None:

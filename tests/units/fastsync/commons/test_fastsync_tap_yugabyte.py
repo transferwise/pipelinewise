@@ -1,5 +1,6 @@
 import datetime
 import io
+import json
 
 import psycopg2
 
@@ -12,6 +13,13 @@ from pipelinewise.fastsync.commons import tap_yugabyte, yb_retry
 from pipelinewise.fastsync.commons.partial_sync_boundary import (
     PartialSyncBoundary,
 )
+
+MAX_PRICE_SQL = 'SELECT MAX(price) AS key_value FROM schema."table1"'
+FINITE_MAX_PRICE_SQL = (
+    'SELECT MAX("price") AS key_value FROM "schema"."table1" '
+    "WHERE \"price\" > '-Infinity' AND \"price\" < 'Infinity'"
+)
+EMPTY_BOOKMARK_WARNING = 'No replication value found for table schema.table1, returning empty bookmark'
 
 
 class TestFastSyncTapYugabyte(TestCase):
@@ -300,6 +308,85 @@ class TestFastSyncTapYugabyte(TestCase):
                 },
                 state,
             )
+
+    def _fetch_price_bookmark(self, *maxima):
+        """Run the handover on schema.table1.price, answering each MAX query in turn."""
+        rows = [[{'key_value': value}] for value in maxima]
+        with patch.object(self.yugabyte, 'query', side_effect=rows) as query_mock:
+            state = self.yugabyte.fetch_current_incremental_key_pos('schema.table1', 'price')
+        return state, query_mock.call_args_list
+
+    def test_fetch_current_incremental_key_pos_nan_max_bookmarks_finite_maximum(self):
+        """A NaN maximum bookmarks the largest finite key, which strict JSON state can hold."""
+        state, queries = self._fetch_price_bookmark(float('nan'), 2.5)
+
+        self.assertDictEqual({'replication_key': 'price', 'replication_key_value': 2.5, 'version': 1}, state)
+        self.assertEqual(state, json.loads(json.dumps(state, allow_nan=False)))
+        self.assertEqual([call(MAX_PRICE_SQL), call(FINITE_MAX_PRICE_SQL)], queries)
+
+    def test_fetch_current_incremental_key_pos_infinite_max_bookmarks_finite_maximum(self):
+        """An Infinity maximum bookmarks the largest finite key, which strict JSON state can hold."""
+        state, queries = self._fetch_price_bookmark(float('inf'), -3.25)
+
+        self.assertDictEqual({'replication_key': 'price', 'replication_key_value': -3.25, 'version': 1}, state)
+        self.assertEqual(state, json.loads(json.dumps(state, allow_nan=False)))
+        self.assertEqual([call(MAX_PRICE_SQL), call(FINITE_MAX_PRICE_SQL)], queries)
+
+    def test_fetch_current_incremental_key_pos_negative_infinite_max_returns_empty_state(self):
+        """A -Infinity maximum means no finite key exists, so Singer starts without a bookmark."""
+        with self.assertLogs(tap_yugabyte.LOGGER, 'WARNING') as logs:
+            state, queries = self._fetch_price_bookmark(float('-inf'), None)
+
+        self.assertEqual({}, state)
+        self.assertEqual([call(MAX_PRICE_SQL), call(FINITE_MAX_PRICE_SQL)], queries)
+        self.assertEqual([EMPTY_BOOKMARK_WARNING], [record.getMessage() for record in logs.records])
+
+    def test_fetch_current_incremental_key_pos_only_nonfinite_keys_return_empty_state(self):
+        """NaN, Infinity and -Infinity keys alone return the existing empty-bookmark warning."""
+        with self.assertLogs(tap_yugabyte.LOGGER, 'WARNING') as logs:
+            state, queries = self._fetch_price_bookmark(float('nan'), None)
+
+        self.assertEqual({}, state)
+        self.assertEqual([call(MAX_PRICE_SQL), call(FINITE_MAX_PRICE_SQL)], queries)
+        self.assertEqual([EMPTY_BOOKMARK_WARNING], [record.getMessage() for record in logs.records])
+
+    def test_fetch_current_incremental_key_pos_finite_float_max_runs_one_query(self):
+        """A finite float maximum keeps the existing single MAX query and number bookmark."""
+        state, queries = self._fetch_price_bookmark(2.5)
+
+        self.assertDictEqual({'replication_key': 'price', 'replication_key_value': 2.5, 'version': 1}, state)
+        self.assertEqual([call(MAX_PRICE_SQL)], queries)
+
+    def test_fetch_current_incremental_key_pos_empty_float_table_returns_empty_state(self):
+        """An empty table keeps the existing single MAX query and empty-bookmark warning."""
+        with self.assertLogs(tap_yugabyte.LOGGER, 'WARNING') as logs:
+            state, queries = self._fetch_price_bookmark(None)
+
+        self.assertEqual({}, state)
+        self.assertEqual([call(MAX_PRICE_SQL)], queries)
+        self.assertEqual([EMPTY_BOOKMARK_WARNING], [record.getMessage() for record in logs.records])
+
+    def test_fetch_current_incremental_key_pos_numeric_nan_max_is_unchanged(self):
+        """Only float maxima take the finite fallback; numeric NaN keeps its existing text bookmark."""
+        state, queries = self._fetch_price_bookmark(Decimal('NaN'))
+
+        self.assertDictEqual({'replication_key': 'price', 'replication_key_value': 'NaN', 'version': 1}, state)
+        self.assertEqual([call(MAX_PRICE_SQL)], queries)
+
+    def test_fetch_current_incremental_key_pos_finite_maximum_quotes_identifiers(self):
+        """The finite fallback quotes each identifier and binds no parameters, so % stays literal."""
+        rows = [[{'key_value': float('inf')}], [{'key_value': 7.0}]]
+        with patch.object(self.yugabyte, 'query', side_effect=rows) as query_mock:
+            state = self.yugabyte.fetch_current_incremental_key_pos('public.Margin %', 'unit_price')
+
+        self.assertEqual(7.0, state['replication_key_value'])
+        self.assertEqual(
+            call(
+                'SELECT MAX("unit_price") AS key_value FROM "public"."Margin %" '
+                "WHERE \"unit_price\" > '-Infinity' AND \"unit_price\" < 'Infinity'"
+            ),
+            query_mock.call_args_list[1],
+        )
 
     def test_get_connection_builds_conn_params(self):
         """get_connection must use the right credentials and enable autocommit"""

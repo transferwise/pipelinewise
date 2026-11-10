@@ -34,9 +34,13 @@ During the run, PipelineWise:
 
 1. locks the tap-target pair to prevent a concurrent run;
 2. selects FastSync-eligible initial tables and Singer tables;
-3. streams or stages records into the target;
-4. persists only target-acknowledged state; and
-5. marks the log ``success`` or ``failed``.
+3. if the tap enables ``native_to_iceberg_conversion``, converts its native
+   Snowflake tables to managed Iceberg v3 first, keeping each original as
+   ``<table>_NATIVE``, and stops before replication if any cannot convert; see
+   :ref:`snowflake_iceberg_auto_conversion`;
+4. streams or stages records into the target;
+5. persists only target-acknowledged state; and
+6. marks the log ``success`` or ``failed``.
 
 Follow the active log from another terminal:
 

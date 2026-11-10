@@ -1,5 +1,6 @@
 import datetime
 import io
+import json
 
 from decimal import Decimal
 from unittest import TestCase
@@ -10,6 +11,13 @@ from pipelinewise.fastsync.commons import tap_postgres
 from pipelinewise.fastsync.commons.partial_sync_boundary import (
     PartialSyncBoundary,
 )
+
+MAX_PRICE_SQL = 'SELECT MAX(price) AS key_value FROM schema."table1"'
+FINITE_MAX_PRICE_SQL = (
+    'SELECT MAX("price") AS key_value FROM "schema"."table1" '
+    "WHERE \"price\" > '-Infinity' AND \"price\" < 'Infinity'"
+)
+EMPTY_BOOKMARK_WARNING = 'No replication value found for table schema.table1, returning empty bookmark'
 
 
 class TestFastSyncTapPostgres(TestCase):
@@ -242,7 +250,7 @@ class TestFastSyncTapPostgres(TestCase):
         """
         Check that get connection uses the right credentials to connect to primary
         """
-        connect_mock.return_value.server_version = 110002
+        connect_mock.return_value.server_version = 140000
         creds = {
             'host': 'my_primary_host',
             'user': 'my_primary_user',
@@ -264,9 +272,9 @@ class TestFastSyncTapPostgres(TestCase):
         self.assertTrue(connect_mock.return_value.autocommit)
 
     @patch('pipelinewise.fastsync.commons.tap_postgres.psycopg2.connect')
-    def test_get_connection_rejects_postgres_before_11_2(self, connect_mock):
+    def test_get_connection_rejects_postgres_before_14(self, connect_mock):
         """Every FastSync source connection enforces the PostgreSQL floor."""
-        connect_mock.return_value.server_version = 110001
+        connect_mock.return_value.server_version = 130016
         creds = {
             'host': 'my_primary_host',
             'user': 'my_primary_user',
@@ -277,7 +285,7 @@ class TestFastSyncTapPostgres(TestCase):
 
         with self.assertRaisesRegex(
             RuntimeError,
-            'PostgreSQL 11.2 or later.*server_version_num 110001',
+            'PostgreSQL 14 or later.*server_version_num 130016',
         ) as error:
             FastSyncTapPostgres.get_connection(creds, prioritize_primary=True)
 
@@ -289,7 +297,7 @@ class TestFastSyncTapPostgres(TestCase):
         self, connect_mock
     ):
         """Removed-tap cleanup can still connect to an obsolete source."""
-        connect_mock.return_value.server_version = 110001
+        connect_mock.return_value.server_version = 130016
         creds = {
             'host': 'my_primary_host',
             'user': 'my_primary_user',
@@ -335,7 +343,7 @@ class TestFastSyncTapPostgres(TestCase):
     @patch('pipelinewise.fastsync.commons.tap_postgres.psycopg2.connect')
     def test_drop_slot_validates_version_by_default(self, connect_mock):
         """FastSync resync slot cleanup must retain source-version validation."""
-        connect_mock.return_value.server_version = 110001
+        connect_mock.return_value.server_version = 130016
         creds = {
             'host': 'my_primary_host',
             'user': 'my_primary_user',
@@ -345,7 +353,7 @@ class TestFastSyncTapPostgres(TestCase):
             'tap_id': 'my_tap',
         }
 
-        with self.assertRaisesRegex(RuntimeError, 'PostgreSQL 11.2 or later'):
+        with self.assertRaisesRegex(RuntimeError, 'PostgreSQL 14 or later'):
             FastSyncTapPostgres.drop_slot(creds)
 
         connect_mock.return_value.close.assert_called_once_with()
@@ -480,7 +488,7 @@ class TestFastSyncTapPostgres(TestCase):
         """
         Check that get connection uses the right credentials to connect to secondary if present
         """
-        connect_mock.return_value.server_version = 110002
+        connect_mock.return_value.server_version = 140000
         creds = {
             'host': 'my_primary_host',
             'replica_host': 'my_replica_host',
@@ -511,7 +519,7 @@ class TestFastSyncTapPostgres(TestCase):
         """
         Check that get connection uses the primary server credentials as a fallback
         """
-        connect_mock.return_value.server_version = 110002
+        connect_mock.return_value.server_version = 140000
         creds = {
             'host': 'my_primary_host',
             'replica_host': 'my_replica_host',
@@ -538,7 +546,7 @@ class TestFastSyncTapPostgres(TestCase):
         """
         Check that get connection uses ssl when present
         """
-        connect_mock.return_value.server_version = 110002
+        connect_mock.return_value.server_version = 140000
         creds = {
             'host': 'my_primary_host',
             'user': 'my_primary_user',
@@ -589,7 +597,7 @@ class TestFastSyncTapPostgres(TestCase):
 
         # mock PG connection instance with ability to open cursor
         pg_con = Mock()
-        pg_con.server_version = 110002
+        pg_con.server_version = 140000
         pg_con.cursor.return_value = cursor_mock
 
         connect_mock.return_value = pg_con
@@ -631,7 +639,7 @@ class TestFastSyncTapPostgres(TestCase):
 
         # mock PG connection instance with ability to open cursor
         pg_con = Mock()
-        pg_con.server_version = 110002
+        pg_con.server_version = 140000
         pg_con.cursor.return_value = cursor_mock
 
         connect_mock.return_value = pg_con
@@ -766,3 +774,82 @@ class TestFastSyncTapPostgres(TestCase):
                 'replication_key_value': '12345678901234567890.123456789',
                 'version': 1,
             }, state)
+
+    def _fetch_price_bookmark(self, *maxima):
+        """Run the handover on schema.table1.price, answering each MAX query in turn."""
+        rows = [[{'key_value': value}] for value in maxima]
+        with patch.object(self.postgres, 'query', side_effect=rows) as query_mock:
+            state = self.postgres.fetch_current_incremental_key_pos('schema.table1', 'price')
+        return state, query_mock.call_args_list
+
+    def test_fetch_current_incremental_key_pos_nan_max_bookmarks_finite_maximum(self):
+        """A NaN maximum bookmarks the largest finite key, which strict JSON state can hold."""
+        state, queries = self._fetch_price_bookmark(float('nan'), 2.5)
+
+        self.assertDictEqual({'replication_key': 'price', 'replication_key_value': 2.5, 'version': 1}, state)
+        self.assertEqual(state, json.loads(json.dumps(state, allow_nan=False)))
+        self.assertEqual([call(MAX_PRICE_SQL), call(FINITE_MAX_PRICE_SQL)], queries)
+
+    def test_fetch_current_incremental_key_pos_infinite_max_bookmarks_finite_maximum(self):
+        """An Infinity maximum bookmarks the largest finite key, which strict JSON state can hold."""
+        state, queries = self._fetch_price_bookmark(float('inf'), -3.25)
+
+        self.assertDictEqual({'replication_key': 'price', 'replication_key_value': -3.25, 'version': 1}, state)
+        self.assertEqual(state, json.loads(json.dumps(state, allow_nan=False)))
+        self.assertEqual([call(MAX_PRICE_SQL), call(FINITE_MAX_PRICE_SQL)], queries)
+
+    def test_fetch_current_incremental_key_pos_negative_infinite_max_returns_empty_state(self):
+        """A -Infinity maximum means no finite key exists, so Singer starts without a bookmark."""
+        with self.assertLogs(tap_postgres.LOGGER, 'WARNING') as logs:
+            state, queries = self._fetch_price_bookmark(float('-inf'), None)
+
+        self.assertEqual({}, state)
+        self.assertEqual([call(MAX_PRICE_SQL), call(FINITE_MAX_PRICE_SQL)], queries)
+        self.assertEqual([EMPTY_BOOKMARK_WARNING], [record.getMessage() for record in logs.records])
+
+    def test_fetch_current_incremental_key_pos_only_nonfinite_keys_return_empty_state(self):
+        """NaN, Infinity and -Infinity keys alone return the existing empty-bookmark warning."""
+        with self.assertLogs(tap_postgres.LOGGER, 'WARNING') as logs:
+            state, queries = self._fetch_price_bookmark(float('nan'), None)
+
+        self.assertEqual({}, state)
+        self.assertEqual([call(MAX_PRICE_SQL), call(FINITE_MAX_PRICE_SQL)], queries)
+        self.assertEqual([EMPTY_BOOKMARK_WARNING], [record.getMessage() for record in logs.records])
+
+    def test_fetch_current_incremental_key_pos_finite_float_max_runs_one_query(self):
+        """A finite float maximum keeps the existing single MAX query and number bookmark."""
+        state, queries = self._fetch_price_bookmark(2.5)
+
+        self.assertDictEqual({'replication_key': 'price', 'replication_key_value': 2.5, 'version': 1}, state)
+        self.assertEqual([call(MAX_PRICE_SQL)], queries)
+
+    def test_fetch_current_incremental_key_pos_empty_float_table_returns_empty_state(self):
+        """An empty table keeps the existing single MAX query and empty-bookmark warning."""
+        with self.assertLogs(tap_postgres.LOGGER, 'WARNING') as logs:
+            state, queries = self._fetch_price_bookmark(None)
+
+        self.assertEqual({}, state)
+        self.assertEqual([call(MAX_PRICE_SQL)], queries)
+        self.assertEqual([EMPTY_BOOKMARK_WARNING], [record.getMessage() for record in logs.records])
+
+    def test_fetch_current_incremental_key_pos_numeric_nan_max_is_unchanged(self):
+        """Only float maxima take the finite fallback; numeric NaN keeps its existing text bookmark."""
+        state, queries = self._fetch_price_bookmark(Decimal('NaN'))
+
+        self.assertDictEqual({'replication_key': 'price', 'replication_key_value': 'NaN', 'version': 1}, state)
+        self.assertEqual([call(MAX_PRICE_SQL)], queries)
+
+    def test_fetch_current_incremental_key_pos_finite_maximum_quotes_identifiers(self):
+        """The finite fallback quotes each identifier and binds no parameters, so % stays literal."""
+        rows = [[{'key_value': float('inf')}], [{'key_value': 7.0}]]
+        with patch.object(self.postgres, 'query', side_effect=rows) as query_mock:
+            state = self.postgres.fetch_current_incremental_key_pos('public.Margin %', 'unit_price')
+
+        self.assertEqual(7.0, state['replication_key_value'])
+        self.assertEqual(
+            call(
+                'SELECT MAX("unit_price") AS key_value FROM "public"."Margin %" '
+                "WHERE \"unit_price\" > '-Infinity' AND \"unit_price\" < 'Infinity'"
+            ),
+            query_mock.call_args_list[1],
+        )

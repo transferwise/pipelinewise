@@ -976,6 +976,8 @@ class IcebergRecoveryStore:
         try:
             with open(self.path, encoding='utf-8') as manifest_file:
                 return IcebergPublicationAttempt.from_dict(json.load(manifest_file))
+        except FileNotFoundError:
+            return None  # deleted after the existence check, by a writer that holds the lock
         except (OSError, TypeError, ValueError, KeyError, json.JSONDecodeError) as exc:
             raise RecoveryManifestError(f'Cannot read Iceberg recovery manifest {self.path}') from exc
 
@@ -987,6 +989,15 @@ class IcebergRecoveryStore:
         """Load and validate the current manifest under the table lock."""
         with self.locked():
             return self._load()
+
+    def peek(self) -> Tuple[Optional[IcebergPublicationAttempt], Optional[IcebergTargetAttemptPointer]]:
+        """Read the manifest and FastSync pointer without a lock, for checks that never act."""
+        # Saves replace files atomically and a file deleted mid-read counts as absent, so a
+        # read never fails because a writer is running.
+        pointer = None
+        if self.fastsync_target_pointer_path is not None:
+            pointer = self._load_fastsync_target_pointer()
+        return self._load(), pointer
 
     def save(self, attempt: IcebergPublicationAttempt) -> None:
         """Atomically persist an attempt under the table lock."""
@@ -1023,6 +1034,8 @@ class IcebergRecoveryStore:
         try:
             with open(pointer_path, encoding='utf-8') as pointer_file:
                 return IcebergTargetAttemptPointer.from_dict(json.load(pointer_file))
+        except FileNotFoundError:
+            return None  # deleted after the existence check, by a writer that holds the lock
         except (OSError, TypeError, ValueError, KeyError, json.JSONDecodeError) as exc:
             raise RecoveryManifestError(f'Cannot read Iceberg FastSync target attempt pointer {pointer_path}') from exc
 

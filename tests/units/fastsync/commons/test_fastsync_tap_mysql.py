@@ -946,6 +946,85 @@ class TestFastSyncTapMySql(TestCase):
         # The datetime branch has no CAST, so the type must not leak into it.
         assert 'AS date) END' not in sql
 
+    def test_float_projection_promotes_exactly_while_other_numerics_keep_raw_columns(self):
+        """The text protocol rounds FLOAT to six significant digits; DOUBLE and DECIMAL arrive exactly."""
+        self.mysql = FastSyncTapMySqlMock(connection_config=self.connection_config)
+        with patch.object(self.mysql, 'query', return_value=[]) as query_mock:
+            self.mysql.get_table_columns('my_db.my_table')
+
+        sql = ' '.join(query_mock.call_args.args[0].split())
+        float_branch = "WHEN data_type = 'float' THEN CONCAT('`', column_name, '` * 1E0 AS `', column_name, '`')"
+        other_branch = "WHEN data_type IN ('double', 'numeric', 'decimal', 'real') THEN CONCAT('`', column_name, '`')"
+        assert float_branch in sql
+        assert other_branch in sql
+        assert sql.index(float_branch) < sql.index(other_branch)
+        assert "WHEN data_type IN ('smallint', 'integer', 'bigint', 'mediumint', 'int') THEN CONCAT('`'" in sql
+
+    def test_float_projection_alias_is_accepted_by_source_transformations(self):
+        """Transformed exports strip only the matching alias, keep the promotion and round FLOAT literals."""
+        self.mysql = FastSyncTapMySql(self.connection_config, lambda data_type, *_: {
+            'float': 'FLOAT', 'varchar': 'VARCHAR(134217728)'}[data_type])
+        self.mysql.source_transformations = {'transformations': [{
+            'tap_stream_name': 'my_db-my_table', 'field_id': 'name', 'type': 'SET-NULL',
+            'when': [{'column': 'amount', 'equals': 0.3}],
+        }]}
+        table_columns = [
+            {'column_name': 'amount', 'data_type': 'float', 'column_type': 'float',
+             'safe_sql_value': '`amount` * 1E0 AS `amount`'},
+            {'column_name': 'name', 'data_type': 'varchar', 'column_type': 'varchar(10)', 'safe_sql_value': '`name`'},
+        ]
+        cursor = MagicMock()
+        cursor.fetchmany.return_value = []
+        self.mysql.conn_unbuffered = MagicMock()
+        self.mysql.conn_unbuffered.cursor.return_value.__enter__.return_value = cursor
+
+        with patch.object(self.mysql, 'get_table_columns', return_value=table_columns), \
+                patch.object(tap_mysql.split_gzip, 'open', return_value=io.StringIO()):
+            self.mysql.copy_table('my_db.my_table', 'unused.csv')
+
+        export_sql = cursor.execute.call_args.args[0]
+        assert 'SELECT ((`amount` * 1E0) * 1E0) AS `amount`, CONVERT((`name`) USING utf8mb4) AS `name`' in export_sql
+        assert 'CASE WHEN (`amount` = 0.30000001192092896) THEN NULL ELSE `name` END AS `name`' in export_sql
+
+    def test_max_num_projection_keeps_the_legacy_float_clamp(self):
+        """No caller passes max_num; if one does, FLOAT keeps the existing clamp instead of promotion."""
+        self.mysql = FastSyncTapMySqlMock(connection_config=self.connection_config)
+        with patch.object(self.mysql, 'query', return_value=[]) as query_mock:
+            self.mysql.get_table_columns('my_db.my_table', max_num='99.99')
+
+        sql = ' '.join(query_mock.call_args.args[0].split())
+        clamp = "CONCAT('GREATEST(LEAST(99.99, ROUND(`', column_name, '`, 2)), -99.99)')"
+        assert f"WHEN data_type = 'float' THEN {clamp}" in sql
+        assert f"WHEN data_type IN ('double', 'numeric', 'decimal', 'real') THEN {clamp}" in sql
+        assert '1E0' not in sql
+
+    def test_float_replication_key_handover_promotes_the_maximum(self):
+        """A six-digit FLOAT maximum can sit above the stored key and make Singer skip later rows."""
+        self.mysql = FastSyncTapMySql(self.connection_config, lambda value, *_args: value)
+        self.mysql.query = Mock(side_effect=[[{'data_type': 'float'}], [{'key_value': 16777216.0}]])
+
+        bookmark = self.mysql.fetch_current_incremental_key_pos('my_db.my_table', 'amount')
+
+        assert bookmark == {'replication_key': 'amount', 'replication_key_value': 16777216.0, 'version': 1}
+        lookup, maximum = self.mysql.query.call_args_list
+        # MySQL 8 reports unaliased information_schema columns in upper case.
+        assert lookup.args[0].startswith('SELECT data_type AS data_type FROM information_schema.columns ')
+        assert lookup.kwargs['params'] == ('my_db', 'my_table', 'amount')
+        assert maximum.args[0] == 'SELECT MAX(amount) * 1E0 AS key_value FROM my_db.my_table'
+
+    def test_non_float_replication_key_handover_keeps_the_raw_maximum(self):
+        """DOUBLE, DECIMAL and other keys already arrive exactly; unknown columns keep the legacy query."""
+        for lookup_result in ([{'data_type': 'double'}], [{'data_type': 'decimal'}], [{'data_type': 'int'}],
+                              [{'data_type': 'datetime'}], []):
+            with self.subTest(lookup_result=lookup_result):
+                self.mysql = FastSyncTapMySql(self.connection_config, lambda value, *_args: value)
+                self.mysql.query = Mock(side_effect=[lookup_result, [{'key_value': 7}]])
+
+                bookmark = self.mysql.fetch_current_incremental_key_pos('my_db.my_table', 'amount')
+
+                assert bookmark['replication_key_value'] == 7
+                assert self.mysql.query.call_args.args[0] == 'SELECT MAX(amount) AS key_value FROM my_db.my_table'
+
     def test_boolean_tinyint_modifiers_are_normalized_for_boolean_copy(self):
         """Every TINYINT declaration mapped to BOOLEAN emits only 0, 1, or NULL."""
         self.mysql = FastSyncTapMySqlMock(connection_config=self.connection_config)

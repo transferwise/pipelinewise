@@ -2,6 +2,7 @@ import datetime
 import decimal
 import glob
 import logging
+import math
 import os
 import re
 import time
@@ -494,6 +495,16 @@ class FastSyncTapYugabyte:
             )
 
         yb_key_value = result[0].get('key_value')
+
+        if isinstance(yb_key_value, float) and not math.isfinite(yb_key_value):
+            # Tap state loaders reject NaN/Infinity JSON; NaN sorts above Infinity, so this range yields the
+            # finite maximum and Singer re-reads nonfinite keys above it.
+            column = quote_source_identifier(replication_key, 'postgres')
+            source_table = '.'.join(quote_source_identifier(part, 'postgres') for part in (schema_name, table_name))
+            yb_key_value = self.query(
+                f'SELECT MAX({column}) AS key_value FROM {source_table} '
+                f"WHERE {column} > '-Infinity' AND {column} < 'Infinity'"
+            )[0].get('key_value')
 
         if yb_key_value is None:
             LOGGER.warning('No replication value found for table %s, returning empty bookmark', table)

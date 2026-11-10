@@ -1,4 +1,10 @@
+import json
+import logging
+import os
 import signal
+import sys
+
+import pipelinewise.cli.native_to_iceberg  # noqa: F401 - load before patches bind its imports
 
 from unittest.mock import call, patch
 
@@ -8,6 +14,8 @@ from pipelinewise import cli
 from pipelinewise.cli.errors import CommandSpecificArgumentsException
 from pipelinewise.cli.errors import PreRunChecksException
 from pipelinewise.cli.pipelinewise import PipelineWise
+from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_plan import ConversionTarget
+from pipelinewise.fastsync.commons.snowflake_iceberg_model import SnowflakeObjectName
 from tests.units.cli.cli_args import CliArgs
 
 
@@ -74,6 +82,10 @@ def test_accepts_valid_conversion_args():
             {'iceberg_version': 3.0},
             'You must explicitly specify Iceberg version 3 using --iceberg-version 3',
         ),
+        (
+            {'conversion_warehouse': ' '},
+            '--conversion-warehouse must name a Snowflake warehouse',
+        ),
     ],
 )
 def test_rejects_invalid_conversion_args(override, message):
@@ -86,7 +98,7 @@ def test_rejects_invalid_conversion_args(override, message):
     'pipelinewise.fastsync.commons.snowflake_iceberg_converter.'
     'SnowflakeNativeToIcebergConverter'
 )
-@patch('pipelinewise.fastsync.commons.snowflake_iceberg.SnowflakeQueryAdapter')
+@patch('pipelinewise.fastsync.commons.snowflake_iceberg.SnowflakeConversionQueryAdapter')
 def test_dispatches_target_only_conversion(mock_adapter, mock_converter):
     """The root command uses generated target credentials without resolving a tap."""
     args = _args(target='target_one', eventual='iceberg')
@@ -97,7 +109,7 @@ def test_dispatches_target_only_conversion(mock_adapter, mock_converter):
     target_config = cli.utils.load_json(
         f'{CONFIG_DIR}/target_one/config.json'
     )
-    mock_adapter.assert_called_once_with(target_config)
+    mock_adapter.assert_called_once_with(target_config, None)
     mock_converter.assert_called_once_with(
         mock_adapter.return_value,
         runtime_dir=f'{CONFIG_DIR}/target_one',
@@ -106,7 +118,85 @@ def test_dispatches_target_only_conversion(mock_adapter, mock_converter):
         'DATABASE.SCHEMA.TABLE',
         eventual='iceberg',
         iceberg_version=3,
+        writer_types={},
+        refusals=(),
     )
+
+
+@patch(
+    'pipelinewise.fastsync.commons.snowflake_iceberg_converter.'
+    'SnowflakeNativeToIcebergConverter'
+)
+@patch('pipelinewise.fastsync.commons.snowflake_iceberg.SnowflakeConversionQueryAdapter')
+def test_manual_conversion_runs_on_the_requested_warehouse(mock_adapter, mock_converter):
+    """--conversion-warehouse moves a manual conversion off the target's warehouse."""
+    args = _args(target='target_one', eventual='iceberg', conversion_warehouse='CONVERSION_WH')
+
+    PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR).copy_native_to_iceberg()
+
+    assert mock_adapter.call_args.args[1] == 'CONVERSION_WH'
+    mock_converter.return_value.convert.assert_called_once()
+
+
+@patch(
+    'pipelinewise.fastsync.commons.snowflake_iceberg_converter.'
+    'SnowflakeNativeToIcebergConverter'
+)
+@patch('pipelinewise.fastsync.commons.snowflake_iceberg.SnowflakeConversionQueryAdapter')
+def test_manual_conversion_passes_column_class_conflicts_as_refusals(mock_adapter, mock_converter):
+    """Disagreeing writers refuse the table in the converter, after an interrupted cutover is restored."""
+    args = _args(target='target_one', table='DATABASE.SCHEMA.TABLE', eventual='iceberg')
+    pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
+    table = SnowflakeObjectName('DATABASE', 'SCHEMA', 'TABLE')
+    imported = [
+        ConversionTarget('a-table', table, {'DOC': 'TEXT'}),
+        ConversionTarget('b-table', table, {'DOC': 'VARIANT'}),
+    ]
+
+    with patch.object(pipelinewise, '_imported_tap_targets', return_value=imported):
+        pipelinewise.copy_native_to_iceberg()
+
+    assert mock_converter.return_value.convert.call_args.kwargs['refusals'] == (
+        'Column DOC is TEXT for stream a-table but VARIANT for stream b-table',
+    )
+
+
+@patch(
+    'pipelinewise.fastsync.commons.snowflake_iceberg_converter.'
+    'SnowflakeNativeToIcebergConverter'
+)
+@patch('pipelinewise.fastsync.commons.snowflake_iceberg.SnowflakeConversionQueryAdapter')
+def test_manual_conversion_applies_the_writing_taps_catalog(mock_adapter, mock_converter):
+    """A manual promotion is checked against the catalog of the tap that writes the table."""
+    args = _args(target='target_one', table='MY_DB.DB_TEST_MYSQL.TABLE_ONE', eventual='iceberg')
+    pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
+
+    pipelinewise.copy_native_to_iceberg()
+
+    mock_converter.return_value.convert.assert_called_once_with(
+        'MY_DB.DB_TEST_MYSQL.TABLE_ONE',
+        eventual='iceberg',
+        iceberg_version=3,
+        writer_types={'EMAIL': 'TEXT'},
+        refusals=(),
+    )
+
+
+@patch('pipelinewise.cli.native_to_iceberg.preflight_report', return_value=[])
+def test_table_scoped_report_plans_the_streams_that_write_it(mock_report):
+    """A table report uses the imported streams that write the table, with their classes."""
+    pipelinewise = PipelineWise(
+        _args(target='target_one', table='my_db.db_test_mysql.table_one', preflight_only=True),
+        CONFIG_DIR,
+        VIRTUALENVS_DIR,
+    )
+
+    pipelinewise.copy_native_to_iceberg()
+
+    _, _, targets, _ = mock_report.call_args.args
+    assert [(target.stream_id, target.table.key, target.writer_types) for target in targets] == [
+        ('db_test_mysql-table_one', 'MY_DB.DB_TEST_MYSQL.TABLE_ONE', {'EMAIL': 'TEXT'}),
+    ]
 
 
 @patch('pipelinewise.cli.pipelinewise.signal.signal')
@@ -129,6 +219,211 @@ def test_target_only_signal_exits(mock_signal):
 
     assert error.value.code == 1
     stop_tap.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    'scope',
+    [{'tap': 'tap_one', 'table': '*'}, {'tap': '*', 'table': 'DATABASE.SCHEMA.TABLE'}],
+)
+def test_accepts_preflight_scopes(scope):
+    """A feasibility report covers either one tap or one table."""
+    cli._validate_command_specific_arguments(_args(preflight_only=True, **scope))
+
+
+@pytest.mark.parametrize(
+    ('override', 'message'),
+    [
+        ({'preflight_only': True, 'tap': 'tap_one'}, 'either a source name using --tap'),
+        ({'preflight_only': True, 'table': '*'}, 'either a source name using --tap'),
+        ({'preflight_only': True, 'table': '*', 'iceberg_version': None}, 'either a source name'),
+        ({'tap': 'tap_one'}, '--tap requires --preflight-only'),
+        ({'preflight_only': True, 'iceberg_version': None}, '--iceberg-version 3'),
+    ],
+)
+def test_rejects_invalid_preflight_scopes(override, message):
+    """A report needs exactly one scope, and only reports accept a tap."""
+    with pytest.raises(CommandSpecificArgumentsException, match=message):
+        cli._validate_command_specific_arguments(_args(**override))
+
+
+@pytest.mark.parametrize('command', ['run_tap', 'fast_sync', 'import_config', 'status'])
+def test_other_commands_reject_the_conversion_warehouse(command):
+    """Only the conversion command runs conversion queries, so no other command may ignore the option."""
+    args = CliArgs(command=command, target='target_one', tap='tap_one', dir='dir', conversion_warehouse='WH')
+
+    with pytest.raises(CommandSpecificArgumentsException, match='only valid with copy_native_to_iceberg'):
+        cli._validate_command_specific_arguments(args)
+
+
+@pytest.mark.parametrize('command', ['run_tap', 'fast_sync', 'import_config', 'status'])
+def test_other_commands_reject_preflight_only(command):
+    """Only the conversion command has a dry-run report, so no other command may ignore the flag."""
+    args = CliArgs(command=command, target='target_one', tap='tap_one', dir='dir', preflight_only=True)
+
+    with pytest.raises(CommandSpecificArgumentsException, match='only valid with copy_native_to_iceberg'):
+        cli._validate_command_specific_arguments(args)
+
+
+@pytest.mark.parametrize(
+    ('overrides', 'expected'),
+    [
+        ({'preflight_only': True, 'output_format': 'json'}, True),
+        ({'preflight_only': True, 'output_format': 'table'}, False),
+        ({'preflight_only': False, 'output_format': 'json'}, False),
+        ({'command': 'list_data_diff_checks', 'preflight_only': True, 'output_format': 'json'}, False),
+    ],
+)
+def test_json_report_detection(overrides, expected):
+    """Only a JSON feasibility report claims stdout for itself."""
+    assert cli._prints_json_report(_args(**overrides)) is expected
+
+
+def test_json_report_logs_to_stderr():
+    """Console logging moves to stderr so stdout carries only the JSON report."""
+    logger = logging.getLogger('pipelinewise-json-report-test')
+    console = logging.StreamHandler(sys.stdout)
+    log_file = logging.FileHandler(os.devnull)
+    logger.handlers = [console, log_file]
+
+    cli._log_to_stderr(logger)
+
+    assert console.stream is sys.stderr
+    assert log_file.stream is not sys.stderr
+    log_file.close()
+
+
+@patch('pipelinewise.cli.pipelinewise.signal.signal')
+def test_tap_scoped_report_never_stops_the_tap(mock_signal):
+    """A report beside a running tap exits on SIGTERM without touching its pidfile."""
+    pipelinewise = PipelineWise(
+        _args(target='target_one', tap='tap_one', table='*', preflight_only=True),
+        CONFIG_DIR,
+        VIRTUALENVS_DIR,
+    )
+    handler = pipelinewise._stop_command_on_signal
+
+    assert mock_signal.call_args_list == [
+        call(signal.SIGINT, handler),
+        call(signal.SIGTERM, handler),
+    ]
+
+
+@patch('pipelinewise.cli.native_to_iceberg.preflight_report', return_value=[])
+def test_tap_scoped_report_plans_selected_streams(mock_report, capsys):
+    """A tap report plans the selected streams with the tap's schema mapping."""
+    pipelinewise = PipelineWise(
+        _args(
+            target='target_one',
+            tap='tap_one',
+            table='*',
+            preflight_only=True,
+            output_format='json',
+        ),
+        CONFIG_DIR,
+        VIRTUALENVS_DIR,
+    )
+
+    with patch.object(pipelinewise, '_stale_catalog_reasons', return_value=[]):
+        pipelinewise.copy_native_to_iceberg()
+
+    target_config, runtime_dir, targets, conversion_warehouse = mock_report.call_args.args
+    assert runtime_dir == f'{CONFIG_DIR}/target_one'
+    assert conversion_warehouse is None
+    assert mock_report.call_args.kwargs == {'other_writers': []}
+    assert target_config['dbname'] == 'my_db'
+    assert target_config['data_flattening_max_level'] == 0
+    assert [(target.stream_id, target.table.key, target.blockers) for target in targets] == [
+        ('db_test_mysql-table_one', 'MY_DB.DB_TEST_MYSQL.TABLE_ONE', ()),
+        ('db_test_mysql-table_two', 'MY_DB.DB_TEST_MYSQL.TABLE_TWO', ()),
+    ]
+    report = json.loads(capsys.readouterr().out)
+    assert report['ready'] is False
+    assert report['tables'] == []
+    assert len(report['blockers']) == 1
+    assert 'not imported with target_table_format: iceberg yet' in report['blockers'][0]
+
+
+@pytest.mark.parametrize(
+    ('requested', 'configured', 'expected'),
+    [(None, 'TAP_WH', 'TAP_WH'), ('CLI_WH', 'TAP_WH', 'CLI_WH'), ('CLI_WH', None, 'CLI_WH')],
+)
+@patch('pipelinewise.cli.native_to_iceberg.preflight_report', return_value=[])
+def test_tap_scoped_report_runs_on_the_conversion_warehouse(mock_report, requested, configured, expected):
+    """The option overrides the tap's conversion_warehouse, which overrides the target's warehouse."""
+    pipelinewise = PipelineWise(
+        _args(target='target_one', tap='tap_one', table='*', preflight_only=True, conversion_warehouse=requested),
+        CONFIG_DIR,
+        VIRTUALENVS_DIR,
+    )
+    if configured:
+        pipelinewise.tap['native_to_iceberg_conversion'] = {'enabled': False, 'conversion_warehouse': configured}
+
+    pipelinewise.copy_native_to_iceberg()
+
+    assert mock_report.call_args.args[3] == expected
+
+
+@patch('pipelinewise.cli.native_to_iceberg.preflight_report', return_value=[])
+def test_tap_scoped_report_is_not_ready_with_a_stale_catalog(mock_report, capsys):
+    """The report shows the stale catalog as a tap-wide blocker, as run_tap refuses on it."""
+    pipelinewise = PipelineWise(
+        _args(target='target_one', tap='tap_one', table='*', preflight_only=True, output_format='json'),
+        CONFIG_DIR,
+        VIRTUALENVS_DIR,
+    )
+
+    with patch.object(pipelinewise, '_stale_catalog_reasons', return_value=['stale catalog']):
+        pipelinewise.copy_native_to_iceberg()
+
+    report = json.loads(capsys.readouterr().out)
+    assert report['ready'] is False
+    assert report['blockers'][-1] == 'stale catalog'
+
+
+def test_stale_catalog_is_a_tap_wide_blocker(tmp_path):
+    """A catalog older than the imported settings means the last import did not rediscover the tap."""
+    pipelinewise = PipelineWise(_args(target='target_one', tap='tap_one'), CONFIG_DIR, VIRTUALENVS_DIR)
+    properties, settings = tmp_path / 'properties.json', tmp_path / 'inheritable_config.json'
+    properties.write_text('{}', encoding='utf-8')
+    settings.write_text('{}', encoding='utf-8')
+    pipelinewise.tap['files'] = {**pipelinewise.tap['files'], 'properties': str(properties),
+                                 'inheritable_config': str(settings)}
+
+    os.utime(properties, (1_000, 1_000))
+    os.utime(settings, (2_000, 2_000))
+    stale = pipelinewise._stale_catalog_reasons()
+    os.utime(properties, (2_000, 2_000))
+    same_time = pipelinewise._stale_catalog_reasons()
+    os.utime(properties, (3_000, 3_000))
+    fresh = pipelinewise._stale_catalog_reasons()
+    pipelinewise._catalog_read_mtime_ns = 2_500 * 10**9
+    changed = pipelinewise._stale_catalog_reasons()
+    del pipelinewise._catalog_read_mtime_ns
+    properties.unlink()
+    missing = pipelinewise._stale_catalog_reasons()
+
+    assert len(stale) == 1 and 'did not rediscover the tap' in stale[0]
+    assert same_time == fresh == []
+    assert changed == ['The tap catalog changed after this run read it. Rerun run_tap so conversion uses it']
+    assert missing == stale
+
+
+@patch('pipelinewise.cli.native_to_iceberg.preflight_report', return_value=[])
+def test_table_scoped_report_uses_the_named_table(mock_report, capsys):
+    """A table report needs no tap and plans exactly the named table."""
+    pipelinewise = PipelineWise(
+        _args(target='target_one', preflight_only=True),
+        CONFIG_DIR,
+        VIRTUALENVS_DIR,
+    )
+
+    pipelinewise.copy_native_to_iceberg()
+
+    _, _, targets, conversion_warehouse = mock_report.call_args.args
+    assert conversion_warehouse is None
+    assert mock_report.call_args.kwargs == {'other_writers': []}
+    assert [target.table.key for target in targets] == ['DATABASE.SCHEMA.TABLE']
+    assert capsys.readouterr().out.strip().endswith('Ready: no blockers found.')
 
 
 @patch(

@@ -19,10 +19,10 @@ cd docs && make check
 and packaged-connector references before a strict clean HTML build. Use
 ``make clean html`` only to isolate Sphinx failures.
 
-Verify prose against implementation, CLI help, schemas, example YAML, and
-runtime—not assumptions or only the diff. Use `import_config` (`import` is
-deprecated) and describe FastSync as a FullSync/PartialSync optimization, not
-Singer replication.
+Verify prose against implementation, CLI help, schemas, examples and runtime;
+do not infer behaviour from the diff alone. Use the root command names and
+FastSync terminology. Root guidance-only/shared-session restrictions apply:
+do not run a project build merely to review or rearrange AGENTS files.
 
 ## Content
 
@@ -36,6 +36,10 @@ Singer replication.
 - Order: support, defaults, operational impact, failures, diagnosis, recovery.
   Separate defaults from examples and supported behaviour from future plans.
 - Exclude Wise-only hosts, credentials, and internal runbooks.
+- Important settings belong in the parameter reference, owning guide and main
+  copy-and-paste example. Check the rendered HTML for each, not only keyword
+  presence in RST. Run the strict docs build when validation is in scope and
+  isolated; otherwise report it as unverified.
 
 ## RST
 
@@ -53,7 +57,7 @@ Singer replication.
 | CLI add/remove/rename | `user_guide/cli.rst`: arguments, environment, references, examples, mentions |
 | Connector add/remove | Connector page, galleries, `project/licenses.rst`, `installation_guide/installation.rst` |
 | Connector behavior/capability/limit | Connector page; concept page if cross-cutting |
-| YAML parameters | `user_guide/yaml_config.rst` and connector page |
+| YAML parameters | `user_guide/yaml_config.rst` reference and main examples; owning connector/behaviour guide |
 | Singer replication | `concept/replication_methods.rst`; `concept/singer.rst` if relevant |
 | FastSync components/selection/pairs | `concept/fastsync.rst`; never list FastSync as a replication method |
 | Resync/`sync_start_from` | `concept/fastsync.rst`, `user_guide/resync.rst` |
@@ -63,6 +67,9 @@ Singer replication.
 | Alert handlers | `user_guide/alerts.rst` |
 | Operational diagnostics | `user_guide/troubleshooting.rst` |
 
-Backend schema changes also require migration/ERD updates per
-`pipelinewise/AGENTS.md`. Update scoped guidance only for durable architecture,
-CI, or workflow changes; otherwise keep docs edits task-scoped.
+Backend changes also need migration/ERD updates per `pipelinewise/AGENTS.md`.
+Keep AGENTS concise: shared rules in root, scoped invariants with their owner,
+procedures/recipes in linked runbooks. Update guidance for durable architecture,
+CI or workflow changes, not incident history or snapshot test totals. Preserve
+exact limits, commands, exceptions and safety rules when moving content; keep
+ordinary docs edits task-scoped.

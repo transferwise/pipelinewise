@@ -1,0 +1,30 @@
+---
+
+id: "mongo_to_sf_auto_iceberg"
+name: "MongoDB native-to-Iceberg conversion test source"
+type: "tap-mongodb"
+owner: "test-runner"
+
+db_conn:
+  host: "${TAP_MONGODB_HOST}"
+  port: ${TAP_MONGODB_PORT}
+  ssl: "true"
+  verify_mode: "false"
+  user: "${TAP_MONGODB_USER}"
+  password: "${TAP_MONGODB_PASSWORD}"
+  auth_database: "admin"
+  dbname: "${TAP_MONGODB_DB}"
+  replica_set: rs0
+  write_batch_rows: 500
+  update_buffer_size: 30
+
+target: "snowflake"
+batch_size_rows: 1000
+stream_buffer_size: 0
+
+schemas:
+  - source_schema: "${TAP_MONGODB_DB}"
+    target_schema: "ppw_e2e_tap_mongodb${TARGET_SNOWFLAKE_SCHEMA_POSTFIX}"
+    tables:
+      - table_name: "my_collection"
+        replication_method: "LOG_BASED"
