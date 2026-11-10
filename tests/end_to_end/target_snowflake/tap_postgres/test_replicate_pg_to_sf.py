@@ -1,6 +1,9 @@
 from datetime import datetime
+from pathlib import Path
+import re
 
 from pipelinewise.fastsync import postgres_to_snowflake
+from pipelinewise.fastsync.commons.tap_postgres import FastSyncTapPostgres
 from tests.end_to_end.helpers import assertions
 from tests.end_to_end.helpers.json_fixtures import (
     assert_ticket_20155_json_metadata,
@@ -14,6 +17,7 @@ from tests.end_to_end.target_snowflake.tap_postgres import (
 
 TAP_ID = 'postgres_to_sf'
 TARGET_ID = 'snowflake'
+EXPECTED_LOG_BASED_STREAMS = {'public-table_with_space and UPPERCase'}
 LOG_BASED_SEED_MARKER = 'Ticket 20155 before unchanged TOAST update'
 LOG_BASED_UPDATED_MARKER = 'Ticket 20155 after unchanged TOAST update'
 LOG_BASED_INSERT_MARKER = 'Ticket 20155 LOG_BASED insert before update'
@@ -103,6 +107,41 @@ class TestReplicatePGToSF(TapPostgres):
             assert_ticket_20155_json_metadata(
                 [(rows[0][1],)], f'PostgreSQL {route} Snowflake row {row_id}'
             )
+
+    def _assert_final_postgres_feedback(self, previous_singer_logs: set[Path]) -> None:
+        """Verify the completed managed run confirmed its durable target checkpoint on the source."""
+        state = assertions._load_persisted_state(self.target_id, self.tap_id)
+        self.assertIsInstance(state, dict)
+        bookmarks = state['bookmarks']
+        self.assertTrue(EXPECTED_LOG_BASED_STREAMS)
+        self.assertTrue(EXPECTED_LOG_BASED_STREAMS.issubset(bookmarks))
+        checkpoint_lsns = [bookmarks[stream_id]['lsn'] for stream_id in EXPECTED_LOG_BASED_STREAMS]
+        self.assertTrue(all(type(lsn) is int and lsn > 0 for lsn in checkpoint_lsns))
+        minimum_lsn = min(checkpoint_lsns)
+        boundary = f'{minimum_lsn >> 32:X}/{minimum_lsn & 0xFFFFFFFF:X}'
+        slot_name = FastSyncTapPostgres.generate_replication_slot_name(
+            self.e2e_env.get_conn_env_var('TAP_POSTGRES', 'DB'), self.tap_id,
+        )
+        rows = self.e2e_env.run_query_tap_postgres(
+            'SELECT confirmed_flush_lsn::text, confirmed_flush_lsn >= %s::pg_lsn '
+            'FROM pg_replication_slots WHERE slot_name = %s',
+            (boundary, slot_name),
+        )
+        self.assertEqual(len(rows), 1, f'Expected managed logical slot {slot_name}')
+        self.assertIs(rows[0][1], True, f'Slot confirmed {rows[0][0]} below durable target checkpoint {boundary}')
+
+        log_dir = assertions._state_file_path(self.target_id, self.tap_id).parent / 'log'
+        current_logs = set(log_dir.glob('*.singer.log.success')) - previous_singer_logs
+        self.assertEqual(len(current_logs), 1, 'Expected one new successful managed Singer run')
+        log_content = current_logs.pop().read_text(encoding='utf-8')
+        confirmations = [
+            line for line in log_content.splitlines()
+            if 'Confirmed final PostgreSQL feedback at ' in line and f'(slot {slot_name})' in line
+        ]
+        self.assertTrue(
+            any(re.search(r'\bINFO\b', line) for line in confirmations),
+            'The recurring run must confirm managed final feedback at INFO rather than use a fallback stop',
+        )
 
     def test_replicate_pg_to_sf(self):
         """
@@ -270,6 +309,8 @@ class TestReplicatePGToSF(TapPostgres):
         )
 
         # 3. Run tap second time - both fastsync and a singer should be triggered, there are some FULL_TABLE
+        log_dir = assertions._state_file_path(self.target_id, self.tap_id).parent / 'log'
+        previous_singer_logs = set(log_dir.glob('*.singer.log.success'))
         assertions.assert_run_tap_success(
             self.tap_id,
             self.target_id,
@@ -277,6 +318,7 @@ class TestReplicatePGToSF(TapPostgres):
             profiling=True,
             expected_state_streams=postgres_recurring_state_expectations(),
         )
+        self._assert_final_postgres_feedback(previous_singer_logs)
 
         assertions.assert_row_counts_equal(
             self.e2e_env.run_query_tap_postgres,

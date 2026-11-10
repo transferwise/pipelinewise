@@ -68,6 +68,11 @@ The same ``run_tap`` invocation then starts Singer for ongoing log consumption.
 The source must retain change-log data until the target-acknowledged bookmark has
 advanced beyond it.
 
+Managed PostgreSQL-to-Snowflake runs acknowledge their completed WAL
+progress-marker boundary after the target's final flush. PostgreSQL may still
+need older WAL to reconstruct decoding state at the next reconnect. See
+:ref:`postgres_final_feedback` for acknowledgement and recovery behaviour.
+
 MySQL/MariaDB checkpoints wait for complete transactions and preserve each
 stream's acknowledged history. Unsupported binlog encodings and selected-table
 ``TRUNCATE`` stop replication; see :ref:`tap-mysql` for source settings and

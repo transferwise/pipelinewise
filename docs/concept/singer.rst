@@ -96,3 +96,10 @@ replayable after interruption.
 For PostgreSQL LOG_BASED replication, the logical slot's flush feedback is
 bounded by the minimum acknowledged LSN in ``state.json``. See
 :ref:`stream_buffering` for termination and replay behaviour.
+
+At a completed progress-marker boundary, managed PostgreSQL-to-Snowflake runs
+close their data pipe while retaining the replication connection. This lets the
+target flush at EOF before PipelineWise sends the final durable acknowledgement
+to PostgreSQL. The target state is persisted immediately so the source can
+finish without waiting for the pipeline to exit. See
+:ref:`postgres_final_feedback` for the scope, deadline and failure behaviour.

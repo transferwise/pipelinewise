@@ -51,6 +51,14 @@ class TestDbFunctions(unittest.TestCase):
         ])
 
     @patch('tap_postgres.db.psycopg2.connect')
+    def test_connection_timeout_default_and_bounded_override(self, connect):
+        connect.return_value.server_version = 150013
+        db.open_connection(self.conn_config)
+        self.assertEqual(30, connect.call_args.kwargs['connect_timeout'])
+        db.open_connection(self.conn_config, prioritize_primary=True, connect_timeout=4)
+        self.assertEqual(4, connect.call_args.kwargs['connect_timeout'])
+
+    @patch('tap_postgres.db.psycopg2.connect')
     def test_open_connection_rejects_postgres_before_14(self, connect):
         """Every connector connection rejects an unsupported source."""
         connection = connect.return_value

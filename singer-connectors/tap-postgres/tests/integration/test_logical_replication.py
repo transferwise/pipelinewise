@@ -1,9 +1,12 @@
 import contextlib
 import json
+import os
+import tempfile
 import unittest
 import unittest.mock
 
 import tap_postgres
+from tap_postgres.final_feedback import FinalFeedbackCoordinator
 from tap_postgres.sync_strategies import common, logical_replication
 
 from ..utils import get_test_connection_config, ensure_test_table, create_replication_slot, drop_replication_slot, \
@@ -334,6 +337,62 @@ class TestWalProgressMessageSlotAdvancement(unittest.TestCase):
     def tearDownClass(cls) -> None:
         drop_replication_slot(tap_id=cls.tap_id)
         drop_table(cls.selected_table)
+
+    def test_final_target_ack_is_confirmed_before_a_new_replication_session(self):
+        """The current session confirms a committed target checkpoint without requiring the next run."""
+        streams = tap_postgres.do_discovery(self.config)
+        selected_stream = next(stream for stream in streams
+                               if stream['tap_stream_id'] == f'public-{self.selected_table}')
+        selected_stream = set_replication_method_for_stream(selected_stream, 'LOG_BASED')
+        output = SingerOutput()
+        with contextlib.redirect_stdout(output):
+            state = tap_postgres.do_sync(self.config, {'streams': [selected_stream]}, 'LOG_BASED', {}, None)
+
+        with tempfile.TemporaryDirectory() as directory:
+            state_file = os.path.join(directory, 'target-state.json')
+            with open(state_file, 'w', encoding='utf-8') as handle:
+                json.dump(state, handle)
+            coordinator = FinalFeedbackCoordinator(state_file, timeout_seconds=30)
+            try:
+                output.seek(0)
+                output.truncate()
+                with contextlib.redirect_stdout(output):
+                    state = tap_postgres.do_sync(
+                        self.config, {'streams': [selected_stream]}, 'LOG_BASED', state, state_file,
+                        final_feedback=coordinator)
+
+                self.assertEqual(1, len(coordinator.sessions))
+                original_connection = coordinator.sessions[0].connection
+                slot_name = coordinator.sessions[0].slot_name
+                boundary = coordinator.sessions[0].safe_lsn
+                self.assertEqual(0, original_connection.closed)
+                self.assertEqual(boundary, state['bookmarks'][f'public-{self.selected_table}']['lsn'])
+
+                # Simulate the core's durable target ACK after the target finishes.
+                # Actual fd-1 EOF is exercised in a database-free subprocess test.
+                with open(state_file, 'w', encoding='utf-8') as handle:
+                    json.dump(state, handle)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                with unittest.mock.patch('tap_postgres.final_feedback.seal_singer_output'):
+                    coordinator.finish()
+
+                self.assertNotEqual(0, original_connection.closed)
+                with get_test_connection() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute('SELECT confirmed_flush_lsn::text FROM pg_replication_slots WHERE slot_name = %s',
+                                    (slot_name,))
+                        confirmed_lsn = logical_replication.lsn_to_int(cur.fetchone()[0])
+                self.assertGreaterEqual(confirmed_lsn, boundary)
+
+                with unittest.mock.patch.object(
+                        logical_replication, '_start_replication', wraps=logical_replication._start_replication
+                ) as start_replication, contextlib.redirect_stdout(SingerOutput()):
+                    tap_postgres.do_sync(
+                        self.config, {'streams': [selected_stream]}, 'LOG_BASED', state, state_file)
+                self.assertEqual(boundary, start_replication.call_args.args[3])
+            finally:
+                coordinator.close()
 
     def test_progress_messages_advance_state_and_confirmed_flush_lsn(self):
         """Idle runs emit no records and flush only the previously acknowledged marker."""
