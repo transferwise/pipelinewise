@@ -1,3 +1,7 @@
+0.101.1 (2026-11-10)
+--------------------
+- Fix for tap-postgres slot name for the names greater than 63 characters.
+
 0.101.0 (2026-11-06)
 --------------------
 
