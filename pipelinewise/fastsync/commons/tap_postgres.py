@@ -47,7 +47,7 @@ class FastSyncTapPostgres:
         self.primary_host_conn = None
 
     @staticmethod
-    def generate_replication_slot_name(dbname, tap_id=None, prefix='pipelinewise'):
+    def generate_replication_slot_name(dbname, tap_id=None, prefix='pipelinewise', shortened_prefix='ppw'):
         """Generate replication slot name with
 
         :param str dbname: Database name that will be part of the replication slot name
@@ -64,6 +64,10 @@ class FastSyncTapPostgres:
             tap_id = ''
 
         slot_name = f'{prefix}_{dbname}{tap_id}'.lower()
+
+        if len(slot_name) > 63:
+            LOGGER.warning('Slot name too long, using shortened prefix instead')
+            slot_name = f'{shortened_prefix}_{dbname}{tap_id}'.lower()
 
         # Replace invalid characters to ensure replication slot name is in accordance with Postgres spec
         return re.sub('[^a-z0-9_]', '_', slot_name)

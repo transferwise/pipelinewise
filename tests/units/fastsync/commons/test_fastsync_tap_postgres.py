@@ -113,6 +113,12 @@ class TestFastSyncTapPostgres(TestCase):
             == 'pipelinewise_some_db_some_tap'
         )
 
+        # Long slot name triggers shortened prefix
+        assert (
+            self.postgres.generate_replication_slot_name('a'*60, 'tap')
+            == 'ppw_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_tap'
+        )
+
     def test_close_connection_is_idempotent(self):
         """Close each opened connection once and clear its cursor reference."""
         connection = Mock()
