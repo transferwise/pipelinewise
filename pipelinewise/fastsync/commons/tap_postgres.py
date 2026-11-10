@@ -6,6 +6,8 @@ import os
 import re
 import sys
 import psycopg2
+import hashlib
+
 from singer.logger import log_source_host
 import psycopg2.extras
 
@@ -65,7 +67,13 @@ class FastSyncTapPostgres:
         slot_name = f'{prefix}_{dbname}{tap_id}'.lower()
 
         # Replace invalid characters to ensure replication slot name is in accordance with Postgres spec
-        return re.sub('[^a-z0-9_]', '_', slot_name)
+        slot_name = re.sub('[^a-z0-9_]', '_', slot_name)
+
+        if len(slot_name) > 63:
+            suffix = hashlib.sha256(slot_name.encode('utf-8')).hexdigest()[:8]
+            slot_name = f'{slot_name[:54]}_{suffix}'
+
+        return slot_name
 
     @classmethod
     def __get_slot_name(
@@ -89,7 +97,6 @@ class FastSyncTapPostgres:
         # Replication hosts pattern versions
         slot_name_v15 = cls.generate_replication_slot_name(dbname)
         slot_name_v16 = cls.generate_replication_slot_name(dbname, tap_id)
-
         v15_slots_count = 0
 
         try:

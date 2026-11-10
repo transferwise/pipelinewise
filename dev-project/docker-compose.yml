@@ -28,6 +28,7 @@ services:
       TAP_ORACLE_MYSQL_DB: ${TAP_ORACLE_MYSQL_DB:-mysql8_source_db}
       GODEBUG: "asyncpreempt=0,cgocheck=0"
       GOMAXPROCS: "1"
+      GOGC: "off"
     volumes:
       - ../:/opt/pipelinewise
       # don't create container specific .virtualenvs files on host
