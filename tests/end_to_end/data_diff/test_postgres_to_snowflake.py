@@ -7,13 +7,24 @@ adapters agree.
 """
 
 import json
+import hashlib
+import math
 import os
+import random
+import struct
+from collections.abc import Callable
+from time import perf_counter
 from datetime import datetime, timezone
+from decimal import Decimal, localcontext
 from uuid import uuid4
 
 import pytest
 
-from pipelinewise.data_diff.engine import DataDiffExecutionError, HistoricalWindowNotReady, run_check
+from pipelinewise.data_diff.adapters import DatabaseAdapter
+from pipelinewise.data_diff.engine import (
+    DataDiffExecutionError, HistoricalWindowNotReady, build_metric_query, connect_source, connect_target, run_check,
+)
+from pipelinewise.data_diff.float64 import FLOAT_NORMALIZATION_ERRORS
 from pipelinewise.fastsync.commons.snowflake_iceberg_versions import MANAGED_ICEBERG_V3_TABLE_OPTIONS
 
 from ..helpers import tasks
@@ -35,6 +46,339 @@ EXPECTED_CHECKS = {
     'max_key',
     'row_checksum',
 }
+
+
+def _float64_probe_values(include_nonfinite: bool) -> list[float | None]:
+    """Cover every binary exponent and its neighbors, plus fixed random bit patterns."""
+    values = [
+        None, 0.0, -0.0, 0.1, math.nextafter(0.1, math.inf), float(2**24), float(2**24 + 1),
+        float(2**53), math.nextafter(float(2**53), math.inf), float.fromhex('0x1.fffffffffffffp+1023'),
+        -0.1, -float(2**53), -float.fromhex('0x0.0000000000001p-1022'),
+        -float.fromhex('0x1.fffffffffffffp+1023'),
+    ]
+    for exponent in range(-1074, 1024):
+        power = 2.0**exponent
+        values.extend((math.nextafter(power, 0.0), power, math.nextafter(power, math.inf)))
+    generator = random.Random(831)
+    for _ in range(80):
+        value = struct.unpack('>d', generator.randbytes(8))[0]
+        if math.isfinite(value):
+            values.append(value)
+    if include_nonfinite:
+        values.extend((math.nan, math.inf, -math.inf))
+    return values
+
+
+def _reference_float64_token(value: float | None) -> str | None:
+    """Decode IEEE-754 bytes independently of the SQL logarithm and power arithmetic."""
+    if value is None:
+        return None
+    if math.isnan(value):
+        return 'nan'
+    if math.isinf(value):
+        return '+inf' if value > 0 else '-inf'
+    if value == 0:
+        return '0'
+    bits = int.from_bytes(struct.pack('>d', value), 'big')
+    sign = '-' if bits >> 63 else '+'
+    exponent_bits = (bits >> 52) & 2047
+    exponent = exponent_bits - 1023 if exponent_bits else -1022
+    significand = bits & ((1 << 52) - 1)
+    if exponent_bits:
+        significand |= 1 << 52
+    return f'{sign}{exponent}:{significand >> 26}:{significand & ((1 << 26) - 1)}'
+
+
+def _float64_probe_query(adapter: DatabaseAdapter, values: list[float | None]) -> str:
+    """Project a bounded synthetic relation through the actual normalizer SQL."""
+    dialect = adapter.checksum_dialect
+    literals = ['NULL' if value is None else f"'{value!r}'" for value in values]
+    if dialect == 'snowflake':
+        rows = ', '.join(f'({position}, {literal})' for position, literal in enumerate(literals))
+        query = f'SELECT column1 AS i, TO_DOUBLE(column2) AS x FROM VALUES {rows}'
+    elif dialect == 'postgres':
+        query = ' UNION ALL '.join(
+            f'SELECT {position} AS i, {literal}::double precision AS x'
+            for position, literal in enumerate(literals)
+        )
+    else:
+        # Scientific notation forces a DOUBLE literal rather than a DECIMAL literal in MySQL/MariaDB.
+        query = ' UNION ALL '.join(
+            f'SELECT {position} AS i, '
+            + ('NULL' if value is None else (repr(value) if 'e' in repr(value) else f'{value!r}E0'))
+            + ' AS x'
+            for position, value in enumerate(values)
+        )
+    return _project_float64_probe(adapter, query)
+
+
+def _project_float64_probe(adapter: DatabaseAdapter, query: str, conversion: str = 'identity') -> str:
+    """Apply the production projection to either a DOUBLE or declared DECIMAL input relation."""
+    dialect = adapter.checksum_dialect
+    column = {
+        'name': 'X' if dialect == 'snowflake' else 'x', 'checksum_kind': 'float64',
+        'checksum_float_conversion': conversion,
+    }
+    stages, columns = adapter.checksum_projection([column])
+    query = adapter.project_checksum_relation(query, stages)
+    return (
+        f"SELECT i, {columns[0]['checksum_float_token']} AS token, "
+        f"{columns[0]['checksum_float_invalid']} AS invalid FROM ({query}) q ORDER BY i"
+    )
+
+
+def _connect_float64_probe(engine: str) -> DatabaseAdapter:
+    """Use DataDiff's normal bounded, read-only connections without touching source fixtures."""
+    e2e = E2EEnv(PROJECT_DIR)
+    check = {'check_id': str(uuid4()), 'statement_timeout_seconds': 60}
+    if engine == 'snowflake':
+        if not e2e.env['TARGET_SNOWFLAKE']['is_configured']:
+            pytest.skip('TARGET_SNOWFLAKE credentials are not configured')
+        config = {
+            key.lower(): e2e.get_conn_env_var('TARGET_SNOWFLAKE', key)
+            for key in ('ACCOUNT', 'DBNAME', 'USER', 'PRIVATE_KEY', 'WAREHOUSE')
+        }
+        return connect_target({**check, 'target_type': 'target-snowflake'}, config)
+    connector = {
+        'postgres': 'TAP_POSTGRES', 'yugabyte': 'TAP_YUGABYTE',
+        'mysql': 'TAP_ORACLE_MYSQL', 'mariadb': 'TAP_MYSQL',
+    }[engine]
+    if not e2e.env[connector]['is_configured']:
+        pytest.skip(f'{connector} credentials are not configured')
+    config = {key.lower(): e2e.get_conn_env_var(connector, key) for key in ('HOST', 'PORT', 'USER', 'PASSWORD')}
+    config.update(dbname=e2e.get_conn_env_var(connector, 'DB'), engine=engine)
+    source_type = {'postgres': 'tap-postgres', 'yugabyte': 'tap-yugabyte'}.get(engine, 'tap-mysql')
+    return connect_source({**check, 'source_type': source_type}, config)
+
+
+@pytest.mark.parametrize('engine', ['postgres', 'yugabyte', 'mysql', 'mariadb', 'snowflake'])
+def test_float64_projection_on_real_engine(engine: str, record_property: Callable[[str, object], None]) -> None:
+    """Check every exponent against raw IEEE-754 bits using only synthetic SELECT statements."""
+    adapter = _connect_float64_probe(engine)
+    values = _float64_probe_values(include_nonfinite=engine not in ('mysql', 'mariadb'))
+    # Small UNION batches avoid source parser limits; Snowflake VALUES handles this fixed vector in one query.
+    batch_size = len(values) if engine == 'snowflake' else 80
+    query_seconds = 0.0
+    try:
+        for offset in range(0, len(values), batch_size):
+            batch = values[offset:offset + batch_size]
+            query = _float64_probe_query(adapter, batch)
+            started = perf_counter()
+            with adapter.connection.cursor() as cursor:
+                cursor.execute(query)
+                rows = cursor.fetchall()
+                names = [description[0] for description in cursor.description]
+            query_seconds += perf_counter() - started
+            assert len(rows) == len(batch)
+            for position, row in enumerate(rows):
+                if not isinstance(row, dict):
+                    row = dict(zip(names, row))
+                row = {str(name).lower(): value for name, value in row.items()}
+                assert row['i'] == position
+                assert row['token'] == _reference_float64_token(batch[position]), (engine, offset + position)
+                assert not row['invalid'], (engine, offset + position)
+    finally:
+        adapter.close()
+    record_property('float64_vector_size', len(values))
+    record_property('float64_query_seconds', query_seconds)
+
+
+def _decimal_coefficient_text(coefficient: int, scale: int) -> str:
+    """Write an exact scaled integer without applying the Decimal context's precision."""
+    sign = '-' if coefficient < 0 else ''
+    digits = str(abs(coefficient)).zfill(scale + 1)
+    return sign + (f'{digits[:-scale]}.{digits[-scale:]}' if scale else digits)
+
+
+def _decimal_probe_values(scale: int) -> list[str | None]:
+    """Keep a fixed, bounded sample of exact DECIMAL rounding boundaries and extreme coefficients."""
+    values = [None, '0', '-0']
+    values.extend(_decimal_coefficient_text(value, scale) for value in (1, -1, 10**65 - 1, 1 - 10**65))
+    generator = random.Random(18473 + scale)
+    for _ in range(64):
+        magnitude = generator.randrange(1, 10**generator.randrange(1, 66))
+        coefficient = -magnitude if generator.randrange(2) else magnitude
+        values.append(_decimal_coefficient_text(coefficient, scale))
+    with localcontext() as context:
+        context.prec = 300
+        unit = Decimal(10)**-scale
+        exponents = {-1, 0, 24, 52, 53, 100, 200, math.floor(-scale * math.log2(10)),
+                     math.floor((65 - scale) * math.log2(10)) - 1}
+        for exponent in sorted(exponents):
+            power = Decimal(2)**exponent
+            midpoint = power + Decimal(2)**(exponent - 53)
+            for value in (power, midpoint):
+                center = int((value / unit).to_integral_value())
+                for offset in (-1, 0, 1):
+                    coefficient = center + offset
+                    if 0 < coefficient < 10**65:
+                        values.extend(_decimal_coefficient_text(sign * coefficient, scale) for sign in (1, -1))
+    if scale >= 30:
+        midpoint_neighbors = (
+            '16777216.000000001862645149230957031249',
+            '16777216.000000001862645149230957031250',
+            '16777216.000000001862645149230957031251',
+            '0.000000000000000000000000000001',
+        )
+        values.extend(midpoint_neighbors)
+        values.extend(f'-{value}' for value in midpoint_neighbors)
+    return list(dict.fromkeys(values))
+
+
+@pytest.mark.parametrize('engine', ['mysql', 'mariadb'])
+def test_decimal_float_rounding_on_real_engine(engine: str, record_property: Callable[[str, object], None]) -> None:
+    """Match exact decimal-to-binary64 rounding using read-only synthetic DECIMAL(65, scale) rows."""
+    adapter = _connect_float64_probe(engine)
+    scales = (0, 1, 6, 18, 30, 38) if engine == 'mariadb' else (0, 1, 6, 18, 30)
+    batch_size = 60
+    total_cases = 0
+    total_seconds = 0.0
+    try:
+        for scale in scales:
+            values = _decimal_probe_values(scale)
+            query_seconds = 0.0
+            for offset in range(0, len(values), batch_size):
+                batch = values[offset:offset + batch_size]
+                literals = ['NULL' if value is None else f"'{value}'" for value in batch]
+                relation = ' UNION ALL '.join(
+                    f'SELECT {position} AS i, CAST({literal} AS DECIMAL(65,{scale})) AS x'
+                    for position, literal in enumerate(literals)
+                )
+                query = _project_float64_probe(adapter, relation, conversion='mysql_decimal')
+                started = perf_counter()
+                with adapter.connection.cursor() as cursor:
+                    cursor.execute(query)
+                    rows = cursor.fetchall()
+                query_seconds += perf_counter() - started
+                assert len(rows) == len(batch)
+                for position, row in enumerate(rows):
+                    assert row['i'] == position
+                    value = batch[position]
+                    expected = _reference_float64_token(None if value is None else float(Decimal(value)))
+                    assert row['token'] == expected, (engine, scale, offset + position)
+                    assert not row['invalid'], (engine, scale, offset + position)
+            record_property(f'decimal_scale_{scale}_vector_size', len(values))
+            record_property(f'decimal_scale_{scale}_query_seconds', query_seconds)
+            total_cases += len(values)
+            total_seconds += query_seconds
+    finally:
+        adapter.close()
+    record_property('decimal_vector_size', total_cases)
+    record_property('decimal_query_seconds', total_seconds)
+
+
+def _varying_float_relation(adapter: DatabaseAdapter, row_count: int) -> str:
+    """Generate varying rows without a UNION barrier between normalization stages."""
+    digits = ' UNION ALL '.join(f'SELECT {value} AS n' for value in range(16))
+    integers = f'SELECT a.n * 16 + b.n AS i FROM ({digits}) a CROSS JOIN ({digits}) b'
+    value = 'CASE WHEN MOD(i, 11) = 0 THEN NULL ELSE (MOD(i, 21) - 10) * 0.25E0 END'
+    if adapter.checksum_dialect == 'postgres':
+        value = f'({value})::double precision'
+    fields = [
+        f'CASE WHEN MOD(i, 17) = 0 THEN NULL ELSE MOD(i, 13) END AS {adapter.quote("_ppw_f64_0_value")}',
+        'CASE WHEN MOD(i, 7) = 0 THEN NULL ELSE MOD(i, 3) END AS updated_at',
+        f'{value} AS x',
+    ]
+    if adapter.checksum_dialect == 'mysql':
+        fields.append(
+            "CASE WHEN MOD(i, 19) = 0 THEN NULL ELSE "
+            "CAST('16777216.000000001862645149230957031250' AS DECIMAL(65,30)) "
+            "+ (i - 128) * CAST('0.000000000000000000000000000001' AS DECIMAL(65,30)) END AS amount"
+        )
+    return (
+        f'SELECT {", ".join(fields)} FROM ({integers}) numbers '
+        f'CROSS JOIN (SELECT 0 AS copy UNION ALL SELECT 1 AS copy) copies WHERE i < {row_count}'
+    )
+
+
+def _reference_float_aggregate(row_count: int, include_decimal: bool) -> dict[str, int | None]:
+    """Calculate framing, IEEE tokens and all key metrics without SQL normalization arithmetic."""
+    keys = []
+    checksum = 0
+    for index in range(row_count):
+        if index % 7 == 0 or index % 3 != 1:
+            continue
+        key = None if index % 17 == 0 else index % 13
+        keys.extend((key, key))
+        values = [None if index % 11 == 0 else (index % 21 - 10) * 0.25]
+        if include_decimal:
+            with localcontext() as context:
+                context.prec = 100
+                amount = Decimal('16777216.000000001862645149230957031250') + Decimal(index - 128) * Decimal('1e-30')
+            values.append(None if index % 19 == 0 else float(amount))
+        field_hashes = []
+        for value in values:
+            token = _reference_float64_token(value)
+            payload = 'N' if token is None else f'V{token}'
+            field_hashes.append(hashlib.md5(payload.encode()).hexdigest())
+        row_hash = int(hashlib.md5(''.join(field_hashes).encode()).hexdigest()[-12:], 16) - (2**48 - 1) // 2
+        checksum += 2 * row_hash
+    nonnull_keys = [key for key in keys if key is not None]
+    return {
+        'row_count': len(keys), 'distinct_key_count': len(set(nonnull_keys)),
+        'null_key_count': len(keys) - len(nonnull_keys),
+        'duplicate_key_count': len(nonnull_keys) - len(set(nonnull_keys)),
+        'min_key': min(nonnull_keys), 'max_key': max(nonnull_keys),
+        'row_checksum': checksum, FLOAT_NORMALIZATION_ERRORS: 0,
+    }
+
+
+def _float_plan_boundary_depth(plan: object) -> int:
+    """Count a nested boundary chain so unrelated input UNION plans cannot satisfy the regression."""
+    if isinstance(plan, list):
+        return max((_float_plan_boundary_depth(item) for item in plan), default=0)
+    if isinstance(plan, dict):
+        boundary = (plan.get('Node Type') == 'Subquery Scan'
+                    or 'materialized_from_subquery' in plan or 'materialized' in plan)
+        return int(boundary) + max((_float_plan_boundary_depth(value) for value in plan.values()), default=0)
+    return 0
+
+
+@pytest.mark.parametrize('engine', ['postgres', 'yugabyte', 'mysql', 'mariadb'])
+@pytest.mark.parametrize('row_count', [32, 256])
+def test_float_aggregate_retains_optimizer_boundaries(
+    engine: str, row_count: int, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Run the production aggregate with duplicates, NULLs, alias collisions and excluded window boundaries."""
+    adapter = _connect_float64_probe(engine)
+    include_decimal = adapter.checksum_dialect == 'mysql'
+    columns = [{
+        'name': 'x', 'checksum_kind': 'float64',
+        'checksum_float_conversion': 'mysql_numeric' if include_decimal else 'postgres_float_text',
+    }]
+    if include_decimal:
+        columns.append({'name': 'amount', 'checksum_kind': 'float64', 'checksum_float_conversion': 'mysql_decimal'})
+    relation = _varying_float_relation(adapter, row_count)
+    monkeypatch.setattr(adapter, 'qualified_table', lambda _schema, _table: f'({relation}) AS fixture')
+    # Synthetic SELECTs have no table metadata; the real half-open predicates remain in build_metric_query.
+    monkeypatch.setattr(adapter, 'window_predicates', lambda *_args: [])
+    checks = ('row_count', 'distinct_key_count', 'null_key_count', 'duplicate_key_count',
+              'min_key', 'max_key', 'row_checksum')
+    query = build_metric_query(
+        adapter, 'synthetic', 'varying_rows', '_ppw_f64_0_value', 'updated_at', checks,
+        checksum_columns_for_query=columns,
+    )
+    try:
+        with adapter.connection.cursor() as cursor:
+            explain = 'EXPLAIN FORMAT=JSON ' if include_decimal else 'EXPLAIN (VERBOSE, FORMAT JSON) '
+            cursor.execute(explain + query, (1, 2))
+            plan_row = cursor.fetchone()
+            plan = next(iter(plan_row.values())) if isinstance(plan_row, dict) else plan_row[0]
+            if isinstance(plan, str):
+                plan = json.loads(plan)
+            depth = _float_plan_boundary_depth(plan)
+            stages, _columns = adapter.checksum_projection(columns, reserved_names=('_ppw_f64_0_value', 'updated_at'))
+            # PostgreSQL can remove the first, alias-only stage; arithmetic stages must remain separated.
+            minimum_depth = len(stages) if include_decimal else len(stages) - 1
+            assert depth >= minimum_depth, (engine, depth, minimum_depth)
+            cursor.execute(query, (1, 2))
+            row = cursor.fetchone()
+            if not isinstance(row, dict):
+                row = dict(zip([description[0] for description in cursor.description], row))
+        actual = {str(name).lower(): None if value is None else int(value) for name, value in row.items()}
+        assert actual == _reference_float_aggregate(row_count, include_decimal), (engine, row_count)
+    finally:
+        adapter.close()
 
 
 @pytest.fixture(params=['postgres', 'yugabyte', 'mysql', 'mariadb'])

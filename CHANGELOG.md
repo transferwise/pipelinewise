@@ -1,3 +1,16 @@
+0.102.0 (2026-11-09)
+--------------------
+
+- Compare source numeric values with Snowflake `FLOAT` columns using data-diff
+  `row_checksum`, for native and managed Iceberg v3 tables. Follow replication's
+  casts, including decimal fallback and retained legacy `FLOAT` columns, without
+  a tolerance or extra decimal rounding. Rows loaded with earlier precision or
+  special-value bugs can fail until they change or are resynced. See
+  [floating-point checksums](docs/user_guide/data_diff.rst#floating-point-checksums).
+- Avoid repeated source casts and arithmetic in floating-point checksums by
+  keeping normalization stages separate in PostgreSQL, YugabyteDB, MySQL and
+  MariaDB query plans. Existing statement timeouts still apply.
+
 0.101.0 (2026-11-06)
 --------------------
 

@@ -74,8 +74,8 @@ plaintext-upload and encryption-exclusion recipe is in
   clean wheel/sdist installation when packaging is affected; editable installs
   alone cannot expose an older cached wheel satisfying an unchanged pin.
 - These are upstream-derived copies. Coordinate non-trivial divergence
-  upstream; keep local fixes narrow, comments limited to why divergence is
-  needed, and avoid broad formatting.
+  upstream; keep local fixes narrow and avoid broad formatting. Follow the root
+  comment guidance to explain important constraints and why divergence is needed.
 - Use the core **PostgreSQL 14+** source floor across Singer/FullSync/PartialSync
   and keep connection gates aligned. Targets and backend DBs have separate
   requirements.
@@ -86,6 +86,10 @@ plaintext-upload and encryption-exclusion recipe is in
   schemas/transport and apply deletes before acknowledging state. Use explicit
   decimal metadata and exact string transport; a generic JSON `number` from an
   API tap remains approximate without that contract.
+- Separate logical types from transport representations. A string may carry an
+  exact decimal or nonfinite float, and a schema containing `number` may describe
+  polymorphic JSON. Use explicit schema semantics to scope conversions and
+  transformations; preserve behavior for other allowed types and connector routes.
 - MySQL binlog checkpoints must retain transaction/table-map boundaries and
   each stream's acknowledged history. Preserve complete GTID sets and replay
   fences; only new complete-history captures may set `gtid_complete: true`.
