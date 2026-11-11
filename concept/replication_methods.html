@@ -291,6 +291,7 @@
 <li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#requires-wal-level-logical">requires wal_level &gt;= logical</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#pgres-copy-both-and-no-message-from-the-libpq">PGRES_COPY_BOTH and no message from the libpq</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#logical-streaming-requires-a-stream-abort-cb-callback">logical streaming requires a stream_abort_cb callback</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#final-wal-acknowledgement-waits-or-times-out">Final WAL acknowledgement waits or times out</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#log-based-replication-is-slow-or-falling-behind">LOG_BASED replication is slow or falling behind</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#canceling-statement-due-to-conflict-with-recovery">Canceling statement due to conflict with recovery</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#connection-already-closed">Connection already closed</a></li>
@@ -458,6 +459,10 @@ and processing.</p>
 The same <code class="docutils literal notranslate"><span class="pre">run_tap</span></code> invocation then starts Singer for ongoing log consumption.
 The source must retain change-log data until the target-acknowledged bookmark has
 advanced beyond it.</p>
+<p>Managed PostgreSQL-to-Snowflake runs acknowledge their completed WAL
+progress-marker boundary after the target’s final flush. PostgreSQL may still
+need older WAL to reconstruct decoding state at the next reconnect. See
+<a class="reference internal" href="../connectors/taps/postgres.html#postgres-final-feedback"><span class="std std-ref">Acknowledgement and recovery</span></a> for acknowledgement and recovery behaviour.</p>
 <p>MySQL/MariaDB checkpoints wait for complete transactions and preserve each
 stream’s acknowledged history. Unsupported binlog encodings and selected-table
 <code class="docutils literal notranslate"><span class="pre">TRUNCATE</span></code> stop replication; see <a class="reference internal" href="../connectors/taps/mysql.html#tap-mysql"><span class="std std-ref">MariaDB and MySQL source</span></a> for source settings and

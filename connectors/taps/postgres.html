@@ -291,6 +291,7 @@
 <li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#requires-wal-level-logical">requires wal_level &gt;= logical</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#pgres-copy-both-and-no-message-from-the-libpq">PGRES_COPY_BOTH and no message from the libpq</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#logical-streaming-requires-a-stream-abort-cb-callback">logical streaming requires a stream_abort_cb callback</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#final-wal-acknowledgement-waits-or-times-out">Final WAL acknowledgement waits or times out</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#log-based-replication-is-slow-or-falling-behind">LOG_BASED replication is slow or falling behind</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#canceling-statement-due-to-conflict-with-recovery">Canceling statement due to conflict with recovery</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#connection-already-closed">Connection already closed</a></li>
@@ -551,7 +552,7 @@ PostgreSQL <code class="docutils literal notranslate"><span class="pre">hstore</
 v3 route; native mappings remain unchanged.</p>
 </section>
 <section id="acknowledgement-and-recovery">
-<h2>Acknowledgement and recovery<a class="headerlink" href="#acknowledgement-and-recovery" title="Link to this heading"></a></h2>
+<span id="postgres-final-feedback"></span><h2>Acknowledgement and recovery<a class="headerlink" href="#acknowledgement-and-recovery" title="Link to this heading"></a></h2>
 <p>Consuming WAL does not by itself advance the slot’s safe flush position.
 PipelineWise sends feedback only up to the minimum target-acknowledged LSN stored
 in <code class="docutils literal notranslate"><span class="pre">state.json</span></code>. Missing, unreadable, invalid, or regressing state retains the
@@ -564,6 +565,25 @@ identifies the fence, and the first decoded transaction commit at or beyond that
 position provides a safe bookmark boundary even when the selected tables are
 idle. Slot feedback advances through that boundary only after the target
 acknowledges the state.</p>
+<p>For managed PostgreSQL-to-Snowflake runs with an existing state file and one
+logical source database that stop at this completed marker, PipelineWise closes
+the Singer data pipe and keeps the original replication connection open.
+Downstream transformations and buffers drain, and Snowflake
+finishes its final load and deletes. PipelineWise immediately persists the
+target’s acknowledged state, sends final feedback up to the completed boundary,
+and checks that PostgreSQL received it before closing the connection. This
+avoids leaving the final durable checkpoint unreported until another run.</p>
+<p>Final acknowledgement has a ten-minute deadline. After a timeout, failed target,
+unreadable state, or lost PostgreSQL connection, the tap logs a warning and
+closes without final feedback, as earlier releases did. This alone does not
+fail the run; a failed target still fails it. The next run resumes from the
+durable target checkpoint. Consumed or buffered records alone
+never justify advancing feedback. This finalization requires the managed
+PipelineWise state channel and a completed progress-marker transaction. It adds
+no YAML setting or state migration.</p>
+<p>PostgreSQL can retain an earlier <code class="docutils literal notranslate"><span class="pre">restart_lsn</span></code> even after acknowledging the
+final checkpoint. Restarting logical decoding can therefore still read older
+WAL. Final acknowledgement does not guarantee that every startup read disappears.</p>
 <p>If the function is unavailable or inaccessible, replication continues using
 the captured current-WAL boundary. Fully filtered idle WAL may then require a
 later decodable message before the bookmark and acknowledgement can advance.</p>
