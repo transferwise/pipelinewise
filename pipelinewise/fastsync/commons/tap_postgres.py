@@ -6,6 +6,7 @@ import math
 import os
 import re
 import sys
+import time
 import psycopg2
 #import hashlib
 
@@ -25,10 +26,29 @@ from ...utils import safe_column_name
 
 LOGGER = logging.getLogger(__name__)
 MIN_SUPPORTED_POSTGRES_VERSION = 140000
+SLOT_PLUGIN = 'wal2json'
+SLOT_DUPLICATE_OBJECT_SQLSTATE = '42710'
+SLOT_READY_TIMEOUT_SECONDS = 900
+SLOT_READY_POLL_SECONDS = 1
 
 
 class UnsupportedPostgresVersionError(RuntimeError):
     """The source server is older than the supported PostgreSQL version floor."""
+
+
+class ReplicationSlotVerificationError(RuntimeError):
+    """The replication slot cannot be proven to cover the bookmark being taken."""
+
+
+def lsn_to_int(lsn: str) -> int:
+    """Convert a PostgreSQL LSN in X/Y text form to an integer."""
+    file, index = lsn.split('/')
+    return (int(file, 16) << 32) + int(index, 16)
+
+
+def int_to_lsn(lsn: int) -> str:
+    """Convert an integer LSN to PostgreSQL X/Y text form."""
+    return f'{lsn >> 32:X}/{lsn & 0xFFFFFFFF:X}'
 
 
 class FastSyncTapPostgres:
@@ -372,9 +392,9 @@ class FastSyncTapPostgres:
 
                 return []
 
-    def create_replication_slot(self):
+    def create_replication_slot(self) -> int:
         """
-        Create replication slot on the primary host
+        Create replication slot on the primary host and return its start LSN
 
         IMPORTANT:
         Replication slot name is different after PPW >=0.16.0 and it's using a
@@ -387,28 +407,95 @@ class FastSyncTapPostgres:
         format you won't be able to do LOG_BASED replication from the same postgres
         database by multiple taps. If that the case then you need to drop the old
         replication slot and full-resync the new taps.
-        """
-        try:
-            slot_name = self.__get_slot_name(
-                self.primary_host_conn,
-                self.connection_config['dbname'],
-                self.connection_config['tap_id'],
-            )
 
-            # Create the replication host
-            self.primary_host_query(
-                f"SELECT * FROM pg_create_logical_replication_slot('{slot_name}', 'wal2json')"
+        "Already exists" (SQLSTATE 42710) says nothing about the slot's state: it is
+        raised while another session is still building the slot, and for a slot left
+        by another tap or an earlier instance. An existing slot is accepted only once
+        it is finished and belongs to this database and plugin. Its confirmed_flush_lsn
+        is then the earliest position it can stream from.
+        """
+        slot_name = self.__get_slot_name(
+            self.primary_host_conn,
+            self.connection_config['dbname'],
+            self.connection_config['tap_id'],
+        )
+
+        try:
+            result = self.primary_host_query(
+                f"SELECT * FROM pg_create_logical_replication_slot('{slot_name}', '{SLOT_PLUGIN}')"
             )
         except Exception as exc:
-            # ERROR: replication slot already exists SQL state: 42710
-            if hasattr(exc, 'pgcode') and exc.pgcode == '42710':
-                pass
-            else:
-                raise exc
+            if getattr(exc, 'pgcode', None) != SLOT_DUPLICATE_OBJECT_SQLSTATE:
+                raise
+            LOGGER.info('Replication slot "%s" already exists, verifying it', slot_name)
+            return self._wait_for_existing_slot_start(slot_name)
+
+        return lsn_to_int(result[0]['lsn'])
+
+    def _wait_for_existing_slot_start(self, slot_name: str) -> int:
+        """Return the start LSN of a finished slot owned by this tap, or raise."""
+        dbname = self.connection_config['dbname']
+        deadline = time.monotonic() + SLOT_READY_TIMEOUT_SECONDS
+        while True:
+            rows = self.primary_host_query(
+                'SELECT database, plugin, slot_type, temporary, active_pid, confirmed_flush_lsn '
+                'FROM pg_replication_slots WHERE slot_name = %s',
+                (slot_name,),
+            )
+            if not rows:
+                raise ReplicationSlotVerificationError(
+                    f'Replication slot "{slot_name}" was reported as existing but is gone; '
+                    'its creation was probably cancelled. Rerun the sync.'
+                )
+
+            slot = rows[0]
+            if (
+                slot['slot_type'] != 'logical'
+                or slot['database'] != dbname
+                or slot['plugin'] != SLOT_PLUGIN
+                or slot['temporary']
+            ):
+                raise ReplicationSlotVerificationError(
+                    f'Replication slot "{slot_name}" exists but does not belong to this tap: '
+                    f'type {slot["slot_type"]}, database {slot["database"]}, plugin {slot["plugin"]}, '
+                    f'temporary {slot["temporary"]}; expected a persistent logical slot on {dbname} '
+                    f'using {SLOT_PLUGIN}'
+                )
+
+            if slot['confirmed_flush_lsn'] is not None and slot['active_pid'] is None:
+                LOGGER.info(
+                    'Using existing replication slot "%s" from %s', slot_name, slot['confirmed_flush_lsn']
+                )
+                return lsn_to_int(slot['confirmed_flush_lsn'])
+
+            if time.monotonic() >= deadline:
+                raise ReplicationSlotVerificationError(
+                    f'Replication slot "{slot_name}" is not ready after {SLOT_READY_TIMEOUT_SECONDS} seconds: '
+                    f'active_pid {slot["active_pid"]}, confirmed_flush_lsn {slot["confirmed_flush_lsn"]}. '
+                    'It is still being created or is in use by another session.'
+                )
+            time.sleep(SLOT_READY_POLL_SECONDS)
+
+    def _read_bookmark_lsn(self) -> int:
+        if self.connection_config.get('replica_host'):
+            result = self.query('SELECT pg_last_wal_replay_lsn() AS current_lsn')
+        else:
+            result = self.query('SELECT pg_current_wal_lsn() AS current_lsn')
+
+        current_lsn = result[0].get('current_lsn')
+        if current_lsn is None:
+            raise ReplicationSlotVerificationError(
+                'Cannot read the replay position from replica_host; it is not a streaming standby'
+            )
+        return lsn_to_int(current_lsn)
 
     def fetch_current_log_pos(self):
         """
         Get the actual wal position in Postgres
+
+        The bookmark must be at or after the slot's start. Otherwise the snapshot copied
+        after it can miss commits that the slot will never stream. A replica_host is given
+        time to replay past the slot's start.
         """
         # Create replication slot dedicated connection
         # Always use Primary server for creating replication_slot
@@ -416,22 +503,20 @@ class FastSyncTapPostgres:
             self.connection_config, prioritize_primary=True
         )
         try:
-            # Create replication slot
-            self.create_replication_slot()
+            slot_start_lsn = self.create_replication_slot()
         finally:
             self._close_primary_host_connection()
 
-        # is replica_host set ?
-        if self.connection_config.get('replica_host'):
-            # Get latest applied lsn from replica_host
-            result = self.query('SELECT pg_last_wal_replay_lsn() AS current_lsn')
-        else:
-            # Get current lsn from primary host
-            result = self.query('SELECT pg_current_wal_lsn() AS current_lsn')
-
-        current_lsn = result[0].get('current_lsn')
-        file, index = current_lsn.split('/')
-        lsn = (int(file, 16) << 32) + int(index, 16)
+        deadline = time.monotonic() + SLOT_READY_TIMEOUT_SECONDS
+        lsn = self._read_bookmark_lsn()
+        while lsn < slot_start_lsn:
+            if not self.connection_config.get('replica_host') or time.monotonic() >= deadline:
+                raise ReplicationSlotVerificationError(
+                    f'Bookmark {int_to_lsn(lsn)} is before the replication slot start '
+                    f'{int_to_lsn(slot_start_lsn)}; commits in between would be lost'
+                )
+            time.sleep(SLOT_READY_POLL_SECONDS)
+            lsn = self._read_bookmark_lsn()
 
         return {'lsn': lsn, 'version': 1}
 

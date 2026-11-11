@@ -36,6 +36,7 @@ class TestFastSyncTapPostgres(TestCase):
 
         def primary_host_query_mock(query, _=None):
             self.postgres.executed_queries_primary_host.append(query)
+            return [{'slot_name': 'slot', 'lsn': '0/2A'}]
 
         self.postgres.primary_host_query = primary_host_query_mock
 
@@ -148,7 +149,7 @@ class TestFastSyncTapPostgres(TestCase):
         with patch.object(
             self.postgres, 'get_connection', return_value=primary_connection
         ), patch.object(
-            self.postgres, 'create_replication_slot'
+            self.postgres, 'create_replication_slot', return_value=42
         ) as create_replication_slot, patch.object(
             self.postgres, 'query', return_value=[{'current_lsn': '0/2A'}]
         ) as query:
@@ -168,7 +169,7 @@ class TestFastSyncTapPostgres(TestCase):
         with patch.object(
             self.postgres, 'get_connection', return_value=primary_connection
         ), patch.object(
-            self.postgres, 'create_replication_slot'
+            self.postgres, 'create_replication_slot', return_value=42
         ), patch.object(
             self.postgres, 'query', return_value=[{'current_lsn': '0/2A'}]
         ) as query:
@@ -176,6 +177,56 @@ class TestFastSyncTapPostgres(TestCase):
 
         self.assertEqual({'lsn': 42, 'version': 1}, bookmark)
         query.assert_called_once_with('SELECT pg_last_wal_replay_lsn() AS current_lsn')
+
+    def test_fetch_current_log_pos_rejects_primary_bookmark_before_slot_start(self):
+        """A bookmark before the slot start would let the snapshot miss commits the slot never streams."""
+        with patch.object(self.postgres, 'get_connection', return_value=Mock()), patch.object(
+            self.postgres, 'create_replication_slot', return_value=43
+        ), patch.object(
+            self.postgres, 'query', return_value=[{'current_lsn': '0/2A'}]
+        ), self.assertRaisesRegex(
+            tap_postgres.ReplicationSlotVerificationError, 'Bookmark 0/2A is before the replication slot start 0/2B'
+        ):
+            self.postgres.fetch_current_log_pos()
+
+    def test_fetch_current_log_pos_waits_for_replica_to_replay_past_slot_start(self):
+        """A lagging replica is polled until its replay position reaches the slot start."""
+        self.postgres.connection_config['replica_host'] = 'replica'
+        replay_positions = [[{'current_lsn': '0/29'}], [{'current_lsn': '0/2B'}]]
+
+        with patch.object(self.postgres, 'get_connection', return_value=Mock()), patch.object(
+            self.postgres, 'create_replication_slot', return_value=42
+        ), patch.object(
+            self.postgres, 'query', side_effect=replay_positions
+        ), patch.object(tap_postgres.time, 'sleep') as sleep:
+            bookmark = self.postgres.fetch_current_log_pos()
+
+        self.assertEqual({'lsn': 43, 'version': 1}, bookmark)
+        sleep.assert_called_once_with(tap_postgres.SLOT_READY_POLL_SECONDS)
+
+    def test_fetch_current_log_pos_rejects_replica_that_never_reaches_slot_start(self):
+        """A replica stuck behind the slot start fails after the timeout instead of taking an early bookmark."""
+        self.postgres.connection_config['replica_host'] = 'replica'
+
+        with patch.object(self.postgres, 'get_connection', return_value=Mock()), patch.object(
+            self.postgres, 'create_replication_slot', return_value=42
+        ), patch.object(
+            self.postgres, 'query', return_value=[{'current_lsn': '0/29'}]
+        ), patch.object(tap_postgres.time, 'sleep'), patch.object(
+            tap_postgres.time, 'monotonic', side_effect=[0, 0, tap_postgres.SLOT_READY_TIMEOUT_SECONDS]
+        ), self.assertRaises(tap_postgres.ReplicationSlotVerificationError):
+            self.postgres.fetch_current_log_pos()
+
+    def test_fetch_current_log_pos_rejects_replica_without_replay_position(self):
+        """A replica_host that is not a standby has no replay position and cannot supply a bookmark."""
+        self.postgres.connection_config['replica_host'] = 'replica'
+
+        with patch.object(self.postgres, 'get_connection', return_value=Mock()), patch.object(
+            self.postgres, 'create_replication_slot', return_value=42
+        ), patch.object(
+            self.postgres, 'query', return_value=[{'current_lsn': None}]
+        ), self.assertRaisesRegex(tap_postgres.ReplicationSlotVerificationError, 'not a streaming standby'):
+            self.postgres.fetch_current_log_pos()
 
     def test_fetch_current_log_pos_closes_primary_connection_on_failure(self):
         """A replication-slot failure cannot leak the primary connection."""
@@ -213,7 +264,7 @@ class TestFastSyncTapPostgres(TestCase):
 
         self.postgres.primary_host_conn = pg_con
 
-        self.postgres.create_replication_slot()
+        self.assertEqual(42, self.postgres.create_replication_slot())
         assert self.postgres.executed_queries_primary_host == [
             "SELECT * FROM pg_replication_slots WHERE slot_name = 'pipelinewise_test_database';",
             "SELECT * FROM pg_create_logical_replication_slot('pipelinewise_test_database_test_tap', 'wal2json')",
@@ -244,6 +295,99 @@ class TestFastSyncTapPostgres(TestCase):
             "SELECT * FROM pg_replication_slots WHERE slot_name = 'pipelinewise_test_database';",
             "SELECT * FROM pg_create_logical_replication_slot('pipelinewise_test_database', 'wal2json')",
         ]
+
+    def _existing_slot(self, slot_rows, monotonic=None):
+        """Run create_replication_slot against a slot that already exists, returning the result."""
+        cursor_mock = MagicMock().return_value
+        type(cursor_mock.__enter__.return_value).rowcount = PropertyMock(return_value=0)
+        pg_con = Mock()
+        pg_con.cursor.return_value = cursor_mock
+        self.postgres.primary_host_conn = pg_con
+
+        duplicate = Exception('replication slot "pipelinewise_test_database_test_tap" already exists')
+        duplicate.pgcode = '42710'
+        self.postgres.primary_host_query = Mock(side_effect=[duplicate, *slot_rows])
+        with patch.object(tap_postgres.time, 'sleep') as sleep, patch.object(
+            tap_postgres.time, 'monotonic', side_effect=monotonic or [0] * (len(slot_rows) + 1)
+        ):
+            return self.postgres.create_replication_slot(), sleep
+
+    @staticmethod
+    def _slot(**overrides):
+        slot = {
+            'database': 'test_database', 'plugin': 'wal2json', 'slot_type': 'logical',
+            'temporary': False, 'active_pid': None, 'confirmed_flush_lsn': '0/2A',
+        }
+        slot.update(overrides)
+        return [slot]
+
+    def test_create_replication_slot_accepts_finished_slot_of_this_tap(self):
+        """An existing finished slot on this database and plugin starts at its confirmed_flush_lsn."""
+        start_lsn, sleep = self._existing_slot([self._slot()])
+
+        self.assertEqual(42, start_lsn)
+        sleep.assert_not_called()
+        self.postgres.primary_host_query.assert_called_with(
+            'SELECT database, plugin, slot_type, temporary, active_pid, confirmed_flush_lsn '
+            'FROM pg_replication_slots WHERE slot_name = %s',
+            ('pipelinewise_test_database_test_tap',),
+        )
+
+    def test_create_replication_slot_waits_for_slot_still_being_created(self):
+        """A slot another worker is still building has no start point yet, so it is polled until finished."""
+        start_lsn, sleep = self._existing_slot([
+            self._slot(active_pid=123, confirmed_flush_lsn=None),
+            self._slot(active_pid=123, confirmed_flush_lsn='0/2B'),
+            self._slot(confirmed_flush_lsn='0/2B'),
+        ])
+
+        self.assertEqual(43, start_lsn)
+        self.assertEqual(2, sleep.call_count)
+
+    def test_create_replication_slot_rejects_slot_that_never_finishes(self):
+        """A slot that stays in creation or in use fails after the timeout."""
+        with self.assertRaisesRegex(tap_postgres.ReplicationSlotVerificationError, 'is not ready'):
+            self._existing_slot(
+                [self._slot(active_pid=123, confirmed_flush_lsn=None)],
+                monotonic=[0, tap_postgres.SLOT_READY_TIMEOUT_SECONDS],
+            )
+
+    def test_create_replication_slot_rejects_foreign_slots(self):
+        """A slot on another database, with another plugin, physical or temporary is never reused."""
+        for overrides in (
+            {'database': 'other_database'},
+            {'plugin': 'pgoutput'},
+            {'slot_type': 'physical'},
+            {'temporary': True},
+        ):
+            with self.subTest(**overrides), self.assertRaisesRegex(
+                tap_postgres.ReplicationSlotVerificationError, 'does not belong to this tap'
+            ):
+                self._existing_slot([self._slot(**overrides)])
+
+    def test_create_replication_slot_rejects_slot_that_disappears(self):
+        """A slot dropped after the duplicate error, for example a cancelled creation, is an error."""
+        with self.assertRaisesRegex(tap_postgres.ReplicationSlotVerificationError, 'is gone'):
+            self._existing_slot([[]])
+
+    def test_create_replication_slot_propagates_other_errors(self):
+        """Errors other than the duplicate-object SQLSTATE are raised unchanged."""
+        cursor_mock = MagicMock().return_value
+        type(cursor_mock.__enter__.return_value).rowcount = PropertyMock(return_value=0)
+        pg_con = Mock()
+        pg_con.cursor.return_value = cursor_mock
+        self.postgres.primary_host_conn = pg_con
+        error = Exception('permission denied')
+        error.pgcode = '42501'
+        self.postgres.primary_host_query = Mock(side_effect=error)
+
+        with self.assertRaisesRegex(Exception, 'permission denied'):
+            self.postgres.create_replication_slot()
+
+    def test_lsn_conversions_round_trip(self):
+        """LSN text and integer forms convert both ways."""
+        self.assertEqual((0x16 << 32) + 0xB374D848, tap_postgres.lsn_to_int('16/B374D848'))
+        self.assertEqual('16/B374D848', tap_postgres.int_to_lsn((0x16 << 32) + 0xB374D848))
 
     @patch('pipelinewise.fastsync.commons.tap_postgres.psycopg2.connect')
     def test_get_connection_to_primary(self, connect_mock):
