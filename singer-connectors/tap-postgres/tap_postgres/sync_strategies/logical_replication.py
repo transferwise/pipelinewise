@@ -680,11 +680,11 @@ def generate_replication_slot_name(dbname, tap_id=None, prefix='pipelinewise'):
     # Replace invalid characters to ensure replication slot name is in accordance with Postgres spec
     slot_name = re.sub('[^a-z0-9_]', '_', slot_name)
 
-    if len(slot_name) > 63:
-        suffix = hashlib.sha256(slot_name.encode('utf-8')).hexdigest()[:8]
-        slot_name = f'{slot_name[:54]}_{suffix}'
+    # This is needs more investigation to support the taps already have slots name greater than 63 and are working
+    # if len(slot_name) > 63:
+    #    suffix = hashlib.sha256(slot_name.encode('utf-8')).hexdigest()[:8]
+    #    slot_name = f'{slot_name[:54]}_{suffix}'
 
-    # Replace invalid characters to ensure replication slot name is in accordance with Postgres spec
     return slot_name
 
 
