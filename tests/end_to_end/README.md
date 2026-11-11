@@ -8,7 +8,7 @@ these recipes aligned when the matrix changes.
 ## Shard recipes
 
 These groups mirror `.github/workflows/e2e_tests.yml` in required-check order
-`e2e_tests_01` through `e2e_tests_23`; update both together. CI runs twenty-two
+`e2e_tests_01` through `e2e_tests_24`; update both together. CI runs twenty-three
 Snowflake groups concurrently on isolated runners; local groups share/reset
 fixtures/config and must run serially:
 
@@ -175,12 +175,10 @@ run_sf_decimal \
 run_e2e \
   tests/end_to_end/target_snowflake/tap_yugabyte/test_partial_sync_yugabyte_to_sf.py \
   tests/end_to_end/target_snowflake/tap_yugabyte/test_partial_sync_repair_yugabyte_to_sf.py \
-  tests/end_to_end/target_snowflake/tap_yugabyte/test_migrate_postgres_tap_to_yugabyte_sf.py \
   tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_with_split_large_files.py
 
 run_e2e \
-  tests/end_to_end/test_yugabyte_recovery.py \
-  tests/end_to_end/test_yugabyte_migration.py
+  tests/end_to_end/test_yugabyte_recovery.py
 
 run_sf_decimal \
   tests/integration/test_decimals.py::test_mysql_extended_composite_key_upgrade_preserves_historical_updates_and_deletes \
@@ -188,13 +186,17 @@ run_sf_decimal \
 
 run_e2e \
   'tests/end_to_end/test_numeric_replication.py::test_postgres_float_nonfinite_snowflake[postgres-native]' \
-  tests/end_to_end/test_numeric_replication.py::test_postgres_bounded_numeric_key_snowflake
+  tests/end_to_end/test_numeric_replication.py::test_postgres_bounded_numeric_key_snowflake \
+  tests/end_to_end/test_yugabyte_migration.py
 
 run_sf_decimal \
   tests/integration/test_decimals.py::test_legacy_float_decimal_keys_coalesce_collisions_and_keep_last_patch_and_delete
+
+run_e2e \
+  tests/end_to_end/target_snowflake/tap_yugabyte/test_migrate_postgres_tap_to_yugabyte_sf.py
 ```
 
-Run all twenty-three only for a full suite; otherwise run every affected group. MariaDB,
+Run all twenty-four only for a full suite; otherwise run every affected group. MariaDB,
 PostgreSQL, and genuine MySQL cover native and explicit v3.
 Do not infer one format from another. `SHOW PRIMARY KEYS` does not prove Iceberg
 identifier fields; compare raw-metadata `identifier-field-ids` with current

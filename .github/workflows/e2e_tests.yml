@@ -270,13 +270,11 @@ jobs:
             test_paths: >-
               tests/end_to_end/target_snowflake/tap_yugabyte/test_partial_sync_yugabyte_to_sf.py
               tests/end_to_end/target_snowflake/tap_yugabyte/test_partial_sync_repair_yugabyte_to_sf.py
-              tests/end_to_end/target_snowflake/tap_yugabyte/test_migrate_postgres_tap_to_yugabyte_sf.py
               tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_with_split_large_files.py
           - shard: yugabyte-recovery
             check_name: e2e_tests_22
             test_paths: >-
               tests/end_to_end/test_yugabyte_recovery.py
-              tests/end_to_end/test_yugabyte_migration.py
             connector_test_paths: >-
               tests/integration/test_decimals.py::test_mysql_extended_composite_key_upgrade_preserves_historical_updates_and_deletes
               tests/integration/test_runtime_contracts.py::test_rejects_table_format_change_without_altering_rows
@@ -285,8 +283,13 @@ jobs:
             test_paths: >-
               tests/end_to_end/test_numeric_replication.py::test_postgres_float_nonfinite_snowflake[postgres-native]
               tests/end_to_end/test_numeric_replication.py::test_postgres_bounded_numeric_key_snowflake
+              tests/end_to_end/test_yugabyte_migration.py
             connector_test_paths: >-
               tests/integration/test_decimals.py::test_legacy_float_decimal_keys_coalesce_collisions_and_keep_last_patch_and_delete
+          - shard: yugabyte-migration
+            check_name: e2e_tests_24
+            test_paths: >-
+              tests/end_to_end/target_snowflake/tap_yugabyte/test_migrate_postgres_tap_to_yugabyte_sf.py
     env:
       E2E_TEST_PATHS: ${{ matrix.test_paths }}
       PIPELINEWISE_E2E_NAMESPACE: >-

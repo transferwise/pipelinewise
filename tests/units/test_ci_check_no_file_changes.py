@@ -240,7 +240,7 @@ def test_snowflake_e2e_matrix_contract():
     assert job['name'] == '${{ matrix.check_name }}'
     assert strategy['fail-fast'] is False
     assert 'max-parallel' not in strategy
-    assert len(shards) == 22
+    assert len(shards) == 23
 
     expected_shards = {
         'conversion': (
@@ -416,7 +416,6 @@ def test_snowflake_e2e_matrix_contract():
             (
                 'tests/end_to_end/target_snowflake/tap_yugabyte/test_partial_sync_yugabyte_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_yugabyte/test_partial_sync_repair_yugabyte_to_sf.py',
-                'tests/end_to_end/target_snowflake/tap_yugabyte/test_migrate_postgres_tap_to_yugabyte_sf.py',
                 'tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_with_split_large_files.py',
             ),
         ),
@@ -424,7 +423,6 @@ def test_snowflake_e2e_matrix_contract():
             'e2e_tests_22',
             (
                 'tests/end_to_end/test_yugabyte_recovery.py',
-                'tests/end_to_end/test_yugabyte_migration.py',
             ),
         ),
         'postgres-float-parity': (
@@ -432,6 +430,13 @@ def test_snowflake_e2e_matrix_contract():
             (
                 'tests/end_to_end/test_numeric_replication.py::test_postgres_float_nonfinite_snowflake[postgres-native]',
                 'tests/end_to_end/test_numeric_replication.py::test_postgres_bounded_numeric_key_snowflake',
+                'tests/end_to_end/test_yugabyte_migration.py',
+            ),
+        ),
+        'yugabyte-migration': (
+            'e2e_tests_24',
+            (
+                'tests/end_to_end/target_snowflake/tap_yugabyte/test_migrate_postgres_tap_to_yugabyte_sf.py',
             ),
         ),
     }
@@ -664,7 +669,7 @@ def test_required_e2e_status_contract():
 
     assert len(configured_names) == len(set(configured_names))
     assert expected_statuses == {
-        f'e2e_tests_{shard_number:02d}' for shard_number in range(1, 24)
+        f'e2e_tests_{shard_number:02d}' for shard_number in range(1, 25)
     }
     assert required_statuses == expected_statuses
     assert not {
