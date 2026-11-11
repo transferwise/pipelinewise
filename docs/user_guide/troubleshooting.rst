@@ -74,6 +74,10 @@ Symptom index
        <troubleshooting_iceberg_conversion_contents_changed>`
      - Snowflake conversion
      - Promoted table, ``_NATIVE`` backup, and conversion manifest.
+   * - :ref:`Source does not match tap state, or a slot or boundary cannot be
+       verified <troubleshooting_source_identity>`
+     - PostgreSQL / MariaDB / MySQL LOG_BASED
+     - Tap host, switchover steps, and the tap's slot on the new primary.
    * - :ref:`Stale running log <troubleshooting_logging>`
      - Process lifecycle
      - PID file and complete process tree.
@@ -145,6 +149,57 @@ For MySQL and PostgreSQL taps, ``fast_sync`` checks the size of non-partial-sync
 tables and will refuse to proceed if any table exceeds the configured
 ``allowed_resync_max_size`` limit (see :ref:`resync`). Use ``fast_sync --force``
 to override this check.
+
+
+.. _troubleshooting_source_identity:
+
+Source identity, slot and boundary checks
+'''''''''''''''''''''''''''''''''''''''''
+
+These errors stop a run or ``reset_state`` before state changes. Do not edit
+``source_identity`` or bookmarks by hand to get past them. See
+:ref:`cli_source_identity` and :ref:`postgres_source_checks`.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 60
+   :width: 100%
+
+   * - Message
+     - What to do
+   * - ``Tap state belongs to source ... but the tap is connected to ...`` or
+       ``... but the replication connection reached ...``
+     - The host now reaches another server. After a switchover, run
+       :ref:`reset_state <cli_reset_state>`. Otherwise fix the host or restore
+       the state that belongs to this server. If neither is possible, resync the
+       tap.
+   * - ``Recorded source identity ... in tap state that already holds log
+       positions`` (warning)
+     - Expected once per tap after the upgrade to 0.103.0. If the tap host
+       changed before this run without ``reset_state``, stop the tap and resync
+       it.
+   * - ``Boundary ... is ahead of the current WAL position``
+     - The value is not a position on this primary. Read the boundary again as
+       described in :ref:`cli_reset_state`.
+   * - ``Replication slot ... starts at ..., after the boundary``
+     - The slot was created after the boundary, so commits in between would be
+       skipped. Resync the tap. Do not pass a later boundary.
+   * - ``Replication slot ... does not exist``, ``is not ready`` or ``does not
+       belong to this tap``
+     - Check ``pg_replication_slots`` on the new primary. A slot that is still
+       being created or is in use becomes ready later. A slot with another
+       plugin, database or type must be dropped by its owner before FastSync
+       can create the tap's slot.
+   * - ``Bookmark ... is before the replication slot start``
+     - Rerun FastSync. With ``replica_host``, check replay lag on the standby.
+   * - ``replica_host is not a standby of host`` or ``it is not a streaming
+       standby``
+     - Point ``replica_host`` at a standby that streams from ``host``, or remove
+       it. After a switchover, standbys of the old primary no longer qualify.
+   * - ``replica_host checkpoint timeline ... is behind host timeline ...``
+     - The standby has not passed a restartpoint on the primary's timeline, or
+       it follows another primary. Rerun after the next checkpoint, or point it
+       at a standby of ``host``.
 
 
 MariaDB / MySQL Errors

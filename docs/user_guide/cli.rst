@@ -321,19 +321,30 @@ copying rows; an incorrect mapping can skip data permanently.
 
 The command takes the tap lock. It fails if the tap is running.
 
-For PostgreSQL, ``--boundary_lsn`` is required. It is the switchover boundary on
-the new primary, in ``X/Y`` form. The tap's replication slot on the new primary
-must be finished, belong to the tap's database and ``wal2json``, and start
-(``confirmed_flush_lsn``) at or before the boundary. Otherwise the command fails
-and leaves state unchanged. On success, LOG_BASED bookmarks are set to ``lsn=1``,
-so the tap streams from the slot's start.
+For PostgreSQL, ``--boundary_lsn`` is required, in ``X/Y`` form. It is the
+switchover boundary on the new primary: the value of ``pg_current_wal_lsn()`` on
+the new primary, read after it has applied every change from the old primary and
+before any service user is unlocked. The ``restart_lsn_mappings`` in the
+switchover event is not the boundary. The command fails, and leaves state
+unchanged, unless:
+
+* the boundary is not ahead of the new primary's current WAL position;
+* the tap's replication slot on the new primary is finished and belongs to the
+  tap's database and ``wal2json``; and
+* the slot starts (``confirmed_flush_lsn``) at or before the boundary.
+
+On success, LOG_BASED bookmarks are set to ``lsn=1``, so the tap streams from the
+slot's start.
 
 For MariaDB/MySQL, ``switch_over_data_file`` in ``config.yml`` points to JSON
 that maps the new host to the old/new identifiers, hosts, timestamp, and binlog
 positions. Back up state and verify target continuity after the first run.
 
 The command does not check that the tap read everything from the old host before
-the switchover. Confirm that before running it.
+the switchover. Confirm that before running it. See
+:ref:`troubleshooting_source_identity` for its error messages.
+
+.. _cli_source_identity:
 
 Source identity
 """""""""""""""
@@ -341,17 +352,33 @@ Source identity
 Tap state for PostgreSQL and MariaDB/MySQL taps with LOG_BASED tables records the
 source it belongs to under ``source_identity``:
 
-* PostgreSQL: ``system_identifier`` and the current timeline. A promoted replica
-  keeps the system identifier but starts a new timeline.
+* PostgreSQL: the configured ``host``, ``system_identifier`` and the current
+  timeline. A promoted replica keeps the system identifier but starts a new
+  timeline.
 * MySQL: ``server_uuid``.
-* MariaDB: the configured ``host``, because MariaDB has no ``server_uuid``.
+* MariaDB: the configured ``host`` and ``server_id``, because MariaDB has no
+  ``server_uuid``. ``server_id`` tells apart two servers behind the same host
+  name.
 
-``run_tap`` and ``fast_sync`` record the identity in a state that has none. They
-refuse to start when the connected source does not match it, because the stored
-log positions do not apply to another source. After a switchover, run
-``reset_state``, which records the new identity. An unfiltered PostgreSQL
-``fast_sync`` that resets the slot also records the new identity. Restoring a
-state backup from another source fails this check.
+``run_tap`` and ``fast_sync`` refuse to start when the connected source does not
+match the state, because the stored log positions do not apply to another
+source. tap-postgres repeats the PostgreSQL check on its replication connection
+before it streams. After a switchover, run ``reset_state``, which records the new
+identity. An unfiltered PostgreSQL ``fast_sync`` that resets the slot also
+records the new identity. Restoring a state backup from another source fails
+this check. A change of the configured ``host`` also fails it, even when the
+server is the same. Run ``reset_state`` with the tap's current position as the
+boundary in that case.
+
+A state without an identity gets the connected source's identity on its next
+run. FastSync records it once its workers have created the state. When the state
+already holds log positions, PipelineWise logs a warning, because nothing proves
+they came from this source. That is the case for every existing tap after the
+upgrade to 0.103.0.
+
+The check does not tell apart two PostgreSQL servers with the same system
+identifier, timeline and host, such as sibling replicas behind one repointed
+DNS name.
 
 
 Target maintenance

@@ -103,6 +103,8 @@ Configuration
      - No
      - Primary host
      - Offloads FastSync reads; logical replication remains on the primary.
+       Must be a streaming standby of ``host``. See
+       :ref:`postgres_source_checks`.
    * - ``filter_schemas``
      - No
      - All visible schemas
@@ -146,6 +148,34 @@ Snowflake Singer loading, FullSync, and PartialSync preserve line breaks, tabs,
 CSV punctuation, Unicode, and literal backslash sequences in string values.
 PostgreSQL ``hstore`` values map to Snowflake ``VARIANT`` only on that explicit
 v3 route; native mappings remain unchanged.
+
+
+.. _postgres_source_checks:
+
+Source and slot checks
+----------------------
+
+These checks stop a run instead of letting it skip changes. Each failure leaves
+state and the slot's confirmed position unchanged. See
+:ref:`troubleshooting_source_identity` for messages and recovery.
+
+- **Source identity.** State records the PostgreSQL source it belongs to. The
+  tap compares it with ``IDENTIFY_SYSTEM`` on its replication connection before
+  streaming, and stops on a mismatch. See :ref:`cli_source_identity`.
+- **Existing slot.** When FastSync finds the tap's slot already present, it uses
+  it only if it is a persistent logical ``wal2json`` slot on the tap's database.
+  A slot that another worker is still creating is waited for, up to 15 minutes.
+- **Bookmark position.** The FastSync bookmark must be at or after the slot's
+  start. Otherwise the snapshot could miss commits the slot never streams.
+- **replica_host.** It must be a standby of ``host``: same system identifier and
+  the same timeline, with replay past the slot's start. FastSync waits up to 15
+  minutes for replay or for the standby's checkpoint to reach the primary's
+  timeline. It fails at once for a server that is not in recovery, a standby of
+  another cluster, or a server on a later timeline, such as a promoted replica.
+- **Unparseable WAL message.** The tap stops at the last complete position when
+  it cannot parse a ``wal2json`` message. Earlier releases skipped the message.
+  The error names the message LSN. Find the cause before rerunning, and never
+  advance the slot past the message by hand.
 
 
 .. _postgres_final_feedback:

@@ -1,22 +1,32 @@
 0.103.0 (2026-11-11)
 --------------------
 
-- Require `--boundary_lsn` for PostgreSQL `reset_state`. The boundary is the
-  switchover position on the new primary. The command fails, and leaves state
-  unchanged, unless the tap's slot there is finished and starts at or before it.
+- Before upgrading, make sure every LOG_BASED PostgreSQL and MariaDB/MySQL tap
+  has run on its current source, and that no switchover or host change is in
+  progress. The first run after the upgrade trusts and records the source it
+  connects to, and logs a warning when the state already holds log positions.
+- Require `--boundary_lsn` for PostgreSQL `reset_state`. The boundary is the new
+  primary's `pg_current_wal_lsn()`, read before any service user is unlocked.
+  It is not `restart_lsn_mappings`. The command fails, and leaves state
+  unchanged, unless the boundary is not ahead of the new primary's current WAL
+  position and the tap's slot there is finished and starts at or before it.
   Automation that calls `reset_state` for PostgreSQL taps must pass it.
 - Take the tap lock in `reset_state`. It fails while the tap is running.
 - Record the source in tap state for PostgreSQL and MariaDB/MySQL taps with
-  LOG_BASED tables: system identifier and timeline for PostgreSQL, `server_uuid`
-  for MySQL and the host for MariaDB. `run_tap` and `fast_sync` refuse to start
-  on a different source. Existing state records the source on the next run.
-  `reset_state` and an unfiltered PostgreSQL `fast_sync` record the new source.
-  See [source identity](docs/user_guide/cli.rst#source-identity).
+  LOG_BASED tables: host, system identifier and timeline for PostgreSQL,
+  `server_uuid` for MySQL, and host and `server_id` for MariaDB. `run_tap` and
+  `fast_sync` refuse to start on a different source. tap-postgres repeats the
+  check with `IDENTIFY_SYSTEM` before it streams. A change of the configured
+  host also needs `reset_state`. `reset_state`, an unfiltered PostgreSQL
+  `fast_sync` and the first FastSync of a new tap record the source. See
+  [source identity](docs/user_guide/cli.rst#source-identity).
 - Fail PostgreSQL FastSync when the replication slot already exists and cannot
   be verified. The slot must be finished, on the tap's database and `wal2json`,
   and start at or before the bookmark. FastSync waits up to 15 minutes for a
-  slot another worker is creating, or for `replica_host` to replay past the
-  slot's start.
+  slot another worker is creating.
+- Fail PostgreSQL FastSync when `replica_host` is not a standby of `host`, by
+  system identifier and timeline. FastSync waits up to 15 minutes for the
+  standby to replay past the slot's start and reach the primary's timeline.
 - Stop tap-postgres on a WAL message it cannot parse instead of skipping it.
   The run fails at the last complete position.
 
