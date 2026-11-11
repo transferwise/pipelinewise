@@ -175,10 +175,12 @@ run_sf_decimal \
 run_e2e \
   tests/end_to_end/target_snowflake/tap_yugabyte/test_partial_sync_yugabyte_to_sf.py \
   tests/end_to_end/target_snowflake/tap_yugabyte/test_partial_sync_repair_yugabyte_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_yugabyte/test_migrate_postgres_tap_to_yugabyte_sf.py \
   tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_with_split_large_files.py
 
 run_e2e \
-  tests/end_to_end/test_yugabyte_recovery.py
+  tests/end_to_end/test_yugabyte_recovery.py \
+  tests/end_to_end/test_yugabyte_migration.py
 
 run_sf_decimal \
   tests/integration/test_decimals.py::test_mysql_extended_composite_key_upgrade_preserves_historical_updates_and_deletes \

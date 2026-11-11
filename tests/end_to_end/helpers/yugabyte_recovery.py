@@ -123,9 +123,11 @@ def mixed_changes(table, keys):
     )
 
 
-def commit_each(e2e, statements):
+def commit_each(e2e, statements, run_query=None):
+    """Commit each statement as its own transaction, on YugabyteDB unless another source's `run_query` is given."""
+    run_query = run_query or e2e.run_query_tap_yugabyte
     for statement, params in statements:
-        e2e.run_query_tap_yugabyte(statement, params)
+        run_query(statement, params)
 
 
 def acknowledge_source_changes(e2e, table, run_tap):

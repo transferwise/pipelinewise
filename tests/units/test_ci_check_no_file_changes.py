@@ -416,6 +416,7 @@ def test_snowflake_e2e_matrix_contract():
             (
                 'tests/end_to_end/target_snowflake/tap_yugabyte/test_partial_sync_yugabyte_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_yugabyte/test_partial_sync_repair_yugabyte_to_sf.py',
+                'tests/end_to_end/target_snowflake/tap_yugabyte/test_migrate_postgres_tap_to_yugabyte_sf.py',
                 'tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_with_split_large_files.py',
             ),
         ),
@@ -423,6 +424,7 @@ def test_snowflake_e2e_matrix_contract():
             'e2e_tests_22',
             (
                 'tests/end_to_end/test_yugabyte_recovery.py',
+                'tests/end_to_end/test_yugabyte_migration.py',
             ),
         ),
         'postgres-float-parity': (
@@ -456,6 +458,7 @@ def test_snowflake_e2e_matrix_contract():
             'tests/end_to_end/data_diff/test_postgres_to_snowflake.py',
             'tests/end_to_end/test_numeric_replication.py',
             'tests/end_to_end/test_yugabyte_recovery.py',
+            'tests/end_to_end/test_yugabyte_migration.py',
         }
     )
     postgres_decimal_tests = {
