@@ -260,7 +260,7 @@ def _patched_run_tap(instance, tmp_path):
         instance, 'create_filtered_tap_properties',
         return_value=(str(filtered), ['db-orders'], str(filtered), ['db-other']),
     ), patch.object(
-        instance, 'do_sync_tables', side_effect=lambda *_: seen.append(('fastsync', _conditions(instance))),
+        instance, 'do_sync_tables', side_effect=lambda *_, **__: seen.append(('fastsync', _conditions(instance))),
     ), patch.object(
         instance, 'run_tap_singer', side_effect=lambda **_: seen.append(('singer', _conditions(instance))),
     ), patch.object(instance, 'send_alert') as send_alert, patch.object(

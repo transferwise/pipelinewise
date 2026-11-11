@@ -1249,7 +1249,9 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
                           {'table_name': 'public.partial', 'table_size': 100}],
         ) as sizes, patch('pipelinewise.cli.pipelinewise.FastSyncTapPostgres.reset_slot') as reset_slot, patch(
             'pipelinewise.cli.pipelinewise.Process',
-        ) as process, patch.object(pipelinewise, '_bind_state_to_source'):
+        ) as process, patch.object(pipelinewise, '_check_state_source', return_value=None), patch.object(
+            pipelinewise, '_record_state_source',
+        ):
             process.return_value.exception = None
             process.return_value.exitcode = 0
             if force:
@@ -1713,8 +1715,8 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         }
         self._make_sample_state_file(test_state_file, content=state_content)
         with patch('pipelinewise.cli.pipelinewise.Process') as mocked_process, patch.object(
-            pipelinewise, '_bind_state_to_source'
-        ):
+            pipelinewise, '_check_state_source', return_value=None
+        ), patch.object(pipelinewise, '_record_state_source'):
             mocked_process.return_value.exception = None
             mocked_process.return_value.exitcode = 0
             pipelinewise.do_sync_tables()

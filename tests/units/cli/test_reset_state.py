@@ -9,12 +9,14 @@ import tempfile
 from unittest import TestCase, mock
 
 import pidfile
+import psycopg2
+import pymysql
 
 from pipelinewise import cli
 from pipelinewise.cli import source_identity
 
-PG_IDENTITY = {'system_identifier': '7300000000000000001', 'timeline_id': 2}
-MYSQL_IDENTITY = {'host': 'new_database_url'}
+PG_IDENTITY = {'host': 'pg-new', 'system_identifier': '7300000000000000001', 'timeline_id': 2}
+MYSQL_IDENTITY = {'host': 'new_database_url', 'server_id': 2}
 
 
 class TestResetState(TestCase):
@@ -87,7 +89,7 @@ class TestResetState(TestCase):
                         'foo': 'bar'
                     }
                 },
-                'source_identity': {'system_identifier': '7300000000000000001', 'timeline_id': 1},
+                'source_identity': {'host': 'pg-new', 'system_identifier': '7300000000000000001', 'timeline_id': 1},
         }
         self._write_pg_state(state_content)
 
@@ -136,6 +138,25 @@ class TestResetState(TestCase):
             {'tap': 'tap_pg', 'target': 'target_foo', 'boundary_lsn': '16/B374D848'},
             {'bookmarks': {'foo_table': {'lsn': 54321}}},
             verify_side_effect=source_identity.SourceIdentityError('starts after the boundary'))
+
+    def test_reset_state_leaves_pg_state_unchanged_when_the_source_cannot_be_reached(self):
+        """A connection error while checking the slot or reading the identity never reaches the state file"""
+        state_content = {'bookmarks': {'foo_table': {'lsn': 54321}}}
+        arguments = {'tap': 'tap_pg', 'target': 'target_foo', 'boundary_lsn': '16/B374D848'}
+        for verify_error, identity_error in (
+            (psycopg2.OperationalError('could not connect'), None),
+            (None, psycopg2.OperationalError('could not connect')),
+        ):
+            with self.subTest(verify_error=verify_error, identity_error=identity_error):
+                self._write_pg_state(state_content)
+                with mock.patch.object(
+                    source_identity, 'verify_postgres_slot_covers_boundary', side_effect=verify_error,
+                ), mock.patch.object(
+                    source_identity, 'read_source_identity', side_effect=identity_error, return_value=PG_IDENTITY,
+                ), self.assertRaises(psycopg2.OperationalError):
+                    self._run_cli(arguments)
+
+                self.assertDictEqual(state_content, self._read_pg_state())
 
     def test_reset_state_refuses_while_tap_is_running(self):
         """reset_state takes the tap lock, so a running tap cannot overwrite the reset"""
@@ -236,6 +257,26 @@ class TestResetState(TestCase):
             'source_identity': MYSQL_IDENTITY,
         }
         self.assertDictEqual(expected_state, actual_state)
+
+    def test_reset_state_leaves_mysql_state_unchanged_when_the_source_cannot_be_reached(self):
+        """A connection error while reading the MariaDB/MySQL identity never reaches the state file"""
+        state_content = {'bookmarks': {'foo_table': {'log_file': 'mysql-bin.000001', 'log_pos': 4, 'version': 1}}}
+        switchover_data = {'new_database_url': {
+            'new_host': 'new_database_url', 'new_binlog_filename': 'mysql-bin.000002', 'new_binlog_position': 4,
+        }}
+        state_path = f'{self.test_cli.CONFIG_DIR}/target_foo/tap_mysql/state.json'
+        with open(state_path, 'w', encoding='utf-8') as state_file:
+            json.dump(state_content, state_file)
+        with open('/tmp/switch_over_test.json', 'w', encoding='utf-8') as switchover_file:
+            json.dump(switchover_data, switchover_file)
+
+        with mock.patch.object(
+            source_identity, 'read_source_identity', side_effect=pymysql.err.OperationalError(2003, 'refused'),
+        ), self.assertRaises(pymysql.err.OperationalError):
+            self._run_cli({'tap': 'tap_mysql', 'target': 'target_foo'})
+
+        with open(state_path, 'r', encoding='utf-8') as state_file:
+            self.assertDictEqual(state_content, json.load(state_file))
 
     def test_exit_with_error_1_if_tap_is_mysql_but_no_record_in_switchover(self):
         """Test reset_state command returns error 1 if there is no record in json file for the tap"""

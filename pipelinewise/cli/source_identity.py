@@ -3,10 +3,12 @@ import re
 from contextlib import closing
 
 from pipelinewise.fastsync.commons.tap_postgres import (
-    SLOT_PLUGIN,
     FastSyncTapPostgres,
+    ReplicationSlotVerificationError,
+    finished_slot_start,
     int_to_lsn,
     lsn_to_int,
+    read_slot,
 )
 
 from .source_table_sizes import open_source_connection
@@ -17,11 +19,8 @@ POSTGRES_IDENTITY_SQL = (
     'SELECT (SELECT system_identifier FROM pg_control_system())::text, '
     'pg_walfile_name(pg_current_wal_lsn())'
 )
-POSTGRES_SLOTS_SQL = (
-    'SELECT slot_name, database, plugin, slot_type, temporary, active_pid, confirmed_flush_lsn '
-    'FROM pg_replication_slots WHERE slot_name IN (%s, %s)'
-)
-MYSQL_SERVER_UUID_SQL = "SHOW GLOBAL VARIABLES LIKE 'server_uuid'"
+POSTGRES_CURRENT_LSN_SQL = 'SELECT pg_current_wal_lsn()::text'
+MYSQL_IDENTITY_SQL = "SHOW GLOBAL VARIABLES WHERE Variable_name IN ('server_uuid', 'server_id')"
 LSN_PATTERN = re.compile(r'^[0-9A-Fa-f]{1,8}/[0-9A-Fa-f]{1,8}$')
 
 
@@ -32,24 +31,30 @@ class SourceIdentityError(Exception):
 def read_source_identity(tap_type: str, config: dict) -> dict | None:
     """Read the identity of the connected source, or None for tap types without a check.
 
-    PostgreSQL uses system_identifier with the current timeline: a promoted physical
-    replica keeps the system_identifier but starts a new timeline, and its log positions
-    after the fork describe a different history. MySQL reports server_uuid. MariaDB has
-    no server_uuid, so the configured host is used.
+    PostgreSQL uses the configured host with system_identifier and the current timeline:
+    a promoted physical replica keeps the system_identifier but starts a new timeline,
+    and its log positions after the fork describe a different history. MySQL reports
+    server_uuid. MariaDB has no server_uuid, so the configured host and server_id are used.
     """
     if tap_type == 'tap-postgres':
         with closing(open_source_connection(tap_type, config)) as connection, connection.cursor() as cursor:
             cursor.execute(POSTGRES_IDENTITY_SQL)
             system_identifier, wal_file = cursor.fetchone()
-        return {'system_identifier': system_identifier, 'timeline_id': int(wal_file[:8], 16)}
+        return {
+            'host': config['host'],
+            'system_identifier': system_identifier,
+            'timeline_id': int(wal_file[:8], 16),
+        }
 
     if tap_type == 'tap-mysql':
         with closing(open_source_connection(tap_type, config)) as connection, connection.cursor() as cursor:
-            cursor.execute(MYSQL_SERVER_UUID_SQL)
-            row = cursor.fetchone()
-        if row and row[1]:
-            return {'server_uuid': row[1]}
-        return {'host': config['host']}
+            cursor.execute(MYSQL_IDENTITY_SQL)
+            variables = dict(cursor.fetchall())
+        if variables.get('server_uuid'):
+            return {'server_uuid': variables['server_uuid']}
+        if not variables.get('server_id'):
+            raise SourceIdentityError('Cannot read server_id from the MariaDB/MySQL source')
+        return {'host': config['host'], 'server_id': int(variables['server_id'])}
 
     return None
 
@@ -81,37 +86,40 @@ def parse_lsn(value: str | None) -> int:
 
 
 def verify_postgres_slot_covers_boundary(config: dict, boundary_lsn: int) -> str:
-    """Check the tap's slot on the connected source starts at or before the boundary.
+    """Check the tap's slot on the connected primary starts at or before the boundary.
 
     Returns the slot name. A tap state reset to lsn=1 streams from the slot's
     confirmed_flush_lsn, so commits between the boundary and a later slot start
-    would never be read.
+    would never be read. A boundary ahead of the primary's current WAL position
+    cannot be a switchover boundary on it and is refused.
     """
     dbname = config['dbname']
-    legacy_name = FastSyncTapPostgres.generate_replication_slot_name(dbname)
-    slot_name = FastSyncTapPostgres.generate_replication_slot_name(dbname, config['tap_id'])
-    with closing(open_source_connection('tap-postgres', config)) as connection, connection.cursor() as cursor:
-        cursor.execute(POSTGRES_SLOTS_SQL, (legacy_name, slot_name))
-        slots = {row[0]: row[1:] for row in cursor.fetchall()}
+    with closing(open_source_connection('tap-postgres', config)) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(POSTGRES_CURRENT_LSN_SQL)
+            current_lsn = cursor.fetchone()[0]
+        name = FastSyncTapPostgres.resolve_slot_name(connection, dbname, config['tap_id'])
+        slot = read_slot(connection, name)
 
-    name = legacy_name if legacy_name in slots else slot_name
-    if name not in slots:
-        raise SourceIdentityError(f'Replication slot "{slot_name}" does not exist on the source')
-
-    database, plugin, slot_type, temporary, active_pid, confirmed_flush_lsn = slots[name]
-    if slot_type != 'logical' or database != dbname or plugin != SLOT_PLUGIN or temporary:
+    if boundary_lsn > lsn_to_int(current_lsn):
         raise SourceIdentityError(
-            f'Replication slot "{name}" does not belong to this tap: type {slot_type}, database {database}, '
-            f'plugin {plugin}, temporary {temporary}'
+            f'Boundary {int_to_lsn(boundary_lsn)} is ahead of the current WAL position {current_lsn} '
+            'on the connected source. It cannot be the switchover boundary of this primary.'
         )
-    if confirmed_flush_lsn is None or active_pid is not None:
+    if slot is None:
+        raise SourceIdentityError(f'Replication slot "{name}" does not exist on the source')
+    try:
+        start_lsn = finished_slot_start(slot, dbname)
+    except ReplicationSlotVerificationError as exc:
+        raise SourceIdentityError(str(exc)) from exc
+    if start_lsn is None:
         raise SourceIdentityError(
-            f'Replication slot "{name}" is not ready: active_pid {active_pid}, '
-            f'confirmed_flush_lsn {confirmed_flush_lsn}'
+            f'Replication slot "{name}" is not ready: active_pid {slot["active_pid"]}, '
+            f'confirmed_flush_lsn {slot["confirmed_flush_lsn"]}'
         )
-    if lsn_to_int(confirmed_flush_lsn) > boundary_lsn:
+    if start_lsn > boundary_lsn:
         raise SourceIdentityError(
-            f'Replication slot "{name}" starts at {confirmed_flush_lsn}, after the boundary '
+            f'Replication slot "{name}" starts at {slot["confirmed_flush_lsn"]}, after the boundary '
             f'{int_to_lsn(boundary_lsn)}. Commits in between would be skipped. Recreate the slot '
             'before the boundary or resync the tap.'
         )
