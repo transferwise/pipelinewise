@@ -187,6 +187,21 @@ class TestResetState(TestCase):
             pid_side_effect=pidfile.AlreadyRunningError)
         verify.assert_not_called()
 
+    def test_reset_state_refuses_while_a_real_tap_lock_is_held(self):
+        """The real pidfile lock that run_tap holds keeps reset_state out"""
+        state_content = {'bookmarks': {'foo_table': {'lsn': 54321}}}
+        self._write_pg_state(state_content)
+        pid_path = f'{self.test_cli.CONFIG_DIR}/target_foo/tap_pg/pipelinewise.pid'
+        with pidfile.PIDFile(pid_path), mock.patch.object(
+            source_identity, 'verify_postgres_slot_covers_boundary'
+        ) as verify, self.assertRaises(SystemExit) as system_exit:
+            self._run_cli({'tap': 'tap_pg', 'target': 'target_foo', 'boundary_lsn': '16/B374D848'})
+
+        self.assertEqual(system_exit.exception.code, 1)
+        verify.assert_not_called()
+        self.assertDictEqual(state_content, self._read_pg_state())
+        self.assertFalse(os.path.exists(pid_path))
+
     def test_reset_state_holds_tap_lock_during_reset(self):
         """The state is rewritten inside the tap pidfile lock"""
         self._write_pg_state({'bookmarks': {'foo_table': {'lsn': 54321}}})
