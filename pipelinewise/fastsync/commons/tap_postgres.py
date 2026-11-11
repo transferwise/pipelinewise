@@ -30,6 +30,15 @@ SLOT_PLUGIN = 'wal2json'
 SLOT_DUPLICATE_OBJECT_SQLSTATE = '42710'
 SLOT_READY_TIMEOUT_SECONDS = 900
 SLOT_READY_POLL_SECONDS = 1
+PRIMARY_HISTORY_SQL = (
+    'SELECT (SELECT system_identifier FROM pg_control_system())::text AS system_identifier, '
+    'pg_walfile_name(pg_current_wal_lsn()) AS wal_file'
+)
+REPLICA_POSITION_SQL = (
+    'SELECT (SELECT system_identifier FROM pg_control_system())::text AS system_identifier, '
+    '(SELECT timeline_id FROM pg_control_checkpoint()) AS timeline_id, '
+    'pg_last_wal_replay_lsn() AS current_lsn'
+)
 SLOT_STATUS_SQL = (
     'SELECT slot_name, database, plugin, slot_type, temporary, active_pid, confirmed_flush_lsn '
     'FROM pg_replication_slots WHERE slot_name = %s'
@@ -493,27 +502,45 @@ class FastSyncTapPostgres:
                 )
             time.sleep(SLOT_READY_POLL_SECONDS)
 
-    def _read_bookmark_lsn(self) -> int:
-        if self.connection_config.get('replica_host'):
-            result = self.query('SELECT pg_last_wal_replay_lsn() AS current_lsn')
-        else:
-            result = self.query('SELECT pg_current_wal_lsn() AS current_lsn')
+    def _read_primary_history(self) -> tuple[str, int]:
+        row = self.primary_host_query(PRIMARY_HISTORY_SQL)[0]
+        return row['system_identifier'], int(row['wal_file'][:8], 16)
 
-        current_lsn = result[0].get('current_lsn')
-        if current_lsn is None:
+    def _read_replica_bookmark(self, primary_history: tuple[str, int]) -> tuple[int | None, str]:
+        """Return the replica's replay LSN, or None with the reason it cannot be used yet.
+
+        A replica_host that streams from another cluster, or from another branch of this
+        one, has a replay position in a different WAL history. Its LSN says nothing about
+        the slot on the primary. The checkpoint timeline of a standby can trail a timeline
+        switch until its next restartpoint, so a lower timeline is waited for.
+        """
+        primary_system_identifier, primary_timeline = primary_history
+        row = self.query(REPLICA_POSITION_SQL)[0]
+        if row['current_lsn'] is None:
             raise ReplicationSlotVerificationError(
                 'Cannot read the replay position from replica_host; it is not a streaming standby'
             )
-        return lsn_to_int(current_lsn)
+        if row['system_identifier'] != primary_system_identifier or row['timeline_id'] > primary_timeline:
+            raise ReplicationSlotVerificationError(
+                f'replica_host is not a standby of host: system identifier {row["system_identifier"]}, '
+                f'timeline {row["timeline_id"]}; host has system identifier {primary_system_identifier}, '
+                f'timeline {primary_timeline}'
+            )
+        if row['timeline_id'] < primary_timeline:
+            return None, (
+                f'replica_host checkpoint timeline {row["timeline_id"]} is behind host timeline {primary_timeline}'
+            )
+        return lsn_to_int(row['current_lsn']), ''
 
     def fetch_current_log_pos(self):
         """
         Get the actual wal position in Postgres
 
         The bookmark must be at or after the slot's start. Otherwise the snapshot copied
-        after it can miss commits that the slot will never stream. A replica_host is given
-        time to replay past the slot's start.
+        after it can miss commits that the slot will never stream. A replica_host must be
+        a standby of host and is given time to replay past the slot's start.
         """
+        replica = bool(self.connection_config.get('replica_host'))
         # Create replication slot dedicated connection
         # Always use Primary server for creating replication_slot
         self.primary_host_conn = self.get_connection(
@@ -521,21 +548,34 @@ class FastSyncTapPostgres:
         )
         try:
             slot_start_lsn = self.create_replication_slot()
+            primary_history = self._read_primary_history() if replica else None
         finally:
             self._close_primary_host_connection()
 
-        deadline = time.monotonic() + SLOT_READY_TIMEOUT_SECONDS
-        lsn = self._read_bookmark_lsn()
-        while lsn < slot_start_lsn:
-            if not self.connection_config.get('replica_host') or time.monotonic() >= deadline:
+        if not replica:
+            lsn = lsn_to_int(self.query('SELECT pg_current_wal_lsn() AS current_lsn')[0]['current_lsn'])
+            if lsn < slot_start_lsn:
                 raise ReplicationSlotVerificationError(
                     f'Bookmark {int_to_lsn(lsn)} is before the replication slot start '
                     f'{int_to_lsn(slot_start_lsn)}; commits in between would be lost'
                 )
-            time.sleep(SLOT_READY_POLL_SECONDS)
-            lsn = self._read_bookmark_lsn()
+            return {'lsn': lsn, 'version': 1}
 
-        return {'lsn': lsn, 'version': 1}
+        deadline = time.monotonic() + SLOT_READY_TIMEOUT_SECONDS
+        while True:
+            lsn, reason = self._read_replica_bookmark(primary_history)
+            if lsn is not None and lsn >= slot_start_lsn:
+                return {'lsn': lsn, 'version': 1}
+            if lsn is not None:
+                reason = (
+                    f'Bookmark {int_to_lsn(lsn)} is before the replication slot start '
+                    f'{int_to_lsn(slot_start_lsn)}; commits in between would be lost'
+                )
+            if time.monotonic() >= deadline:
+                raise ReplicationSlotVerificationError(
+                    f'{reason}. replica_host did not catch up within {SLOT_READY_TIMEOUT_SECONDS} seconds'
+                )
+            time.sleep(SLOT_READY_POLL_SECONDS)
 
     def fetch_current_incremental_key_pos(self, table, replication_key):
         """

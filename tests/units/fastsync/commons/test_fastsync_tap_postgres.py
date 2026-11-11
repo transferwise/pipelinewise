@@ -161,22 +161,33 @@ class TestFastSyncTapPostgres(TestCase):
         primary_connection.close.assert_called_once_with()
         self.assertIsNone(self.postgres.primary_host_conn)
 
-    def test_fetch_current_log_pos_uses_current_wal_function_on_replica(self):
-        """Supported replicas use the current WAL function name."""
-        self.postgres.connection_config['replica_host'] = 'replica'
-        primary_connection = Mock()
+    PRIMARY_HISTORY = [{'system_identifier': '7300000000000000001', 'wal_file': '000000020000000000000001'}]
 
-        with patch.object(
-            self.postgres, 'get_connection', return_value=primary_connection
+    @staticmethod
+    def _replica_row(current_lsn='0/2A', timeline_id=2, system_identifier='7300000000000000001'):
+        return [{'system_identifier': system_identifier, 'timeline_id': timeline_id, 'current_lsn': current_lsn}]
+
+    def _fetch_from_replica(self, replica_rows, slot_start=42, monotonic=None):
+        self.postgres.connection_config['replica_host'] = 'replica'
+        self.postgres.primary_host_query = Mock(return_value=self.PRIMARY_HISTORY)
+        monotonic_patch = patch.object(
+            tap_postgres.time, 'monotonic', side_effect=monotonic
+        ) if monotonic else patch.object(tap_postgres.time, 'monotonic', return_value=0)
+        with patch.object(self.postgres, 'get_connection', return_value=Mock()), patch.object(
+            self.postgres, 'create_replication_slot', return_value=slot_start
         ), patch.object(
-            self.postgres, 'create_replication_slot', return_value=42
-        ), patch.object(
-            self.postgres, 'query', return_value=[{'current_lsn': '0/2A'}]
-        ) as query:
+            self.postgres, 'query', side_effect=replica_rows
+        ) as query, patch.object(tap_postgres.time, 'sleep') as sleep, monotonic_patch:
             bookmark = self.postgres.fetch_current_log_pos()
+        return bookmark, query, sleep
+
+    def test_fetch_current_log_pos_reads_replay_position_and_history_on_replica(self):
+        """A replica bookmark comes with the replica's system identifier and timeline in one query."""
+        bookmark, query, _ = self._fetch_from_replica([self._replica_row()])
 
         self.assertEqual({'lsn': 42, 'version': 1}, bookmark)
-        query.assert_called_once_with('SELECT pg_last_wal_replay_lsn() AS current_lsn')
+        query.assert_called_once_with(tap_postgres.REPLICA_POSITION_SQL)
+        self.postgres.primary_host_query.assert_called_once_with(tap_postgres.PRIMARY_HISTORY_SQL)
 
     def test_fetch_current_log_pos_rejects_primary_bookmark_before_slot_start(self):
         """A bookmark before the slot start would let the snapshot miss commits the slot never streams."""
@@ -191,42 +202,44 @@ class TestFastSyncTapPostgres(TestCase):
 
     def test_fetch_current_log_pos_waits_for_replica_to_replay_past_slot_start(self):
         """A lagging replica is polled until its replay position reaches the slot start."""
-        self.postgres.connection_config['replica_host'] = 'replica'
-        replay_positions = [[{'current_lsn': '0/29'}], [{'current_lsn': '0/2B'}]]
+        bookmark, _, sleep = self._fetch_from_replica([self._replica_row('0/29'), self._replica_row('0/2B')])
 
-        with patch.object(self.postgres, 'get_connection', return_value=Mock()), patch.object(
-            self.postgres, 'create_replication_slot', return_value=42
-        ), patch.object(
-            self.postgres, 'query', side_effect=replay_positions
-        ), patch.object(tap_postgres.time, 'sleep') as sleep:
-            bookmark = self.postgres.fetch_current_log_pos()
+        self.assertEqual({'lsn': 43, 'version': 1}, bookmark)
+        sleep.assert_called_once_with(tap_postgres.SLOT_READY_POLL_SECONDS)
+
+    def test_fetch_current_log_pos_waits_for_replica_checkpoint_on_the_new_timeline(self):
+        """A standby's checkpoint timeline trails a timeline switch until its next restartpoint."""
+        bookmark, _, sleep = self._fetch_from_replica(
+            [self._replica_row('0/2B', timeline_id=1), self._replica_row('0/2B')])
 
         self.assertEqual({'lsn': 43, 'version': 1}, bookmark)
         sleep.assert_called_once_with(tap_postgres.SLOT_READY_POLL_SECONDS)
 
     def test_fetch_current_log_pos_rejects_replica_that_never_reaches_slot_start(self):
         """A replica stuck behind the slot start fails after the timeout instead of taking an early bookmark."""
-        self.postgres.connection_config['replica_host'] = 'replica'
+        with self.assertRaisesRegex(tap_postgres.ReplicationSlotVerificationError, 'did not catch up'):
+            self._fetch_from_replica(
+                [self._replica_row('0/29')] * 2, monotonic=[0, 0, tap_postgres.SLOT_READY_TIMEOUT_SECONDS])
 
-        with patch.object(self.postgres, 'get_connection', return_value=Mock()), patch.object(
-            self.postgres, 'create_replication_slot', return_value=42
-        ), patch.object(
-            self.postgres, 'query', return_value=[{'current_lsn': '0/29'}]
-        ), patch.object(tap_postgres.time, 'sleep'), patch.object(
-            tap_postgres.time, 'monotonic', side_effect=[0, 0, tap_postgres.SLOT_READY_TIMEOUT_SECONDS]
-        ), self.assertRaises(tap_postgres.ReplicationSlotVerificationError):
-            self.postgres.fetch_current_log_pos()
+    def test_fetch_current_log_pos_rejects_replica_of_an_older_timeline_after_the_timeout(self):
+        """A standby of the old primary after a switchover never reaches the new timeline."""
+        with self.assertRaisesRegex(tap_postgres.ReplicationSlotVerificationError, 'timeline 1 is behind host'):
+            self._fetch_from_replica(
+                [self._replica_row('0/FF', timeline_id=1)] * 2,
+                monotonic=[0, 0, tap_postgres.SLOT_READY_TIMEOUT_SECONDS])
+
+    def test_fetch_current_log_pos_rejects_replica_of_another_server(self):
+        """A standby of another cluster, or ahead on another branch, can never supply the bookmark."""
+        for row in (self._replica_row(system_identifier='7399999999999999999'), self._replica_row(timeline_id=3)):
+            with self.subTest(row=row), self.assertRaisesRegex(
+                tap_postgres.ReplicationSlotVerificationError, 'replica_host is not a standby of host'
+            ):
+                self._fetch_from_replica([row])
 
     def test_fetch_current_log_pos_rejects_replica_without_replay_position(self):
         """A replica_host that is not a standby has no replay position and cannot supply a bookmark."""
-        self.postgres.connection_config['replica_host'] = 'replica'
-
-        with patch.object(self.postgres, 'get_connection', return_value=Mock()), patch.object(
-            self.postgres, 'create_replication_slot', return_value=42
-        ), patch.object(
-            self.postgres, 'query', return_value=[{'current_lsn': None}]
-        ), self.assertRaisesRegex(tap_postgres.ReplicationSlotVerificationError, 'not a streaming standby'):
-            self.postgres.fetch_current_log_pos()
+        with self.assertRaisesRegex(tap_postgres.ReplicationSlotVerificationError, 'not a streaming standby'):
+            self._fetch_from_replica([self._replica_row(None)])
 
     def test_fetch_current_log_pos_closes_primary_connection_on_failure(self):
         """A replication-slot failure cannot leak the primary connection."""
