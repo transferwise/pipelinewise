@@ -370,7 +370,8 @@ def test_first_fast_sync_records_the_host_its_bookmarks_came_from(tmp_path):
     with patch('pipelinewise.cli.pipelinewise.pidfile.PIDFile'), patch(
         'pipelinewise.cli.pipelinewise.Process',
     ) as process, patch.object(
-        source_identity, 'read_source_identity', side_effect=lambda _type, config: dict(PG_IDENTITY, host=config['host']),
+        source_identity, 'read_source_identity',
+        side_effect=lambda _type, config: dict(PG_IDENTITY, host=config['host']),
     ) as read_identity:
         process.return_value.start.side_effect = worker
         process.return_value.exception = None
