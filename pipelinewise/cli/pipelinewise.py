@@ -29,6 +29,7 @@ from . import commands
 from .commands import TapParams, TargetParams, TransformParams
 from .config import Config
 from pipelinewise.cli.source_table_metadata import get_source_table_details
+from . import source_identity
 from .fastsync_capabilities import (
     FastSyncOperation,
     resolve_fastsync_capabilities,
@@ -1401,6 +1402,7 @@ class PipelineWise:
         start_time = datetime.now()
         try:
             with pidfile.PIDFile(self.tap['files']['pidfile']):
+                state_bound_to_source = self._bind_state_to_source()
                 # A saved catalog already makes tap-mysql read FLOAT exactly; do not wait for a new discovery.
                 self._round_mysql_float_conditions(self.tap)
 
@@ -1444,6 +1446,9 @@ class PipelineWise:
                         'No table available that needs to be sync by fastsync'
                     )
 
+                if not state_bound_to_source:
+                    self._bind_state_to_source()
+
                 # Run singer tap for INCREMENTAL and LOG_BASED replication methods
                 if len(singer_stream_ids) > 0:
                     self.logger.info(
@@ -1477,6 +1482,11 @@ class PipelineWise:
 
         except pidfile.AlreadyRunningError:
             self.logger.error('Another instance of the tap is already running.')
+            sys.exit(1)
+        except source_identity.SourceIdentityError as exc:
+            self.logger.error('%s', exc)
+            self._print_tap_run_summary(self.STATUS_FAILED, start_time, datetime.now())
+            self.send_alert(message=f'{tap_id} tap failed: source does not match tap state', exc=exc)
             sys.exit(1)
         # Delete temp files if there is any
         except commands.RunCommandException as exc:
@@ -1612,6 +1622,9 @@ class PipelineWise:
         except pidfile.AlreadyRunningError as exc:
             self.logger.error('Another instance of the tap is already running.')
             raise SystemExit(1) from exc
+        except source_identity.SourceIdentityError as exc:
+            self.logger.error('%s', exc)
+            raise SystemExit(1) from exc
 
     def _get_fastsync_size_limit(self, tap_type, target_type):
         """Use the same size-limit policy for preflight and the FullSync worker."""
@@ -1663,6 +1676,7 @@ class PipelineWise:
                     tap_config,
                     before_reset=self._clear_tap_bookmarks_before_source_slot_reset,
                 )
+        self._bind_state_to_source()
 
         processes_list = []
         if selected_tables['partial_sync']:
@@ -2024,6 +2038,7 @@ class PipelineWise:
         self.logger.info('Pre-reset tap state backed up to %s', backup_path)
         state['bookmarks'] = {}
         state['currently_syncing'] = None
+        state.pop(source_identity.STATE_KEY, None)
         fastsync_utils.save_dict_to_json(state_path, state)
         return backup_path
 
@@ -2857,18 +2872,75 @@ class PipelineWise:
                 utils.silentremove(cons_target_config)
 
     def reset_state(self):
-        """Reset state file"""
-        if self.tap.get('type') == 'tap-postgres':
-            state_items_to_update = [('lsn', 1), ]
-        elif self.tap.get('type') == 'tap-mysql':
-            state_items_to_update = self._get_data_from_switchover_file()
-        else:
-            self.logger.error('state reset is available only for PostgreSQL taps!')
+        """Reset state file to the new source after a switchover, holding the tap lock"""
+        if self.tap.get('type') not in ('tap-postgres', 'tap-mysql'):
+            self.logger.error('state reset is available only for PostgreSQL and MariaDB/MySQL taps!')
             raise SystemExit(1)
+
+        try:
+            with pidfile.PIDFile(self.tap['files']['pidfile']):
+                self._reset_state_locked()
+        except pidfile.AlreadyRunningError as exc:
+            self.logger.error('Another instance of the tap is already running.')
+            raise SystemExit(1) from exc
+
+    def _reset_state_locked(self):
+        tap_config = utils.load_json_with_env_vars(self.tap['files']['config'])
+        try:
+            if self.tap['type'] == 'tap-postgres':
+                boundary_lsn = source_identity.parse_lsn(getattr(self.args, 'boundary_lsn', None))
+                slot_name = source_identity.verify_postgres_slot_covers_boundary(tap_config, boundary_lsn)
+                self.logger.info('Replication slot %s starts at or before the boundary', slot_name)
+                state_items_to_update = [('lsn', 1), ]
+            else:
+                state_items_to_update = self._get_data_from_switchover_file()
+            identity = source_identity.read_source_identity(self.tap['type'], tap_config)
+        except source_identity.SourceIdentityError as exc:
+            self.logger.error('Refusing to reset state for %s: %s', self.tap['id'], exc)
+            raise SystemExit(1) from exc
 
         for state_item in state_items_to_update:
             self._update_state_file(state_item[0], state_item[1])
-            self.logger.info('state file is reset for log based tables!')
+        self._update_state_source_identity(identity)
+        self.logger.info('state file is reset for log based tables!')
+
+    def _update_state_source_identity(self, identity):
+        tap_state = self.tap['files']['state']
+        try:
+            state_content = self._load_required_json_object(tap_state, 'tap state')
+            state_content[source_identity.STATE_KEY] = identity
+            fastsync_utils.save_dict_to_json(tap_state, state_content)
+        except Exception as exp:
+            self.logger.error(exp)
+            raise SystemExit(1) from exp
+
+    def _has_log_based_selection(self) -> bool:
+        selection = utils.load_json(self.tap['files']['selection']) or {}
+        return any(
+            table.get('replication_method') == self.LOG_BASED for table in selection.get('selection') or []
+        )
+
+    def _bind_state_to_source(self) -> bool:
+        """Refuse to run on a source other than the one the tap state belongs to.
+
+        Records the identity in an existing state that has none. Returns whether the
+        state now carries an identity, or no check applies to this tap.
+        """
+        if self.tap['type'] not in ('tap-postgres', 'tap-mysql') or not self._has_log_based_selection():
+            return True
+
+        tap_state = self.tap['files']['state']
+        if not os.path.exists(tap_state) or os.path.getsize(tap_state) == 0:
+            return False
+
+        state = self._load_required_json_object(tap_state, 'tap state')
+        identity = source_identity.read_source_identity(
+            self.tap['type'], utils.load_json_with_env_vars(self.tap['files']['config'])
+        )
+        if source_identity.bind_state_to_source(state, identity):
+            fastsync_utils.save_dict_to_json(tap_state, state)
+            self.logger.info('Recorded source identity %s in tap state', identity)
+        return True
 
     def tap_info(self):
         """Print JSON information for an imported tap under the selected target."""

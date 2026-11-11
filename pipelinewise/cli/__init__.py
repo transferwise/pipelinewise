@@ -405,6 +405,8 @@ def main():
     parser.add_argument('--column', type=str, default='*', help='Name of the column to use as sync key in partial sync')
     parser.add_argument('--start_value', type=str, default='*', help='Start value of the column to partial sync')
     parser.add_argument('--end_value', type=str, default=None, help='End value of the column to partial sync')
+    parser.add_argument('--boundary_lsn', type=str, default=None,
+                        help='reset_state: switchover boundary LSN on the new PostgreSQL primary, e.g. 16/B374D848')
     parser.add_argument('--force', default=False, required=False,
                         help='Override fast_sync size limits without overriding sync_start_from, '
                              'or rerun a completed data-diff slot',
