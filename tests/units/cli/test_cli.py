@@ -1131,7 +1131,7 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         ), patch.object(pipelinewise, 'do_sync_tables') as do_sync_tables:
             pipelinewise.fast_sync()
 
-        do_sync_tables.assert_called_once_with(reset_source_slot=expected_reset)
+        do_sync_tables.assert_called_once_with(reset_source_slot=expected_reset, connected_source=None)
 
     @pytest.mark.parametrize('tap_type', [ConnectorType.TAP_POSTGRES.value, ConnectorType.TAP_YUGABYTE.value])
     @pytest.mark.parametrize('selected', [False, True])

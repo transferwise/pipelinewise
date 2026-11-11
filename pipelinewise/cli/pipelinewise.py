@@ -1402,7 +1402,8 @@ class PipelineWise:
         start_time = datetime.now()
         try:
             with pidfile.PIDFile(self.tap['files']['pidfile']):
-                checked_identity = self._check_state_source()
+                connected_source = self._read_run_source()
+                self._check_state_source(connected_source)
                 # A saved catalog already makes tap-mysql read FLOAT exactly; do not wait for a new discovery.
                 self._round_mysql_float_conditions(self.tap)
 
@@ -1429,7 +1430,7 @@ class PipelineWise:
                     self.logger.info(
                         'Table(s) selected to sync by fastsync/partialsync: %s', fastsync_stream_ids
                     )
-                    self.do_sync_tables(fastsync_stream_ids, checked_identity=checked_identity)
+                    self.do_sync_tables(fastsync_stream_ids, connected_source=connected_source)
 
                     # Finding out which partial syn tables are not synced yet for not running singer for them
                     try:
@@ -1477,7 +1478,7 @@ class PipelineWise:
                         'No table available that needs to be sync by singer'
                     )
 
-                self._record_state_source()
+                self._record_state_source(connected_source)
 
         except pidfile.AlreadyRunningError:
             self.logger.error('Another instance of the tap is already running.')
@@ -1614,9 +1615,11 @@ class PipelineWise:
         self.force_fast_sync = self.args.force
         try:
             with pidfile.PIDFile(self.tap['files']['pidfile']):
+                connected_source = self._read_run_source()
                 self._round_mysql_float_conditions(self.tap)
                 self.do_sync_tables(
-                    reset_source_slot=self._should_reset_source_slot_for_fast_sync()
+                    reset_source_slot=self._should_reset_source_slot_for_fast_sync(),
+                    connected_source=connected_source,
                 )
         except pidfile.AlreadyRunningError as exc:
             self.logger.error('Another instance of the tap is already running.')
@@ -1651,12 +1654,14 @@ class PipelineWise:
         self,
         fastsync_stream_ids=None,
         reset_source_slot: bool = False,
-        checked_identity: dict | None = None,
+        connected_source: dict | None = None,
     ):
         """
         syncing tables by using fast sync
 
-        checked_identity is the source identity run_tap already checked under the tap lock.
+        connected_source is the source identity the caller read under the tap lock before
+        any bookmark was taken. It is checked against the state and recorded in a state
+        this run creates, so bookmarks are never bound to a source read after they were taken.
         """
         if fastsync_stream_ids:
             tables_to_sync = ','.join(fastsync_stream_ids).replace('-', '.')
@@ -1682,8 +1687,9 @@ class PipelineWise:
                     tap_config,
                     before_reset=self._clear_tap_bookmarks_before_source_slot_reset,
                 )
-        if checked_identity is None:
-            checked_identity = self._check_state_source()
+        if connected_source is None:
+            connected_source = self._read_run_source()
+        self._check_state_source(connected_source)
 
         processes_list = []
         if selected_tables['partial_sync']:
@@ -1707,7 +1713,7 @@ class PipelineWise:
             if process.exitcode != 0:
                 raise SystemExit(process.exitcode)
 
-        self._record_state_source()
+        self._record_state_source(connected_source)
 
     def _check_fastsync_targets_are_iceberg(self, selected_tables) -> None:
         """Refuse an Iceberg FastSync before any source or state change while a target is native."""
@@ -2929,23 +2935,33 @@ class PipelineWise:
             table.get('replication_method') == self.LOG_BASED for table in selection.get('selection') or []
         )
 
-    def _check_state_source(self) -> dict | None:
+    def _read_run_source(self) -> dict | None:
+        """Read the connected source identity for this run, or None when no check applies.
+
+        Read once under the tap lock before any bookmark is taken, even without a state,
+        so a config rewritten to another host during a long run cannot be stamped on
+        positions taken from the old one.
+        """
+        if not self._source_identity_applies():
+            return None
+        return source_identity.read_source_identity(
+            self.tap['type'], utils.load_json_with_env_vars(self.tap['files']['config'])
+        )
+
+    def _check_state_source(self, identity: dict | None) -> None:
         """Refuse to run on a source other than the one the existing tap state belongs to.
 
         A state without an identity gets the connected source's identity recorded, with
         a warning when it already holds log positions, because nothing proves they came
-        from this source. Returns the identity, or None when there is no state yet or no
-        check applies to this tap.
+        from this source.
         """
-        if not self._source_identity_applies():
-            return None
+        if identity is None:
+            return
         state = self._load_existing_state()
         if state is None:
-            return None
-
-        identity = self._read_source_identity()
+            return
         if not source_identity.bind_state_to_source(state, identity):
-            return identity
+            return
 
         fastsync_utils.save_dict_to_json(self.tap['files']['state'], state)
         if self._has_log_positions(state):
@@ -2957,28 +2973,21 @@ class PipelineWise:
             )
         else:
             self.logger.info('Recorded source identity %s in tap state', identity)
-        return identity
 
-    def _record_state_source(self) -> None:
-        """Record the source identity in a tap state this run created or reset."""
-        if not self._source_identity_applies():
+    def _record_state_source(self, identity: dict | None) -> None:
+        """Record the identity read at the start of the run in a tap state this run created or reset."""
+        if identity is None:
             return
         state = self._load_existing_state()
         if state is None or source_identity.STATE_KEY in state:
             return
 
-        identity = self._read_source_identity()
         source_identity.bind_state_to_source(state, identity)
         fastsync_utils.save_dict_to_json(self.tap['files']['state'], state)
         self.logger.info('Recorded source identity %s in tap state', identity)
 
     def _source_identity_applies(self) -> bool:
         return self.tap['type'] in ('tap-postgres', 'tap-mysql') and self._has_log_based_selection()
-
-    def _read_source_identity(self) -> dict:
-        return source_identity.read_source_identity(
-            self.tap['type'], utils.load_json_with_env_vars(self.tap['files']['config'])
-        )
 
     def _load_existing_state(self) -> dict | None:
         tap_state = self.tap['files']['state']

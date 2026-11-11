@@ -1,5 +1,5 @@
 import json
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import ANY, MagicMock, call, patch
 
 import psycopg2
 import pymysql
@@ -182,10 +182,8 @@ def _saved_state(tmp_path):
 
 def test_tap_records_identity_in_state_without_log_positions(tmp_path):
     pipelinewise = _pipelinewise(tmp_path, state={'bookmarks': {'public-one': {'replication_key_value': 3}}})
-    with patch.object(source_identity, 'read_source_identity', return_value=PG_IDENTITY) as identity:
-        assert pipelinewise._check_state_source() == PG_IDENTITY
+    pipelinewise._check_state_source(PG_IDENTITY)
 
-    identity.assert_called_once_with('tap-postgres', PG_CONFIG)
     assert _saved_state(tmp_path)['source_identity'] == PG_IDENTITY
     pipelinewise.logger.warning.assert_not_called()
 
@@ -194,8 +192,7 @@ def test_tap_records_identity_in_state_without_log_positions(tmp_path):
 def test_first_identity_over_existing_log_positions_is_recorded_with_a_warning(tmp_path, bookmark):
     """State from before this release is trusted once; the warning makes that event auditable."""
     pipelinewise = _pipelinewise(tmp_path, state={'bookmarks': {'public-one': bookmark}})
-    with patch.object(source_identity, 'read_source_identity', return_value=PG_IDENTITY):
-        pipelinewise._check_state_source()
+    pipelinewise._check_state_source(PG_IDENTITY)
 
     assert _saved_state(tmp_path) == {'bookmarks': {'public-one': bookmark}, 'source_identity': PG_IDENTITY}
     pipelinewise.logger.warning.assert_called_once()
@@ -206,28 +203,29 @@ def test_tap_refuses_to_start_on_another_source(tmp_path):
     state = {'bookmarks': {'public-one': {'lsn': 10}},
              'source_identity': dict(PG_IDENTITY, timeline_id=1)}
     pipelinewise = _pipelinewise(tmp_path, state=state)
-    with patch.object(source_identity, 'read_source_identity', return_value=PG_IDENTITY), pytest.raises(
-        source_identity.SourceIdentityError
-    ):
-        pipelinewise._check_state_source()
+    with pytest.raises(source_identity.SourceIdentityError):
+        pipelinewise._check_state_source(PG_IDENTITY)
 
     assert _saved_state(tmp_path) == state
 
 
 @pytest.mark.parametrize('state_text', [None, ''])
-def test_tap_without_state_defers_reading_identity(tmp_path, state_text):
+def test_tap_without_state_reads_identity_before_any_bookmark(tmp_path, state_text):
+    """The identity of a first run is read up front, not after bookmarks exist."""
     pipelinewise = _pipelinewise(tmp_path)
     if state_text is not None:
         (tmp_path / 'state.json').write_text(state_text)
-    with patch.object(source_identity, 'read_source_identity') as identity:
-        assert pipelinewise._check_state_source() is None
-    identity.assert_not_called()
+    with patch.object(source_identity, 'read_source_identity', return_value=PG_IDENTITY) as identity:
+        assert pipelinewise._read_run_source() == PG_IDENTITY
+        pipelinewise._check_state_source(PG_IDENTITY)
+
+    identity.assert_called_once_with('tap-postgres', PG_CONFIG)
+    assert (tmp_path / 'state.json').exists() is (state_text is not None)
 
 
 def test_record_adds_identity_to_state_created_by_this_run(tmp_path):
     pipelinewise = _pipelinewise(tmp_path, state={'bookmarks': {'public-one': {'lsn': 10}}})
-    with patch.object(source_identity, 'read_source_identity', return_value=PG_IDENTITY):
-        pipelinewise._record_state_source()
+    pipelinewise._record_state_source(PG_IDENTITY)
 
     assert _saved_state(tmp_path)['source_identity'] == PG_IDENTITY
     pipelinewise.logger.warning.assert_not_called()
@@ -236,9 +234,11 @@ def test_record_adds_identity_to_state_created_by_this_run(tmp_path):
 @pytest.mark.parametrize('state', [None, {'bookmarks': {}, 'source_identity': PG_IDENTITY}])
 def test_record_skips_missing_or_bound_state(tmp_path, state):
     pipelinewise = _pipelinewise(tmp_path, state=state)
-    with patch.object(source_identity, 'read_source_identity') as identity:
-        pipelinewise._record_state_source()
-    identity.assert_not_called()
+    pipelinewise._record_state_source(dict(PG_IDENTITY, timeline_id=3))
+
+    assert (tmp_path / 'state.json').exists() is (state is not None)
+    if state is not None:
+        assert _saved_state(tmp_path) == state
 
 
 @pytest.mark.parametrize('tap_type, replication_method', [
@@ -250,8 +250,7 @@ def test_identity_is_checked_only_for_log_based_postgres_and_mysql(tmp_path, tap
     pipelinewise = _pipelinewise(tmp_path, tap_type=tap_type, state={'bookmarks': {}},
                                  replication_method=replication_method)
     with patch.object(source_identity, 'read_source_identity') as identity:
-        assert pipelinewise._check_state_source() is None
-        pipelinewise._record_state_source()
+        assert pipelinewise._read_run_source() is None
     identity.assert_not_called()
 
 
@@ -345,14 +344,45 @@ def test_filtered_fast_sync_checks_identity_before_the_first_worker(tmp_path):
     assert events == ['read_identity', 'start']
 
 
-def test_first_fast_sync_records_identity_once_workers_created_the_state(tmp_path):
+def test_first_fast_sync_reads_identity_before_workers_and_records_it_after(tmp_path):
     worker_state = {'bookmarks': LOG_POSITION}
     instance = _fast_sync_instance(tmp_path, tables='db_test_mysql.table_one')
 
     events = _run_fast_sync(instance, worker_state=worker_state)
 
-    assert events == ['start', 'read_identity']
+    assert events == ['read_identity', 'start']
     assert _saved_state(tmp_path) == dict(worker_state, source_identity=PG_IDENTITY)
+
+
+def test_first_fast_sync_records_the_host_its_bookmarks_came_from(tmp_path):
+    """A switchover that rewrites the tap config during a first FastSync must not relabel old-host bookmarks."""
+    instance = _fast_sync_instance(tmp_path, tables='db_test_mysql.table_one')
+    config_path = tmp_path / 'config.json'
+    config_path.write_text(json.dumps(dict(PG_CONFIG, host='pg-old')))
+    instance.tap['files']['config'] = str(config_path)
+    state_path = instance.tap['files']['state']
+
+    def worker():
+        with open(state_path, 'w', encoding='utf-8') as state_file:
+            json.dump({'bookmarks': LOG_POSITION}, state_file)
+        config_path.write_text(json.dumps(PG_CONFIG))
+
+    with patch('pipelinewise.cli.pipelinewise.pidfile.PIDFile'), patch(
+        'pipelinewise.cli.pipelinewise.Process',
+    ) as process, patch.object(
+        source_identity, 'read_source_identity', side_effect=lambda _type, config: dict(PG_IDENTITY, host=config['host']),
+    ) as read_identity:
+        process.return_value.start.side_effect = worker
+        process.return_value.exception = None
+        process.return_value.exitcode = 0
+        instance.fast_sync()
+
+    read_identity.assert_called_once()
+    assert _saved_state(tmp_path)['source_identity'] == dict(PG_IDENTITY, host='pg-old')
+    with patch.object(source_identity, 'read_source_identity', return_value=PG_IDENTITY), pytest.raises(
+        source_identity.SourceIdentityError, match='Tap state belongs to source'
+    ):
+        instance._check_state_source(instance._read_run_source())
 
 
 def test_unfiltered_reset_clears_identity_then_records_the_connected_source(tmp_path):
@@ -362,11 +392,11 @@ def test_unfiltered_reset_clears_identity_then_records_the_connected_source(tmp_
 
     events = _run_fast_sync(instance)
 
-    assert events[:3] == ['reset_slot', 'read_identity', 'start']
+    assert events[:3] == ['read_identity', 'reset_slot', 'start']
     assert _saved_state(tmp_path) == {'bookmarks': {}, 'currently_syncing': None, 'source_identity': PG_IDENTITY}
 
 
-def _run_tap_with_identity(tmp_path, check_side_effect):
+def _run_tap_with_identity(tmp_path, read_side_effect, check_side_effect=None):
     instance = PipelineWise(CliArgs(target='target_one', tap='tap_one'), CONFIG_DIR, VIRTUALENVS_DIR)
     properties = tmp_path / 'properties.json'
     properties.write_text('{"streams": []}', encoding='utf-8')
@@ -374,7 +404,9 @@ def _run_tap_with_identity(tmp_path, check_side_effect):
     with patch('pipelinewise.cli.pipelinewise.pidfile.PIDFile'), patch.object(
         instance, 'create_filtered_tap_properties',
         return_value=(str(properties), ['db-one'], str(properties), ['db-two']),
-    ), patch.object(instance, '_check_state_source', side_effect=check_side_effect) as check, patch.object(
+    ), patch.object(instance, '_read_run_source', side_effect=read_side_effect) as read, patch.object(
+        instance, '_check_state_source', side_effect=check_side_effect,
+    ) as check, patch.object(
         instance, '_record_state_source',
     ) as record, patch.object(
         instance, '_convert_native_tables_to_iceberg',
@@ -383,6 +415,7 @@ def _run_tap_with_identity(tmp_path, check_side_effect):
     ) as run_tap_singer, patch.object(instance, 'send_alert') as send_alert, patch.object(
         instance, '_print_tap_run_summary',
     ):
+        calls.attach_mock(read, 'read')
         calls.attach_mock(check, 'check')
         calls.attach_mock(record, 'record')
         calls.attach_mock(convert, 'convert')
@@ -401,17 +434,21 @@ def test_run_tap_checks_identity_before_any_writer_and_records_after(tmp_path):
     calls, send_alert, exit_code = _run_tap_with_identity(tmp_path, [PG_IDENTITY])
 
     assert exit_code is None
-    assert [entry[0] for entry in calls] == ['check', 'convert', 'fastsync', 'singer', 'record']
-    assert calls[2] == call.fastsync(['db-one'], checked_identity=PG_IDENTITY)
+    assert calls == [
+        call.read(), call.check(PG_IDENTITY), call.convert(['db-one', 'db-two']),
+        call.fastsync(['db-one'], connected_source=PG_IDENTITY), call.singer(
+            tap=ANY, target=ANY, transform=ANY, stream_buffer_size=ANY,
+        ), call.record(PG_IDENTITY),
+    ]
     send_alert.assert_not_called()
 
 
 def test_run_tap_refuses_to_start_on_identity_mismatch(tmp_path):
     error = source_identity.SourceIdentityError('Tap state belongs to source')
-    calls, send_alert, exit_code = _run_tap_with_identity(tmp_path, error)
+    calls, send_alert, exit_code = _run_tap_with_identity(tmp_path, [PG_IDENTITY], error)
 
     assert exit_code == 1
-    assert [entry[0] for entry in calls] == ['check']
+    assert [entry[0] for entry in calls] == ['read', 'check']
     send_alert.assert_called_once_with(message='tap_one tap failed: source does not match tap state', exc=error)
 
 
@@ -423,5 +460,5 @@ def test_run_tap_starts_no_writer_when_the_identity_cannot_be_read(tmp_path, err
     calls, send_alert, raised = _run_tap_with_identity(tmp_path, error)
 
     assert raised is error
-    assert [entry[0] for entry in calls] == ['check']
+    assert [entry[0] for entry in calls] == ['read']
     send_alert.assert_called_once_with(message='tap_one tap failed', exc=error)
