@@ -14,6 +14,9 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
   FullSync/PartialSync policy: resolve every native/Iceberg direct route through
   its operation-specific immutable registry and derive, never duplicate,
   compatibility views.
+- `cli/source_identity.py` binds tap state to its source. See the
+  [source identity design](cli/SOURCE_IDENTITY.md) before changing state
+  binding, `reset_state` or the PostgreSQL slot and `replica_host` checks.
 - `fastsync/`: native bulk sync. FullSync replaces tables for initial loads,
   FULL_TABLE, and explicit `fast_sync`; PartialSync merges filtered ranges for
   `partial_sync_table`/`sync_start_from`. FullSync supports `tap-mysql`
