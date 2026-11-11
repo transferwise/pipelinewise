@@ -75,6 +75,8 @@ def tap_type_to_target_type(
 def sync_table(table: str, args: Namespace) -> Union[bool, str]:
     """Sync one table"""
     postgres = FastSyncTapPostgres(args.tap, tap_type_to_target_type)
+    postgres.state_path = args.state
+    postgres.synced_tables = getattr(args, 'tables', None)
     postgres_target = FastSyncTargetPostgres(args.target, args.transform)
 
     try:

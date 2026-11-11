@@ -36,6 +36,21 @@ def test_postgres_hstore_projection(iceberg_version):
     assert source.target_iceberg_version == iceberg_version
 
 
+@pytest.mark.parametrize(('route_args', 'expected'), [
+    ({'state': 'state.json', 'tables': ['public.one', 'public.two']}, ['public.one', 'public.two']),
+    ({'state': 'state.json', 'table': 'public.one,public.two'}, ['public.one', 'public.two']),
+    ({}, []),
+])
+def test_postgres_source_knows_the_state_and_tables_of_its_sync(route_args, expected):
+    """FullSync and PartialSync tell the source which LOG_BASED positions a new slot would strand."""
+    adapter = RdbmsSnowflakeSource.postgres(mock.Mock(return_value=mock.Mock()), mock.Mock())
+
+    source = adapter.create(Namespace(tap={'dbname': 'source'}, transform=None, **route_args), None)
+
+    assert source.state_path == route_args.get('state')
+    assert source.synced_tables == expected
+
+
 @pytest.mark.parametrize('iceberg_version', [None, 2])
 def test_mysql_source_transformations(iceberg_version):
     """Both Snowflake formats pass transformation config to the source export."""

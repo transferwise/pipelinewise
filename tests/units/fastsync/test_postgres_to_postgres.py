@@ -1,4 +1,7 @@
 import unittest
+from argparse import Namespace
+from unittest.mock import patch
+
 from . import assertions
 
 from pipelinewise.fastsync.postgres_to_postgres import (
@@ -54,3 +57,19 @@ class PostgresToPostgres(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+    @staticmethod
+    def test_sync_table_tells_the_source_its_state_and_tables():
+        """A new slot is refused while LOG_BASED streams outside this sync hold positions."""
+        args = Namespace(
+            tap={'dbname': 'db'}, target={}, transform={}, properties={}, temp_dir='',
+            state='state.json', tables=['public.one', 'public.two'],
+        )
+        with patch(f'{PACKAGE_IN_SCOPE}.{TAP}') as tap_mock, patch(f'{PACKAGE_IN_SCOPE}.{TARGET}'), patch(
+            f'{PACKAGE_IN_SCOPE}.utils',
+        ) as utils_mock:
+            utils_mock.get_bookmark_for_table.side_effect = RuntimeError('stop after the bookmark')
+            sync_table('public.one', args)
+
+        assert tap_mock.return_value.state_path == 'state.json'
+        assert tap_mock.return_value.synced_tables == ['public.one', 'public.two']

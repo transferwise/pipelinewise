@@ -1,6 +1,8 @@
 import datetime
 import io
 import json
+import os
+import tempfile
 
 from decimal import Decimal
 from unittest import TestCase
@@ -383,6 +385,65 @@ class TestFastSyncTapPostgres(TestCase):
         """A slot dropped after the duplicate error, for example a cancelled creation, is an error."""
         with self.assertRaisesRegex(tap_postgres.ReplicationSlotVerificationError, 'is gone'):
             self._existing_slot([None])
+
+    def _new_slot_with_state(self, state, synced_tables, existing_slot=None):
+        """Run create_replication_slot for a slot that does not exist yet, with a tap state on disk."""
+        cursor_mock = MagicMock().return_value
+        type(cursor_mock.__enter__.return_value).rowcount = PropertyMock(return_value=0)
+        pg_con = Mock()
+        pg_con.cursor.return_value = cursor_mock
+        self.postgres.primary_host_conn = pg_con
+        with tempfile.TemporaryDirectory() as state_dir:
+            self.postgres.state_path = os.path.join(state_dir, 'state.json')
+            with open(self.postgres.state_path, 'w', encoding='utf-8') as state_file:
+                json.dump(state, state_file)
+            self.postgres.synced_tables = synced_tables
+            with patch.object(tap_postgres, 'read_slot', return_value=existing_slot) as read_slot:
+                return self.postgres.create_replication_slot(), read_slot
+
+    def test_create_replication_slot_refuses_new_slot_behind_unsynced_log_positions(self):
+        """Streams at lsn=1 or an old LSN would resume from a new slot and skip the commits in between."""
+        for bookmark in ({'lsn': 1}, {'lsn': 54321, 'version': 1}):
+            self.postgres.executed_queries_primary_host.clear()
+            state = {'bookmarks': {'public-other': bookmark, 'public-synced': {'lsn': 7}}}
+            with self.subTest(bookmark=bookmark), self.assertRaisesRegex(
+                tap_postgres.ReplicationSlotVerificationError, 'outside this sync: public-other'
+            ):
+                self._new_slot_with_state(state, ['public.synced'])
+            self.assertEqual([], [q for q in self.postgres.executed_queries_primary_host if 'create' in q])
+
+    def test_create_replication_slot_creates_a_new_slot_when_every_log_position_is_replaced(self):
+        """A first sync, or one that covers every LOG_BASED stream, may start a new slot."""
+        for state in (
+            {},
+            {'bookmarks': {'public-synced': {'lsn': 7}, 'public-incremental': {'replication_key_value': 3}}},
+        ):
+            with self.subTest(state=state):
+                start_lsn, _ = self._new_slot_with_state(state, ['public.synced'])
+                self.assertEqual(42, start_lsn)
+
+    def test_create_replication_slot_reuses_an_existing_slot_behind_unsynced_log_positions(self):
+        """The guard applies only to a new slot; an existing finished slot still holds the positions."""
+        duplicate = Exception('already exists')
+        duplicate.pgcode = '42710'
+        self.postgres.primary_host_query = Mock(side_effect=duplicate)
+
+        start_lsn, read_slot = self._new_slot_with_state(
+            {'bookmarks': {'public-other': {'lsn': 1}}}, ['public.synced'], existing_slot=self._slot())
+
+        self.assertEqual(42, start_lsn)
+        self.assertEqual(2, read_slot.call_count)
+
+    def test_create_replication_slot_drops_a_slot_created_after_a_concurrent_drop(self):
+        """A slot dropped between the check and the creation is replaced by a new one, which is removed again."""
+        with self.assertRaisesRegex(tap_postgres.ReplicationSlotVerificationError, 'outside this sync'):
+            self._new_slot_with_state(
+                {'bookmarks': {'public-other': {'lsn': 1}}}, ['public.synced'], existing_slot=self._slot())
+
+        self.assertEqual(
+            "SELECT pg_drop_replication_slot('pipelinewise_test_database_test_tap')",
+            self.postgres.executed_queries_primary_host[-1],
+        )
 
     def test_create_replication_slot_propagates_other_errors(self):
         """Errors other than the duplicate-object SQLSTATE are raised unchanged."""

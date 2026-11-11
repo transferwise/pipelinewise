@@ -80,6 +80,21 @@ def read_primary_history(connection) -> tuple[str, int]:
     return row['system_identifier'], int(row['wal_file'][:8], 16)
 
 
+def unsynced_log_positions(state_path: str | None, synced_tables) -> list[str]:
+    """Return the streams whose LOG_BASED bookmarks a sync of synced_tables does not replace."""
+    if not state_path or not os.path.exists(state_path) or os.path.getsize(state_path) == 0:
+        return []
+    synced = set()
+    for table in synced_tables or ():
+        names = utils.tablename_to_dict(table)
+        synced.add(f'{names["schema_name"]}-{names["table_name"]}' if names['schema_name'] else names['table_name'])
+    bookmarks = utils.load_json(state_path).get('bookmarks') or {}
+    return sorted(
+        stream for stream, bookmark in bookmarks.items()
+        if stream not in synced and isinstance(bookmark, dict) and 'lsn' in bookmark
+    )
+
+
 def finished_slot_start(slot: dict, dbname: str) -> int | None:
     """Return the start LSN of a finished slot that belongs to the tap.
 
@@ -120,6 +135,8 @@ class FastSyncTapPostgres:
         self.conn = None
         self.curr = None
         self.primary_host_conn = None
+        self.state_path = None
+        self.synced_tables = None
 
     @staticmethod
     def generate_replication_slot_name(dbname, tap_id=None, prefix='pipelinewise'):
@@ -466,12 +483,19 @@ class FastSyncTapPostgres:
         by another tap or an earlier instance. An existing slot is accepted only once
         it is finished and belongs to this database and plugin. Its confirmed_flush_lsn
         is then the earliest position it can stream from.
+
+        A new slot starts now. Streams outside this sync that already hold LOG_BASED
+        positions would resume from it and skip every commit in between, so a missing
+        slot is not created while such positions exist.
         """
         slot_name = self.resolve_slot_name(
             self.primary_host_conn,
             self.connection_config['dbname'],
             self.connection_config['tap_id'],
         )
+        unsynced = unsynced_log_positions(self.state_path, self.synced_tables)
+        if unsynced and read_slot(self.primary_host_conn, slot_name) is None:
+            raise self._missing_slot_error(slot_name, unsynced)
 
         try:
             result = self.primary_host_query(
@@ -483,7 +507,19 @@ class FastSyncTapPostgres:
             LOGGER.info('Replication slot "%s" already exists, verifying it', slot_name)
             return self._wait_for_existing_slot_start(slot_name)
 
+        if unsynced:
+            self.primary_host_query(f"SELECT pg_drop_replication_slot('{slot_name}')")
+            raise self._missing_slot_error(slot_name, unsynced)
         return lsn_to_int(result[0]['lsn'])
+
+    @staticmethod
+    def _missing_slot_error(slot_name: str, unsynced: list[str]) -> ReplicationSlotVerificationError:
+        return ReplicationSlotVerificationError(
+            f'Replication slot "{slot_name}" does not exist, but the tap state holds LOG_BASED positions '
+            f'for streams outside this sync: {", ".join(unsynced)}. A new slot would start after them and '
+            'their changes in between would be skipped. Run an unfiltered fast_sync to resync every '
+            'LOG_BASED table of the tap.'
+        )
 
     def _wait_for_existing_slot_start(self, slot_name: str) -> int:
         """Return the start LSN of a finished slot owned by this tap, or raise."""

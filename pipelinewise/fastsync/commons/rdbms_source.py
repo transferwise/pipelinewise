@@ -140,6 +140,9 @@ class PostgresSnowflakeSource(RdbmsSnowflakeSource):
         source = self._configure(self.factory(args.tap, self.type_mapper), args, iceberg_version)
         source.hstore_as_json = iceberg_version is not None
         source.target_type = 'snowflake'
+        source.state_path = getattr(args, 'state', None)
+        table = getattr(args, 'table', None)
+        source.synced_tables = getattr(args, 'tables', None) or (table.split(',') if table else [])
         return source
 
     def source_engine(self, args) -> str:
