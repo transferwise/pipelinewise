@@ -49,6 +49,10 @@ class UnparseableWalMessageError(Exception):
     """Custom exception when a wal2json payload cannot be parsed"""
 
 
+class SourceIdentityMismatchError(Exception):
+    """Custom exception when the replication connection reaches a source other than the state's"""
+
+
 def lsn_to_int(lsn):
     """Convert pg_lsn to int"""
 
@@ -761,6 +765,30 @@ def _write_lsn_state(state, logical_streams, lsn):
     return state
 
 
+def verify_source_identity(cur, conn_info, state):
+    """Refuse to stream when the replication connection reaches another source than the state's.
+
+    PipelineWise records the source under source_identity. IDENTIFY_SYSTEM runs on the
+    connection that streams, so a host that resolves to another server after PipelineWise
+    checked it is still caught before any WAL is read or any feedback is sent.
+    """
+    identity = state.get('source_identity') or {}
+    if 'system_identifier' not in identity:
+        return
+
+    cur.execute('IDENTIFY_SYSTEM')
+    system_identifier, timeline_id = cur.fetchone()[:2]
+    connected = {'system_identifier': str(system_identifier), 'timeline_id': int(timeline_id)}
+    if 'host' in identity:
+        connected['host'] = conn_info['host']
+    recorded = {key: identity.get(key) for key in connected}
+    if connected != recorded:
+        raise SourceIdentityMismatchError(
+            f'Tap state belongs to source {recorded} but the replication connection reached {connected}. '
+            'Its log positions do not apply to this source.'
+        )
+
+
 def _start_replication(cur, logical_streams, slot, start_lsn, decimal_target=None):
     wal_sender_timeout = 10800000  # 10800000ms = 3 hours
     LOGGER.info('Set session wal_sender_timeout = %i milliseconds', wal_sender_timeout)
@@ -822,6 +850,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file,  # noqa:
 
     try:
         cur = conn.cursor()
+        verify_source_identity(cur, conn_info, state)
         decimal_options = {'decimal_target': conn_info['decimal_target']} if conn_info.get('decimal_target') else {}
         _start_replication(cur, logical_streams, slot, start_lsn, **decimal_options)
 

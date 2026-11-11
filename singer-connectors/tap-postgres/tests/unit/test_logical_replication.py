@@ -1885,3 +1885,57 @@ class TestLogicalReplicationFeedback(unittest.TestCase):
 
         self.assertIs(error, termination)
         self.assertEqual(self._expected_feedback(100), feedback)
+
+    IDENTITY = {'host': 'foo', 'system_identifier': '7300000000000000001', 'timeline_id': 2}
+
+    def test_source_identity_is_not_checked_without_a_recorded_identity(self):
+        cursor = Mock()
+
+        logical_replication.verify_source_identity(cursor, self.conn_info, self._state({'foo-bar': 100}))
+
+        cursor.execute.assert_not_called()
+
+    def test_source_identity_matches_identify_system_on_the_streaming_connection(self):
+        cursor = Mock()
+        cursor.fetchone.return_value = ('7300000000000000001', 2, '0/2A', 'db')
+        state = dict(self._state({'foo-bar': 100}), source_identity=self.IDENTITY)
+
+        logical_replication.verify_source_identity(cursor, self.conn_info, state)
+
+        cursor.execute.assert_called_once_with('IDENTIFY_SYSTEM')
+
+    def test_source_identity_mismatch_is_refused(self):
+        cases = {
+            'promoted-replica': (('7300000000000000001', 3, '0/2A', 'db'), self.IDENTITY),
+            'other-cluster': (('7399999999999999999', 2, '0/2A', 'db'), self.IDENTITY),
+            'other-host': (('7300000000000000001', 2, '0/2A', 'db'), dict(self.IDENTITY, host='bar')),
+        }
+        for name, (row, identity) in cases.items():
+            cursor = Mock()
+            cursor.fetchone.return_value = row
+            with self.subTest(name=name), self.assertRaises(logical_replication.SourceIdentityMismatchError):
+                logical_replication.verify_source_identity(
+                    cursor, self.conn_info, dict(self._state({'foo-bar': 100}), source_identity=identity))
+
+    def test_sync_stops_before_streaming_when_the_source_does_not_match(self):
+        """No WAL is read and no feedback is sent, so the slot on the wrong source does not move."""
+        state = dict(self._state({'foo-bar': 100}), source_identity=self.IDENTITY)
+
+        with patch('tap_postgres.sync_strategies.logical_replication.sync_common.send_schema_message'), \
+                patch('tap_postgres.sync_strategies.logical_replication.singer.write_message') as mocked_write, \
+                patch('tap_postgres.sync_strategies.logical_replication.locate_replication_slot',
+                      return_value='replication_slot'), \
+                patch('tap_postgres.sync_strategies.logical_replication.emit_wal_progress_message') as emit, \
+                patch('psycopg2.connect') as mocked_connect:
+            mocked_connect.return_value.server_version = 150000
+            cursor = mocked_connect.return_value.cursor.return_value
+            cursor.fetchone.return_value = ('7300000000000000001', 3, '0/2A', 'db')
+
+            with self.assertRaises(logical_replication.SourceIdentityMismatchError):
+                logical_replication.sync_tables(self.conn_info, self.logical_streams, state, 1000, 'state.json')
+
+        cursor.start_replication.assert_not_called()
+        cursor.send_feedback.assert_not_called()
+        emit.assert_not_called()
+        mocked_write.assert_not_called()
+        mocked_connect.return_value.close.assert_called_once_with()
