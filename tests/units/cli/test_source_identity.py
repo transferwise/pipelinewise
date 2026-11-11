@@ -16,6 +16,8 @@ PG_CONFIG = {'host': 'pg-new', 'dbname': 'app', 'tap_id': 'tap_pg'}
 PG_IDENTITY = {'host': 'pg-new', 'system_identifier': '7300000000000000001', 'timeline_id': 2}
 MYSQL_IDENTITY = {'host': 'maria', 'server_id': 2}
 
+pytestmark = pytest.mark.real_source_identity
+
 
 def _connection(fetchone=None, fetchall=None):
     connection = MagicMock()
