@@ -30,6 +30,10 @@ SLOT_PLUGIN = 'wal2json'
 SLOT_DUPLICATE_OBJECT_SQLSTATE = '42710'
 SLOT_READY_TIMEOUT_SECONDS = 900
 SLOT_READY_POLL_SECONDS = 1
+SLOT_STATUS_SQL = (
+    'SELECT slot_name, database, plugin, slot_type, temporary, active_pid, confirmed_flush_lsn '
+    'FROM pg_replication_slots WHERE slot_name = %s'
+)
 
 
 class UnsupportedPostgresVersionError(RuntimeError):
@@ -49,6 +53,38 @@ def lsn_to_int(lsn: str) -> int:
 def int_to_lsn(lsn: int) -> str:
     """Convert an integer LSN to PostgreSQL X/Y text form."""
     return f'{lsn >> 32:X}/{lsn & 0xFFFFFFFF:X}'
+
+
+def read_slot(connection, slot_name: str) -> dict | None:
+    """Read one row of pg_replication_slots, or None when the slot does not exist."""
+    with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(SLOT_STATUS_SQL, (slot_name,))
+        row = cur.fetchone()
+    return dict(row) if row is not None else None
+
+
+def finished_slot_start(slot: dict, dbname: str) -> int | None:
+    """Return the start LSN of a finished slot that belongs to the tap.
+
+    Returns None while the slot is still being created or is in use by a session.
+    Raises ReplicationSlotVerificationError for a slot that is not a persistent
+    logical wal2json slot on the tap's database.
+    """
+    if (
+        slot['slot_type'] != 'logical'
+        or slot['database'] != dbname
+        or slot['plugin'] != SLOT_PLUGIN
+        or slot['temporary']
+    ):
+        raise ReplicationSlotVerificationError(
+            f'Replication slot "{slot["slot_name"]}" does not belong to this tap: '
+            f'type {slot["slot_type"]}, database {slot["database"]}, plugin {slot["plugin"]}, '
+            f'temporary {slot["temporary"]}; expected a persistent logical slot on {dbname} '
+            f'using {SLOT_PLUGIN}'
+        )
+    if slot['confirmed_flush_lsn'] is None or slot['active_pid'] is not None:
+        return None
+    return lsn_to_int(slot['confirmed_flush_lsn'])
 
 
 class FastSyncTapPostgres:
@@ -98,7 +134,7 @@ class FastSyncTapPostgres:
         return slot_name
 
     @classmethod
-    def __get_slot_name(
+    def resolve_slot_name(
         cls,
         connection,
         dbname: str,
@@ -167,7 +203,7 @@ class FastSyncTapPostgres:
         LOGGER.debug('Connection to Primary server created.')
 
         try:
-            slot_name = cls.__get_slot_name(
+            slot_name = cls.resolve_slot_name(
                 connection, connection_config['dbname'], connection_config['tap_id']
             )
 
@@ -414,7 +450,7 @@ class FastSyncTapPostgres:
         it is finished and belongs to this database and plugin. Its confirmed_flush_lsn
         is then the earliest position it can stream from.
         """
-        slot_name = self.__get_slot_name(
+        slot_name = self.resolve_slot_name(
             self.primary_host_conn,
             self.connection_config['dbname'],
             self.connection_config['tap_id'],
@@ -437,36 +473,17 @@ class FastSyncTapPostgres:
         dbname = self.connection_config['dbname']
         deadline = time.monotonic() + SLOT_READY_TIMEOUT_SECONDS
         while True:
-            rows = self.primary_host_query(
-                'SELECT database, plugin, slot_type, temporary, active_pid, confirmed_flush_lsn '
-                'FROM pg_replication_slots WHERE slot_name = %s',
-                (slot_name,),
-            )
-            if not rows:
+            slot = read_slot(self.primary_host_conn, slot_name)
+            if slot is None:
                 raise ReplicationSlotVerificationError(
                     f'Replication slot "{slot_name}" was reported as existing but is gone; '
                     'its creation was probably cancelled. Rerun the sync.'
                 )
 
-            slot = rows[0]
-            if (
-                slot['slot_type'] != 'logical'
-                or slot['database'] != dbname
-                or slot['plugin'] != SLOT_PLUGIN
-                or slot['temporary']
-            ):
-                raise ReplicationSlotVerificationError(
-                    f'Replication slot "{slot_name}" exists but does not belong to this tap: '
-                    f'type {slot["slot_type"]}, database {slot["database"]}, plugin {slot["plugin"]}, '
-                    f'temporary {slot["temporary"]}; expected a persistent logical slot on {dbname} '
-                    f'using {SLOT_PLUGIN}'
-                )
-
-            if slot['confirmed_flush_lsn'] is not None and slot['active_pid'] is None:
-                LOGGER.info(
-                    'Using existing replication slot "%s" from %s', slot_name, slot['confirmed_flush_lsn']
-                )
-                return lsn_to_int(slot['confirmed_flush_lsn'])
+            start_lsn = finished_slot_start(slot, dbname)
+            if start_lsn is not None:
+                LOGGER.info('Using existing replication slot "%s" from %s', slot_name, slot['confirmed_flush_lsn'])
+                return start_lsn
 
             if time.monotonic() >= deadline:
                 raise ReplicationSlotVerificationError(

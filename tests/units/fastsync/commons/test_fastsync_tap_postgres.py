@@ -296,7 +296,7 @@ class TestFastSyncTapPostgres(TestCase):
             "SELECT * FROM pg_create_logical_replication_slot('pipelinewise_test_database', 'wal2json')",
         ]
 
-    def _existing_slot(self, slot_rows, monotonic=None):
+    def _existing_slot(self, slots, monotonic=None):
         """Run create_replication_slot against a slot that already exists, returning the result."""
         cursor_mock = MagicMock().return_value
         type(cursor_mock.__enter__.return_value).rowcount = PropertyMock(return_value=0)
@@ -306,20 +306,24 @@ class TestFastSyncTapPostgres(TestCase):
 
         duplicate = Exception('replication slot "pipelinewise_test_database_test_tap" already exists')
         duplicate.pgcode = '42710'
-        self.postgres.primary_host_query = Mock(side_effect=[duplicate, *slot_rows])
-        with patch.object(tap_postgres.time, 'sleep') as sleep, patch.object(
-            tap_postgres.time, 'monotonic', side_effect=monotonic or [0] * (len(slot_rows) + 1)
+        self.postgres.primary_host_query = Mock(side_effect=duplicate)
+        with patch.object(tap_postgres, 'read_slot', side_effect=slots) as read_slot, patch.object(
+            tap_postgres.time, 'sleep'
+        ) as sleep, patch.object(
+            tap_postgres.time, 'monotonic', side_effect=monotonic or [0] * (len(slots) + 1)
         ):
-            return self.postgres.create_replication_slot(), sleep
+            start_lsn = self.postgres.create_replication_slot()
+        read_slot.assert_called_with(pg_con, 'pipelinewise_test_database_test_tap')
+        return start_lsn, sleep
 
     @staticmethod
     def _slot(**overrides):
         slot = {
-            'database': 'test_database', 'plugin': 'wal2json', 'slot_type': 'logical',
-            'temporary': False, 'active_pid': None, 'confirmed_flush_lsn': '0/2A',
+            'slot_name': 'pipelinewise_test_database_test_tap', 'database': 'test_database', 'plugin': 'wal2json',
+            'slot_type': 'logical', 'temporary': False, 'active_pid': None, 'confirmed_flush_lsn': '0/2A',
         }
         slot.update(overrides)
-        return [slot]
+        return slot
 
     def test_create_replication_slot_accepts_finished_slot_of_this_tap(self):
         """An existing finished slot on this database and plugin starts at its confirmed_flush_lsn."""
@@ -327,11 +331,6 @@ class TestFastSyncTapPostgres(TestCase):
 
         self.assertEqual(42, start_lsn)
         sleep.assert_not_called()
-        self.postgres.primary_host_query.assert_called_with(
-            'SELECT database, plugin, slot_type, temporary, active_pid, confirmed_flush_lsn '
-            'FROM pg_replication_slots WHERE slot_name = %s',
-            ('pipelinewise_test_database_test_tap',),
-        )
 
     def test_create_replication_slot_waits_for_slot_still_being_created(self):
         """A slot another worker is still building has no start point yet, so it is polled until finished."""
@@ -368,7 +367,7 @@ class TestFastSyncTapPostgres(TestCase):
     def test_create_replication_slot_rejects_slot_that_disappears(self):
         """A slot dropped after the duplicate error, for example a cancelled creation, is an error."""
         with self.assertRaisesRegex(tap_postgres.ReplicationSlotVerificationError, 'is gone'):
-            self._existing_slot([[]])
+            self._existing_slot([None])
 
     def test_create_replication_slot_propagates_other_errors(self):
         """Errors other than the duplicate-object SQLSTATE are raised unchanged."""
@@ -383,6 +382,16 @@ class TestFastSyncTapPostgres(TestCase):
 
         with self.assertRaisesRegex(Exception, 'permission denied'):
             self.postgres.create_replication_slot()
+
+    def test_read_slot_returns_the_named_slot_or_none(self):
+        """The slot row is read by exact name, so reset_state and FastSync see the same slot."""
+        connection = MagicMock()
+        cursor = connection.cursor.return_value.__enter__.return_value
+        cursor.fetchone.side_effect = [self._slot(), None]
+
+        self.assertEqual(self._slot(), tap_postgres.read_slot(connection, 'pipelinewise_test_database_test_tap'))
+        self.assertIsNone(tap_postgres.read_slot(connection, 'missing'))
+        cursor.execute.assert_called_with(tap_postgres.SLOT_STATUS_SQL, ('missing',))
 
     def test_lsn_conversions_round_trip(self):
         """LSN text and integer forms convert both ways."""
