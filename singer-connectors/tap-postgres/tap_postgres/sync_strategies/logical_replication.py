@@ -7,7 +7,7 @@ import json
 import re
 import singer
 import warnings
-import hashlib
+#import hashlib
 
 from select import select
 from psycopg2 import sql

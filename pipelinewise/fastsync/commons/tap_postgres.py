@@ -7,7 +7,7 @@ import os
 import re
 import sys
 import psycopg2
-import hashlib
+#import hashlib
 
 from singer.logger import log_source_host
 import psycopg2.extras
