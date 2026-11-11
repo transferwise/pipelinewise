@@ -43,6 +43,10 @@ Symptom index
        <troubleshooting_postgres_logical_decoding_spill>`
      - PostgreSQL LOG_BASED
      - Logical-decoding disk spill and ``logical_decoding_work_mem``.
+   * - :ref:`Final WAL acknowledgement waits or times out
+       <troubleshooting_postgres_final_feedback>`
+     - PostgreSQL to Snowflake
+     - Target final load, saved state, and source feedback confirmation.
    * - :ref:`Recovery conflict <troubleshooting_postgres_recovery_conflict>`
      - PostgreSQL replica reads
      - Standby replay delay settings.
@@ -382,6 +386,30 @@ transactions. Use the incremental tuning and memory guidance in
 same tap so its replication connection receives the new value. Do not drop,
 recreate, or advance the slot; that can discard changes that PipelineWise has not
 acknowledged.
+
+.. _troubleshooting_postgres_final_feedback:
+
+Final WAL acknowledgement waits or times out
+""""""""""""""""""""""""""""""""""""""""""""
+
+Managed PostgreSQL-to-Snowflake runs can keep their replication session open
+after extraction finishes. The target must finish loading and deleting rows,
+and acknowledge its final checkpoint, before the source can confirm that
+checkpoint to PostgreSQL. See :ref:`postgres_final_feedback`.
+
+Compare target load completion, state-file write errors and source feedback
+confirmation in the same UTC interval. Check connectivity to the writable
+primary if the target has acknowledged its state but source confirmation fails.
+Finalization has a ten-minute deadline. An unconfirmed acknowledgement logs a
+warning but does not fail the run. The next run resumes from the durable target
+state.
+
+A PostgreSQL startup message can report ``reading WAL from`` an earlier LSN
+than the requested resume point. The server reconstructs logical-decoding
+state from retained WAL before delivering later transactions. Compare
+``restart_lsn`` and ``confirmed_flush_lsn`` with the target checkpoint to
+distinguish old decoding history from unreported target progress. Their byte
+distances are WAL address ranges, not physical disk-read measurements.
 
 .. _troubleshooting_postgres_logical_decoding_spill:
 

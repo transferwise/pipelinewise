@@ -1160,6 +1160,7 @@ class PipelineWise:
         start = None
         state = None
         retryable_disconnect = False
+        postgres_final_feedback = commands.uses_postgres_final_feedback(tap, target)
 
         def update_state_file(line: str) -> str:
             nonlocal start, state, retryable_disconnect
@@ -1168,17 +1169,15 @@ class PipelineWise:
 
             # Update state variable with latest state
             if utils.is_state_message(line):
-                # if it has been more than 2 seconds since we last updated the state file
-                # update it again with newly received state
-                if start is None or time() - start >= 2:
+                # PostgreSQL can wait for this file while retaining its replication session.
+                # Coalescing its last ACK until process exit would deadlock that handshake.
+                if postgres_final_feedback or start is None or time() - start >= 2:
                     _persist_singer_state(tap.state, line)
 
                     # Update start time to be the current time.
                     start = time()
 
-                # Keep track of state message so that we do one last file update at the end of the run_tap_singer
-                # function. This is to avoid the edge case where the last state message and the one before it are
-                # less than 2 sec apart.
+                # Other routes coalesce writes and persist their final state after process exit.
                 state = line
 
             return line
@@ -1241,7 +1240,7 @@ class PipelineWise:
                 sleep(retry_delay)
 
         # update the state file one last time to make sure it always has the last state message.
-        if state is not None:
+        if state is not None and not postgres_final_feedback:
             _persist_singer_state(tap.state, state)
 
     def run_tap_partialsync(self, tap: TapParams, target: TargetParams, transform: TransformParams):

@@ -16,6 +16,7 @@ from tap_postgres.sync_strategies import logical_replication
 from tap_postgres.sync_strategies import full_table
 from tap_postgres.sync_strategies import incremental
 from tap_postgres.discovery_utils import discover_db
+from tap_postgres.final_feedback import FinalFeedbackCoordinator, FinalFeedbackError
 from tap_postgres.stream_utils import (
     dump_catalog, clear_state_on_replication_change,
     is_selected_via_metadata, refresh_streams_schema, any_logical_streams)
@@ -196,7 +197,8 @@ def sync_traditional_stream(conn_config, stream, state, sync_method, end_lsn):
     return state
 
 
-def sync_logical_streams(conn_config, logical_streams, state, end_lsn, state_file):
+def sync_logical_streams(conn_config, logical_streams, state, end_lsn, state_file,
+                         final_feedback: FinalFeedbackCoordinator | None = None):
     """
     Sync streams that use LOG_BASED method
     """
@@ -220,12 +222,14 @@ def sync_logical_streams(conn_config, logical_streams, state, end_lsn, state_fil
                 new_state['bookmarks'][stream] = bookmark
         state = new_state
 
+        feedback_options = {'final_feedback': final_feedback} if final_feedback is not None else {}
         state = logical_replication.sync_tables(
             conn_config,
             logical_streams,
             state,
             end_lsn,
             state_file,
+            **feedback_options,
         )
 
     return state
@@ -280,7 +284,8 @@ def register_type_adapters(conn_config):
                         (enum_oid,), f'ENUM_{enum_oid}[]', psycopg2.STRING))
 
 
-def do_sync(conn_config, catalog, default_replication_method, state, state_file=None):
+def do_sync(conn_config, catalog, default_replication_method, state, state_file=None,
+            final_feedback: FinalFeedbackCoordinator | None = None):
     """
     Orchestrates sync of all streams
     """
@@ -324,6 +329,11 @@ def do_sync(conn_config, catalog, default_replication_method, state, state_file=
                                         end_lsn)
 
     logical_streams.sort(key=lambda s: metadata.to_map(s['metadata']).get(()).get('database-name'))
+    logical_databases = {metadata.to_map(stream['metadata']).get(()).get('database-name') for stream in logical_streams}
+    if final_feedback is not None and len(logical_databases) > 1:
+        LOGGER.info('Using legacy session cleanup for %i logical database groups', len(logical_databases))
+        final_feedback = None
+    feedback_options = {'final_feedback': final_feedback} if final_feedback is not None else {}
     for dbname, streams in itertools.groupby(
             logical_streams, lambda s: metadata.to_map(s['metadata']).get(()).get('database-name')):
         conn_config['dbname'] = dbname
@@ -333,6 +343,7 @@ def do_sync(conn_config, catalog, default_replication_method, state, state_file=
             state,
             end_lsn,
             state_file,
+            **feedback_options,
         )
     return state
 
@@ -450,8 +461,21 @@ def main_impl():
     elif args.properties or args.catalog:
         state = args.state
         state_file = args.state_file
-        do_sync(conn_config, args.catalog.to_dict() if args.catalog else args.properties,
-                args.config.get('default_replication_method'), state, state_file)
+        final_feedback = FinalFeedbackCoordinator.from_environment(state_file)
+        feedback_options = {'final_feedback': final_feedback} if final_feedback is not None else {}
+        try:
+            do_sync(conn_config, args.catalog.to_dict() if args.catalog else args.properties,
+                    args.config.get('default_replication_method'), state, state_file, **feedback_options)
+            if final_feedback is not None:
+                try:
+                    final_feedback.finish()
+                except FinalFeedbackError as exc:
+                    # Durable target state is unchanged, so an unconfirmed acknowledgement only repeats the
+                    # previous lifecycle. A failed target still fails the pipeline through its own exit status.
+                    LOGGER.warning('%s. The next run resumes from the durable target state.', exc)
+        finally:
+            if final_feedback is not None:
+                final_feedback.close()
     else:
         LOGGER.info("No properties were selected")
 

@@ -11,7 +11,7 @@ import hashlib
 
 from select import select
 from psycopg2 import sql
-from singer import metadata, utils, get_bookmark
+from singer import metadata, utils
 from singer.decimal_support import decimal_to_string, is_decimal_schema
 from dateutil.parser import parse, UnknownTimezoneWarning, ParserError
 from functools import reduce
@@ -21,6 +21,11 @@ import tap_postgres.sync_strategies.common as sync_common
 from tap_postgres.stream_utils import refresh_streams_schema
 from tap_postgres.discovery_utils import (
     FLOAT_ARRAY_TYPES, Column, allow_nonfinite_float_array_items, schema_for_column)
+from tap_postgres.final_feedback import (
+    FinalFeedbackCoordinator,
+    minimum_acknowledged_lsn as _minimum_acknowledged_lsn,
+    read_target_acknowledged_lsn as _read_target_acknowledged_lsn,
+)
 
 LOGGER = singer.get_logger('tap_postgres')
 
@@ -737,30 +742,6 @@ def streams_to_wal2json_tables(streams):
     return ','.join(tables)
 
 
-def _minimum_acknowledged_lsn(state, logical_streams):
-    """Return the oldest valid target-acknowledged LSN across logical streams."""
-    acknowledged_lsns = [
-        get_bookmark(state, stream['tap_stream_id'], 'lsn')
-        for stream in logical_streams
-    ]
-    if not acknowledged_lsns or any(
-            isinstance(lsn, bool) or not isinstance(lsn, int) or lsn < 0
-            for lsn in acknowledged_lsns):
-        raise ValueError('State does not contain a valid LSN for every logical stream')
-    return min(acknowledged_lsns)
-
-
-def _read_target_acknowledged_lsn(state_file, logical_streams, previous_safe_lsn):
-    """Read a target acknowledgement without accepting invalid or regressing state."""
-    try:
-        with open(state_file, mode='r', encoding='utf-8') as fh:
-            target_state = json.load(fh)
-        return max(previous_safe_lsn, _minimum_acknowledged_lsn(target_state, logical_streams))
-    except (AttributeError, KeyError, OSError, TypeError, UnicodeError, ValueError):
-        LOGGER.debug('Unable to open and parse %s', state_file)
-        return previous_safe_lsn
-
-
 def _write_lsn_state(state, logical_streams, lsn):
     for stream in logical_streams:
         state = singer.write_bookmark(state, stream['tap_stream_id'], 'lsn', lsn)
@@ -798,7 +779,8 @@ def _start_replication(cur, logical_streams, slot, start_lsn, decimal_target=Non
         raise Exception(f"Unable to start replication with logical replication (slot {ex})") from ex
 
 
-def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):  # noqa: C901
+def sync_tables(conn_info, logical_streams, state, end_lsn, state_file,  # noqa: C901
+                final_feedback: FinalFeedbackCoordinator | None = None):
     target_acknowledged_lsn = _minimum_acknowledged_lsn(state, logical_streams)
     start_lsn = target_acknowledged_lsn
     lsn_to_flush = None
@@ -823,6 +805,8 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):  # noqa
     conn = post_db.open_connection(conn_info, True, True)
     cur = None
     finalize_state = False
+    completed_marker_stop = False
+    retained = False
 
     try:
         cur = conn.cursor()
@@ -918,6 +902,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):  # noqa
                     lsn_last_processed = msg.data_start
                     completed_wal_progress_lsn = lsn_last_processed
                     if break_at_end_lsn:
+                        completed_marker_stop = True
                         LOGGER.info('Breaking - reached PipelineWise WAL progress message at %s',
                                     int_to_lsn(lsn_last_processed))
                         break
@@ -969,11 +954,15 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):  # noqa
                     state = _write_lsn_state(state, logical_streams, lsn_last_processed)
                 else:
                     singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
+            if final_feedback is not None and completed_marker_stop:
+                final_feedback.retain(conn, cur, conn_info, logical_streams, completed_wal_progress_lsn, slot)
+                retained = True
         finally:
-            try:
-                if cur is not None:
-                    cur.close()
-            finally:
-                conn.close()
+            if not retained:
+                try:
+                    if cur is not None:
+                        cur.close()
+                finally:
+                    conn.close()
 
     return state

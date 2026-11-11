@@ -148,6 +148,8 @@ PostgreSQL ``hstore`` values map to Snowflake ``VARIANT`` only on that explicit
 v3 route; native mappings remain unchanged.
 
 
+.. _postgres_final_feedback:
+
 Acknowledgement and recovery
 ----------------------------
 
@@ -164,6 +166,28 @@ identifies the fence, and the first decoded transaction commit at or beyond that
 position provides a safe bookmark boundary even when the selected tables are
 idle. Slot feedback advances through that boundary only after the target
 acknowledges the state.
+
+For managed PostgreSQL-to-Snowflake runs with an existing state file and one
+logical source database that stop at this completed marker, PipelineWise closes
+the Singer data pipe and keeps the original replication connection open.
+Downstream transformations and buffers drain, and Snowflake
+finishes its final load and deletes. PipelineWise immediately persists the
+target's acknowledged state, sends final feedback up to the completed boundary,
+and checks that PostgreSQL received it before closing the connection. This
+avoids leaving the final durable checkpoint unreported until another run.
+
+Final acknowledgement has a ten-minute deadline. After a timeout, failed target,
+unreadable state, or lost PostgreSQL connection, the tap logs a warning and
+closes without final feedback, as earlier releases did. This alone does not
+fail the run; a failed target still fails it. The next run resumes from the
+durable target checkpoint. Consumed or buffered records alone
+never justify advancing feedback. This finalization requires the managed
+PipelineWise state channel and a completed progress-marker transaction. It adds
+no YAML setting or state migration.
+
+PostgreSQL can retain an earlier ``restart_lsn`` even after acknowledging the
+final checkpoint. Restarting logical decoding can therefore still read older
+WAL. Final acknowledgement does not guarantee that every startup read disappears.
 
 If the function is unavailable or inaccessible, replication continues using
 the captured current-WAL boundary. Fully filtered idle WAL may then require a

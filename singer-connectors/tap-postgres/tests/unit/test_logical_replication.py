@@ -1511,7 +1511,7 @@ class TestLogicalReplicationFeedback(unittest.TestCase):
 
         self.assertEqual(150, acknowledged_lsn)
 
-    def _run_sync(self, state, messages, state_reader, logical_streams=None, marker_lsn=None):
+    def _run_sync(self, state, messages, state_reader, logical_streams=None, marker_lsn=None, final_feedback=None):
         termination = RuntimeError('unexpected replication termination')
         streams = self.logical_streams if logical_streams is None else logical_streams
 
@@ -1538,6 +1538,7 @@ class TestLogicalReplicationFeedback(unittest.TestCase):
                     state,
                     1000,
                     'state.json',
+                    final_feedback=final_feedback,
                 )
             except Exception as exc:  # The harness captures the intentional termination or regression failure.
                 error = exc
@@ -1587,6 +1588,46 @@ class TestLogicalReplicationFeedback(unittest.TestCase):
         self.assertIsNone(error)
         self.assertEqual(220, state['bookmarks']['foo-bar']['lsn'])
         self.assertEqual(self._expected_feedback(100), feedback)
+
+    def test_managed_completed_marker_retains_original_session_after_final_state(self):
+        state = self._state({'foo-bar': 100})
+        self.conn_info['break_at_end_lsn'] = True
+        coordinator = Mock()
+        messages = [self._message('B', 200), self._message('C', 220)]
+        feedback_calls, error, _, writes = self._run_sync(
+            state, messages, mock_open(read_data=json.dumps(state)), marker_lsn=210, final_feedback=coordinator)
+        self.assertIsNone(error)
+        self.assertEqual(self._expected_feedback(100), feedback_calls)
+        self.assertEqual(220, writes[-1].args[0].value['bookmarks']['foo-bar']['lsn'])
+        coordinator.retain.assert_called_once()
+        conn, cursor, config, streams, boundary, slot = coordinator.retain.call_args.args
+        self.assertEqual(220, boundary)
+        self.assertEqual('replication_slot', slot)
+        self.assertIs(self.conn_info, config)
+        self.assertIs(self.logical_streams, streams)
+        conn.close.assert_not_called()
+        cursor.close.assert_not_called()
+
+    def test_managed_other_exit_paths_do_not_retain_or_ack_final_state(self):
+        cases = {
+            'continuous': ({'break_at_end_lsn': False}, 210, [self._message('C', 220)]),
+            'legacy_marker': ({'break_at_end_lsn': True}, None, [self._message('B', 1100)]),
+            'max_runtime': ({'max_run_seconds': -1}, 210, []),
+            'idle': ({'logical_poll_total_seconds': -1}, 210, []),
+            'error': ({'break_at_end_lsn': True}, 210, [self._message('B', 200)]),
+        }
+        for name, (updates, marker_lsn, messages) in cases.items():
+            with self.subTest(name=name):
+                original_config = self.conn_info.copy()
+                self.conn_info.update(updates)
+                coordinator = Mock()
+                state = self._state({'foo-bar': 100})
+                feedback_calls, _, _, _ = self._run_sync(
+                    state, messages, mock_open(read_data=json.dumps(state)),
+                    marker_lsn=marker_lsn, final_feedback=coordinator)
+                coordinator.retain.assert_not_called()
+                self.assertTrue(all(entry.kwargs['flush_lsn'] <= 100 for entry in feedback_calls))
+                self.conn_info = original_config
 
     def test_finalization_writes_zero_lsn_to_every_stream(self):
         """A valid zero LSN is distinct from the uninitialized sentinel."""

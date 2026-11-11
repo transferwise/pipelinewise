@@ -53,7 +53,7 @@ def fully_qualified_table_name(schema, table):
     return f'"{canonicalize_identifier(schema)}"."{canonicalize_identifier(table)}"'
 
 
-def open_connection(conn_config, logical_replication=False, prioritize_primary=False):
+def open_connection(conn_config, logical_replication=False, prioritize_primary=False, *, connect_timeout: int = 30):
     cfg = {
         'application_name': 'pipelinewise',
         'host': conn_config['host'],
@@ -61,7 +61,7 @@ def open_connection(conn_config, logical_replication=False, prioritize_primary=F
         'user': conn_config['user'],
         'password': conn_config['password'],
         'port': conn_config['port'],
-        'connect_timeout': 30
+        'connect_timeout': connect_timeout
     }
 
     if conn_config['use_secondary'] and not prioritize_primary and not logical_replication:

@@ -21,6 +21,7 @@ DEFAULT_STREAM_BUFFER_BIN = 'mbuffer'
 MIN_STREAM_BUFFER_SIZE = 10
 MAX_STREAM_BUFFER_SIZE = 2500
 SHUTDOWN_OUTPUT_DRAIN_SECONDS = 5
+POSTGRES_FINAL_FEEDBACK_ENV = 'PIPELINEWISE_POSTGRES_FINAL_FEEDBACK'
 
 PARAMS_VALIDATION_RETRY_PERIOD_SEC = 2
 PARAMS_VALIDATION_RETRY_TIMES = 3
@@ -298,6 +299,16 @@ def build_stream_buffer_command(
     return buffer_command
 
 
+def uses_postgres_final_feedback(tap: TapParams, target: TargetParams) -> bool:
+    """Return whether the managed route supports feedback after the target's final flush."""
+    return (
+        tap.type == 'tap-postgres'
+        and target.type == 'target-snowflake'
+        and tap.state is not None
+        and os.path.isfile(tap.state)
+    )
+
+
 def build_singer_command(
     tap: TapParams,
     target: TargetParams,
@@ -326,6 +337,9 @@ def build_singer_command(
         string of command line executable
     """
     tap_command = build_tap_command(tap, profiling_mode, profiling_dir)
+    if uses_postgres_final_feedback(tap, target):
+        # Scope the coordinator contract to the tap, including its profiling wrapper.
+        tap_command = f'{POSTGRES_FINAL_FEEDBACK_ENV}=1 {tap_command}'
 
     LOGGER.debug('Tap command: %s', tap_command)
 
