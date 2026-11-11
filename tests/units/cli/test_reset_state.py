@@ -119,6 +119,27 @@ class TestResetState(TestCase):
         }
         self.assertDictEqual(expected_state, self._read_pg_state())
 
+    def test_reset_state_writes_bookmarks_and_identity_in_one_atomic_write(self):
+        """A failed write never leaves lsn=1 under the old identity or a truncated state file"""
+        state_content = {
+            'bookmarks': {'foo_table': {'lsn': 54321}, 'bar_table': {'lsn': 12345}},
+            'source_identity': dict(PG_IDENTITY, timeline_id=1),
+        }
+        self._write_pg_state(state_content)
+        arguments = {'tap': 'tap_pg', 'target': 'target_foo', 'boundary_lsn': '16/B374D848'}
+        with mock.patch.object(
+            source_identity, 'verify_postgres_slot_covers_boundary', return_value='pipelinewise_db_tap_pg'
+        ), mock.patch.object(
+            source_identity, 'read_source_identity', return_value=PG_IDENTITY
+        ), mock.patch(
+            'pipelinewise.cli.pipelinewise.fastsync_utils.save_dict_to_json', side_effect=OSError('disk full'),
+        ) as save, self.assertRaises(SystemExit) as system_exit:
+            self._run_cli(arguments)
+
+        self.assertEqual(system_exit.exception.code, 1)
+        save.assert_called_once()
+        self.assertDictEqual(state_content, self._read_pg_state())
+
     def test_reset_state_refuses_pg_without_boundary(self):
         """Postgres state is never reset to lsn=1 without the operator's boundary position"""
         verify = self._assert_pg_reset_refused(

@@ -2914,15 +2914,18 @@ class PipelineWise:
             self.logger.error('Refusing to reset state for %s: %s', self.tap['id'], exc)
             raise SystemExit(1) from exc
 
-        for state_item in state_items_to_update:
-            self._update_state_file(state_item[0], state_item[1])
-        self._update_state_source_identity(identity)
+        self._write_reset_state(state_items_to_update, identity)
         self.logger.info('state file is reset for log based tables!')
 
-    def _update_state_source_identity(self, identity):
+    def _write_reset_state(self, state_items_to_update, identity):
+        """Apply the reset bookmarks and the new source identity in one atomic state write."""
         tap_state = self.tap['files']['state']
         try:
             state_content = self._load_required_json_object(tap_state, 'tap state')
+            for properties in state_content['bookmarks'].values():
+                for table_property, new_value in state_items_to_update:
+                    if table_property in properties:
+                        properties[table_property] = new_value
             state_content[source_identity.STATE_KEY] = identity
             fastsync_utils.save_dict_to_json(tap_state, state_content)
         except Exception as exp:
@@ -3095,24 +3098,6 @@ class PipelineWise:
 
         self.logger.error('There is no data for switchover %s!', self.tap['id'])
         raise SystemExit(1)
-
-    def _update_state_file(self, table_property, new_value):
-        tap_state = self.tap['files']['state']
-        try:
-            with open(tap_state, 'r', encoding='utf8') as state_file:
-                state_content = json.load(state_file)
-                bookmarks = state_content.get('bookmarks')
-                for table, properties in bookmarks.items():
-                    if table_property in properties:
-                        bookmarks[table][table_property] = new_value
-                state_content['bookmarks'] = bookmarks
-
-            with open(tap_state, 'w', encoding='utf8') as state_file:
-                json.dump(state_content, state_file, indent=4)
-
-        except Exception as exp:
-            self.logger.error(exp)
-            raise SystemExit(1) from exp
 
     @staticmethod
     def _remove_not_partial_synced_tables_from_properties(tap_params, not_synced_tables):
