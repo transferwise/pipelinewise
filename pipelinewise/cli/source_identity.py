@@ -8,6 +8,7 @@ from pipelinewise.fastsync.commons.tap_postgres import (
     finished_slot_start,
     int_to_lsn,
     lsn_to_int,
+    read_primary_history,
     read_slot,
 )
 
@@ -15,10 +16,6 @@ from .source_table_sizes import open_source_connection
 
 STATE_KEY = 'source_identity'
 
-POSTGRES_IDENTITY_SQL = (
-    'SELECT (SELECT system_identifier FROM pg_control_system())::text, '
-    'pg_walfile_name(pg_current_wal_lsn())'
-)
 POSTGRES_CURRENT_LSN_SQL = 'SELECT pg_current_wal_lsn()::text'
 MYSQL_IDENTITY_SQL = "SHOW GLOBAL VARIABLES WHERE Variable_name IN ('server_uuid', 'server_id')"
 LSN_PATTERN = re.compile(r'^[0-9A-Fa-f]{1,8}/[0-9A-Fa-f]{1,8}$')
@@ -37,14 +34,9 @@ def read_source_identity(tap_type: str, config: dict) -> dict | None:
     server_uuid. MariaDB has no server_uuid, so the configured host and server_id are used.
     """
     if tap_type == 'tap-postgres':
-        with closing(open_source_connection(tap_type, config)) as connection, connection.cursor() as cursor:
-            cursor.execute(POSTGRES_IDENTITY_SQL)
-            system_identifier, wal_file = cursor.fetchone()
-        return {
-            'host': config['host'],
-            'system_identifier': system_identifier,
-            'timeline_id': int(wal_file[:8], 16),
-        }
+        with closing(open_source_connection(tap_type, config)) as connection:
+            system_identifier, timeline_id = read_primary_history(connection)
+        return {'host': config['host'], 'system_identifier': system_identifier, 'timeline_id': timeline_id}
 
     if tap_type == 'tap-mysql':
         with closing(open_source_connection(tap_type, config)) as connection, connection.cursor() as cursor:

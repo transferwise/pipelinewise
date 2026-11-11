@@ -161,7 +161,7 @@ class TestFastSyncTapPostgres(TestCase):
         primary_connection.close.assert_called_once_with()
         self.assertIsNone(self.postgres.primary_host_conn)
 
-    PRIMARY_HISTORY = [{'system_identifier': '7300000000000000001', 'wal_file': '000000020000000000000001'}]
+    PRIMARY_HISTORY = ('7300000000000000001', 2)
 
     @staticmethod
     def _replica_row(current_lsn='0/2A', timeline_id=2, system_identifier='7300000000000000001'):
@@ -169,13 +169,15 @@ class TestFastSyncTapPostgres(TestCase):
 
     def _fetch_from_replica(self, replica_rows, slot_start=42, monotonic=None):
         self.postgres.connection_config['replica_host'] = 'replica'
-        self.postgres.primary_host_query = Mock(return_value=self.PRIMARY_HISTORY)
+        self.primary_connection = Mock()
         monotonic_patch = patch.object(
             tap_postgres.time, 'monotonic', side_effect=monotonic
         ) if monotonic else patch.object(tap_postgres.time, 'monotonic', return_value=0)
-        with patch.object(self.postgres, 'get_connection', return_value=Mock()), patch.object(
+        with patch.object(self.postgres, 'get_connection', return_value=self.primary_connection), patch.object(
             self.postgres, 'create_replication_slot', return_value=slot_start
         ), patch.object(
+            tap_postgres, 'read_primary_history', return_value=self.PRIMARY_HISTORY
+        ) as self.read_primary_history, patch.object(
             self.postgres, 'query', side_effect=replica_rows
         ) as query, patch.object(tap_postgres.time, 'sleep') as sleep, monotonic_patch:
             bookmark = self.postgres.fetch_current_log_pos()
@@ -187,7 +189,7 @@ class TestFastSyncTapPostgres(TestCase):
 
         self.assertEqual({'lsn': 42, 'version': 1}, bookmark)
         query.assert_called_once_with(tap_postgres.REPLICA_POSITION_SQL)
-        self.postgres.primary_host_query.assert_called_once_with(tap_postgres.PRIMARY_HISTORY_SQL)
+        self.read_primary_history.assert_called_once_with(self.primary_connection)
 
     def test_fetch_current_log_pos_rejects_primary_bookmark_before_slot_start(self):
         """A bookmark before the slot start would let the snapshot miss commits the slot never streams."""

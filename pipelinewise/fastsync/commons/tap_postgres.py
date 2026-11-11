@@ -72,6 +72,14 @@ def read_slot(connection, slot_name: str) -> dict | None:
     return dict(row) if row is not None else None
 
 
+def read_primary_history(connection) -> tuple[str, int]:
+    """Return the system identifier and current insertion timeline of a primary."""
+    with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(PRIMARY_HISTORY_SQL)
+        row = cur.fetchone()
+    return row['system_identifier'], int(row['wal_file'][:8], 16)
+
+
 def finished_slot_start(slot: dict, dbname: str) -> int | None:
     """Return the start LSN of a finished slot that belongs to the tap.
 
@@ -502,10 +510,6 @@ class FastSyncTapPostgres:
                 )
             time.sleep(SLOT_READY_POLL_SECONDS)
 
-    def _read_primary_history(self) -> tuple[str, int]:
-        row = self.primary_host_query(PRIMARY_HISTORY_SQL)[0]
-        return row['system_identifier'], int(row['wal_file'][:8], 16)
-
     def _read_replica_bookmark(self, primary_history: tuple[str, int]) -> tuple[int | None, str]:
         """Return the replica's replay LSN, or None with the reason it cannot be used yet.
 
@@ -548,7 +552,7 @@ class FastSyncTapPostgres:
         )
         try:
             slot_start_lsn = self.create_replication_slot()
-            primary_history = self._read_primary_history() if replica else None
+            primary_history = read_primary_history(self.primary_host_conn) if replica else None
         finally:
             self._close_primary_host_connection()
 

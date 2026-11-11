@@ -7,6 +7,7 @@ import pytest
 
 from pipelinewise.cli import source_identity
 from pipelinewise.cli.pipelinewise import PipelineWise
+from pipelinewise.fastsync.commons import tap_postgres
 from tests.units.cli.cli_args import CliArgs
 
 CONFIG_DIR = 'tests/units/cli/resources/sample_json_config'
@@ -37,13 +38,14 @@ def _slot(**overrides):
 
 
 def test_postgres_identity_combines_host_system_identifier_and_timeline():
-    connection, cursor = _connection(fetchone=('7300000000000000001', '0000000200000016000000B3'))
+    connection, cursor = _connection(
+        fetchone={'system_identifier': '7300000000000000001', 'wal_file': '0000000200000016000000B3'})
     with patch.object(source_identity, 'open_source_connection', return_value=connection) as connect:
         identity = source_identity.read_source_identity('tap-postgres', PG_CONFIG)
 
     assert identity == PG_IDENTITY
     connect.assert_called_once_with('tap-postgres', PG_CONFIG)
-    cursor.execute.assert_called_once_with(source_identity.POSTGRES_IDENTITY_SQL)
+    cursor.execute.assert_called_once_with(tap_postgres.PRIMARY_HISTORY_SQL)
     connection.close.assert_called_once_with()
 
 
