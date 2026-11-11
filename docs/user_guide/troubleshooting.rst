@@ -190,6 +190,11 @@ These errors stop a run or ``reset_state`` before state changes. Do not edit
        being created or is in use becomes ready later. A slot with another
        plugin, database or type must be dropped by its owner before FastSync
        can create the tap's slot.
+   * - ``Replication slot ... does not exist, but the tap state holds LOG_BASED
+       positions for streams outside this sync``
+     - The slot was dropped after those positions were taken, for example after
+       ``reset_state``. A new slot would start after them. Run an unfiltered
+       ``fast_sync`` to resync every LOG_BASED table of the tap.
    * - ``Bookmark ... is before the replication slot start``
      - Rerun FastSync. With ``replica_host``, check replay lag on the standby.
    * - ``replica_host is not a standby of host`` or ``it is not a streaming

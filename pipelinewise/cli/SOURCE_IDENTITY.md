@@ -54,11 +54,27 @@ commits in between are skipped. The boundary must not be ahead of the new
 primary's current WAL position, which rejects typos and values from another
 server.
 
+**The identity is read before the first bookmark.** `run_tap` and `fast_sync`
+read it once under the tap lock, also when there is no state yet, and record
+that value in a state the run creates. Reading it at the end of a long first
+FastSync would stamp a host that a switchover wrote into the config during the
+run on positions taken from the old host, and the next run would pass.
+
 **FastSync and reset_state share one slot check.** `read_slot` and
 `finished_slot_start` in `fastsync/commons/tap_postgres.py` decide whether a slot
 belongs to the tap (persistent, logical, `wal2json`, tap database) and whether it
 is finished (`confirmed_flush_lsn` set, no active backend). `resolve_slot_name`
-picks the legacy name first in both paths.
+picks the legacy name first in both paths. `read_primary_history` is the one
+read of system identifier and timeline for the recorded identity and the
+`replica_host` check.
+
+**FastSync does not create a slot behind existing positions.** A new slot starts
+now. Streams outside the sync that hold LOG_BASED positions, such as `lsn=1`
+after `reset_state` followed by a dropped slot, would resume from it and skip
+everything in between (PostgreSQL moves an earlier start forward silently). A
+missing slot is not created while such positions exist, and a slot created after
+a concurrent drop is removed again. An unfiltered `fast_sync` clears the
+bookmarks first, so it is the recovery path.
 
 **replica_host must be a standby of host.** FastSync compares the replica's
 system identifier and checkpoint timeline (`pg_control_checkpoint()`) with the
@@ -86,6 +102,8 @@ boundary.
   `server_id`. A change stops the tap until `reset_state` or a resync.
 - `reset_state` does not check that the tap drained the old source up to the
   boundary. The operator must confirm it.
+- A slot that is dropped and recreated outside PipelineWise after `reset_state`
+  is accepted, because nothing records when a slot was created.
 - YugabyteDB FastSync still accepts an existing slot, and `partial_sync_table`
   does not check the identity.
 
@@ -106,9 +124,14 @@ boundary.
   sibling on another host, a MariaDB server behind the same host, a boundary one
   byte before the slot start or ahead of the primary, a slot still being
   created, foreign slots, a replica on another cluster or timeline, connection
-  errors leaving state unchanged, and a mismatch on the streaming connection.
+  errors leaving state unchanged, a mismatch on the streaming connection, a
+  config host change during a first FastSync, a real pidfile held during
+  `reset_state` and a new slot behind unsynced LOG_BASED positions.
 - Real engine: `tests/end_to_end/test_source_identity.py` in E2E group 01
   covers concurrent slot creation, foreign slots, a primary as `replica_host`,
-  the boundary limits and MariaDB/MySQL identities. Replica lag, promotion and a
+  the boundary limits, a dropped slot behind unsynced positions, tap-postgres
+  `IDENTIFY_SYSTEM` against the recorded identity and MariaDB/MySQL identities.
+  The `IDENTIFY_SYSTEM` test runs the tap-postgres virtualenv interpreter, or
+  `TAP_POSTGRES_PYTHON` when set. Replica lag, promotion and a
   standby of the old primary were run against PostgreSQL 15 and 18 containers
   only, because the dev-project stack has no PostgreSQL standby.

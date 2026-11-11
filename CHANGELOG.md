@@ -24,6 +24,10 @@
   be verified. The slot must be finished, on the tap's database and `wal2json`,
   and start at or before the bookmark. FastSync waits up to 15 minutes for a
   slot another worker is creating.
+- Do not create a missing PostgreSQL slot in FastSync or PartialSync while
+  streams outside the sync hold LOG_BASED positions, for example `lsn=1` after
+  `reset_state`. A new slot would start after them. Run an unfiltered
+  `fast_sync` instead.
 - Fail PostgreSQL FastSync when `replica_host` is not a standby of `host`, by
   system identifier and timeline. FastSync waits up to 15 minutes for the
   standby to replay past the slot's start and reach the primary's timeline.

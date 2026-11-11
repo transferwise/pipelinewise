@@ -371,7 +371,10 @@ server is the same. Run ``reset_state`` with the tap's current position as the
 boundary in that case.
 
 A state without an identity gets the connected source's identity on its next
-run. FastSync records it once its workers have created the state. When the state
+run. The identity is read under the tap lock before the first bookmark is taken,
+also for a new tap, and FastSync records that value once its workers have
+created the state. A tap config rewritten to another host during the run cannot
+relabel positions taken from the old one. When the state
 already holds log positions, PipelineWise logs a warning, because nothing proves
 they came from this source. That is the case for every existing tap after the
 upgrade to 0.103.0.
