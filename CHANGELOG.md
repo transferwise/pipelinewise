@@ -1,3 +1,25 @@
+0.103.0 (2026-11-11)
+--------------------
+
+- Require `--boundary_lsn` for PostgreSQL `reset_state`. The boundary is the
+  switchover position on the new primary. The command fails, and leaves state
+  unchanged, unless the tap's slot there is finished and starts at or before it.
+  Automation that calls `reset_state` for PostgreSQL taps must pass it.
+- Take the tap lock in `reset_state`. It fails while the tap is running.
+- Record the source in tap state for PostgreSQL and MariaDB/MySQL taps with
+  LOG_BASED tables: system identifier and timeline for PostgreSQL, `server_uuid`
+  for MySQL and the host for MariaDB. `run_tap` and `fast_sync` refuse to start
+  on a different source. Existing state records the source on the next run.
+  `reset_state` and an unfiltered PostgreSQL `fast_sync` record the new source.
+  See [source identity](docs/user_guide/cli.rst#source-identity).
+- Fail PostgreSQL FastSync when the replication slot already exists and cannot
+  be verified. The slot must be finished, on the tap's database and `wal2json`,
+  and start at or before the bookmark. FastSync waits up to 15 minutes for a
+  slot another worker is creating, or for `replica_host` to replay past the
+  slot's start.
+- Stop tap-postgres on a WAL message it cannot parse instead of skipping it.
+  The run fails at the last complete position.
+
 0.102.3 (2026-11-11)
 --------------------
 - Revert changes in 0.102.1 (tsp-postgres slot name)
