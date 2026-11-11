@@ -45,6 +45,10 @@ class UnsupportedPayloadKindError(Exception):
     """Custom exception when waljson payload is not insert, update nor delete"""
 
 
+class UnparseableWalMessageError(Exception):
+    """Custom exception when a wal2json payload cannot be parsed"""
+
+
 def lsn_to_int(lsn):
     """Convert pg_lsn to int"""
 
@@ -543,12 +547,20 @@ def refresh_message_schema(stream, payload, conn_info):
     sync_common.send_schema_message(stream, ['lsn'], record_update_mode=sync_common.PATCH_RECORD_UPDATE_MODE)
 
 
+def _parse_wal_message(msg, conn_info):
+    try:
+        return parse_wal_payload(msg.payload, conn_info)
+    except (TypeError, ValueError) as exc:
+        lsn = int_to_lsn(msg.data_start) if isinstance(msg.data_start, int) else msg.data_start
+        raise UnparseableWalMessageError(
+            f'Unable to parse wal2json message at {lsn} ({type(exc).__name__}); '
+            'stopping without advancing the slot past it'
+        ) from exc
+
+
 def consume_message(streams, state, msg, time_extracted, conn_info, *, message_payload=None):
     if message_payload is None:
-        try:
-            message_payload = parse_wal_payload(msg.payload, conn_info)
-        except Exception:
-            return state
+        message_payload = _parse_wal_message(msg, conn_info)
 
     lsn = msg.data_start
 
@@ -852,10 +864,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file,  # noqa:
                                 int_to_lsn(end_lsn))
                     break
 
-                try:
-                    message_payload = parse_wal_payload(msg.payload, conn_info)
-                except (TypeError, ValueError):
-                    message_payload = {}
+                message_payload = _parse_wal_message(msg, conn_info)
 
                 state = consume_message(
                     logical_streams,

@@ -154,15 +154,20 @@ class TestLogicalReplication(unittest.TestCase):
                                                                                 'some_tap'),
                              'pipelinewise_some_db_some_tap')
 
-    def test_consume_with_message_payload_is_not_json_expect_same_state(self):
-        output = logical_replication.consume_message([],
-                                                     {},
-                                                     self.WalMessage(payload='this is an invalid json message',
-                                                                     data_start=None),
-                                                     None,
-                                                     {}
-                                                     )
-        self.assertDictEqual({}, output)
+    def test_consume_with_message_payload_is_not_json_raises(self):
+        with self.assertRaisesRegex(logical_replication.UnparseableWalMessageError, '0/C8'):
+            logical_replication.consume_message([],
+                                                {},
+                                                self.WalMessage(payload='this is an invalid json message',
+                                                                data_start=200),
+                                                None,
+                                                {}
+                                                )
+
+    def test_consume_with_integer_over_digit_limit_raises(self):
+        payload = '{"action": "I", "value": ' + '9' * 5000 + '}'
+        with self.assertRaises(logical_replication.UnparseableWalMessageError):
+            logical_replication.consume_message([], {}, self.WalMessage(payload=payload, data_start=200), None, {})
 
     @patch('tap_postgres.sync_strategies.logical_replication.singer.write_message')
     def test_consume_with_message_stream_in_payload_is_not_selected_expect_same_state(self, mocked_write_message):
@@ -1556,15 +1561,32 @@ class TestLogicalReplicationFeedback(unittest.TestCase):
         self.assertIs(error, termination)
         self.assertEqual(self._expected_feedback(100), feedback)
 
-    def test_invalid_utf8_payload_is_skipped(self):
+    def test_invalid_utf8_payload_stops_replication(self):
         state = self._state({'foo-bar': 100})
         state_reader = mock_open(read_data=json.dumps(state))
         messages = [self.WalMessage(payload=b'\x80\x81abc', data_start=200)]
 
-        feedback, error, termination, _ = self._run_sync(state, messages, state_reader)
+        feedback, error, _, _ = self._run_sync(state, messages, state_reader)
 
-        self.assertIs(error, termination)
+        self.assertIsInstance(error, logical_replication.UnparseableWalMessageError)
+        self.assertEqual([], feedback)
+        self.assertEqual(100, state['bookmarks']['foo-bar']['lsn'])
+
+    def test_unparseable_payload_after_valid_messages_keeps_last_complete_lsn(self):
+        state = self._state({'foo-bar': 100})
+        state_reader = mock_open(read_data=json.dumps(state))
+        messages = [
+            self._message('B', 200),
+            self._message('C', 300),
+            self.WalMessage(payload='not json', data_start=400),
+        ]
+
+        feedback, error, _, writes = self._run_sync(state, messages, state_reader)
+
+        self.assertIsInstance(error, logical_replication.UnparseableWalMessageError)
         self.assertEqual(self._expected_feedback(100), feedback)
+        final_state = writes[-1].args[0].value
+        self.assertEqual(200, final_state['bookmarks']['foo-bar']['lsn'])
 
     def test_progress_message_advances_state_without_advancing_feedback(self):
         """The tap stops at its committed marker while feedback remains target-bounded."""
