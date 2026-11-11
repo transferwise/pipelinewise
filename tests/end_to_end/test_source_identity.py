@@ -1,6 +1,8 @@
 """Real-engine checks for source identity, FastSync slot verification and the reset_state boundary."""
 
+import json
 import os
+import subprocess
 import threading
 import time
 import uuid
@@ -8,11 +10,29 @@ import uuid
 import psycopg2
 import pytest
 
+from pipelinewise import cli
 from pipelinewise.cli import source_identity
 from pipelinewise.fastsync.commons import tap_postgres
 from pipelinewise.fastsync.commons.tap_postgres import FastSyncTapPostgres
 
 TAP_ID_PREFIX = 'e2e_identity_'
+TAP_POSTGRES_PYTHON = os.environ.get(
+    'TAP_POSTGRES_PYTHON', os.path.join(cli.VENV_DIR, 'tap-postgres', 'bin', 'python'),
+)
+VERIFY_ON_REPLICATION_CONNECTION = """
+import json, sys
+from tap_postgres import db
+from tap_postgres.sync_strategies.logical_replication import SourceIdentityMismatchError, verify_source_identity
+conn_info, state = json.loads(sys.argv[1]), json.loads(sys.argv[2])
+conn = db.open_connection(conn_info, True, True)
+try:
+    verify_source_identity(conn.cursor(), conn_info, state)
+    print('match')
+except SourceIdentityMismatchError:
+    print('mismatch')
+finally:
+    conn.close()
+"""
 
 
 def _pg_config(tap_id: str, **overrides) -> dict:
@@ -70,8 +90,10 @@ def fixture_tap_id():
         connection.close()
 
 
-def _bookmark(tap_id, **overrides):
+def _bookmark(tap_id, state_path=None, synced_tables=None, **overrides):
     tap = FastSyncTapPostgres(_pg_config(tap_id, **overrides), {})
+    tap.state_path = state_path
+    tap.synced_tables = synced_tables
     tap.open_connection()
     try:
         return tap.fetch_current_log_pos()
@@ -144,9 +166,47 @@ def test_second_worker_waits_for_a_slot_still_being_created(tap_id):
 
     creator.join(60)
     waiter.join(60)
+    assert not creator.is_alive()
+    assert not waiter.is_alive()
+    assert set(results) == {'creator', 'waiter'}
     _, confirmed_flush_lsn = _slot(tap_id)
     slot_start = tap_postgres.lsn_to_int(confirmed_flush_lsn)
     assert all(isinstance(result, dict) and result['lsn'] >= slot_start for result in results.values()), results
+
+
+def test_tap_postgres_replication_connection_matches_the_recorded_identity(tap_id):
+    """IDENTIFY_SYSTEM on the streaming connection must agree with the identity the CLI records."""
+    config = _pg_config(tap_id)
+    identity = source_identity.read_source_identity('tap-postgres', config)
+    conn_info = dict(config, use_secondary=False)
+
+    def verify(recorded):
+        result = subprocess.run(
+            [TAP_POSTGRES_PYTHON, '-I', '-c', VERIFY_ON_REPLICATION_CONNECTION,
+             json.dumps(conn_info), json.dumps({'bookmarks': {}, 'source_identity': recorded})],
+            capture_output=True, text=True, timeout=60, check=True,
+        )
+        return result.stdout.strip()
+
+    assert verify(identity) == 'match'
+    assert verify(dict(identity, timeline_id=identity['timeline_id'] + 1)) == 'mismatch'
+    assert verify(dict(identity, system_identifier='1')) == 'mismatch'
+
+
+def test_missing_slot_is_not_created_behind_unsynced_log_positions(tap_id, tmp_path):
+    """After reset_state, a dropped slot must not be recreated by a FastSync of other tables."""
+    _bookmark(tap_id)
+    slot_name = FastSyncTapPostgres.generate_replication_slot_name(os.environ['TAP_POSTGRES_DB'], tap_id)
+    _query_one('SELECT pg_drop_replication_slot(%s)', (slot_name,))
+    state_path = tmp_path / 'state.json'
+    state_path.write_text(json.dumps({'bookmarks': {'public-other': {'lsn': 1}}}))
+
+    with pytest.raises(tap_postgres.ReplicationSlotVerificationError, match='outside this sync: public-other'):
+        _bookmark(tap_id, state_path=str(state_path), synced_tables=['public.synced'])
+
+    assert _slot(tap_id) is None
+    assert _bookmark(tap_id, state_path=str(state_path), synced_tables=['public.synced', 'public.other'])['lsn']
+    assert _slot(tap_id) is not None
 
 
 def test_existing_slot_with_another_plugin_is_refused(tap_id):
