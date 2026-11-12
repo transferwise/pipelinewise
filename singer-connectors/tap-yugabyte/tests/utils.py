@@ -7,6 +7,7 @@ import psycopg2.extras
 
 from psycopg2.extensions import quote_ident
 from singer import get_logger
+from tap_yugabyte.sync_strategies.logical_replication import generate_replication_slot_name
 
 LOGGER = get_logger()
 
@@ -163,7 +164,7 @@ def lsn_to_int(lsn):
 def create_replication_slot(tap_id='tap_test'):
     """Create a wal2json/HYBRID_TIME replication slot named the same way FastSync would."""
     conn_config = get_test_connection_config()
-    slot_name = f"pipelinewise_{conn_config['dbname']}_{tap_id}"
+    slot_name = generate_replication_slot_name(conn_config['dbname'], tap_id)
     sql = (
         f"select pg_create_logical_replication_slot("
         f"'{slot_name}', 'wal2json', false, false, 'HYBRID_TIME');"
@@ -186,7 +187,7 @@ def drop_replication_slot(tap_id='tap_test'):
     still settling the catalog-version bump a recent CDC session/DDL left behind (which
     can surface as InFailedSqlTransaction/SerializationFailure on this same statement)."""
     conn_config = get_test_connection_config()
-    slot_name = f"pipelinewise_{conn_config['dbname']}_{tap_id}"
+    slot_name = generate_replication_slot_name(conn_config['dbname'], tap_id)
     sql = f"SELECT pg_drop_replication_slot('{slot_name}');"
 
     with get_test_connection() as conn:

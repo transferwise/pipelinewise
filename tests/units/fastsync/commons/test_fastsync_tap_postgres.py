@@ -11,6 +11,7 @@ from pipelinewise.fastsync.commons import tap_postgres
 from pipelinewise.fastsync.commons.partial_sync_boundary import (
     PartialSyncBoundary,
 )
+from pipelinewise.fastsync.commons import utils
 
 MAX_PRICE_SQL = 'SELECT MAX(price) AS key_value FROM schema."table1"'
 FINITE_MAX_PRICE_SQL = (
@@ -72,45 +73,6 @@ class TestFastSyncTapPostgres(TestCase):
         self.assertIn('to_char("event_date", \'%Y-%m-01\')', export_sql)
         self.assertIn(
             ' WHERE "rate%s" >= \'x\\\'\' OR 1=1 --\'', export_sql
-        )
-
-    def test_generate_repl_slot_name(self):
-        """Validate if the replication slot name generated correctly"""
-        # Provide only database name
-        assert (
-            self.postgres.generate_replication_slot_name('some_db')
-            == 'pipelinewise_some_db'
-        )
-
-        # Provide database name and tap_id
-        assert (
-            self.postgres.generate_replication_slot_name('some_db', 'some_tap')
-            == 'pipelinewise_some_db_some_tap'
-        )
-
-        # Provide database name, tap_id and prefix
-        assert (
-            self.postgres.generate_replication_slot_name(
-                'some_db', 'some_tap', prefix='custom_prefix'
-            )
-            == 'custom_prefix_some_db_some_tap'
-        )
-
-        # Replication slot name should be lowercase
-        assert (
-            self.postgres.generate_replication_slot_name('SoMe_DB', 'SoMe_TaP')
-            == 'pipelinewise_some_db_some_tap'
-        )
-
-        # Invalid characters should be replaced by underscores
-        assert (
-            self.postgres.generate_replication_slot_name('some-db', 'some-tap')
-            == 'pipelinewise_some_db_some_tap'
-        )
-
-        assert (
-            self.postgres.generate_replication_slot_name('some.db', 'some.tap')
-            == 'pipelinewise_some_db_some_tap'
         )
 
     def test_close_connection_is_idempotent(self):
@@ -216,6 +178,7 @@ class TestFastSyncTapPostgres(TestCase):
         self.postgres.create_replication_slot()
         assert self.postgres.executed_queries_primary_host == [
             "SELECT * FROM pg_replication_slots WHERE slot_name = 'pipelinewise_test_database';",
+            "SELECT * FROM pg_replication_slots WHERE slot_name = 'pipelinewise_test_database_test_tap';",
             "SELECT * FROM pg_create_logical_replication_slot('pipelinewise_test_database_test_tap', 'wal2json')",
         ]
 
@@ -242,6 +205,7 @@ class TestFastSyncTapPostgres(TestCase):
         self.postgres.create_replication_slot()
         assert self.postgres.executed_queries_primary_host == [
             "SELECT * FROM pg_replication_slots WHERE slot_name = 'pipelinewise_test_database';",
+            "SELECT * FROM pg_replication_slots WHERE slot_name = 'pipelinewise_test_database_test_tap';",
             "SELECT * FROM pg_create_logical_replication_slot('pipelinewise_test_database', 'wal2json')",
         ]
 
@@ -379,8 +343,8 @@ class TestFastSyncTapPostgres(TestCase):
         assert calls.mock_calls == [
             call.execute(
                 'SELECT slot_name, database, plugin, active FROM pg_replication_slots '
-                'WHERE slot_name IN (%s, %s)',
-                ('pipelinewise_my_db', 'pipelinewise_my_db_my_tap'),
+                'WHERE slot_name IN (%s, %s, %s)',
+                ('pipelinewise_my_db', 'pipelinewise_my_db_my_tap', 'pipelinewise_my_db_my_tap'),
             ),
             call.before_reset(),
             call.execute('SELECT pg_drop_replication_slot(%s)', ('pipelinewise_my_db_my_tap',)),
@@ -435,12 +399,12 @@ class TestFastSyncTapPostgres(TestCase):
 
     def test_reset_slot_name_length_boundary(self):
         """Reset accepts boundary names and hashes longer names before creating the slot."""
-        slot_prefix = FastSyncTapPostgres.generate_replication_slot_name('my_db') + '_'
+        slot_prefix = utils.generate_replication_slot_name('my_db') + '_'
         for length in (63, 64):
             with self.subTest(length=length):
                 config = {'dbname': 'my_db', 'tap_id': 't' * (length - len(slot_prefix))}
                 original_name = slot_prefix + config['tap_id']
-                slot_name = FastSyncTapPostgres.generate_replication_slot_name('my_db', config['tap_id'])
+                slot_name = utils.generate_replication_slot_name('my_db', config['tap_id'])
                 self.assertEqual(len(slot_name), 63)
                 if length == 63:
                     self.assertEqual(slot_name, original_name)
@@ -456,8 +420,8 @@ class TestFastSyncTapPostgres(TestCase):
                 self.assertEqual(cursor.execute.call_args_list, [
                     call(
                         'SELECT slot_name, database, plugin, active FROM pg_replication_slots '
-                        'WHERE slot_name IN (%s, %s)',
-                        (slot_prefix[:-1], slot_name),
+                        'WHERE slot_name IN (%s, %s, %s)',
+                        (slot_prefix[:-1], slot_name, original_name),
                     ),
                     call(
                         'SELECT * FROM pg_create_logical_replication_slot(%s, %s)',
@@ -473,7 +437,8 @@ class TestFastSyncTapPostgres(TestCase):
         before_reset = MagicMock()
         with patch.object(FastSyncTapPostgres, 'get_connection', return_value=connection):
             with patch.object(
-                FastSyncTapPostgres, 'generate_replication_slot_name', side_effect=['pipelinewise_my_db', 't' * 64],
+                utils, 'generate_replication_slot_name',
+                side_effect=['pipelinewise_my_db', 't' * 64, 't' * 64],
             ):
                 with self.assertRaisesRegex(RuntimeError, 'at most 63 characters'):
                     FastSyncTapPostgres.reset_slot(
@@ -592,7 +557,7 @@ class TestFastSyncTapPostgres(TestCase):
         cursor_mock = MagicMock().return_value
         cursor_mock.__enter__.return_value.execute.side_effect = execute_mock
         type(cursor_mock.__enter__.return_value).rowcount = PropertyMock(
-            side_effect=[1, 2]
+            side_effect=[1, 0, 2]
         )
 
         # mock PG connection instance with ability to open cursor
@@ -606,6 +571,7 @@ class TestFastSyncTapPostgres(TestCase):
 
         assert self.postgres.executed_queries_primary_host == [
             "SELECT * FROM pg_replication_slots WHERE slot_name = 'pipelinewise_my_db';",
+            "SELECT * FROM pg_replication_slots WHERE slot_name = 'pipelinewise_my_db_tap_test';",
             'SELECT pg_drop_replication_slot(slot_name) FROM pg_replication_slots WHERE '
             "slot_name = 'pipelinewise_my_db';",
         ]
@@ -634,7 +600,7 @@ class TestFastSyncTapPostgres(TestCase):
         cursor_mock = MagicMock().return_value
         cursor_mock.__enter__.return_value.execute.side_effect = execute_mock
         type(cursor_mock.__enter__.return_value).rowcount = PropertyMock(
-            side_effect=[0, 1]
+            side_effect=[0, 0, 1]
         )
 
         # mock PG connection instance with ability to open cursor
@@ -648,6 +614,7 @@ class TestFastSyncTapPostgres(TestCase):
 
         assert self.postgres.executed_queries_primary_host == [
             "SELECT * FROM pg_replication_slots WHERE slot_name = 'pipelinewise_my_db';",
+            "SELECT * FROM pg_replication_slots WHERE slot_name = 'pipelinewise_my_db_tap_test';",
             'SELECT pg_drop_replication_slot(slot_name) FROM pg_replication_slots WHERE '
             "slot_name = 'pipelinewise_my_db_tap_test';",
         ]

@@ -4,10 +4,8 @@ import glob
 import logging
 import math
 import os
-import re
 import sys
 import psycopg2
-import hashlib
 
 from singer.logger import log_source_host
 import psycopg2.extras
@@ -48,35 +46,6 @@ class FastSyncTapPostgres:
         self.curr = None
         self.primary_host_conn = None
 
-    @staticmethod
-    def generate_replication_slot_name(dbname, tap_id=None, prefix='pipelinewise'):
-        """Generate replication slot name with
-
-        :param str dbname: Database name that will be part of the replication slot name
-        :param str tap_id: Optional. If provided then it will be appended to the end of the slot name
-        :param str prefix: Optional. Defaults to 'pipelinewise'
-        :return: well formatted lowercased replication slot name
-        :rtype: str
-        """
-        # Add tap_id to the end of the slot name if provided
-        if tap_id:
-            tap_id = f'_{tap_id}'
-        # Convert None to empty string
-        else:
-            tap_id = ''
-
-        slot_name = f'{prefix}_{dbname}{tap_id}'.lower()
-
-        # Replace invalid characters to ensure replication slot name is in accordance with Postgres spec
-        slot_name = re.sub('[^a-z0-9_]', '_', slot_name)
-
-        # This is needs more investigation to support the taps already have slots name greater than 63 and are working
-        if len(slot_name) > 63:
-            suffix = hashlib.sha256(slot_name.encode('utf-8')).hexdigest()[:8]
-            slot_name = f'{slot_name[:54]}_{suffix}'
-
-        return slot_name
-
     @classmethod
     def __get_slot_name(
         cls,
@@ -97,9 +66,11 @@ class FastSyncTapPostgres:
 
         """
         # Replication hosts pattern versions
-        slot_name_v15 = cls.generate_replication_slot_name(dbname)
-        slot_name_v16 = cls.generate_replication_slot_name(dbname, tap_id)
+        slot_name_v15 = utils.generate_replication_slot_name(dbname)
+        slot_name_v16 = utils.generate_replication_slot_name(dbname, tap_id)
+        slot_name_no_length_limit = utils.generate_replication_slot_name(dbname, tap_id, limit_len_63=False)
         v15_slots_count = 0
+        no_len_limit_count = 0
 
         try:
             # Backward compatibility: try to locate existing v15 slot first. PPW <= 0.15.0
@@ -109,11 +80,19 @@ class FastSyncTapPostgres:
                 )
                 v15_slots_count = cur.rowcount
 
+            with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+                cur.execute(
+                    f"SELECT * FROM pg_replication_slots WHERE slot_name = '{slot_name_no_length_limit}';"
+                )
+                no_len_limit_count = cur.rowcount
+
         except psycopg2.Error:
             LOGGER.exception('Error while looking for slots', exc_info=sys.exc_info())
         finally:
             if v15_slots_count > 0:
                 slot_name = slot_name_v15
+            elif no_len_limit_count > 0:
+                slot_name = slot_name_no_length_limit
             else:
                 slot_name = slot_name_v16
 
@@ -202,19 +181,26 @@ class FastSyncTapPostgres:
     def _preflight_slot_reset(cls, cursor, connection_config):
         """Reject shared, active, or incompatible slots before invalidating state."""
         database = connection_config['dbname']
-        legacy_name = cls.generate_replication_slot_name(database)
-        slot_name = cls.generate_replication_slot_name(database, connection_config['tap_id'])
+        legacy_name = utils.generate_replication_slot_name(database)
+        slot_name = utils.generate_replication_slot_name(database, connection_config['tap_id'])
+        no_limit_name = utils.generate_replication_slot_name(database, connection_config['tap_id'], limit_len_63=False)
         if slot_name == legacy_name or len(slot_name) > 63:
             raise RuntimeError('Slot reset requires a distinct tap-specific slot name of at most 63 characters.')
         cursor.execute(
             'SELECT slot_name, database, plugin, active FROM pg_replication_slots '
-            'WHERE slot_name IN (%s, %s)',
-            (legacy_name, slot_name),
+            'WHERE slot_name IN (%s, %s, %s)',
+            (legacy_name, slot_name, no_limit_name),
         )
         slots = {row[0]: row[1:] for row in cursor.fetchall()}
         if legacy_name in slots:
             raise RuntimeError(
                 f'Cannot reset legacy PostgreSQL slot "{legacy_name}": it may be shared by other taps. '
+                'Coordinate migration to tap-specific slots with your DBA before retrying. '
+                'No source or state changes were made.'
+            )
+        if no_limit_name != slot_name and no_limit_name in slots:
+            raise RuntimeError(
+                f'Cannot reset longer than 63 chars PostgreSQL slot "{legacy_name}": it may be shared by other taps. '
                 'Coordinate migration to tap-specific slots with your DBA before retrying. '
                 'No source or state changes were made.'
             )

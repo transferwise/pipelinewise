@@ -1,6 +1,9 @@
 import argparse
 import fcntl
+import hashlib
 import multiprocessing
+import random
+import string
 import os
 import pytest
 
@@ -984,4 +987,59 @@ class TestFastSyncUtils(TestCase):
                 'tap', 'table', suffix='suffix', postfix='postfix', ext='ext'
             ),
             'pipelinewise_tap_table_suffix_fastsync_postfix.ext',
+        )
+
+    def test_generate_repl_slot_name(self):
+        """Validate if the replication slot name generated correctly"""
+        # Provide only database name
+        assert (
+            utils.generate_replication_slot_name('some_db')
+            == 'pipelinewise_some_db'
+        )
+
+        # Provide database name and tap_id
+        assert (
+            utils.generate_replication_slot_name('some_db', 'some_tap')
+            == 'pipelinewise_some_db_some_tap'
+        )
+
+        # Provide database name, tap_id and prefix
+        assert (
+            utils.generate_replication_slot_name(
+                'some_db', 'some_tap', prefix='custom_prefix'
+            )
+            == 'custom_prefix_some_db_some_tap'
+        )
+
+        # Replication slot name should be lowercase
+        assert (
+            utils.generate_replication_slot_name('SoMe_DB', 'SoMe_TaP')
+            == 'pipelinewise_some_db_some_tap'
+        )
+
+        # Invalid characters should be replaced by underscores
+        assert (
+            utils.generate_replication_slot_name('some-db', 'some-tap')
+            == 'pipelinewise_some_db_some_tap'
+        )
+
+        assert (
+            utils.generate_replication_slot_name('some.db', 'some.tap')
+            == 'pipelinewise_some_db_some_tap'
+        )
+
+        big_database_name = ''.join(random.choices(string.ascii_lowercase, k=30))
+        big_tap_id = ''.join(random.choices(string.ascii_lowercase, k=30))
+        assert (
+            utils.generate_replication_slot_name(big_database_name, big_tap_id, limit_len_63=False)
+            == f'pipelinewise_{big_database_name}_{big_tap_id}'
+        )
+
+        slot_name = f'pipelinewise_{big_database_name}_{big_tap_id}'
+        suffix = hashlib.sha256(slot_name.encode('utf-8')).hexdigest()[:8]
+        expected_name = f'{slot_name[:54]}_{suffix}'
+
+        assert (
+                utils.generate_replication_slot_name(big_database_name, big_tap_id)
+                == expected_name
         )

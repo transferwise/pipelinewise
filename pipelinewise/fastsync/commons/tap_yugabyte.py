@@ -4,7 +4,6 @@ import glob
 import logging
 import math
 import os
-import re
 import time
 import psycopg2
 import psycopg2.extras
@@ -93,26 +92,6 @@ class FastSyncTapYugabyte:
         # export snapshot to the exact point the CDC stream will resume from.
         self._snapshot_ht = None
 
-    @staticmethod
-    def generate_replication_slot_name(dbname, tap_id=None, prefix='pipelinewise'):
-        """Generate replication slot name with
-
-        :param str dbname: Database name that will be part of the replication slot name
-        :param str tap_id: Optional. If provided then it will be appended to the end of the slot name
-        :param str prefix: Optional. Defaults to 'pipelinewise'
-        :return: well formatted lowercased replication slot name
-        :rtype: str
-        """
-        if tap_id:
-            tap_id = f'_{tap_id}'
-        else:
-            tap_id = ''
-
-        slot_name = f'{prefix}_{dbname}{tap_id}'.lower()
-
-        # Replace invalid characters to ensure replication slot name is in accordance with YSQL spec
-        return re.sub('[^a-z0-9_]', '_', slot_name)
-
     @classmethod
     def admin_connection(cls, connection_config: Dict):
         """
@@ -164,7 +143,7 @@ class FastSyncTapYugabyte:
         """
         LOGGER.info('Attempting to drop slot ...')
         connection = cls.admin_connection(connection_config)
-        slot_name = cls.generate_replication_slot_name(
+        slot_name = utils.generate_replication_slot_name(
             connection_config['dbname'], connection_config['tap_id']
         )
 
@@ -229,8 +208,8 @@ class FastSyncTapYugabyte:
     def _preflight_slot_reset(cls, connection, connection_config: Dict) -> Tuple[str, bool]:
         """Reject shared or incompatible slots and wait out the lingering active window."""
         database = connection_config['dbname']
-        legacy_name = cls.generate_replication_slot_name(database)
-        slot_name = cls.generate_replication_slot_name(database, connection_config['tap_id'])
+        legacy_name = utils.generate_replication_slot_name(database)
+        slot_name = utils.generate_replication_slot_name(database, connection_config['tap_id'])
         if slot_name == legacy_name or len(slot_name) > 63:
             raise RuntimeError('Slot reset requires a distinct tap-specific slot name of at most 63 characters.')
 
@@ -365,7 +344,7 @@ class FastSyncTapYugabyte:
         Create the HYBRID_TIME logical replication slot for this tap, tolerating one that
         already exists.
         """
-        slot_name = self.generate_replication_slot_name(
+        slot_name = utils.generate_replication_slot_name(
             self.connection_config['dbname'], self.connection_config['tap_id']
         )
         try:
@@ -420,7 +399,7 @@ class FastSyncTapYugabyte:
         """
         self.create_replication_slot()
 
-        slot_name = self.generate_replication_slot_name(
+        slot_name = utils.generate_replication_slot_name(
             self.connection_config['dbname'], self.connection_config['tap_id']
         )
         result = self.query(
