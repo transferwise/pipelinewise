@@ -3,7 +3,6 @@ from pathlib import Path
 import re
 
 from pipelinewise.fastsync import postgres_to_snowflake
-from pipelinewise.fastsync.commons.tap_postgres import FastSyncTapPostgres
 from pipelinewise.fastsync.commons import utils
 from tests.end_to_end.helpers import assertions
 from tests.end_to_end.helpers.json_fixtures import (
