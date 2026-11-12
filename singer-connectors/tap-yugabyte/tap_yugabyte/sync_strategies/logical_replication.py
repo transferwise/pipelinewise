@@ -649,10 +649,8 @@ def generate_replication_slot_name(dbname, tap_id=None, prefix='pipelinewise'):
 
     slot_name = f'{prefix}_{dbname}{tap_id}'.lower()
 
-
     slot_name = re.sub('[^a-z0-9_]', '_', slot_name)
 
-    # This is needs more investigation to support the taps already have slots name greater than 63 and are working
     if len(slot_name) > 63:
         suffix = hashlib.sha256(slot_name.encode('utf-8')).hexdigest()[:8]
         slot_name = f'{slot_name[:54]}_{suffix}'
