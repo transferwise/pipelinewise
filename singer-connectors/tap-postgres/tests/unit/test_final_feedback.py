@@ -5,6 +5,7 @@ import signal
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, call
 
@@ -292,10 +293,12 @@ def test_actual_os_eof_while_process_waits_and_real_sigterm(tmp_path, terminate)
     state_file, feedback_file = tmp_path / 'state.json', tmp_path / 'feedback.json'
     state_file.write_text(json.dumps(state_at(first=100)), encoding='utf-8')
     process = subprocess.Popen([sys.executable, '-c', CHILD_PROCESS, str(state_file), str(feedback_file)],
-                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                               cwd=Path(__file__).resolve().parents[2])
     try:
         with ThreadPoolExecutor(max_workers=1) as reader:
             output = reader.submit(process.stdout.read).result(timeout=5)
+        assert output, process.stderr.read() if process.poll() is not None else 'Child emitted no STATE message'
         assert json.loads(output)['value']['bookmarks']['first']['lsn'] == 200
         assert process.poll() is None  # EOF is observable before source process or session termination.
         assert not feedback_file.exists()

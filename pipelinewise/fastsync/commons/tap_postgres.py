@@ -7,7 +7,7 @@ import os
 import re
 import sys
 import psycopg2
-#import hashlib
+import hashlib
 
 from singer.logger import log_source_host
 import psycopg2.extras
@@ -71,9 +71,9 @@ class FastSyncTapPostgres:
         slot_name = re.sub('[^a-z0-9_]', '_', slot_name)
 
         # This is needs more investigation to support the taps already have slots name greater than 63 and are working
-        # if len(slot_name) > 63:
-        #    suffix = hashlib.sha256(slot_name.encode('utf-8')).hexdigest()[:8]
-        #    slot_name = f'{slot_name[:54]}_{suffix}'
+        if len(slot_name) > 63:
+            suffix = hashlib.sha256(slot_name.encode('utf-8')).hexdigest()[:8]
+            slot_name = f'{slot_name[:54]}_{suffix}'
 
         return slot_name
 
