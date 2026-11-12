@@ -27,7 +27,7 @@ def slot_config(e2e, tap_id):
 
 
 def slot_name(e2e, tap_id):
-    return FastSyncTapYugabyte.generate_replication_slot_name(e2e.get_conn_env_var('TAP_YUGABYTE', 'DB'), tap_id)
+    return _fastsync_utils.generate_replication_slot_name(e2e.get_conn_env_var('TAP_YUGABYTE', 'DB'), tap_id)
 
 
 def drop_slot(e2e, tap_id):
