@@ -14,11 +14,11 @@ and `dev-project/`; connector-source work also follows connector guidance.
 - Target under 15 minutes per shard. Rebalance from measured durations after
   relevant changes or failures; preserve coverage and isolation. Do not repeat
   successful runs without a new reason.
-- `.github/workflows/e2e_tests.yml` is authoritative for `e2e_tests_01`–`23`.
+- `.github/workflows/e2e_tests.yml` is authoritative for `e2e_tests_01`–`24`.
   [README.md](README.md) preserves the corresponding local recipes; update it
-  with matrix changes. Run all twenty-three only for a full-suite request; otherwise
+  with matrix changes. Run all twenty-four only for a full-suite request; otherwise
   select every affected group within the authorised scope.
-- CI's twenty-two Snowflake groups use isolated runners. Local groups share/reset
+- CI's twenty-three Snowflake groups use isolated runners. Local groups share/reset
   fixtures and must run serially. Do not reset another session's fixtures or
   recreate its services; coordinate or isolate work first.
 
