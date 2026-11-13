@@ -343,7 +343,7 @@ class MigrationScenario:
     def postgres_slot_exists(self):
         return bool(self.e2e.run_query_tap_postgres(
             'SELECT 1 FROM pg_replication_slots WHERE slot_name = %s',
-            (FastSyncTapPostgres.generate_replication_slot_name(
+            (_fastsync_utils.generate_replication_slot_name(
                 self.e2e.get_conn_env_var('TAP_POSTGRES', 'DB'), self.tap_id),),
         ))
 

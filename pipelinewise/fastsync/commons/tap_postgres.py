@@ -67,8 +67,8 @@ class FastSyncTapPostgres:
         """
         # Replication hosts pattern versions
         slot_name_v15 = utils.generate_replication_slot_name(dbname)
-        slot_name_v16 = utils.generate_replication_slot_name(dbname, tap_id)
-        slot_name_no_length_limit = utils.generate_replication_slot_name(dbname, tap_id, limit_len_63=False)
+        slot_name_v16 = utils.generate_replication_slot_name(dbname, tap_id, limit_len_63=True)
+        slot_name_v16_legacy = utils.generate_replication_slot_name(dbname, tap_id, limit_len_63=False)
         v15_slots_count = 0
         no_len_limit_count = 0
 
@@ -82,7 +82,7 @@ class FastSyncTapPostgres:
 
             with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
                 cur.execute(
-                    f"SELECT * FROM pg_replication_slots WHERE slot_name = '{slot_name_no_length_limit}';"
+                    f"SELECT * FROM pg_replication_slots WHERE slot_name = '{slot_name_v16_legacy}';"
                 )
                 no_len_limit_count = cur.rowcount
 
@@ -92,7 +92,7 @@ class FastSyncTapPostgres:
             if v15_slots_count > 0:
                 slot_name = slot_name_v15
             elif no_len_limit_count > 0:
-                slot_name = slot_name_no_length_limit
+                slot_name = slot_name_v16_legacy
             else:
                 slot_name = slot_name_v16
 
