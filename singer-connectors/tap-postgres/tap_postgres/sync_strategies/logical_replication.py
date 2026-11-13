@@ -709,7 +709,7 @@ def locate_replication_slot_by_cur(cursor, dbname, tap_id=None):
         return slot_name_v16_no_limit
 
     raise ReplicationSlotNotFoundError(
-        f'Unable to find none of replication slots {slot_name_v15}, {slot_name_v16}, {slot_name_v16_no_limit}')
+        f'Unable to find replication slots matching any of {slot_name_v15}, {slot_name_v16}, {slot_name_v16_no_limit}')
 
 
 def locate_replication_slot(conn_info):
