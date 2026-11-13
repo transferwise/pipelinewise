@@ -3,7 +3,7 @@ from pathlib import Path
 import re
 
 from pipelinewise.fastsync import postgres_to_snowflake
-from pipelinewise.fastsync.commons.tap_postgres import FastSyncTapPostgres
+from pipelinewise.fastsync.commons import utils
 from tests.end_to_end.helpers import assertions
 from tests.end_to_end.helpers.json_fixtures import (
     assert_ticket_20155_json_metadata,
@@ -119,7 +119,7 @@ class TestReplicatePGToSF(TapPostgres):
         self.assertTrue(all(type(lsn) is int and lsn > 0 for lsn in checkpoint_lsns))
         minimum_lsn = min(checkpoint_lsns)
         boundary = f'{minimum_lsn >> 32:X}/{minimum_lsn & 0xFFFFFFFF:X}'
-        slot_name = FastSyncTapPostgres.generate_replication_slot_name(
+        slot_name = utils.generate_replication_slot_name(
             self.e2e_env.get_conn_env_var('TAP_POSTGRES', 'DB'), self.tap_id,
         )
         rows = self.e2e_env.run_query_tap_postgres(

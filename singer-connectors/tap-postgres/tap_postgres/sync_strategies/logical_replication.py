@@ -7,7 +7,7 @@ import json
 import re
 import singer
 import warnings
-#import hashlib
+import hashlib
 
 from select import select
 from psycopg2 import sql
@@ -659,7 +659,7 @@ def consume_message(streams, state, msg, time_extracted, conn_info, *, message_p
     return state
 
 
-def generate_replication_slot_name(dbname, tap_id=None, prefix='pipelinewise'):
+def generate_replication_slot_name(dbname, tap_id=None, prefix='pipelinewise', limit_len_63=True):
     """Generate replication slot name with
 
     :param str dbname: Database name that will be part of the replication slot name
@@ -680,31 +680,36 @@ def generate_replication_slot_name(dbname, tap_id=None, prefix='pipelinewise'):
     # Replace invalid characters to ensure replication slot name is in accordance with Postgres spec
     slot_name = re.sub('[^a-z0-9_]', '_', slot_name)
 
-    # This is needs more investigation to support the taps already have slots name greater than 63 and are working
-    # if len(slot_name) > 63:
-    #    suffix = hashlib.sha256(slot_name.encode('utf-8')).hexdigest()[:8]
-    #    slot_name = f'{slot_name[:54]}_{suffix}'
+    if limit_len_63 and len(slot_name) > 63:
+        suffix = hashlib.sha256(slot_name.encode('utf-8')).hexdigest()[:8]
+        slot_name = f'{slot_name[:54]}_{suffix}'
 
     return slot_name
 
 
 def locate_replication_slot_by_cur(cursor, dbname, tap_id=None):
     slot_name_v15 = generate_replication_slot_name(dbname)
-    slot_name_v16 = generate_replication_slot_name(dbname, tap_id)
-
     # Backward compatibility: try to locate existing v15 slot first. PPW <= 0.15.0
     cursor.execute(f"SELECT * FROM pg_replication_slots WHERE slot_name = '{slot_name_v15}'")
     if len(cursor.fetchall()) == 1:
         LOGGER.info('Using pg_replication_slot %s', slot_name_v15)
         return slot_name_v15
 
+    slot_name_v16 = generate_replication_slot_name(dbname, tap_id)
     # v15 style replication slot not found, try to locate v16
     cursor.execute(f"SELECT * FROM pg_replication_slots WHERE slot_name = '{slot_name_v16}'")
     if len(cursor.fetchall()) == 1:
         LOGGER.info('Using pg_replication_slot %s', slot_name_v16)
         return slot_name_v16
 
-    raise ReplicationSlotNotFoundError(f'Unable to find replication slot {slot_name_v16}')
+    slot_name_v16_no_limit = generate_replication_slot_name(dbname, tap_id, limit_len_63=False)
+    cursor.execute(f"SELECT * FROM pg_replication_slots WHERE slot_name = '{slot_name_v16_no_limit}'")
+    if len(cursor.fetchall()) == 1:
+        LOGGER.info('Using pg_replication_slot %s', slot_name_v16_no_limit)
+        return slot_name_v16_no_limit
+
+    raise ReplicationSlotNotFoundError(
+        f'Unable to find replication slots matching any of {slot_name_v15}, {slot_name_v16}, {slot_name_v16_no_limit}')
 
 
 def locate_replication_slot(conn_info):

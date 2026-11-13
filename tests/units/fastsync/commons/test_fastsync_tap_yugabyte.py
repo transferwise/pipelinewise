@@ -13,6 +13,7 @@ from pipelinewise.fastsync.commons import tap_yugabyte, yb_retry
 from pipelinewise.fastsync.commons.partial_sync_boundary import (
     PartialSyncBoundary,
 )
+from pipelinewise.fastsync.commons import utils
 
 MAX_PRICE_SQL = 'SELECT MAX(price) AS key_value FROM schema."table1"'
 FINITE_MAX_PRICE_SQL = (
@@ -32,40 +33,6 @@ class TestFastSyncTapYugabyte(TestCase):
         self.yugabyte = FastSyncTapYugabyte(
             connection_config={'dbname': 'test_database', 'tap_id': 'test_tap'},
             tap_type_to_target_type={},
-        )
-
-    def test_generate_replication_slot_name(self):
-        """Validate if the replication slot name generated correctly"""
-        self.assertEqual(
-            self.yugabyte.generate_replication_slot_name('some_db'),
-            'pipelinewise_some_db',
-        )
-
-        self.assertEqual(
-            self.yugabyte.generate_replication_slot_name('some_db', 'some_tap'),
-            'pipelinewise_some_db_some_tap',
-        )
-
-        self.assertEqual(
-            self.yugabyte.generate_replication_slot_name(
-                'some_db', 'some_tap', prefix='custom_prefix'
-            ),
-            'custom_prefix_some_db_some_tap',
-        )
-
-        self.assertEqual(
-            self.yugabyte.generate_replication_slot_name('SoMe_DB', 'SoMe_TaP'),
-            'pipelinewise_some_db_some_tap',
-        )
-
-        self.assertEqual(
-            self.yugabyte.generate_replication_slot_name('some-db', 'some-tap'),
-            'pipelinewise_some_db_some_tap',
-        )
-
-        self.assertEqual(
-            self.yugabyte.generate_replication_slot_name('some.db', 'some.tap'),
-            'pipelinewise_some_db_some_tap',
         )
 
     def test_create_replication_slot_issues_hybrid_time_slot_creation(self):
@@ -685,25 +652,54 @@ class TestFastSyncTapYugabyte(TestCase):
         self.assertGreater(sum(c.args[0] for c in sleep_mock.call_args_list), 300)
 
     def test_reset_slot_name_length_boundary(self):
-        """Accept exactly 63 characters; reject a longer name before SQL or state changes."""
-        slot_prefix = FastSyncTapYugabyte.generate_replication_slot_name('my_db') + '_'
+        """Reset accepts boundary names and hashes longer names before creating the slot."""
+        slot_prefix = utils.generate_replication_slot_name('my_db') + '_'
         for length in (63, 64):
             with self.subTest(length=length):
                 config = {'dbname': 'my_db', 'tap_id': 't' * (length - len(slot_prefix))}
+                original_name = slot_prefix + config['tap_id']
+                slot_name = utils.generate_replication_slot_name('my_db', config['tap_id'])
+                self.assertEqual(len(slot_name), 63)
+                if length == 63:
+                    self.assertEqual(slot_name, original_name)
+                else:
+                    self.assertNotEqual(slot_name, original_name)
                 connection = MagicMock()
                 cursor = connection.cursor.return_value.__enter__.return_value
                 cursor.fetchall.return_value = []
                 before_reset = MagicMock(return_value=None)
                 with patch.object(FastSyncTapYugabyte, 'get_connection', return_value=connection):
-                    if length == 64:
-                        with self.assertRaisesRegex(RuntimeError, 'at most 63 characters'):
-                            FastSyncTapYugabyte.reset_slot(config, before_reset=before_reset)
-                        cursor.execute.assert_not_called()
-                        before_reset.assert_not_called()
-                    else:
-                        FastSyncTapYugabyte.reset_slot(config, before_reset=before_reset)
-                        before_reset.assert_called_once_with()
+                    FastSyncTapYugabyte.reset_slot(config, before_reset=before_reset)
+                before_reset.assert_called_once_with()
+                self.assertEqual(cursor.execute.call_args_list, [
+                    call(
+                        'SELECT slot_name, database, plugin, active FROM pg_replication_slots '
+                        'WHERE slot_name IN (%s, %s)',
+                        (slot_prefix[:-1], slot_name),
+                    ),
+                    call(
+                        'SELECT * FROM pg_create_logical_replication_slot(%s, %s, %s, %s, %s)',
+                        (slot_name, 'wal2json', False, False, 'HYBRID_TIME'),
+                    ),
+                ])
                 connection.close.assert_called_once_with()
+
+    def test_reset_slot_rejects_overlong_generated_name(self):
+        """Reject an invalid generated name before SQL or state changes."""
+        connection = MagicMock()
+        cursor = connection.cursor.return_value.__enter__.return_value
+        before_reset = MagicMock()
+        with patch.object(FastSyncTapYugabyte, 'get_connection', return_value=connection):
+            with patch.object(
+                utils, 'generate_replication_slot_name', side_effect=['pipelinewise_my_db', 't' * 64],
+            ):
+                with self.assertRaisesRegex(RuntimeError, 'at most 63 characters'):
+                    FastSyncTapYugabyte.reset_slot(
+                        {'dbname': 'my_db', 'tap_id': 'my_tap'}, before_reset=before_reset,
+                    )
+        cursor.execute.assert_not_called()
+        before_reset.assert_not_called()
+        connection.close.assert_called_once_with()
 
     def test_reset_slot_reports_failed_phase_and_backup_without_restoring_state(self):
         """A source error after invalidation names its phase and the pre-reset backup."""

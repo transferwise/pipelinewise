@@ -1,6 +1,12 @@
+0.102.4 (2026-11-12)
+--------------------
+- Fixed an issue in `tap-postgres` with replication slot names exceeding 63 characters, 
+  while maintaining support for existing slots longer than 63 characters.
+- Limited replication slot names in Yugabyte to 63 characters.
+
 0.102.3 (2026-11-11)
 --------------------
-- Revert changes in 0.102.1 (tsp-postgres slot name)
+- Revert changes in 0.102.1 (tap-postgres slot name)
 
 0.102.2 (2026-11-10)
 --------------------

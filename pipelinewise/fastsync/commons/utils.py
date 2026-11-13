@@ -9,6 +9,7 @@ import datetime
 import re
 import stat
 import tempfile
+import hashlib
 
 from typing import Callable, Dict, List, Optional, Tuple
 from singer.logger import configure_log_redaction
@@ -859,3 +860,31 @@ def gen_export_filename(
         ext = 'csv.gz'
 
     return f'pipelinewise_{tap_id}_{table}_{suffix}_{sync_type}_{postfix}.{ext}'
+
+
+def generate_replication_slot_name(dbname, tap_id=None, prefix='pipelinewise', limit_len_63=True):
+    """Generate replication slot name with
+
+    :param str dbname: Database name that will be part of the replication slot name
+    :param str tap_id: Optional. If provided then it will be appended to the end of the slot name
+    :param str prefix: Optional. Defaults to 'pipelinewise'
+    :return: well formatted lowercased replication slot name
+    :rtype: str
+    """
+    # Add tap_id to the end of the slot name if provided
+    if tap_id:
+        tap_id = f'_{tap_id}'
+    # Convert None to empty string
+    else:
+        tap_id = ''
+
+    slot_name = f'{prefix}_{dbname}{tap_id}'.lower()
+
+    # Replace invalid characters to ensure replication slot name is in accordance with Postgres spec
+    slot_name = re.sub('[^a-z0-9_]', '_', slot_name)
+
+    if limit_len_63 and len(slot_name) > 63:
+        suffix = hashlib.sha256(slot_name.encode('utf-8')).hexdigest()[:8]
+        slot_name = f'{slot_name[:54]}_{suffix}'
+
+    return slot_name
