@@ -149,6 +149,10 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
 
 ## Publication and recovery
 
+MariaDB JSON mapping and existing-TEXT compatibility follow
+[the JSON contract](fastsync/commons/MARIADB_JSON.md), including discovery evidence,
+staging types, transformations, conversion and recovery.
+
 - Key recovery by stable source stream, index active attempts by physical
   target, and hold both locks throughout; reject source, target, staging, role,
   transformation, or boundary drift. `RecoveryCoordinator` owns target runtime

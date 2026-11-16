@@ -89,8 +89,7 @@ class MySqlSnowflakeSource(RdbmsSnowflakeSource):
 
     def create(self, args, iceberg_version: Optional[int]):
         source = self._configure(self.factory(args.tap, self.type_mapper), args, iceberg_version)
-        if iceberg_version is not None:
-            source.set_mariadb_json_aliases_enabled(True)
+        source.set_mariadb_json_aliases_enabled(True)
         return source
 
     def source_engine(self, args) -> str:

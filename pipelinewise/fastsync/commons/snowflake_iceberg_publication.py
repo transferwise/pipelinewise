@@ -230,7 +230,8 @@ class SnowflakeIcebergPublicationService:
         snapshot = self.inspect_table(spec.name)
         if snapshot.fingerprint == attempt.pre_publication_target_fingerprint:
             method, additions = self._full_method(
-                spec, snapshot, iceberg_version
+                spec, snapshot, iceberg_version,
+                mariadb_json_columns=attempt.manifest_payload.mariadb_json_columns or (),
             )
         elif attempt.method == PUBLICATION_ADDITIVE_OVERWRITE:
             compatibility, additions = self._compatibility(spec, snapshot.spec)
@@ -299,6 +300,7 @@ class SnowflakeIcebergPublicationService:
             method, additions = self._partial_method(
                 spec, snapshot, drop_target, iceberg_version, decimal_columns=decimal_columns,
                 version_legacy_float_columns=version_legacy_float_columns,
+                mariadb_json_columns=attempt.manifest_payload.mariadb_json_columns or (),
             )
         elif attempt.method == PUBLICATION_PARTIAL_MERGE:
             compatibility, additions = partial_compatibility(
@@ -370,12 +372,12 @@ class SnowflakeIcebergPublicationService:
 
     def _partial_method(
         self, spec, snapshot, drop_target, iceberg_version, decimal_columns=(),
-        version_legacy_float_columns=False,
+        version_legacy_float_columns=False, mariadb_json_columns=(),
     ):
         if snapshot.table_format == TABLE_FORMAT_MISSING:
             return PUBLICATION_PARTIAL_BOOTSTRAP_CTAS, ()
         self._require_managed_version(snapshot, spec.name, iceberg_version)
-        self._reject_text_variant_mismatch(spec, snapshot.spec)
+        self._reject_text_variant_mismatch(spec, snapshot.spec, mariadb_json_columns if drop_target else ())
         if drop_target:
             return PUBLICATION_PARTIAL_REPLACEMENT_CTAS, ()
         compatibility, additions = partial_compatibility(
@@ -409,13 +411,14 @@ class SnowflakeIcebergPublicationService:
         expected: IcebergTableSpec,
         snapshot: SnowflakeTableSnapshot,
         iceberg_version: int,
+        mariadb_json_columns=(),
     ) -> Tuple[str, Tuple[IcebergColumn, ...]]:
         if snapshot.table_format == TABLE_FORMAT_MISSING:
             return PUBLICATION_MISSING_CTAS, ()
         self._require_managed_version(
             snapshot, expected.name, iceberg_version
         )
-        self._reject_text_variant_mismatch(expected, snapshot.spec)
+        self._reject_text_variant_mismatch(expected, snapshot.spec, mariadb_json_columns)
         compatibility, additions = self._compatibility(expected, snapshot.spec)
         if compatibility == 'exact':
             return PUBLICATION_INSERT_OVERWRITE, ()
@@ -427,6 +430,7 @@ class SnowflakeIcebergPublicationService:
     def _reject_text_variant_mismatch(
         expected: IcebergTableSpec,
         actual: Optional[IcebergTableSpec],
+        mariadb_json_columns=(),
     ) -> None:
         if actual is None:
             return
@@ -434,6 +438,12 @@ class SnowflakeIcebergPublicationService:
         for actual_column in actual.columns:
             expected_column = expected_columns.get(actual_column.name)
             if expected_column is None:
+                continue
+            if (
+                actual_column.name in mariadb_json_columns
+                and expected_column.data_type == 'VARIANT'
+                and actual_column.data_type.startswith('VARCHAR(')
+            ):
                 continue
             data_types = {expected_column.data_type, actual_column.data_type}
             if 'VARIANT' in data_types and any(

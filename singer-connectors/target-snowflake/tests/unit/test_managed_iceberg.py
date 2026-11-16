@@ -504,3 +504,29 @@ def test_column_change_plan_rejects_v3_text_variant_transitions(
             is_iceberg_table=True,
             iceberg_version=3,
         )
+
+
+@pytest.mark.parametrize('iceberg_version', [None, 3])
+@pytest.mark.parametrize('existing_type', [
+    'TEXT', 'TEXT(134217728)', 'VARCHAR(134217728)', 'STRING', 'CHAR(8)', 'CHARACTER VARYING(64)',
+])
+@pytest.mark.parametrize('keys', [(), ('payload',)])
+@pytest.mark.parametrize('version_legacy_float_columns', [False, True])
+def test_mariadb_json_alias_retains_existing_text_without_changing_new_variant_mapping(
+    iceberg_version, existing_type, keys, version_legacy_float_columns,
+):
+    schema = _v3_behavior_cases()['mariadb_json_transport']['schema']
+    plan = managed_iceberg.plan_column_changes(
+        {'payload': schema, 'new_payload': schema},
+        {'PAYLOAD': existing_type},
+        is_iceberg_table=iceberg_version == 3,
+        iceberg_version=iceberg_version,
+        key_properties=keys,
+        version_legacy_float_columns=version_legacy_float_columns,
+    )
+
+    assert tuple(definition.upper() for definition in plan.additions) == ('"NEW_PAYLOAD" VARIANT',)
+    assert plan.replacements == ()
+    assert plan.retained_column_types == (('PAYLOAD', existing_type),)
+    assert plan.retained_decimal_types == ()
+    assert db_sync.column_trans(schema, existing_type) == ''

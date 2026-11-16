@@ -1051,8 +1051,9 @@ class TestFastSyncTapMySql(TestCase):
         sql = query_mock.call_args.args[0]
         assert "CASE WHEN is_json_alias THEN 'json' ELSE data_type END" in sql
         assert 'information_schema.check_constraints' in sql
+        assert 'cc.table_name = tc.table_name' in sql
         assert "c.data_type = 'longtext'" in sql
-        assert "REPLACE(LOWER(cc.check_clause), ' ', '') =" in sql
+        assert "LOWER(TRIM(cc.check_clause)) =" in sql
         assert "CONCAT('json_valid(`'" in sql
         assert ' LIKE ' not in sql
 

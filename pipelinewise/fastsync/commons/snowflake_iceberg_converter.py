@@ -814,7 +814,7 @@ class SnowflakeNativeToIcebergConverter:
             phase='metadata',
         ))
         primary_key = self._primary_key(table)
-        self._assert_primary_key(columns, primary_key, table)
+        self._assert_primary_key_metadata(columns, primary_key)
         self._assert_no_other_constraints(table)
         self._assert_no_streams(table)
         self._assert_no_policies(table)
@@ -889,34 +889,15 @@ class SnowflakeNativeToIcebergConverter:
                 'foreign keys that manual conversion cannot preserve safely'
             )
 
-    def _assert_primary_key(
-        self,
+    @staticmethod
+    def _assert_primary_key_metadata(
         columns: Tuple[NativeColumn, ...],
         primary_key: Tuple[str, ...],
-        table: SnowflakeTableName,
     ) -> None:
         column_names = {column.name for column in columns}
         if any(not isinstance(column, str) or column not in column_names for column in primary_key):
             raise NativeToIcebergConversionError(
                 'Snowflake returned invalid primary-key metadata'
-            )
-        if not primary_key:
-            return
-        predicate = ' OR '.join(
-            f'{quote_identifier(column)} IS NULL' for column in primary_key
-        )
-        rows = self._query(
-            f'SELECT COUNT(*) AS "NULL_KEY_COUNT" FROM {table.quoted} WHERE {predicate}',
-            phase='metadata',
-        )
-        null_count = _row_value(rows[0], 'NULL_KEY_COUNT') if rows else None
-        if null_count is None:
-            raise NativeToIcebergConversionError(
-                'Snowflake did not return primary-key nullability evidence'
-            )
-        if int(null_count) > 0:
-            raise NativeToIcebergConversionError(
-                f'{table.quoted} contains NULL primary-key values'
             )
 
     def _table_metadata(

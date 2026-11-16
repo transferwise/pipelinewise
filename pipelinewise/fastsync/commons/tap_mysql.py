@@ -200,6 +200,7 @@ class FastSyncTapMySql:
         self.conn_unbuffered = None
         self.is_replica = False
         self._mariadb_json_aliases_enabled = False
+        self.retained_column_types: dict[str, str] = {}
         self._source_regex_verified = False
         self._terminating = False
 
@@ -227,7 +228,7 @@ class FastSyncTapMySql:
 
     @property
     def uses_mariadb_json_aliases(self) -> bool:
-        """Return whether MariaDB JSON aliases should map to Iceberg VARIANT."""
+        """Return whether this Snowflake route recognizes MariaDB JSON aliases."""
         iceberg_version = self.connection_config.get('iceberg_version')
         return (
             self.is_mariadb
@@ -646,10 +647,11 @@ class FastSyncTapMySql:
                                 JOIN information_schema.check_constraints AS cc
                                   ON cc.constraint_schema = tc.constraint_schema
                                  AND cc.constraint_name = tc.constraint_name
+                                 AND cc.table_name = tc.table_name
                                 WHERE tc.table_schema = c.table_schema
                                   AND tc.table_name = c.table_name
                                   AND tc.constraint_type = 'CHECK'
-                                  AND REPLACE(LOWER(cc.check_clause), ' ', '') =
+                                  AND LOWER(TRIM(cc.check_clause)) =
                                       CONCAT('json_valid(`',
                                              REPLACE(LOWER(c.column_name), '`', '``'),
                                              '`)')
@@ -758,6 +760,12 @@ class FastSyncTapMySql:
         ]
         if decimal_columns:
             mapped['decimal_columns'] = decimal_columns
+        mariadb_json_columns = [
+            column['column_name'].upper() for column in mysql_columns
+            if self.uses_mariadb_json_aliases and column.get('data_type') == 'json'
+        ]
+        if mariadb_json_columns:
+            mapped['mariadb_json_columns'] = mariadb_json_columns
         binary_lengths = declared_binary_lengths(mysql_columns)
         if binary_lengths:
             mapped['binary_lengths'] = binary_lengths
@@ -883,8 +891,10 @@ class FastSyncTapMySql:
         if self.source_transformations is None:
             return None
         table_columns, primary_keys = self._decimal_key_projection(table_name, table_columns)
-        columns = [dict(column, target_type=self._mapped_column_type(
-            column, safe_column_name(column['column_name'], self.target_quote) in primary_keys,
+        columns = [dict(column, target_type=self.retained_column_types.get(
+            column['column_name'].upper(), self._mapped_column_type(
+                column, safe_column_name(column['column_name'], self.target_quote) in primary_keys,
+            ),
         )) for column in table_columns]
         table_dict = utils.tablename_to_dict(table_name)
         dialect = self._source_dialect

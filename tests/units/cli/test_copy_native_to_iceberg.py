@@ -14,9 +14,11 @@ from pipelinewise import cli
 from pipelinewise.cli.errors import CommandSpecificArgumentsException
 from pipelinewise.cli.errors import PreRunChecksException
 from pipelinewise.cli.pipelinewise import PipelineWise
+from pipelinewise.cli.native_to_iceberg import TableReport
 from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_plan import ConversionTarget
 from pipelinewise.fastsync.commons.snowflake_iceberg_model import SnowflakeObjectName
 from tests.units.cli.cli_args import CliArgs
+from tests.units.fastsync.commons.test_snowflake_iceberg_converter import FakeSnowflake
 
 
 CONFIG_DIR = 'tests/units/cli/resources/sample_json_config'
@@ -340,7 +342,98 @@ def test_tap_scoped_report_plans_selected_streams(mock_report, capsys):
     assert report['ready'] is False
     assert report['tables'] == []
     assert len(report['blockers']) == 1
-    assert 'not imported with target_table_format: iceberg yet' in report['blockers'][0]
+    assert 'MariaDB JSON aliases may be recorded as TEXT' in report['blockers'][0]
+
+
+@pytest.mark.parametrize('complete', [True, False])
+@patch('pipelinewise.cli.native_to_iceberg.preflight_report', return_value=[])
+def test_native_mysql_report_uses_catalog_discovery_proof(mock_report, complete, capsys):
+    """The command checks every selected stream's imported proof before declaring readiness."""
+    pipelinewise = PipelineWise(
+        _args(target='target_one', tap='tap_one', table='*', preflight_only=True, output_format='json'),
+        CONFIG_DIR, VIRTUALENVS_DIR,
+    )
+    properties_path = pipelinewise.tap['files']['properties']
+    load_json = cli.utils.load_json
+    catalog = load_json(properties_path)
+    selected_roots = []
+    for stream in catalog['streams']:
+        root = next(entry['metadata'] for entry in stream['metadata'] if not entry['breadcrumb'])
+        root['mariadb-json-discovery'] = {'version': 1, 'engine': 'mariadb'}
+        if root.get('selected'):
+            selected_roots.append(root)
+    if not complete:
+        del selected_roots[-1]['mariadb-json-discovery']
+
+    with (
+        patch('pipelinewise.cli.pipelinewise.utils.load_json',
+              side_effect=lambda path: catalog if path == properties_path else load_json(path)),
+        patch.object(pipelinewise, '_stale_catalog_reasons', return_value=[]),
+    ):
+        pipelinewise.copy_native_to_iceberg()
+
+    report = json.loads(capsys.readouterr().out)
+    assert report['ready'] is complete
+    assert len(report['blockers']) == (0 if complete else 1)
+    assert 'run import_config' in report['next_steps'][0]
+    mock_report.assert_called_once()
+
+
+@pytest.mark.parametrize('table_blockers', [(), ('table is incompatible',)])
+@pytest.mark.parametrize('conversion_enabled', [None, False, True])
+@patch('pipelinewise.cli.native_to_iceberg.preflight_report')
+def test_native_postgres_report_before_enabling_iceberg(mock_report, conversion_enabled, table_blockers, capsys):
+    """A native PostgreSQL tap can assess conversion while preserving real table blockers."""
+    pipelinewise = PipelineWise(
+        _args(target='target_one', tap='tap_one', table='*', preflight_only=True, output_format='json'),
+        CONFIG_DIR,
+        VIRTUALENVS_DIR,
+    )
+    pipelinewise.tap['type'] = 'tap-postgres'
+    assert 'native_to_iceberg_conversion' not in pipelinewise.tap
+    if conversion_enabled is not None:
+        pipelinewise.tap['native_to_iceberg_conversion'] = {'enabled': conversion_enabled}
+    settings = pipelinewise._iceberg_target_config()
+    assert 'target_table_format' not in settings
+    assert 'iceberg_version' not in settings
+    mock_report.return_value = [TableReport('stream', 'DB.S.TABLE', 'native', 'convert', 1, 1, table_blockers)]
+
+    with patch.object(pipelinewise, '_stale_catalog_reasons', return_value=[]):
+        pipelinewise.copy_native_to_iceberg()
+
+    assert mock_report.call_args.args[0]['iceberg_version'] == 3
+    report = json.loads(capsys.readouterr().out)
+    assert report['ready'] is (not table_blockers)
+    assert report['blockers'] == []
+    assert 'run import_config' in report['next_steps'][0]
+    assert 'MariaDB' not in json.dumps(report)
+
+
+def test_native_postgres_report_inspects_native_tables_without_writes(tmp_path, capsys):
+    """Exercise planning and converter feasibility against a read-only Snowflake fake."""
+    pipelinewise = PipelineWise(
+        _args(target='target_one', tap='tap_one', table='*', preflight_only=True, output_format='json'),
+        CONFIG_DIR,
+        VIRTUALENVS_DIR,
+    )
+    pipelinewise.tap['type'] = 'tap-postgres'
+    snowflake = FakeSnowflake()
+    snowflake.connection_config['dbname'] = 'MY_DB'
+    snowflake.formats = {'TABLE_ONE': 'native', 'TABLE_TWO': 'native'}
+
+    with (
+        patch('pipelinewise.cli.native_to_iceberg.SnowflakeConversionQueryAdapter', return_value=snowflake),
+        patch.object(pipelinewise, '_stale_catalog_reasons', return_value=[]),
+        patch.object(pipelinewise, 'get_target_dir', return_value=str(tmp_path)),
+    ):
+        pipelinewise.copy_native_to_iceberg()
+
+    report = json.loads(capsys.readouterr().out)
+    assert report['ready'] is True, report
+    assert len(report['tables']) == 2
+    assert all(table['state'] == 'native' for table in report['tables'])
+    assert not list(tmp_path.iterdir())
+    assert not any(sql.startswith(('CREATE', 'ALTER', 'GRANT')) for sql, _, _ in snowflake.queries)
 
 
 @pytest.mark.parametrize(

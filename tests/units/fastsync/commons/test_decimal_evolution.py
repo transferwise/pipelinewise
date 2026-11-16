@@ -118,6 +118,8 @@ def test_partial_export_validation_reapplies_retained_decimal_types():
         table_name='TABLE',
         spec=retained,
         decimal_columns=('AMOUNT',),
+        mariadb_json_columns=(),
+        attempt=Mock(manifest_payload=Mock(mariadb_json_columns=None)),
     )
 
     with patch.object(

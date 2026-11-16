@@ -25,6 +25,7 @@ from pipelinewise.fastsync.commons.snowflake_iceberg_converter import (
     EVENTUAL_ICEBERG,
     SnowflakeNativeToIcebergConverter,
 )
+from tests.end_to_end.target_snowflake.mariadb_json_values import JSON_VALUES
 
 
 REQUIRED_ENVIRONMENT = {
@@ -156,7 +157,7 @@ def _rows(adapter, table):
     )
 
 
-def _run_conversion_cli(config_dir, table, eventual=None):
+def _run_conversion_cli(config_dir, table, eventual=None, *, success=True):
     command = [
         'pipelinewise',
         'copy_native_to_iceberg',
@@ -179,9 +180,10 @@ def _run_conversion_cli(config_dir, table, eventual=None):
         text=True,
         timeout=300,
     )
-    assert process.returncode == 0, (
+    assert (process.returncode == 0) == success, (
         f'Command failed: {command}\nstdout:\n{process.stdout}\nstderr:\n{process.stderr}'
     )
+    return process
 
 
 def _row_value(row, name, default=None):
@@ -392,3 +394,76 @@ def test_cutover_recovers_lost_response(conversion_environment):
 
     _run_conversion_cli(config_dir, table, EVENTUAL_ICEBERG)
     assert _rows(adapter, table) == expected_rows
+
+
+def _register_json_catalog(config_dir, runtime_dir, table, schema_property):
+    """Register a selected writer so the CLI must apply its catalog contract."""
+    tap_id = 'mariadb-json-converter'
+    config_path = config_dir / 'config.json'
+    config = json.loads(config_path.read_text(encoding='utf-8'))
+    config['targets'][0]['taps'] = [{
+        'id': tap_id, 'name': tap_id, 'type': 'tap-mysql', 'status': 'ready',
+    }]
+    config_path.write_text(json.dumps(config), encoding='utf-8')
+    tap_dir = runtime_dir / tap_id
+    tap_dir.mkdir(exist_ok=True)
+    (tap_dir / 'config.json').write_text('{}', encoding='utf-8')
+    (tap_dir / 'inheritable_config.json').write_text(json.dumps({
+        'schema_mapping': {'mariadb': {'target_schema': table.schema}},
+        'data_flattening_max_level': 0,
+    }), encoding='utf-8')
+    (tap_dir / 'properties.json').write_text(json.dumps({'streams': [{
+        'tap_stream_id': f'mariadb-{table.table.lower()}',
+        'schema': {'properties': {'payload': schema_property}},
+        'metadata': [{'breadcrumb': [], 'metadata': {
+            'selected': True,
+            'mariadb-json-discovery': {'version': 1, 'engine': 'mariadb'},
+        }}],
+    }]}), encoding='utf-8')
+
+
+@pytest.mark.parametrize('physical_type', ['TEXT', 'VARIANT'])
+def test_mariadb_json_catalog_conversion_preserves_physical_type(conversion_environment, physical_type):
+    """Marked MariaDB JSON retains bytes or roots; generic class mismatches refuse."""
+    adapter, database, schema, config_dir, runtime_dir = conversion_environment
+    table = SnowflakeObjectName(database, schema, f'JSON_{physical_type}')
+    adapter.query(f'CREATE TABLE {table.quoted} ("ID" NUMBER, "PAYLOAD" {physical_type}, PRIMARY KEY ("ID"))')
+    expression = '%(payload)s' if physical_type == 'TEXT' else 'PARSE_JSON(%(payload)s)'
+    for row_id, value in enumerate(JSON_VALUES, 1):
+        adapter.query(
+            f'INSERT INTO {table.quoted} SELECT %(id)s, {expression}',
+            {'id': row_id, 'payload': value},
+        )
+
+    def contents(target):
+        if physical_type == 'TEXT':
+            projection = '"PAYLOAD" IS NULL AS "SQL_NULL", HEX_ENCODE("PAYLOAD") AS "PAYLOAD_VALUE"'
+        else:
+            projection = ('"PAYLOAD" IS NULL AS "SQL_NULL", TYPEOF("PAYLOAD") AS "JSON_TYPE", '
+                          'TO_JSON("PAYLOAD") AS "PAYLOAD_VALUE"')
+        return adapter.query(f'SELECT "ID", {projection} FROM {target.quoted} ORDER BY "ID"')
+
+    expected = contents(table)
+    generic = {'type': ['null', 'object']} if physical_type == 'TEXT' else {'type': ['null', 'string']}
+    _register_json_catalog(config_dir, runtime_dir, table, generic)
+    rejected = _run_conversion_cli(config_dir, table, success=False)
+    assert 'tap catalog maps it to' in rejected.stdout + rejected.stderr
+    assert _formats(adapter, runtime_dir, table) == (TABLE_FORMAT_NATIVE, TABLE_FORMAT_MISSING, TABLE_FORMAT_MISSING)
+    assert contents(table) == expected
+
+    _register_json_catalog(config_dir, runtime_dir, table, {
+        'type': ['null', 'object', 'array', 'string', 'number', 'boolean'],
+        'format': 'mariadb-json',
+    })
+    _run_conversion_cli(config_dir, table, EVENTUAL_ICEBERG)
+    assert contents(table) == expected
+    assert contents(table.with_suffix('_NATIVE')) == expected
+    columns = adapter.query(
+        'SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS '
+        'WHERE TABLE_SCHEMA = %(schema)s AND TABLE_NAME = %(table)s AND COLUMN_NAME = \'PAYLOAD\'',
+        {'schema': schema, 'table': table.table},
+    )
+    assert columns == [{'DATA_TYPE': physical_type}]
+    assert _formats(adapter, runtime_dir, table) == (
+        TABLE_FORMAT_MANAGED_ICEBERG_V3, TABLE_FORMAT_MISSING, TABLE_FORMAT_NATIVE,
+    )

@@ -350,3 +350,36 @@ def test_writer_classes_skip_only_the_objects_a_flattening_tap_splits(tmp_path):
         {'DOC': 'VARIANT', 'ADDRESS': 'VARIANT'},  # mirror, at level 0
         {'DOC': 'VARIANT'},  # shadow, at level 10
     ]
+
+
+def test_conversion_entry_points_load_imported_transformation_requirements(tmp_path):
+    """Tap, manual and other-writer planning all use the same generated transformation file."""
+    instance = _project(tmp_path)
+    for tap_id in ('orders', 'mirror'):
+        tap_dir = tmp_path / 'snow' / tap_id
+        catalog = json.loads((tap_dir / 'properties.json').read_text())
+        for stream in catalog['streams']:
+            stream['schema']['properties']['doc']['format'] = 'mariadb-json'
+        _write_json(tap_dir / 'properties.json', catalog)
+        _write_json(tap_dir / 'transformation.json', {'transformations': [
+            {'tap_stream_name': 'public-items', 'field_id': 'doc', 'type': 'HASH'},
+        ]})
+
+    with patch('pipelinewise.cli.native_to_iceberg.convert_tap_tables') as convert:
+        instance._run_native_to_iceberg_conversion(['public-items'], None)
+    assert convert.call_args.args[2][0].writer_types['DOC'] == 'TEXT'
+
+    imported = instance._imported_tap_targets({'dbname': 'analytics'})
+    assert [target.writer_types['DOC'] for target in imported if target.stream_id == 'public-items'] == [
+        'TEXT', 'TEXT', 'VARIANT',
+    ]
+    writers = instance._other_writers({'account': 'ACC', 'dbname': 'analytics'}, PLANNED[1:])
+    mirror = next(writer for writer in writers if writer.target.stream_id == 'public-items of tap mirror')
+    assert mirror.target.writer_types['DOC'] == 'TEXT'
+
+    instance.args.iceberg_version = 3
+    instance.args.output_format = 'json'
+    with patch('pipelinewise.cli.native_to_iceberg.preflight_report', return_value=[]) as preflight:
+        instance._native_to_iceberg_preflight({})
+    item = next(target for target in preflight.call_args.args[2] if target.stream_id == 'public-items')
+    assert item.writer_types['DOC'] == 'TEXT'

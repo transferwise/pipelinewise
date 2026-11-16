@@ -14,6 +14,8 @@ from pipelinewise.fastsync.commons.snowflake_iceberg import (
     SnowflakeQueryAdapter,
 )
 from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_plan import (
+    CONVERSION_DOCS_URL,
+    MARIADB_JSON,
     STATE_BLOCKED,
     STATE_ICEBERG,
     STATE_NATIVE,
@@ -98,11 +100,12 @@ def tap_targets(
     target_config: Mapping[str, Any],
     fastsync_capable: bool,
     stream_ids: Optional[Sequence[str]] = None,
+    transformation_config: Mapping[str, Any] | None = None,
 ) -> List[ConversionTarget]:
     """Plan the selected streams of one tap, or the given stream IDs."""
     if stream_ids is None:
         stream_ids = selected_stream_ids(catalog)
-    return plan_conversion_targets(catalog, target_config, stream_ids, fastsync_capable)
+    return plan_conversion_targets(catalog, target_config, stream_ids, fastsync_capable, transformation_config)
 
 
 def table_targets(fqtn: str, imported: Sequence[ConversionTarget]) -> List[ConversionTarget]:
@@ -127,9 +130,9 @@ def tap_blockers(target_config: Mapping[str, Any]) -> List[str]:
     version = target_config.get('iceberg_version')
     if target_config.get('target_table_format') != STATE_ICEBERG:
         blockers.append(
-            'The tap is not imported with target_table_format: iceberg yet, so its catalog '
-            'may still map MariaDB JSON aliases to TEXT. Pause the tap, import the Iceberg '
-            'settings with native_to_iceberg_conversion enabled: false, and run this report again'
+            'The tap is not imported with target_table_format: iceberg yet. '
+            'Run import_config with target_table_format: iceberg and iceberg_version: 3 '
+            'before enabling native_to_iceberg_conversion'
         )
     elif version != 3 or isinstance(version, bool):
         blockers.append(f'iceberg_version is {version!r}; native_to_iceberg_conversion requires 3')
@@ -140,6 +143,51 @@ def tap_blockers(target_config: Mapping[str, Any]) -> List[str]:
             'requires 0'
         )
     return blockers
+
+
+def preflight_configuration(
+    target_config: Mapping[str, Any], tap_type: str,
+    catalog: Mapping[str, Any] | None = None,
+) -> tuple[list[str], list[str]]:
+    """Separate catalog safety blockers from settings needed only before conversion runs."""
+    if target_config.get('target_table_format') == STATE_ICEBERG:
+        return tap_blockers(target_config), []
+    blockers = tap_blockers({**target_config, 'target_table_format': STATE_ICEBERG, 'iceberg_version': 3})
+    if tap_type == 'tap-mysql' and not _has_mariadb_json_discovery(catalog):
+        blockers.append(
+            'The catalog does not prove MariaDB JSON discovery for every selected stream; '
+            'MariaDB JSON aliases may be recorded as TEXT. Run import_config for the tap '
+            '(target_table_format: native is supported), then rerun this report. '
+            f'See {CONVERSION_DOCS_URL}#conversion-feasibility-report'
+        )
+    next_steps = [
+        'Before enabling native_to_iceberg_conversion, pause the tap and run import_config '
+        'with target_table_format: iceberg and iceberg_version: 3, then rerun this report'
+    ]
+    return blockers, next_steps
+
+
+def _has_mariadb_json_discovery(catalog: Mapping[str, Any] | None) -> bool:
+    """Require successful Snowflake-aware alias discovery on every selected stream."""
+    if catalog is None or not (selected := set(selected_stream_ids(catalog))):
+        return False
+    for stream in catalog.get('streams', []):
+        if stream.get('tap_stream_id') not in selected:
+            continue
+        root = next(
+            (entry.get('metadata', {}) for entry in stream.get('metadata', [])
+             if isinstance(entry, dict) and not entry.get('breadcrumb')),
+            {},
+        )
+        proof = root.get('mariadb-json-discovery')
+        if (
+            not isinstance(proof, dict)
+            or type(proof.get('version')) is not int
+            or proof['version'] != 1
+            or proof.get('engine') not in ('mariadb', 'mysql')
+        ):
+            return False
+    return True
 
 
 def assert_imported_for_conversion(target_config: Mapping[str, Any], tap_id: str) -> None:
@@ -254,7 +302,10 @@ def _merge_writer_types(
         for column, column_class in target.writer_types.items():
             expected = columns.setdefault(column, column_class)
             sources.setdefault((key, column), target.stream_id)
-            if expected != column_class:
+            if expected == MARIADB_JSON and column_class != MARIADB_JSON:
+                columns[column] = column_class
+                sources[(key, column)] = target.stream_id
+            elif column_class not in (expected, MARIADB_JSON):
                 conflicts.setdefault(key, []).append(
                     f'Column {column} is {expected} for stream {sources[(key, column)]} but '
                     f'{column_class} for stream {target.stream_id}'
@@ -535,6 +586,7 @@ def render_preflight_report(
     reports: Sequence[TableReport],
     blockers: Sequence[str],
     output_format: str,
+    next_steps: Sequence[str] = (),
 ) -> str:
     """Render a feasibility report as a table or JSON."""
     ready = not blockers and not any(report.blockers for report in reports)
@@ -544,6 +596,8 @@ def render_preflight_report(
             'blockers': list(blockers),
             'tables': [asdict(report) for report in reports],
         }
+        if next_steps:
+            payload['next_steps'] = list(next_steps)
         return json.dumps(payload, indent=2)
     rows = [
         [
@@ -558,6 +612,7 @@ def render_preflight_report(
         for report in reports
     ]
     lines = [f'Blocker: {blocker}' for blocker in blockers]
+    lines.extend(f'Next step: {step}' for step in next_steps)
     lines.append(tabulate(
         rows,
         headers=['Stream', 'Table', 'State', 'Action', 'Rows', 'Bytes', 'Blockers'],

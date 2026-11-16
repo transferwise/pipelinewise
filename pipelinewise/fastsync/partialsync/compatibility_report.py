@@ -27,12 +27,13 @@ class ReportInputError(ValueError):
 
 
 class MappedSourceColumns(list):
-    """Mapped definitions with transient source decimal and binary-length provenance."""
+    """Mapped definitions with decimal, binary-length and MariaDB JSON provenance."""
 
-    def __init__(self, columns, decimal_columns, binary_lengths=None):
+    def __init__(self, columns, decimal_columns, binary_lengths=None, mariadb_json_columns=()):
         super().__init__(columns)
         self.decimal_columns = frozenset(decimal_columns)
         self.binary_lengths = dict(binary_lengths or {})
+        self.mariadb_json_columns = frozenset(mariadb_json_columns)
 
 
 class MetadataSnowflakeClient(SnowflakeSqlClient):
@@ -152,7 +153,13 @@ def mapped_source_columns(connection, source, table, primary_keys=()):
         if (column[1] if postgres else column.get('data_type')) in ('numeric', 'decimal')
     ]
     binary_lengths = {} if postgres else declared_binary_lengths(columns)
-    return MappedSourceColumns(source.map_table_columns(columns, primary_keys), decimal_columns, binary_lengths)
+    mariadb_json_columns = [
+        column['column_name'].upper() for column in columns
+        if not postgres and source.uses_mariadb_json_aliases and column.get('data_type') == 'json'
+    ]
+    return MappedSourceColumns(
+        source.map_table_columns(columns, primary_keys), decimal_columns, binary_lengths, mariadb_json_columns,
+    )
 
 
 def _table_report(
@@ -184,6 +191,7 @@ def _table_report(
             decimal_columns=getattr(mapped, 'decimal_columns', ()),
             version_legacy_float_columns=version_legacy_float_columns,
             binary_lengths=getattr(mapped, 'binary_lengths', {}),
+            mariadb_json_columns=getattr(mapped, 'mariadb_json_columns', ()),
         )
         status = 'incompatible' if any(row['status'] == 'incompatible' for row in column_report) else 'compatible'
         return {**result, 'status': status, 'columns': column_report}

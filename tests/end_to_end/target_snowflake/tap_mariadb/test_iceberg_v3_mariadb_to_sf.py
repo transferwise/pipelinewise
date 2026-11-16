@@ -6,11 +6,32 @@ from tests.end_to_end.target_snowflake.multiline_values import (
     prepare_mysql_multiline_table,
 )
 from tests.end_to_end.target_snowflake.tap_mariadb import TapMariaDB
+from tests.end_to_end.target_snowflake.mariadb_json_values import (
+    exercise_mariadb_json_replication,
+    prepare_mariadb_json_table,
+)
 
 
 TAP_ID = 'mariadb_to_sf_iceberg'
 TARGET_ID = 'snowflake'
 LARGE_VARCHAR_LENGTH = 16_777_217
+
+
+class TestIcebergV3MariaDBJSONToSnowflake(TapMariaDB):
+    """Exercise new and established JSON columns on managed Iceberg v3."""
+
+    def setUp(self):
+        super().setUp(tap_id=TAP_ID, target_id=TARGET_ID)
+        self.source_db = self.e2e_env.get_conn_env_var('TAP_MYSQL', 'DB')
+        self.target_schema = f'PPW_E2E_TAP_MYSQL{self.e2e_env.sf_schema_postfix}'.upper()
+
+    def prepare_source(self):
+        super().prepare_source()
+        prepare_mariadb_json_table(self, 'tap_mysql_to_sf_iceberg.yml')
+
+    def test_json_roots_and_retained_text_across_replication_engines(self):
+        """Iceberg Singer/PartialSync retain TEXT until explicit FullSync rebuilds."""
+        exercise_mariadb_json_replication(self, iceberg=True, tap_yaml_name='tap_mysql_to_sf_iceberg.yml')
 
 
 class TestIcebergV3MariaDBToSnowflake(TapMariaDB):

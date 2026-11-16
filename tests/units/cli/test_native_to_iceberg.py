@@ -9,6 +9,7 @@ import pytest
 from pipelinewise.cli import native_to_iceberg
 from pipelinewise.cli.errors import NativeToIcebergConversionException, PreRunChecksException
 from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_plan import (
+    MARIADB_JSON,
     STATE_BLOCKED,
     STATE_ICEBERG,
     STATE_NATIVE,
@@ -81,8 +82,38 @@ def test_report_includes_catalog_type_blockers(tmp_path):
     assert reports[0].action == 'resolve the blockers'
     assert reports[0].blockers == (
         'Column ATTRIBUTES is TEXT but the tap catalog maps it to VARIANT; '
-        'the Iceberg writers would refuse the converted table',
+        'the Iceberg writers would refuse the converted table. '
+        'See https://transferwise.github.io/pipelinewise/connectors/targets/'
+        'snowflake_iceberg.html#clear-a-text-variant-blocker',
     )
+
+
+@pytest.mark.parametrize('physical_type', ['TEXT', 'VARIANT'])
+def test_mariadb_json_report_and_conversion_preserve_physical_type(tmp_path, physical_type):
+    """The real converter accepts marked JSON without parsing or retyping established TEXT."""
+    snowflake = FakeSnowflake()
+    column = {
+        'COLUMN_NAME': 'DOCUMENT', 'DATA_TYPE': physical_type, 'IS_NULLABLE': 'YES',
+        'COMMENT': None, 'COLUMN_DEFAULT': None, 'IS_IDENTITY': 'NO',
+    }
+    snowflake.native_extra_columns = [column]
+    snowflake.companion_extra_columns = [{**column, 'CHARACTER_MAXIMUM_LENGTH': 134217728}]
+    writer_types = {'DOCUMENT': MARIADB_JSON}
+
+    reports = _report(tmp_path, snowflake, [_target('TABLE', writer_types)])
+
+    assert reports[0].blockers == ()
+    assert not list(tmp_path.iterdir())
+    assert not any(sql.startswith(('CREATE', 'ALTER', 'GRANT')) for sql, _, _ in snowflake.queries)
+
+    native_to_iceberg.SnowflakeNativeToIcebergConverter(snowflake, str(tmp_path)).convert(
+        'database.schema.table', iceberg_version=3, writer_types=writer_types,
+    )
+
+    create_sql = next(sql for sql, _, _ in snowflake.queries if sql.startswith('CREATE'))
+    copy_type = 'VARCHAR(134217728)' if physical_type == 'TEXT' else 'VARIANT'
+    assert f'CAST("DOCUMENT" AS {copy_type}) AS "DOCUMENT"' in create_sql
+    assert 'PARSE_JSON' not in create_sql
 
 
 def test_report_records_inspection_failures_per_table(tmp_path):
@@ -538,12 +569,155 @@ def test_run_tap_accepts_a_tap_imported_for_conversion():
 
 
 def test_tap_blockers_wait_for_the_imported_iceberg_catalog():
-    """A report on a catalog discovered with native settings can never claim ready."""
+    """Automatic conversion still requires imported Iceberg settings."""
     blockers = native_to_iceberg.tap_blockers({'data_flattening_max_level': 0})
 
     assert len(blockers) == 1
     assert 'not imported with target_table_format: iceberg yet' in blockers[0]
-    assert 'native_to_iceberg_conversion enabled: false' in blockers[0]
+    assert 'MariaDB' not in blockers[0]
+
+
+@pytest.mark.parametrize('settings', [{}, {'target_table_format': 'native'}])
+def test_native_postgres_preflight_only_advises_importing_iceberg(settings):
+    """PostgreSQL catalog mappings can be checked before activating Iceberg."""
+    blockers, next_steps = native_to_iceberg.preflight_configuration(settings, 'tap-postgres')
+
+    assert blockers == []
+    assert len(next_steps) == 1
+    assert 'run import_config' in next_steps[0]
+    assert 'enabled: false' not in next_steps[0]
+    payload = json.loads(native_to_iceberg.render_preflight_report([], blockers, 'json', next_steps))
+    assert payload['ready'] is True
+    assert payload['next_steps'] == next_steps
+    assert 'Next step: ' in native_to_iceberg.render_preflight_report([], blockers, 'table', next_steps)
+
+
+def test_native_mysql_preflight_cannot_prove_json_alias_mapping():
+    """Auto-detection can conceal MariaDB aliases in a native tap-mysql catalog."""
+    blockers, _ = native_to_iceberg.preflight_configuration({}, 'tap-mysql')
+
+    assert len(blockers) == 1
+    assert 'MariaDB JSON aliases may be recorded as TEXT' in blockers[0]
+    assert (
+        'https://transferwise.github.io/pipelinewise/connectors/targets/'
+        'snowflake_iceberg.html#conversion-feasibility-report'
+    ) in blockers[0]
+    assert 'enabled: false' not in blockers[0]
+    assert 'target_table_format: native is supported' in blockers[0]
+    assert 'with target_table_format: iceberg' not in blockers[0]
+
+
+def _discovered_catalog(proofs):
+    return {'streams': [
+        {
+            'tap_stream_id': f'public-table_{index}',
+            'schema': {'properties': {}},
+            'metadata': [{'breadcrumb': [], 'metadata': {
+                'selected': True, 'mariadb-json-discovery': proof,
+            }}],
+        }
+        for index, proof in enumerate(proofs)
+    ]}
+
+
+@pytest.mark.parametrize('engine', ['mariadb', 'mysql'])
+def test_native_mysql_preflight_accepts_complete_discovery_even_without_json_columns(engine):
+    """Every selected stream's discovery proof allows a native-format feasibility report."""
+    catalog = _discovered_catalog([{'version': 1, 'engine': engine}] * 2)
+    catalog['streams'].append({'tap_stream_id': 'public-unselected', 'metadata': []})
+
+    blockers, next_steps = native_to_iceberg.preflight_configuration({}, 'tap-mysql', catalog)
+
+    assert blockers == []
+    assert len(next_steps) == 1
+    assert 'with target_table_format: iceberg and iceberg_version: 3' in next_steps[0]
+
+
+@pytest.mark.parametrize('proof', [
+    None, {}, [], 'discovered', {'version': 1}, {'engine': 'mariadb'},
+    {'version': True, 'engine': 'mariadb'}, {'version': 1.0, 'engine': 'mariadb'},
+    {'version': '1', 'engine': 'mariadb'}, {'version': 2, 'engine': 'mariadb'},
+    {'version': 1, 'engine': 'postgres'}, {'version': 1, 'engine': None},
+])
+def test_native_mysql_preflight_refuses_partial_or_malformed_discovery(proof):
+    """A valid stream or a JSON property cannot stand in for proof covering the whole selection."""
+    catalog = _discovered_catalog([{'version': 1, 'engine': 'mariadb'}, proof])
+    catalog['streams'][0]['schema']['properties']['doc'] = {'type': ['object'], 'format': 'mariadb-json'}
+
+    blockers, _ = native_to_iceberg.preflight_configuration({}, 'tap-mysql', catalog)
+
+    assert len(blockers) == 1
+    assert 'every selected stream' in blockers[0]
+    assert 'Run import_config' in blockers[0]
+
+
+@pytest.mark.parametrize('catalog', [
+    {}, {'streams': []},
+    {'streams': [{'tap_stream_id': 'public-table', 'metadata': [
+        {'breadcrumb': [], 'metadata': {
+            'selected': False, 'mariadb-json-discovery': {'version': 1, 'engine': 'mysql'},
+        }},
+    ]}]},
+])
+def test_native_mysql_preflight_cannot_infer_discovery_from_an_empty_selection(catalog):
+    """No selected streams provides no discovery evidence."""
+    blockers, _ = native_to_iceberg.preflight_configuration({}, 'tap-mysql', catalog)
+
+    assert len(blockers) == 1
+
+
+def test_imported_iceberg_mysql_preflight_keeps_existing_readiness_contract():
+    """An imported v3 catalog keeps its established gate without a new discovery-proof requirement."""
+    settings = {'target_table_format': 'iceberg', 'iceberg_version': 3, 'data_flattening_max_level': 0}
+
+    assert native_to_iceberg.preflight_configuration(settings, 'tap-mysql') == ([], [])
+
+
+@pytest.mark.parametrize('strict_class', ['TEXT', 'VARIANT'])
+@pytest.mark.parametrize('mariadb_first', [True, False])
+def test_mariadb_json_shared_writer_policy_intersects_with_strict_writers(strict_class, mariadb_first):
+    """A compatible shared writer constrains the retained physical representation."""
+    writers = [_target('TABLE', {'DOCUMENT': MARIADB_JSON}), _target('TABLE', {'DOCUMENT': strict_class})]
+
+    merged, conflicts = native_to_iceberg.writer_classes_for_table(
+        'database.schema.table', writers if mariadb_first else list(reversed(writers)),
+    )
+
+    assert merged == {'DOCUMENT': strict_class}
+    assert conflicts == ()
+
+
+def test_mariadb_json_does_not_hide_conflicting_shared_writers():
+    """A permissive MariaDB writer does not reconcile incompatible TEXT and VARIANT writers."""
+    table = SnowflakeObjectName('DATABASE', 'SCHEMA', 'TABLE')
+    writers = [
+        ConversionTarget('maria-table', table, {'DOCUMENT': MARIADB_JSON}),
+        ConversionTarget('text-table', table, {'DOCUMENT': 'TEXT'}),
+        ConversionTarget('variant-table', table, {'DOCUMENT': 'VARIANT'}),
+    ]
+
+    _, conflicts = native_to_iceberg.writer_classes_for_table('database.schema.table', writers)
+
+    assert conflicts == ('Column DOCUMENT is TEXT for stream text-table but VARIANT for stream variant-table',)
+
+
+@pytest.mark.parametrize('version', [None, 2, True, '3'])
+def test_preflight_retains_explicit_iceberg_version_blockers(version):
+    """A CLI version must not hide incompatible settings already imported for Iceberg."""
+    settings = {'target_table_format': 'iceberg', 'iceberg_version': version}
+
+    blockers, next_steps = native_to_iceberg.preflight_configuration(settings, 'tap-postgres')
+
+    assert blockers == native_to_iceberg.tap_blockers(settings)
+    assert blockers
+    assert next_steps == []
+
+
+def test_native_preflight_retains_flattening_blockers():
+    """An advisory import step does not excuse incompatible writer column mappings."""
+    blockers, _ = native_to_iceberg.preflight_configuration({'data_flattening_max_level': 10}, 'tap-postgres')
+
+    assert blockers == ['data_flattening_max_level is 10; native_to_iceberg_conversion requires 0']
 
 
 def test_report_preflights_pending_native_tables(tmp_path):
@@ -854,3 +1028,39 @@ def test_report_lists_other_writers_that_block_a_table(tmp_path):
     assert reports[0].state == STATE_BLOCKED
     assert reports[0].blockers == ('also written by tap legacy',)
     assert json.loads(native_to_iceberg.render_preflight_report(reports, [], 'json'))['ready'] is False
+
+
+@pytest.mark.parametrize('physical_type', ['TEXT', 'VARIANT'])
+def test_transformed_mariadb_json_preflight_and_auto_conversion(tmp_path, physical_type):
+    """A TEXT-only transformation stops a VARIANT conversion before any manifest or DDL."""
+    snowflake = FakeSnowflake()
+    column = {
+        'COLUMN_NAME': 'DOCUMENT', 'DATA_TYPE': physical_type, 'IS_NULLABLE': 'YES',
+        'COMMENT': None, 'COLUMN_DEFAULT': None, 'IS_IDENTITY': 'NO',
+    }
+    snowflake.native_extra_columns = [column]
+    snowflake.companion_extra_columns = [{**column, 'CHARACTER_MAXIMUM_LENGTH': 134217728}]
+    targets = native_to_iceberg.tap_targets(
+        {'streams': [{'tap_stream_id': 'public-table', 'schema': {'properties': {
+            'document': {'type': ['null', 'object', 'array', 'string'], 'format': 'mariadb-json'},
+        }}}]},
+        FASTSYNC_CONFIG, False, ['public-table'],
+        transformation_config={'transformations': [
+            {'tap_stream_name': 'public-table', 'field_id': 'document', 'type': 'HASH'},
+        ]},
+    )
+
+    reports = _report(tmp_path, snowflake, targets)
+
+    assert bool(reports[0].blockers) == (physical_type == 'VARIANT')
+    with patch.object(native_to_iceberg, 'SnowflakeConversionQueryAdapter', return_value=snowflake):
+        if physical_type == 'VARIANT':
+            with pytest.raises(NativeToIcebergConversionException, match='maps it to TEXT'):
+                native_to_iceberg.convert_tap_tables({}, str(tmp_path), targets)
+        else:
+            native_to_iceberg.convert_tap_tables({}, str(tmp_path), targets)
+    if physical_type == 'VARIANT':
+        assert not list(tmp_path.iterdir())
+        assert not any(sql.startswith(('CREATE', 'ALTER', 'GRANT')) for sql, _, _ in snowflake.queries)
+    else:
+        assert snowflake.formats['TABLE'] == 'iceberg'

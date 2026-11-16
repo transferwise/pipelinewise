@@ -2,16 +2,19 @@ import decimal
 import os
 import uuid
 from datetime import datetime
+from pathlib import Path
 from random import randint
 
 import bson
 import pytest
 from bson import Timestamp
+from pipelinewise.cli.utils import load_json_with_env_vars
 from pipelinewise.fastsync import mysql_to_postgres
 
 from .helpers import tasks
 from .helpers import assertions
-from .helpers.env import E2EEnv
+from .helpers.env import CONFIG_DIR, E2EEnv
+from .helpers.legacy_transformations import assert_apostrophe_conditions
 
 DIR = os.path.dirname(__file__)
 TAP_MARIADB_ID = 'mariadb_to_pg'
@@ -95,6 +98,12 @@ class TestTargetPostgres:
 
         assertions.assert_command_success(return_code, stdout, stderr)
         assertions.assert_profiling_stats_files_created(stdout, 'import_project')
+
+    @pytest.mark.dependency(depends=['import_config'])
+    def test_legacy_transformation_conditions_with_apostrophes(self):
+        """PostgreSQL executes legacy equals/regex rules containing single quotes."""
+        config = load_json_with_env_vars(Path(CONFIG_DIR) / TARGET_ID / 'config.json')
+        assert_apostrophe_conditions(config, snowflake=False)
 
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_mariadb_to_pg(self, tap_mariadb_id=TAP_MARIADB_ID):

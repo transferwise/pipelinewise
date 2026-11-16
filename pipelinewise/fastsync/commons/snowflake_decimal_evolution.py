@@ -1,13 +1,15 @@
 """Plan resumable decimal column versioning for managed Iceberg PartialSync."""
 
 from dataclasses import dataclass, replace
+from collections.abc import Iterable
 
 from .snowflake_column_versioning import (
     has_column_versions, is_decimal_version_change, is_retained_legacy_decimal_float, is_versioned_column,
     versioned_column_name,
 )
-from .snowflake_iceberg_model import ColumnVersionRename, IcebergColumn, quote_identifier
+from .snowflake_iceberg_model import ColumnVersionRename, IcebergColumn, IcebergTableSpec, quote_identifier
 from .snowflake_iceberg_recovery import RecoveryManifestError, TableCompatibilityError
+from .snowflake_types import canonical_native_type
 
 
 @dataclass(frozen=True)
@@ -116,6 +118,28 @@ def with_retained_decimal_types(
                 actual_columns[column.name].data_type,
                 column.data_type,
             )
+        )
+        else column
+        for column in expected.columns
+    )
+    return replace(expected, columns=columns)
+
+
+def with_retained_mariadb_json_types(
+    expected: IcebergTableSpec, actual: IcebergTableSpec | None, mariadb_json_columns: Iterable[str] = (),
+) -> IcebergTableSpec:
+    """Retain established TEXT only for recognized MariaDB JSON aliases."""
+    if actual is None or not mariadb_json_columns:
+        return expected
+    json_columns = set(mariadb_json_columns)
+    actual_columns = {column.name: column for column in actual.columns}
+    columns = tuple(
+        replace(column, data_type=actual_columns[column.name].data_type)
+        if (
+            column.name in json_columns
+            and column.name in actual_columns
+            and column.data_type == 'VARIANT'
+            and canonical_native_type(actual_columns[column.name].data_type).startswith('VARCHAR(')
         )
         else column
         for column in expected.columns

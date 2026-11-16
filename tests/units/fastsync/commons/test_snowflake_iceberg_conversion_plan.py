@@ -197,6 +197,28 @@ def test_plan_records_catalog_text_and_variant_columns():
     assert targets[0].writer_types == {'NOTE': plan.TEXT, 'ATTRIBUTES': plan.VARIANT}
 
 
+@pytest.mark.parametrize('planner', [plan.plan_conversion_targets, plan.plan_written_tables])
+def test_plan_retains_mariadb_json_existing_column_policy(planner):
+    """Only marked MariaDB JSON accepts existing TEXT as well as the new-column VARIANT type."""
+    catalog = {'streams': [_stream('public-orders', {
+        'document': {'type': ['null', 'object', 'array', 'string'], 'format': 'mariadb-json'},
+        'other': {'type': ['null', 'object']},
+    })]}
+
+    targets = planner(catalog, TARGET_CONFIG, ['public-orders'], True)
+
+    assert targets[0].writer_types == {'DOCUMENT': plan.MARIADB_JSON, 'OTHER': plan.VARIANT}
+    assert plan.singer_text_variant_class(catalog['streams'][0]['schema']['properties']['document']) == plan.VARIANT
+
+
+@pytest.mark.parametrize('physical_type', ['TEXT', 'VARCHAR', 'VARIANT'])
+def test_mariadb_json_allows_existing_text_or_variant(physical_type):
+    """Conversion preserves a MariaDB JSON column's established physical representation."""
+    assert plan.text_variant_blockers(
+        [SimpleNamespace(name='DOCUMENT', data_type=physical_type)], {'DOCUMENT': plan.MARIADB_JSON},
+    ) == []
+
+
 def test_plan_records_shortened_column_names_for_long_properties():
     """A property name of 255 or more characters is checked under the column the connector writes."""
     long_name = 'very_long_property_name_' * 12
@@ -230,9 +252,13 @@ def test_text_variant_blockers_compare_native_classes():
 
     assert plan.text_variant_blockers(columns, writer_types) == [
         'Column ATTRIBUTES is TEXT but the tap catalog maps it to VARIANT; '
-        'the Iceberg writers would refuse the converted table',
+        'the Iceberg writers would refuse the converted table. '
+        'See https://transferwise.github.io/pipelinewise/connectors/targets/'
+        'snowflake_iceberg.html#clear-a-text-variant-blocker',
         'Column PAYLOAD is VARIANT but the tap catalog maps it to TEXT; '
-        'the Iceberg writers would refuse the converted table',
+        'the Iceberg writers would refuse the converted table. '
+        'See https://transferwise.github.io/pipelinewise/connectors/targets/'
+        'snowflake_iceberg.html#clear-a-text-variant-blocker',
     ]
 
 
@@ -535,3 +561,48 @@ def test_interrupted_fastsync_publication_can_resume(tmp_path, listing, expected
     )
 
     assert classified[0].state == expected
+
+
+@pytest.mark.parametrize('planner', [plan.plan_conversion_targets, plan.plan_written_tables])
+@pytest.mark.parametrize(('rule', 'expected'), [
+    ({'type': 'HASH'}, plan.TEXT),
+    ({'type': 'HASH-SKIP-FIRST-2'}, plan.TEXT),
+    ({'type': 'MASK-HIDDEN'}, plan.TEXT),
+    ({'type': 'MASK-STRING-SKIP-ENDS-2'}, plan.TEXT),
+    ({'type': 'SET-NULL'}, plan.MARIADB_JSON),
+    ({'type': 'SET-NULL', 'when': [{'column': 'document', 'equals': None}]}, plan.MARIADB_JSON),
+    ({'type': 'SET-NULL', 'when': [{'column': 'document', 'equals': ''}]}, plan.TEXT),
+    ({'type': 'SET-NULL', 'when': [{'column': 'document', 'equals': False}]}, plan.TEXT),
+    ({'type': 'SET-NULL', 'when': [{'column': 'document', 'regex_match': '.*'}]}, plan.TEXT),
+])
+def test_conversion_plans_mariadb_json_transformation_text_requirements(planner, rule, expected):
+    """Both own and shared writers narrow JSON compatibility only when runtime requires TEXT."""
+    catalog = {'streams': [_stream('public-orders', {
+        'document': {'type': ['null', 'object', 'array', 'string'], 'format': 'mariadb-json'},
+    })]}
+    transformations = {'transformations': [{'tap_stream_name': 'public-orders', 'field_id': 'document', **rule}]}
+
+    target = planner(catalog, TARGET_CONFIG, ['public-orders'], True, transformations)[0]
+
+    assert target.writer_types == {'DOCUMENT': expected}
+    assert not plan.text_variant_blockers([SimpleNamespace(name='DOCUMENT', data_type='TEXT')], target.writer_types)
+    blockers = plan.text_variant_blockers([SimpleNamespace(name='DOCUMENT', data_type='VARIANT')], target.writer_types)
+    assert bool(blockers) == (expected == plan.TEXT)
+    assert catalog['streams'][0]['schema']['properties']['document']['format'] == 'mariadb-json'
+
+
+def test_conversion_text_requirement_tracks_condition_column_and_exact_stream():
+    """Condition columns require TEXT even when the transformed field is another column."""
+    catalog = {'streams': [_stream('public-orders', {
+        name: {'type': ['null', 'object', 'array', 'string'], 'format': 'mariadb-json'}
+        for name in ('document', 'untouched')
+    })]}
+    transformations = {'transformations': [
+        {'tap_stream_name': 'public-orders', 'field_id': 'ordinary', 'type': 'SET-NULL',
+         'when': [{'column': 'document', 'equals': '{}'}]},
+        {'tap_stream_name': 'public-other', 'field_id': 'untouched', 'type': 'HASH'},
+    ]}
+
+    target = plan.plan_conversion_targets(catalog, TARGET_CONFIG, ['public-orders'], False, transformations)[0]
+
+    assert target.writer_types == {'DOCUMENT': plan.TEXT, 'UNTOUCHED': plan.MARIADB_JSON}

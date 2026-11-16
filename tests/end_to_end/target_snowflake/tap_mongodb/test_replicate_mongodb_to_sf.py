@@ -1,10 +1,14 @@
 import decimal
 import uuid
 from datetime import datetime
+from pathlib import Path
 from random import randint
 
 import bson
+from pipelinewise.cli.utils import load_json_with_env_vars
 from tests.end_to_end.helpers import assertions
+from tests.end_to_end.helpers.legacy_transformations import assert_apostrophe_conditions
+from tests.end_to_end.target_snowflake import CONFIG_DIR
 from tests.end_to_end.target_snowflake.tap_mongodb import TapMongoDB
 
 TAP_ID = 'mongo_to_sf'
@@ -61,6 +65,8 @@ class TestReplicateMongoDBToSF(TapMongoDB):
         assertions.assert_run_tap_success(
             self.tap_id, self.target_id, ['fastsync', 'singer']
         )
+        config = load_json_with_env_vars(Path(CONFIG_DIR) / self.target_id / 'config.json')
+        assert_apostrophe_conditions(config, snowflake=True)
         self.assert_columns_exist('listings')
         self.assert_columns_exist('my_collection')
         self.assert_columns_exist('all_datatypes')

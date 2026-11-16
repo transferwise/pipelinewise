@@ -1,3 +1,31 @@
+0.103.0 (2026-11-17)
+--------------------
+
+- Map new MariaDB JSON columns to VARIANT in Snowflake native and Iceberg tables.
+  Keep existing TEXT columns and their hash/mask rules during Singer replication
+  and PartialSync. Preserve existing JSON column types during manual or automatic
+  native-to-Iceberg conversion. FullSync rebuilds use VARIANT.
+- Block native-to-Iceberg conversion when a MariaDB JSON transformation needs
+  TEXT but the existing column is VARIANT. Check every imported writer before
+  copying the table.
+- Restore Singer's handling of NULL for nullable non-JSON transformation targets
+  and regex conditions in rules involving MariaDB JSON. Invalid patterns still
+  stop replication.
+- Allow conversion preflight before a tap is configured for Iceberg.
+  MySQL/MariaDB taps first need a fresh `import_config`. Automatic conversion
+  still requires imported Iceberg settings.
+- Remove NULL-primary-key data scans from preflight and both conversion paths.
+  Keep primary-key metadata validation and time/timestamp precision checks.
+- Improve conversion errors with documentation links. Clarify the existing
+  `--conversion-warehouse` option and remove outdated conversion-audit instructions.
+- Escape apostrophes in FastSync transformation conditions for PostgreSQL
+  targets and MongoDB-to-Snowflake loads. Also escape trailing backslashes on
+  the Snowflake route so equality and regex rules cannot alter the predicate.
+- Finish pending MariaDB Iceberg syncs that still need source re-export before
+  upgrading. Already-staged attempts retain their saved types. After upgrading,
+  run `import_config` to refresh JSON discovery. See
+  [recovery](docs/connectors/targets/snowflake_iceberg.rst#snowflake-iceberg-recovery).
+
 0.102.4 (2026-11-12)
 --------------------
 - Fixed an issue in `tap-postgres` with replication slot names exceeding 63 characters, 

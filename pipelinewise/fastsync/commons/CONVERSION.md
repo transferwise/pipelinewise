@@ -60,3 +60,13 @@ imported tap splits into child columns.
 `--preflight-only` takes no lock, manifest or DDL. `fast_sync` never converts;
 it refuses native targets before resetting a source slot, but may rebuild a
 missing primary beside leftover companions.
+
+Preflight treats a native tap's Iceberg configuration as next steps, without
+requiring `native_to_iceberg_conversion`. Native `tap-mysql` catalogs still block
+readiness until every selected stream has current JSON-discovery evidence.
+Discovery can run with native settings. Recognized MariaDB JSON writers accept
+existing TEXT or VARIANT unless an imported transformation requires TEXT.
+Intersect the permitted classes of every writer and preserve the physical class
+through conversion. Generic class conflicts remain blockers. See
+[the JSON contract](MARIADB_JSON.md).
+Automatic conversion retains the imported-configuration and catalog-freshness gates.

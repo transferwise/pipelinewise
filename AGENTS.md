@@ -18,19 +18,35 @@ rebuild environments, restart shared services or reset fixtures; coordinate or
 isolate disruptive work. Read-only reviews do not trigger implementation gates.
 If told not to run anything, limit work to file reads and text searches.
 
-## Agent roles
+## Model selection and delegation
 
-- Prefer GPT-6 Astra for planning, architecture decisions and orchestration
-  when a task warrants multiple agents.
-- Prefer GPT-6.1 Sol for scoped implementation, testing and independent code
-  review. Use a separate reviewer from the implementer.
-- Give independent reviewers a fresh conversation context (`fork_turns: "none"`
-  where available), requirements, the proposal or diff, and relevant source
-  references. Let them form their own conclusions without the author's transcript.
-- Delegate bounded tasks with context, file ownership and acceptance criteria;
-  coordinate edits to shared files. Keep small tasks with one agent.
-- These are preferences. Explicit user choices and model availability take
-  precedence; disclose any substitute.
+- Use GPT-6.1 Sol (`gpt-6.1-sol`) for most work: implementation, codebase
+  exploration, routine debugging, refactoring, tests, documentation and ordinary
+  code review. Use Sol for subagents by default.
+- Delegate a focused task to GPT-6 Astra (`gpt-6-astra`) when:
+  - An architecture decision has competing constraints or consequences across
+    several components.
+  - A difficult failure remains unexplained after substantive investigation, or
+    the evidence supports conflicting explanations.
+  - A change needs careful reasoning about concurrency, transactions,
+    replication, recovery, security boundaries or possible data loss.
+  - Research must reconcile conflicting sources or substantial uncertainty for
+    a consequential recommendation.
+- Task length or file count alone does not justify Astra. State briefly which
+  difficult question Astra will resolve. Provide relevant evidence, constraints
+  and previous attempts; request concrete conclusions, supporting references
+  and remaining uncertainty. Keep its assignment bounded. Use Sol to implement,
+  integrate and validate the resulting changes.
+- This policy authorizes useful subagent delegation. Select the model explicitly
+  where supported. If the requested model is unavailable, disclose that
+  limitation rather than claiming to have used it. Explicit user choices take
+  precedence.
+- Delegate other bounded tasks with context, file ownership and acceptance
+  criteria; coordinate edits to shared files. Keep small tasks with one agent.
+  Use a separate reviewer from the implementer. Give independent reviewers a
+  fresh context (`fork_turns: "none"` where available), the requirements, the
+  proposal or diff, and relevant source references. Let them form their own
+  conclusions without the author's transcript.
 
 ## Architecture and environment
 
@@ -165,9 +181,11 @@ alone do not establish a Medium issue. If there are no findings, say so.
   a ticket counts only if the bot can fetch its description. Recheck the rendered
   description after creating or updating the PR.
 - Write docs/CHANGELOG in plain language: short sentences, one idea each,
-  behaviour/default/operator action first. CHANGELOG bullets start with verbs
-  and cover user-visible outcomes and upgrade steps. Link detailed rules;
-  retain exact limits, boundaries and recovery requirements when shortening.
+  behaviour/default/operator action first. Keep CHANGELOG bullets compact, with
+  no blank lines between them. Start each with a verb and focus on user-visible
+  outcomes. Cover one topic per bullet; combine related minor documentation
+  changes. Put upgrade/recovery instructions in a separate bullet. Link detailed
+  rules; retain exact limits, boundaries and recovery requirements when shortening.
 - Before PR creation/push, reconcile the whole branch diff with its CHANGELOG
   entry; stop if it omits/misstates changes or claims absent behaviour. Date
   that release today, never `TBD` or an earlier date, and link its entry in the PR.

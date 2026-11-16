@@ -111,6 +111,29 @@ def sql_get_columns_postgres(schemas: list) -> str:
     ORDER BY table_name"""
 
 
+def sql_get_columns_mariadb_to_snowflake(schemas: list[str]) -> str:
+    """Compare MariaDB JSON aliases with Snowflake's new-column JSON mapping."""
+    sql_schemas = ', '.join(f"'{schema}'" for schema in schemas)
+    return f"""
+    SELECT c.table_name, GROUP_CONCAT(CONCAT(c.column_name, ':',
+             CASE WHEN c.data_type = 'longtext' AND EXISTS (
+                 SELECT 1 FROM information_schema.table_constraints tc
+                 JOIN information_schema.check_constraints cc
+                   ON cc.constraint_schema = tc.constraint_schema
+                  AND cc.constraint_name = tc.constraint_name
+                  AND cc.table_name = tc.table_name
+                 WHERE tc.table_schema = c.table_schema AND tc.table_name = c.table_name
+                   AND tc.constraint_type = 'CHECK'
+                   AND LOWER(TRIM(cc.check_clause)) =
+                       CONCAT('json_valid(`', REPLACE(LOWER(c.column_name), '`', '``'), '`)')
+             ) THEN 'json' ELSE c.data_type END,
+             ':', c.column_type) ORDER BY c.column_name SEPARATOR ';')
+      FROM information_schema.columns c
+     WHERE c.table_schema IN ({sql_schemas})
+     GROUP BY c.table_name
+     ORDER BY c.table_name"""
+
+
 def sql_get_columns_snowflake(schemas: list) -> str:
     """Generates an SQL command that gives the list of columns of every table
     in a specific schema from a snowflake database"""

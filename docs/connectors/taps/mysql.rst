@@ -152,7 +152,7 @@ Operational notes
 - Singer, FullSync, and PartialSync use an explicit ``engine`` value when
   present and otherwise detect the connected server. The resolved engine is
   used consistently for session defaults, GTID handling, binlog status, and
-  managed Iceberg v3 JSON aliases. MariaDB sessions set
+  Snowflake JSON-alias mapping. MariaDB sessions set
   ``max_statement_time=0``; MySQL uses
   ``max_execution_time=0`` instead. MySQL's limit is in milliseconds and
   applies to read-only SELECT statements; MariaDB's is in seconds.
@@ -249,12 +249,12 @@ Operational notes
   pending recovery before replacing or repointing the source server.
 - Snowflake Singer, FullSync, and PartialSync can target managed Iceberg v3 with
   explicit tap-level configuration. See :ref:`snowflake_iceberg`.
-- On a v3 route, MariaDB's generated ``JSON_VALID`` constraint identifies its
-  ``JSON``-alias ``LONGTEXT`` columns for ``VARIANT`` loading. Plain
-  ``LONGTEXT`` and native routes remain strings.
-  Object, array, string, number, Boolean, and null JSON roots are carried as
-  validated JSON text and restored as ``VARIANT``. JSON null remains distinct
-  from SQL ``NULL``.
+- MariaDB's generated ``JSON_VALID`` constraint identifies its ``JSON``-alias
+  ``LONGTEXT`` columns. New Snowflake native and Iceberg JSON columns use
+  ``VARIANT``; existing TEXT columns keep their type during Singer replication,
+  PartialSync, and native-to-Iceberg conversion. FullSync rebuilds use VARIANT.
+  Plain ``LONGTEXT`` stays text. See :ref:`mariadb_json_mapping` for discovery
+  refresh and compatibility rules.
 - Use :ref:`troubleshooting` for missing-binlog and packet-size failures.
 - Primary-key value changes are replicated as deletion of the previous key and
   insertion of the new key. After changing the primary-key definition itself,

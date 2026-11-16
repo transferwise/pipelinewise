@@ -271,12 +271,13 @@ def assert_snowflake_sync_table_native_workflow(
     )
     if source_type == 'mysql':
         assert tap.method_calls == [
+            call.set_mariadb_json_aliases_enabled(True),
             call.open_connections(),
             expected_copy_call,
             call.map_column_types_to_target(table),
             call.close_connections(),
             call.close_connections(silent=True),
-        ]
+        ], tap.method_calls
         source_timeline = [
             'source.open', 'bookmark', 'source.copy', 'source.map', 'source.close',
             'getsize', 'getsize',

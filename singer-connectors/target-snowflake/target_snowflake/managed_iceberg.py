@@ -852,7 +852,21 @@ def iceberg_text_variant_mismatch_reason(current_type, iceberg_version):
 
 def column_clause(name, schema_property, is_iceberg_table=False, iceberg_version=None, is_key=False, source=None):
     """Generate a DDL column definition."""
+    validate_mariadb_json_text_column(name, schema_property)
     return f'{safe_column_name(name)} {column_type(schema_property, is_iceberg_table, iceberg_version, is_key, source)}'
+
+
+def validate_mariadb_json_text_column(
+    name: str, schema_property: dict, current_type: str | None = None,
+) -> None:
+    """Allow transformed MariaDB JSON text only in a preexisting string column."""
+    if schema_property.get('format') != 'mariadb-json-text':
+        return
+    if current_type is None or _base_snowflake_type(current_type) not in SNOWFLAKE_STRING_TYPES:
+        raise TableFormatMismatchException(
+            f'Column {name.upper()} requires an existing Snowflake TEXT column for a MariaDB JSON '
+            'string transformation; preserve legacy TEXT or choose a compatible transformation before FullSync'
+        )
 
 
 def safe_column_name(name):
@@ -971,6 +985,7 @@ def plan_column_changes(
     retained_column_types = []
     for name, properties_schema in flatten_schema.items():
         name_upper = name.upper()
+        validate_mariadb_json_text_column(name, properties_schema, normalized_existing_types.get(name_upper))
         if name_upper not in normalized_existing_types:
             additions.append(column_clause(
                 name,
@@ -983,6 +998,13 @@ def plan_column_changes(
             continue
 
         current_type = normalized_existing_types[name_upper]
+        if (
+            properties_schema.get('format') in ('mariadb-json', 'mariadb-json-text')
+            and _base_snowflake_type(current_type) in SNOWFLAKE_STRING_TYPES
+        ):
+            # Discovery now recognizes JSON aliases; keep their historical text representation until a rebuild.
+            retained_column_types.append((name_upper, current_type))
+            continue
         if (
             is_decimal_schema(properties_schema)
             and (not version_legacy_float_columns or name_upper in primary_keys)

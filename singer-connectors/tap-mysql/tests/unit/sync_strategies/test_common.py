@@ -26,6 +26,24 @@ def _mariadb_json_transport_case():
 
 class TestCommonSyncStrategyHelpers:
 
+    @pytest.mark.parametrize('extractor', ['sql', 'binlog'])
+    @pytest.mark.parametrize('value', [' \n { "key" : [null, true] } \t', ' null ', ' " spaced " ', ' 42 '])
+    def test_mariadb_json_transport_preserves_serialized_whitespace(self, extractor, value):
+        catalog = CatalogEntry(
+            stream='stream',
+            schema=Schema.from_dict({
+                'properties': {'value': {'type': list(common.MARIADB_JSON_ROOT_TYPES), 'format': 'mariadb-json'}},
+            }),
+        )
+        extracted_at = datetime.datetime.now(datetime.timezone.utc)
+        if extractor == 'sql':
+            message = common.row_to_singer_record(catalog, 1, (value,), ['value'], extracted_at)
+        else:
+            message = binlog.row_to_singer_record(
+                catalog, 1, {'value': FIELD_TYPE.BLOB}, {'value': value.encode('utf-8')}, extracted_at,
+            )
+        assert message.record['value'] == value
+
     @pytest.mark.parametrize('value,expected', [
         (datetime.timedelta(hours=8, minutes=30), '08:30:00'),
         (datetime.timedelta(seconds=1, microseconds=123456), '00:00:01.123456'),

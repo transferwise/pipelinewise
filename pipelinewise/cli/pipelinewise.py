@@ -1735,7 +1735,10 @@ class PipelineWise:
         fastsync_capable = resolve_fastsync_capabilities(
             self.tap['type'], self.target['type'], Config.TABLE_FORMAT_ICEBERG,
         ).full_sync
-        targets = native_to_iceberg.tap_targets(catalog, target_config, fastsync_capable, stream_ids)
+        targets = native_to_iceberg.tap_targets(
+            catalog, target_config, fastsync_capable, stream_ids,
+            transformation_config=utils.load_json(self.tap['files']['transformation']),
+        )
         native_to_iceberg.convert_tap_tables(
             target_config,
             self.get_target_dir(self.target['id']),
@@ -1838,7 +1841,10 @@ class PipelineWise:
             catalog = utils.load_json(files['properties'])
             catalog = catalog if isinstance(catalog, dict) else {}
             writers = native_to_iceberg.other_tap_writers(
-                label, plan_written_tables(catalog, config, stream_ids, fastsync_capable), targets,
+                label, plan_written_tables(
+                    catalog, config, stream_ids, fastsync_capable,
+                    transformation_config=utils.load_json(files['transformation']),
+                ), targets,
             )
         return writers
 
@@ -2671,6 +2677,7 @@ class PipelineWise:
             ).full_sync
             targets.extend(native_to_iceberg.tap_targets(
                 catalog, {**target_config, **inheritable_config}, fastsync_capable,
+                transformation_config=utils.load_json(files['transformation']),
             ))
         return targets
 
@@ -2679,6 +2686,7 @@ class PipelineWise:
         from pipelinewise.cli import native_to_iceberg
 
         blockers = []
+        next_steps = []
         conversion_warehouse = getattr(self.args, 'conversion_warehouse', None)
         if hasattr(self, 'tap'):
             conversion = self.tap.get(Config.NATIVE_TO_ICEBERG_CONVERSION) or {}
@@ -2690,14 +2698,19 @@ class PipelineWise:
             fastsync_capable = resolve_fastsync_capabilities(
                 self.tap['type'], self.target['type'], Config.TABLE_FORMAT_ICEBERG,
             ).full_sync
-            targets = native_to_iceberg.tap_targets(catalog, target_config, fastsync_capable)
-            blockers = native_to_iceberg.tap_blockers(target_config) + self._stale_catalog_reasons()
+            targets = native_to_iceberg.tap_targets(
+                catalog, target_config, fastsync_capable,
+                transformation_config=utils.load_json(self.tap['files']['transformation']),
+            )
+            blockers, next_steps = native_to_iceberg.preflight_configuration(target_config, self.tap['type'], catalog)
+            blockers += self._stale_catalog_reasons()
             other_writers = self._other_writers(target_config, targets)
         else:
             targets = native_to_iceberg.table_targets(
                 self.args.table, self._imported_tap_targets(target_config),
             )
             other_writers = []
+        target_config = {**target_config, 'iceberg_version': self.args.iceberg_version}
         reports = native_to_iceberg.preflight_report(
             target_config,
             self.get_target_dir(self.target['id']),
@@ -2706,7 +2719,7 @@ class PipelineWise:
             other_writers=other_writers,
         )
         return native_to_iceberg.render_preflight_report(
-            reports, blockers, self.args.output_format,
+            reports, blockers, self.args.output_format, next_steps,
         )
 
     def partial_sync_table(self):

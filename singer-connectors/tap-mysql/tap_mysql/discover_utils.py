@@ -112,14 +112,33 @@ def integer_schema(column, inclusion):
 
 
 def mariadb_json_aliases_enabled(config: Dict) -> bool:
-    """Return whether MariaDB JSON aliases should use Iceberg v3 semantics."""
-    iceberg_version = config.get('iceberg_version')
+    """Return whether resolved MariaDB aliases should use Snowflake JSON semantics."""
     return (
         str(config.get('engine', '')).lower() == 'mariadb'
-        and config.get('target_table_format') == 'iceberg'
+        and bool(json_discovery_options(config))
+    )
+
+
+def json_discovery_options(config: dict) -> dict[str, object]:
+    """Build JSON discovery options for Snowflake and older explicit-v3 runtimes."""
+    iceberg_version = config.get('iceberg_version')
+    iceberg_v3 = (
+        config.get('target_table_format') == 'iceberg'
         and isinstance(iceberg_version, int)
         and iceberg_version == 3
     )
+    supported_format = config.get('target_table_format') in (None, 'native') or iceberg_v3
+    snowflake_json = config.get('json_target') == 'snowflake' and supported_format
+    legacy_iceberg_json = 'json_target' not in config and iceberg_v3
+    if not (snowflake_json or legacy_iceberg_json):
+        return {}
+    engine = str(config.get('engine', '')).lower()
+    if engine not in ('mysql', 'mariadb'):
+        raise ValueError('Snowflake JSON discovery requires a resolved MySQL or MariaDB source engine.')
+    options: dict[str, object] = {'json_discovery_engine': engine}
+    if engine == 'mariadb':
+        options['detect_json_aliases'] = True
+    return options
 
 
 def should_run_discovery(column_names: Set[str], md_map: Dict[Tuple, Dict]) -> bool:
@@ -164,8 +183,12 @@ def discover_catalog(
         dbs: str = None,
         tables: Optional[str] = None,
         detect_json_aliases: bool = False,
-        decimal_target: Optional[str] = None):
+        decimal_target: Optional[str] = None,
+        json_discovery_engine: str | None = None):
     """Returns a Catalog describing the structure of the database."""
+
+    if json_discovery_engine is not None and json_discovery_engine not in ('mysql', 'mariadb'):
+        raise ValueError('JSON discovery evidence requires a resolved MySQL or MariaDB source engine.')
 
     if dbs:
         filter_dbs_clause = ",".join([f"'{db_name}'" for db_name in dbs.split(",")])
@@ -195,10 +218,11 @@ def discover_catalog(
                            JOIN information_schema.check_constraints AS cc
                              ON cc.constraint_schema = tc.constraint_schema
                             AND cc.constraint_name = tc.constraint_name
+                            AND cc.table_name = tc.table_name
                            WHERE tc.table_schema = c.table_schema
                              AND tc.table_name = c.table_name
                              AND tc.constraint_type = 'CHECK'
-                             AND REPLACE(LOWER(cc.check_clause), ' ', '') =
+                             AND LOWER(TRIM(cc.check_clause)) =
                                  CONCAT('json_valid(`',
                                         REPLACE(LOWER(c.column_name), '`', '``'),
                                         '`)')
@@ -262,6 +286,10 @@ def discover_catalog(
                                         (),
                                         'database-name',
                                         table_schema)
+                if json_discovery_engine is not None:
+                    md_map = metadata.write(
+                        md_map, (), 'mariadb-json-discovery', {'version': 1, 'engine': json_discovery_engine},
+                    )
 
                 is_view = table_info[table_schema][table_name]['is_view']
 
