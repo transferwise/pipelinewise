@@ -2,8 +2,7 @@
 --------------------
 - Escape quotes in FastSync transformation conditions so names and regular
   expressions containing apostrophes do not abort MySQL-to-PostgreSQL syncs.
-  Preserve literal backslashes in Snowflake conditions. No configuration or
-  state migration is required.
+  No configuration or state migration is required.
 
 0.102.4 (2026-11-12)
 --------------------

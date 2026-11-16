@@ -1,8 +1,6 @@
 from enum import unique, Enum
 from typing import List, Dict, Optional
 
-from pipelinewise.fastsync.commons.snowflake_sql_utils import sql_string_literal
-
 
 @unique
 class TransformationType(Enum):
@@ -184,14 +182,14 @@ class TransformationHelper:
                 else:
                     operator = '='
                     value = (
-                        cls.__string_literal(condition['equals'], sql_flavor)
+                        cls.__string_literal(condition['equals'])
                         if isinstance(condition['equals'], str)
                         else condition['equals']
                     )
 
             elif 'regex_match' in condition:
 
-                value = cls.__string_literal(condition['regex_match'], sql_flavor)
+                value = cls.__string_literal(condition['regex_match'])
 
                 if sql_flavor == SQLFlavor.SNOWFLAKE:
                     operator = 'REGEXP'
@@ -215,9 +213,7 @@ class TransformationHelper:
         return ' AND '.join(conditions)
 
     @staticmethod
-    def __string_literal(value: str, sql_flavor: SQLFlavor) -> str:
-        if sql_flavor == SQLFlavor.SNOWFLAKE:
-            return sql_string_literal(value)
+    def __string_literal(value: str) -> str:
         return "'" + value.replace("'", "''") + "'"
 
     @classmethod

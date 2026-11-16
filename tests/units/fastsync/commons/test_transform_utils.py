@@ -31,22 +31,6 @@ class TestTransformHelper(unittest.TestCase):
                     )
                     self.assertEqual(result['conditions'], f'("{column}" {sql_operator} \'O\'\'Brien\')')
 
-    def test_condition_literals_preserve_backslashes(self):
-        for flavor in SQLFlavor:
-            for operator in ('equals', 'regex_match'):
-                with self.subTest(flavor=flavor, operator=operator):
-                    transformations = [{
-                        'tap_stream_name': 'public-people',
-                        'field_id': 'name',
-                        'type': 'SET-NULL',
-                        'when': [{'column': 'name', operator: "O\\'Brien"}],
-                    }]
-                    result = TransformationHelper.get_trans_in_sql_flavor(
-                        'public-people', transformations, flavor
-                    )[0]
-                    literal = "'O\\\\''Brien'" if flavor == SQLFlavor.SNOWFLAKE else "'O\\''Brien'"
-                    self.assertTrue(result['conditions'].endswith(f'{literal})'))
-
     def test_postgres_equals_updates_only_matching_row(self):
         transformations = [{
             'tap_stream_name': 'public-people',
@@ -373,7 +357,7 @@ class TestTransformHelper(unittest.TestCase):
                 {
                     'trans': '"COL_6" = CONCAT(SUBSTRING("COL_6", 1, 5), SHA2(SUBSTRING("COL_6", 5 + 1), 256))',
                     'conditions': '("COL_1" = 30) AND ("COL_2" '
-                    'REGEXP \'[0-9]{3}\\\\.[0-9]{3}\')',
+                    'REGEXP \'[0-9]{3}\\.[0-9]{3}\')',
                 },
                 {
                     'trans': '"COL_7" = CASE WHEN LENGTH("COL_7") > 2 * 3 THEN '
@@ -381,7 +365,7 @@ class TestTransformHelper(unittest.TestCase):
                     'SUBSTRING("COL_7", LENGTH("COL_7")-3+1, 3)) '
                     'ELSE REPEAT(\'*\', LENGTH("COL_7")) END',
                     'conditions': '("COL_1" = 30) AND ("COL_2" '
-                    'REGEXP \'[0-9]{3}\\\\.[0-9]{3}\') AND ("COL_4" IS NULL)',
+                    'REGEXP \'[0-9]{3}\\.[0-9]{3}\') AND ("COL_4" IS NULL)',
                 },
             ],
         )
