@@ -1,3 +1,10 @@
+0.102.5 (2026-11-16)
+--------------------
+- Escape quotes in FastSync transformation conditions so names and regular
+  expressions containing apostrophes do not abort MySQL-to-PostgreSQL syncs.
+  Preserve literal backslashes in Snowflake conditions. No configuration or
+  state migration is required.
+
 0.102.4 (2026-11-12)
 --------------------
 - Fixed an issue in `tap-postgres` with replication slot names exceeding 63 characters, 
