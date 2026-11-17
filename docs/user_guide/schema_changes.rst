@@ -79,7 +79,10 @@ v3 tables. Ordinary ``LONGTEXT`` stays text. Other destinations keep their
 existing mapping.
 
 Run ``import_config`` after upgrading to refresh MariaDB discovery and enable
-this mapping for native Snowflake taps. Existing columns follow these rules:
+this mapping for native Snowflake taps. Until then, both FastSync and Singer
+keep the earlier text mapping, including during a resync. Older Iceberg v3
+configs without the new setting keep their existing JSON mapping.
+Existing columns follow these rules:
 
 .. list-table:: MariaDB JSON columns in Snowflake
    :header-rows: 1

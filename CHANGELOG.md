@@ -1,10 +1,11 @@
 0.103.0 (2026-11-17)
 --------------------
 
-- Map new MariaDB JSON columns to VARIANT in Snowflake native and Iceberg tables.
-  Keep existing TEXT columns and their hash/mask rules during Singer replication
-  and PartialSync. Preserve existing JSON column types during manual or automatic
-  native-to-Iceberg conversion. FullSync rebuilds use VARIANT.
+- After `import_config` updates FastSync and Singer, map new MariaDB JSON columns
+  to VARIANT in Snowflake native and Iceberg tables. Until then, resyncs keep
+  the earlier TEXT mapping. Retain existing TEXT columns and their hash/mask
+  rules during Singer replication and PartialSync. Preserve existing JSON
+  column types during manual or automatic native-to-Iceberg conversion.
 - Block native-to-Iceberg conversion when a MariaDB JSON transformation needs
   TEXT but the existing column is VARIANT. Check every imported writer before
   copying the table.

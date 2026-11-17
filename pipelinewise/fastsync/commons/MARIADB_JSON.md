@@ -2,10 +2,11 @@
 
 ## Contract
 
-New Snowflake native and managed Iceberg v3 MariaDB JSON columns use VARIANT.
+After imported config enables JSON discovery, new Snowflake native and managed
+Iceberg v3 MariaDB JSON columns use VARIANT.
 Singer and PartialSync retain established TEXT columns, including their raw JSON
-serialization. FullSync creates replacement columns with the current VARIANT
-mapping. Native-to-Iceberg conversion preserves established TEXT or VARIANT;
+serialization. After import, FullSync creates replacement columns with the
+VARIANT mapping. Native-to-Iceberg conversion preserves established TEXT or VARIANT;
 it does not parse or retype the column. Ordinary LONGTEXT, Oracle MySQL JSON,
 other sources and other destinations keep their existing behavior.
 
@@ -15,7 +16,9 @@ other sources and other destinations keep their existing behavior.
 preserving spaces and escaped backticks inside identifiers. Core config derives
 the internal `json_target` from the Snowflake destination. Existing v3 settings
 remain accepted for older generated configs. Refresh native catalogs with
-`import_config` to enable the mapping.
+`import_config` to enable the mapping. Until the generated tap config contains
+`json_target: snowflake`, native FastSync and Singer both keep the older TEXT
+mapping, including during a resync.
 
 Successful discovery records `mariadb-json-discovery` version 1 and the resolved
 engine in every stream's root metadata, including streams without JSON columns.

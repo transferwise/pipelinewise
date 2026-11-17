@@ -250,9 +250,10 @@ Operational notes
 - Snowflake Singer, FullSync, and PartialSync can target managed Iceberg v3 with
   explicit tap-level configuration. See :ref:`snowflake_iceberg`.
 - MariaDB's generated ``JSON_VALID`` constraint identifies its ``JSON``-alias
-  ``LONGTEXT`` columns. New Snowflake native and Iceberg JSON columns use
-  ``VARIANT``; existing TEXT columns keep their type during Singer replication,
-  PartialSync, and native-to-Iceberg conversion. FullSync rebuilds use VARIANT.
+  ``LONGTEXT`` columns. After ``import_config``, new Snowflake native and Iceberg
+  JSON columns use ``VARIANT``; existing TEXT columns keep their type during
+  Singer replication, PartialSync, and native-to-Iceberg conversion. FullSync
+  rebuilds then use VARIANT.
   Plain ``LONGTEXT`` stays text. See :ref:`mariadb_json_mapping` for discovery
   refresh and compatibility rules.
 - Use :ref:`troubleshooting` for missing-binlog and packet-size failures.

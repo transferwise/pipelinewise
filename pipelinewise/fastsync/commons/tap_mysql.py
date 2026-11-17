@@ -230,15 +230,17 @@ class FastSyncTapMySql:
     def uses_mariadb_json_aliases(self) -> bool:
         """Return whether this Snowflake route recognizes MariaDB JSON aliases."""
         iceberg_version = self.connection_config.get('iceberg_version')
+        iceberg_v3 = (
+            self.connection_config.get('target_table_format') == 'iceberg'
+            and isinstance(iceberg_version, int)
+            and iceberg_version == 3
+        )
+        supported_format = self.connection_config.get('target_table_format') in (None, 'native') or iceberg_v3
         return (
             self.is_mariadb
             and (
-                self._mariadb_json_aliases_enabled
-                or (
-                    self.connection_config.get('target_table_format') == 'iceberg'
-                    and isinstance(iceberg_version, int)
-                    and iceberg_version == 3
-                )
+                (self._mariadb_json_aliases_enabled and supported_format)
+                or ('json_target' not in self.connection_config and iceberg_v3)
             )
         )
 

@@ -35,7 +35,7 @@ COLUMNS = [
 
 def _source(iceberg_version=None):
     adapter = RdbmsSnowflakeSource.mysql(FastSyncTapMySql, tap_type_to_target_type)
-    args = Namespace(tap={'engine': 'mariadb', 'export_batch_rows': 100}, transform=None)
+    args = Namespace(tap={'engine': 'mariadb', 'json_target': 'snowflake', 'export_batch_rows': 100}, transform=None)
     source = adapter.create(args, iceberg_version)
     source.get_table_columns = Mock(return_value=COLUMNS)
     source.get_primary_keys = Mock(return_value=['"ID"'])
@@ -64,6 +64,28 @@ def test_snowflake_routes_recognize_json_aliases_with_provenance(version):
     assert source.uses_mariadb_json_aliases
     assert mapped['columns'] == ['"ID" NUMBER', '"PAYLOAD" VARIANT', '"FRESH" VARIANT']
     assert mapped['mariadb_json_columns'] == ['PAYLOAD', 'FRESH']
+
+
+@pytest.mark.parametrize(('tap_config', 'expected'), [
+    ({'engine': 'mariadb'}, False),
+    ({'engine': 'mariadb', 'target_table_format': 'native'}, False),
+    ({'engine': 'mariadb', 'json_target': 'snowflake'}, True),
+    ({'engine': 'mariadb', 'target_table_format': 'iceberg', 'iceberg_version': 3}, True),
+    ({'engine': 'mariadb', 'target_table_format': 'iceberg', 'iceberg_version': 3,
+      'json_target': 'postgres'}, False),
+    ({'engine': 'mariadb', 'target_table_format': 'iceberg', 'iceberg_version': 2,
+      'json_target': 'snowflake'}, False),
+    ({'engine': 'mysql', 'json_target': 'snowflake'}, False),
+])
+def test_json_alias_detection_waits_for_generated_singer_config(tap_config, expected):
+    """FastSync must not create VARIANT before Singer enables the same MariaDB alias discovery."""
+    adapter = RdbmsSnowflakeSource.mysql(FastSyncTapMySql, tap_type_to_target_type)
+    source = adapter.create(Namespace(tap=tap_config, transform=None), tap_config.get('iceberg_version'))
+
+    assert source.uses_mariadb_json_aliases is expected
+    with patch.object(source, 'query', return_value=[]) as query:
+        source.get_table_columns(TABLE)
+    assert ("CASE WHEN is_json_alias THEN 'json' ELSE data_type END" in query.call_args.args[0]) is expected
 
 
 def test_other_destinations_do_not_enable_native_mariadb_alias_detection():

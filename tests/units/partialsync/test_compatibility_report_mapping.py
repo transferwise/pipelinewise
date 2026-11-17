@@ -42,6 +42,7 @@ def runtime_source(tap_type, config, connection):
     return source
 
 
+@pytest.mark.parametrize('json_target', [None, 'snowflake', 'postgres'])
 @pytest.mark.parametrize(('tap_type', 'engine', 'server_version'), [
     ('tap-postgres', None, None),
     ('tap-mysql', None, '8.4.0'),
@@ -51,11 +52,13 @@ def runtime_source(tap_type, config, connection):
     ('tap-mysql', 'mysql', '11.4.10-MariaDB-log'),
     ('tap-mysql', 'mariadb', '8.4.0'),
 ])
-def test_report_and_runtime_share_native_configuration_query_and_mapping(tap_type, engine, server_version):
+def test_report_and_runtime_share_native_configuration_query_and_mapping(tap_type, engine, server_version, json_target):
     config = {'host': 'source', 'port': 3306, 'user': 'reader', 'password': 'secret',
               'session_sqls': ['SELECT custom_session_setting']}
     if engine is not None:
         config['engine'] = engine
+    if json_target is not None:
+        config['json_target'] = json_target
     original_config = config.copy()
     connection = mock.MagicMock()
     connection.get_server_info.return_value = server_version
@@ -91,7 +94,7 @@ def test_report_and_runtime_share_native_configuration_query_and_mapping(tap_typ
         connection.cursor.assert_called_once_with()
     else:
         assert source.source_engine == runtime.source_engine
-        aliases_enabled = runtime.is_mariadb
+        aliases_enabled = runtime.is_mariadb and json_target == 'snowflake'
         assert source.uses_mariadb_json_aliases is runtime.uses_mariadb_json_aliases is aliases_enabled
         assert actual == ['"JSON" VARIANT', '"JSON_ALIAS" VARCHAR(134217728)', '"BINARY" BINARY(67108864)',
                           '"BOOLEAN" BOOLEAN', '"NUMBER" NUMBER']

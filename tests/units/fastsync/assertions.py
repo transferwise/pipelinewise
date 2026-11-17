@@ -271,7 +271,7 @@ def assert_snowflake_sync_table_native_workflow(
     )
     if source_type == 'mysql':
         assert tap.method_calls == [
-            call.set_mariadb_json_aliases_enabled(True),
+            call.set_mariadb_json_aliases_enabled(args.tap.get('json_target') == 'snowflake'),
             call.open_connections(),
             expected_copy_call,
             call.map_column_types_to_target(table),
@@ -599,7 +599,7 @@ def assert_snowflake_sync_table_iceberg_workflow(
     create_publisher_mock.assert_called_once_with(target, args)
     validate_mock.assert_called_once_with(args.target)
     if source_type == 'mysql':
-        tap.set_mariadb_json_aliases_enabled.assert_called_once_with(True)
+        tap.set_mariadb_json_aliases_enabled.assert_called_once_with(args.tap.get('json_target') == 'snowflake')
     publisher.table_lock.assert_called_once_with(recovery_target, recovery_identity)
     publisher.load_attempt.assert_called_once_with(
         recovery_target,
