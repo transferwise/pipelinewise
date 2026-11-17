@@ -605,8 +605,9 @@ does, from the stream ID and the tap's schema mapping. For MariaDB, MySQL, and
 PostgreSQL taps it also derives the FastSync name, and blocks a stream whose two
 names differ. Recognized MariaDB JSON columns can keep their existing ``TEXT``
 or ``VARIANT`` class. If an imported transformation needs the JSON as text,
-preflight blocks conversion of a ``VARIANT`` column. Conversion preserves the
-physical type; every tap writing a shared column must accept it. Other
+preflight requires that column to already exist as ``TEXT``. A missing column
+or another type blocks conversion. Conversion preserves the physical type;
+every tap writing a shared column must accept it. Other
 ``TEXT``/``VARIANT`` mismatches remain blockers.
 
 PostgreSQL taps can pass preflight before Iceberg settings are imported.
@@ -643,15 +644,19 @@ same rules as automatic conversion.
 Clear a TEXT/VARIANT blocker
 ----------------------------
 
-Conversion preserves a column's class. Recognized MariaDB JSON columns may
-remain TEXT or VARIANT and do not cause this blocker. For other columns, the
-existing class must match what every writer accepts. A TEXT/VARIANT conflict
+Conversion preserves a column's class. Recognized MariaDB JSON columns without
+text-dependent transformations may remain TEXT or VARIANT. For other columns,
+the existing class must match what every writer accepts. A TEXT/VARIANT conflict
 stops conversion before copying.
 
 First refresh the catalog with ``import_config``. If the conflict remains,
-review the source type and every tap writing the table. With the tap paused and
-its Iceberg settings imported, a column that genuinely needs VARIANT can be
-migrated in one of two ways:
+review the source type and every tap writing the table. A MariaDB JSON field
+used by a string transformation needs an existing TEXT column. If it is missing,
+remove or change the transformation to one that can write a new VARIANT column,
+then run ``import_config`` and preflight again.
+
+With the tap paused and its Iceberg settings imported, a column that genuinely
+needs VARIANT can be migrated in one of two ways:
 
 * Rebuild the column as ``VARIANT``:
 

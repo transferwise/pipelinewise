@@ -67,6 +67,8 @@ readiness until every selected stream has current JSON-discovery evidence.
 Discovery can run with native settings. Recognized MariaDB JSON writers accept
 existing TEXT or VARIANT unless an imported transformation requires TEXT.
 Intersect the permitted classes of every writer and preserve the physical class
-through conversion. Generic class conflicts remain blockers. See
+through conversion. A transformed MariaDB JSON field must already exist as TEXT;
+keep that requirement when merging writers and block its absence before copying.
+Generic class conflicts remain blockers. See
 [the JSON contract](MARIADB_JSON.md).
 Automatic conversion retains the imported-configuration and catalog-freshness gates.

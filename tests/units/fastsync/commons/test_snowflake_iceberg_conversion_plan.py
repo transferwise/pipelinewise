@@ -565,15 +565,15 @@ def test_interrupted_fastsync_publication_can_resume(tmp_path, listing, expected
 
 @pytest.mark.parametrize('planner', [plan.plan_conversion_targets, plan.plan_written_tables])
 @pytest.mark.parametrize(('rule', 'expected'), [
-    ({'type': 'HASH'}, plan.TEXT),
-    ({'type': 'HASH-SKIP-FIRST-2'}, plan.TEXT),
-    ({'type': 'MASK-HIDDEN'}, plan.TEXT),
-    ({'type': 'MASK-STRING-SKIP-ENDS-2'}, plan.TEXT),
+    ({'type': 'HASH'}, plan.EXISTING_TEXT),
+    ({'type': 'HASH-SKIP-FIRST-2'}, plan.EXISTING_TEXT),
+    ({'type': 'MASK-HIDDEN'}, plan.EXISTING_TEXT),
+    ({'type': 'MASK-STRING-SKIP-ENDS-2'}, plan.EXISTING_TEXT),
     ({'type': 'SET-NULL'}, plan.MARIADB_JSON),
     ({'type': 'SET-NULL', 'when': [{'column': 'document', 'equals': None}]}, plan.MARIADB_JSON),
-    ({'type': 'SET-NULL', 'when': [{'column': 'document', 'equals': ''}]}, plan.TEXT),
-    ({'type': 'SET-NULL', 'when': [{'column': 'document', 'equals': False}]}, plan.TEXT),
-    ({'type': 'SET-NULL', 'when': [{'column': 'document', 'regex_match': '.*'}]}, plan.TEXT),
+    ({'type': 'SET-NULL', 'when': [{'column': 'document', 'equals': ''}]}, plan.EXISTING_TEXT),
+    ({'type': 'SET-NULL', 'when': [{'column': 'document', 'equals': False}]}, plan.EXISTING_TEXT),
+    ({'type': 'SET-NULL', 'when': [{'column': 'document', 'regex_match': '.*'}]}, plan.EXISTING_TEXT),
 ])
 def test_conversion_plans_mariadb_json_transformation_text_requirements(planner, rule, expected):
     """Both own and shared writers narrow JSON compatibility only when runtime requires TEXT."""
@@ -587,7 +587,8 @@ def test_conversion_plans_mariadb_json_transformation_text_requirements(planner,
     assert target.writer_types == {'DOCUMENT': expected}
     assert not plan.text_variant_blockers([SimpleNamespace(name='DOCUMENT', data_type='TEXT')], target.writer_types)
     blockers = plan.text_variant_blockers([SimpleNamespace(name='DOCUMENT', data_type='VARIANT')], target.writer_types)
-    assert bool(blockers) == (expected == plan.TEXT)
+    assert bool(blockers) == (expected == plan.EXISTING_TEXT)
+    assert bool(plan.text_variant_blockers([], target.writer_types)) == (expected == plan.EXISTING_TEXT)
     assert catalog['streams'][0]['schema']['properties']['document']['format'] == 'mariadb-json'
 
 
@@ -605,4 +606,9 @@ def test_conversion_text_requirement_tracks_condition_column_and_exact_stream():
 
     target = plan.plan_conversion_targets(catalog, TARGET_CONFIG, ['public-orders'], False, transformations)[0]
 
-    assert target.writer_types == {'DOCUMENT': plan.TEXT, 'UNTOUCHED': plan.MARIADB_JSON}
+    assert target.writer_types == {'DOCUMENT': plan.EXISTING_TEXT, 'UNTOUCHED': plan.MARIADB_JSON}
+
+
+def test_missing_ordinary_text_column_remains_allowed():
+    """Singer can add a new ordinary TEXT column after conversion."""
+    assert plan.text_variant_blockers([], {'NOTE': plan.TEXT}) == []

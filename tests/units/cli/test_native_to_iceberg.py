@@ -9,6 +9,7 @@ import pytest
 from pipelinewise.cli import native_to_iceberg
 from pipelinewise.cli.errors import NativeToIcebergConversionException, PreRunChecksException
 from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_plan import (
+    EXISTING_TEXT,
     MARIADB_JSON,
     STATE_BLOCKED,
     STATE_ICEBERG,
@@ -673,7 +674,7 @@ def test_imported_iceberg_mysql_preflight_keeps_existing_readiness_contract():
     assert native_to_iceberg.preflight_configuration(settings, 'tap-mysql') == ([], [])
 
 
-@pytest.mark.parametrize('strict_class', ['TEXT', 'VARIANT'])
+@pytest.mark.parametrize('strict_class', ['TEXT', 'VARIANT', EXISTING_TEXT])
 @pytest.mark.parametrize('mariadb_first', [True, False])
 def test_mariadb_json_shared_writer_policy_intersects_with_strict_writers(strict_class, mariadb_first):
     """A compatible shared writer constrains the retained physical representation."""
@@ -699,6 +700,34 @@ def test_mariadb_json_does_not_hide_conflicting_shared_writers():
     _, conflicts = native_to_iceberg.writer_classes_for_table('database.schema.table', writers)
 
     assert conflicts == ('Column DOCUMENT is TEXT for stream text-table but VARIANT for stream variant-table',)
+
+
+@pytest.mark.parametrize('other_class', ['TEXT', MARIADB_JSON, 'VARIANT'])
+@pytest.mark.parametrize('required_first', [True, False])
+@pytest.mark.parametrize('shared', [True, False])
+def test_existing_text_requirement_survives_writer_merging(other_class, required_first, shared):
+    """Own and shared writers preserve presence requirements regardless of merge order."""
+    targets = [
+        _target('TABLE', {'DOCUMENT': EXISTING_TEXT}),
+        _target('TABLE', {'DOCUMENT': other_class}),
+    ]
+    if not required_first:
+        targets.reverse()
+    if shared:
+        merged, conflicts = native_to_iceberg.writer_classes_for_table('database.schema.table', targets)
+    else:
+        classified = [ClassifiedTarget(target, STATE_NATIVE) for target in targets]
+        all_merged, all_conflicts = native_to_iceberg._writer_classes(classified, ())
+        merged = all_merged['DATABASE.SCHEMA.TABLE']
+        conflicts = all_conflicts.get('DATABASE.SCHEMA.TABLE', ())
+
+    if other_class == 'VARIANT':
+        assert len(conflicts) == 1
+        assert 'TEXT' in conflicts[0] and 'VARIANT' in conflicts[0]
+        assert EXISTING_TEXT not in conflicts[0]
+    else:
+        assert merged == {'DOCUMENT': EXISTING_TEXT}
+        assert not conflicts
 
 
 @pytest.mark.parametrize('version', [None, 2, True, '3'])
@@ -1030,15 +1059,20 @@ def test_report_lists_other_writers_that_block_a_table(tmp_path):
     assert json.loads(native_to_iceberg.render_preflight_report(reports, [], 'json'))['ready'] is False
 
 
-@pytest.mark.parametrize('physical_type', ['TEXT', 'VARIANT'])
-def test_transformed_mariadb_json_preflight_and_auto_conversion(tmp_path, physical_type):
-    """A TEXT-only transformation stops a VARIANT conversion before any manifest or DDL."""
+@pytest.mark.parametrize('physical_type', ['TEXT', 'VARIANT', 'NUMBER', None])
+@pytest.mark.parametrize('rule', [
+    {'type': 'HASH'},
+    {'type': 'MASK-HIDDEN'},
+    {'type': 'SET-NULL', 'when': [{'column': 'document', 'equals': '{}'}]},
+])
+def test_transformed_mariadb_json_preflight_and_auto_conversion(tmp_path, physical_type, rule):
+    """TEXT-dependent transformations require an existing string column before any mutation."""
     snowflake = FakeSnowflake()
     column = {
         'COLUMN_NAME': 'DOCUMENT', 'DATA_TYPE': physical_type, 'IS_NULLABLE': 'YES',
         'COMMENT': None, 'COLUMN_DEFAULT': None, 'IS_IDENTITY': 'NO',
     }
-    snowflake.native_extra_columns = [column]
+    snowflake.native_extra_columns = [column] if physical_type else []
     snowflake.companion_extra_columns = [{**column, 'CHARACTER_MAXIMUM_LENGTH': 134217728}]
     targets = native_to_iceberg.tap_targets(
         {'streams': [{'tap_stream_id': 'public-table', 'schema': {'properties': {
@@ -1046,21 +1080,26 @@ def test_transformed_mariadb_json_preflight_and_auto_conversion(tmp_path, physic
         }}}]},
         FASTSYNC_CONFIG, False, ['public-table'],
         transformation_config={'transformations': [
-            {'tap_stream_name': 'public-table', 'field_id': 'document', 'type': 'HASH'},
+            {'tap_stream_name': 'public-table', 'field_id': 'document', **rule},
         ]},
     )
 
     reports = _report(tmp_path, snowflake, targets)
 
-    assert bool(reports[0].blockers) == (physical_type == 'VARIANT')
+    assert bool(reports[0].blockers) == (physical_type != 'TEXT')
     with patch.object(native_to_iceberg, 'SnowflakeConversionQueryAdapter', return_value=snowflake):
-        if physical_type == 'VARIANT':
-            with pytest.raises(NativeToIcebergConversionException, match='maps it to TEXT'):
+        if physical_type != 'TEXT':
+            with pytest.raises(NativeToIcebergConversionException, match='requires an existing TEXT column'):
                 native_to_iceberg.convert_tap_tables({}, str(tmp_path), targets)
         else:
             native_to_iceberg.convert_tap_tables({}, str(tmp_path), targets)
-    if physical_type == 'VARIANT':
+    if physical_type != 'TEXT':
         assert not list(tmp_path.iterdir())
+        with pytest.raises(NativeToIcebergConversionError, match='requires an existing TEXT column'):
+            native_to_iceberg.SnowflakeNativeToIcebergConverter(snowflake, str(tmp_path)).convert(
+                'database.schema.table', iceberg_version=3, writer_types=targets[0].writer_types,
+            )
+        assert not list(tmp_path.glob('*.json'))
         assert not any(sql.startswith(('CREATE', 'ALTER', 'GRANT')) for sql, _, _ in snowflake.queries)
     else:
         assert snowflake.formats['TABLE'] == 'iceberg'

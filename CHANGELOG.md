@@ -7,8 +7,8 @@
   rules during Singer replication and PartialSync. Preserve existing JSON
   column types during manual or automatic native-to-Iceberg conversion.
 - Block native-to-Iceberg conversion when a MariaDB JSON transformation needs
-  TEXT but the existing column is VARIANT. Check every imported writer before
-  copying the table.
+  an existing TEXT column but that column is missing or has another type. Check
+  every imported writer before copying the table.
 - Restore Singer's handling of NULL for nullable non-JSON transformation targets
   and regex conditions in rules involving MariaDB JSON. Invalid patterns still
   stop replication.

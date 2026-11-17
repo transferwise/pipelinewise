@@ -114,7 +114,8 @@ rebuilds therefore need a compatible transformation such as ``SET-NULL``.
 
 Import validation does not query Snowflake. Singer checks the existing column
 before writing. Conversion preflight also checks whether imported transformations
-require TEXT. Nested JSON paths are not supported for these serialized text values.
+require an existing TEXT column; a missing column also blocks conversion. Nested
+JSON paths are not supported for these serialized text values.
 
 .. _exact_decimal_mapping:
 

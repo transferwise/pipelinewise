@@ -71,6 +71,9 @@ Conversion intersects every writer's acceptable TEXT/VARIANT classes. MariaDB
 JSON alone permits either class; generated transformations that need string
 semantics narrow that writer to TEXT before preflight or automatic conversion.
 This includes JSON columns used only by regex or non-null equality conditions.
+A text-dependent JSON field must already exist as TEXT; preserve that requirement
+when merging shared writers and block missing or non-TEXT columns before conversion.
+Ordinary missing columns may still be added by replication.
 A strict writer also narrows the choice. Conflicting strict writers still block.
 Copy and content validation retain the physical column class and values,
 including on resumed attempts.

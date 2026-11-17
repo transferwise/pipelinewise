@@ -8,7 +8,7 @@ import pytest
 
 from pipelinewise.cli.errors import NativeToIcebergConversionException
 from pipelinewise.cli.pipelinewise import PipelineWise
-from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_plan import ConversionTarget
+from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_plan import EXISTING_TEXT, ConversionTarget
 from pipelinewise.fastsync.commons.snowflake_iceberg_model import SnowflakeObjectName
 from tests.units.cli.cli_args import CliArgs
 
@@ -367,19 +367,19 @@ def test_conversion_entry_points_load_imported_transformation_requirements(tmp_p
 
     with patch('pipelinewise.cli.native_to_iceberg.convert_tap_tables') as convert:
         instance._run_native_to_iceberg_conversion(['public-items'], None)
-    assert convert.call_args.args[2][0].writer_types['DOC'] == 'TEXT'
+    assert convert.call_args.args[2][0].writer_types['DOC'] == EXISTING_TEXT
 
     imported = instance._imported_tap_targets({'dbname': 'analytics'})
     assert [target.writer_types['DOC'] for target in imported if target.stream_id == 'public-items'] == [
-        'TEXT', 'TEXT', 'VARIANT',
+        EXISTING_TEXT, EXISTING_TEXT, 'VARIANT',
     ]
     writers = instance._other_writers({'account': 'ACC', 'dbname': 'analytics'}, PLANNED[1:])
     mirror = next(writer for writer in writers if writer.target.stream_id == 'public-items of tap mirror')
-    assert mirror.target.writer_types['DOC'] == 'TEXT'
+    assert mirror.target.writer_types['DOC'] == EXISTING_TEXT
 
     instance.args.iceberg_version = 3
     instance.args.output_format = 'json'
     with patch('pipelinewise.cli.native_to_iceberg.preflight_report', return_value=[]) as preflight:
         instance._native_to_iceberg_preflight({})
     item = next(target for target in preflight.call_args.args[2] if target.stream_id == 'public-items')
-    assert item.writer_types['DOC'] == 'TEXT'
+    assert item.writer_types['DOC'] == EXISTING_TEXT

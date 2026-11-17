@@ -32,6 +32,7 @@ STATE_BLOCKED = 'blocked'
 TEXT = 'TEXT'
 VARIANT = 'VARIANT'
 MARIADB_JSON = 'MARIADB_JSON'
+EXISTING_TEXT = 'EXISTING_TEXT'
 CONVERSION_DOCS_URL = 'https://transferwise.github.io/pipelinewise/connectors/targets/snowflake_iceberg.html'
 
 _MISSING = 'missing'
@@ -160,13 +161,28 @@ def native_text_variant_class(data_type: str) -> Optional[str]:
 def text_variant_blockers(columns: Iterable[Any], writer_types: Mapping[str, str]) -> List[str]:
     """Return native columns whose TEXT/VARIANT class differs from the current tap catalog."""
     blockers = []
+    existing_columns = set()
     for column in columns:
+        existing_columns.add(column.name)
         expected = writer_types.get(column.name)
         actual = native_text_variant_class(column.data_type)
+        if expected == EXISTING_TEXT:
+            if actual != TEXT:
+                blockers.append(
+                    f'Column {column.name} is {column.data_type} but its MariaDB JSON transformation requires '
+                    f'an existing TEXT column. See {CONVERSION_DOCS_URL}#clear-a-text-variant-blocker'
+                )
+            continue
         if expected is not None and actual is not None and expected not in (actual, MARIADB_JSON):
             blockers.append(
                 f'Column {column.name} is {column.data_type} but the tap catalog maps it to '
                 f'{expected}; the Iceberg writers would refuse the converted table. '
+                f'See {CONVERSION_DOCS_URL}#clear-a-text-variant-blocker'
+            )
+    for name, expected in writer_types.items():
+        if expected == EXISTING_TEXT and name not in existing_columns:
+            blockers.append(
+                f'Column {name} is missing but its MariaDB JSON transformation requires an existing TEXT column. '
                 f'See {CONVERSION_DOCS_URL}#clear-a-text-variant-blocker'
             )
     return blockers
@@ -254,7 +270,7 @@ def _writer_types(
     text_fields = _transformation_text_fields(stream.get('tap_stream_id', ''), transformation_config)
     return {
         level_zero_column_name(name): (
-            (TEXT if name in text_fields else MARIADB_JSON)
+            (EXISTING_TEXT if name in text_fields else MARIADB_JSON)
             if _level_zero_schema(schema_property).get('format') == 'mariadb-json' else column_class
         )
         for name, schema_property in properties.items()

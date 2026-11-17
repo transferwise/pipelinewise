@@ -15,7 +15,9 @@ from pipelinewise.fastsync.commons.snowflake_iceberg import (
 )
 from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_plan import (
     CONVERSION_DOCS_URL,
+    EXISTING_TEXT,
     MARIADB_JSON,
+    TEXT,
     STATE_BLOCKED,
     STATE_ICEBERG,
     STATE_NATIVE,
@@ -305,10 +307,16 @@ def _merge_writer_types(
             if expected == MARIADB_JSON and column_class != MARIADB_JSON:
                 columns[column] = column_class
                 sources[(key, column)] = target.stream_id
+            elif {expected, column_class} == {TEXT, EXISTING_TEXT}:
+                columns[column] = EXISTING_TEXT
+                if column_class == EXISTING_TEXT:
+                    sources[(key, column)] = target.stream_id
             elif column_class not in (expected, MARIADB_JSON):
+                expected_type = TEXT if expected == EXISTING_TEXT else expected
+                writer_type = TEXT if column_class == EXISTING_TEXT else column_class
                 conflicts.setdefault(key, []).append(
-                    f'Column {column} is {expected} for stream {sources[(key, column)]} but '
-                    f'{column_class} for stream {target.stream_id}'
+                    f'Column {column} is {expected_type} for stream {sources[(key, column)]} but '
+                    f'{writer_type} for stream {target.stream_id}'
                 )
     return merged, conflicts
 
