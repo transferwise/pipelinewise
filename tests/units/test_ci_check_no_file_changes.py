@@ -316,7 +316,6 @@ def test_snowflake_e2e_matrix_contract():
             (
                 'tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_table_size_check.py',
                 'tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf.py',
-                'tests/end_to_end/target_snowflake/tap_mariadb/test_multiline_native_mariadb_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_mariadb/test_defined_partial_sync_mariadb_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_with_split_large_files.py',
                 'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[mariadb-native]',
@@ -433,10 +432,11 @@ def test_snowflake_e2e_matrix_contract():
                 'tests/end_to_end/test_yugabyte_migration.py',
             ),
         ),
-        'yugabyte-migration': (
+        'migration-multiline': (
             'e2e_tests_24',
             (
                 'tests/end_to_end/target_snowflake/tap_yugabyte/test_migrate_postgres_tap_to_yugabyte_sf.py',
+                'tests/end_to_end/target_snowflake/tap_mariadb/test_multiline_native_mariadb_to_sf.py',
             ),
         ),
     }
