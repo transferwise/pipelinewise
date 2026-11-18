@@ -873,11 +873,15 @@ class Config:
         if (
             not isinstance(conversion, dict)
             or not isinstance(conversion.get('enabled'), bool)
-            or set(conversion) - {'enabled', 'conversion_warehouse'}
+            or set(conversion) - {'enabled', 'conversion_warehouse', 'automatic_preflight'}
         ):
             raise InvalidConfigException(
                 f'Tap "{tap.get("id")}" {setting} must be an object with a Boolean '
-                '"enabled" and an optional "conversion_warehouse".'
+                '"enabled", an optional Boolean "automatic_preflight", and an optional "conversion_warehouse".'
+            )
+        if 'automatic_preflight' in conversion and not isinstance(conversion['automatic_preflight'], bool):
+            raise InvalidConfigException(
+                f'Tap "{tap.get("id")}" {setting} automatic_preflight must be a Boolean.'
             )
         conversion_warehouse = conversion.get('conversion_warehouse')
         if 'conversion_warehouse' in conversion and (

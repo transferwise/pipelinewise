@@ -28,8 +28,10 @@ from pipelinewise.fastsync.commons.snowflake_iceberg_model import (
 )
 from pipelinewise.fastsync.commons.snowflake_iceberg_validation import NativeToIcebergConversionError
 from tests.units.fastsync.commons.snowflake_iceberg_test_helpers import make_attempt
-from tests.units.fastsync.commons.test_snowflake_iceberg_converter import FakeSnowflake
+from tests.units.fastsync.commons.test_snowflake_iceberg_converter import FakeSnowflake, _manifest_files
 from tests.units.fastsync.commons.test_snowflake_iceberg_converter_preflight import (
+    _lossy_snowflake,
+    _mutations,
     _submitted_attempt_over_temporal_column,
 )
 
@@ -238,7 +240,9 @@ def test_gate_resumes_pending_first_then_converts_smallest_first():
     final = [_classified(name, STATE_ICEBERG) for name in ('DONE', 'BIG', 'HALF', 'UNKNOWN', 'SMALL')]
 
     with _gate(first, final) as (converter, adapter, classify):
-        native_to_iceberg.convert_tap_tables({'dbname': 'database'}, '/runtime', ['targets'], 'WH')
+        native_to_iceberg.convert_tap_tables(
+            {'dbname': 'database'}, '/runtime', ['targets'], 'WH', automatic_preflight=True,
+        )
 
     adapter.assert_called_once_with({'dbname': 'database'}, 'WH')
     assert converter.convert.call_args_list == [
@@ -248,6 +252,20 @@ def test_gate_resumes_pending_first_then_converts_smallest_first():
     assert [entry.args[0] for entry in converter.preflight.call_args_list] == [
         _quoted(table) for table in ('SMALL', 'BIG', 'UNKNOWN')
     ]
+    assert classify.call_count == 2
+
+
+@pytest.mark.parametrize('options', [{}, {'automatic_preflight': False}])
+def test_gate_skips_batch_preflight_but_converts_and_checks_readiness(options):
+    """Omitted or false preflight still converts with catalog types and verifies the result."""
+    first = [_classified('T', STATE_NATIVE, 1, writer_types={'DOC': 'VARIANT'})]
+    final = [_classified('T', STATE_ICEBERG)]
+
+    with _gate(first, final, preflight=lambda *_: ('must not run',)) as (converter, _, classify):
+        native_to_iceberg.convert_tap_tables({}, '/runtime', [], **options)
+
+    converter.preflight.assert_not_called()
+    converter.convert.assert_called_once_with(_quoted('T'), eventual='iceberg', writer_types={'DOC': 'VARIANT'})
     assert classify.call_count == 2
 
 
@@ -330,8 +348,9 @@ def test_gate_preflights_every_table_before_converting_any():
 
     with _gate(first, preflight=preflight) as (converter, _, _):
         with pytest.raises(NativeToIcebergConversionException, match='LOSSY.*cannot be converted.*TIMESTAMP_TZ'):
-            native_to_iceberg.convert_tap_tables({}, '/runtime', [])
+            native_to_iceberg.convert_tap_tables({}, '/runtime', [], automatic_preflight=True)
 
+    assert converter.preflight.call_args_list == [call(_quoted(table), {}) for table in ('CLEAN', 'LOSSY')]
     converter.convert.assert_not_called()
 
 
@@ -449,7 +468,7 @@ def test_gate_passes_every_stream_class_to_preflight_and_conversion():
     merged = {'DOC': 'VARIANT', 'NOTE': 'TEXT'}
 
     with _gate(first, [_classified('T', STATE_ICEBERG)]) as (converter, _, _):
-        native_to_iceberg.convert_tap_tables({}, '/runtime', [])
+        native_to_iceberg.convert_tap_tables({}, '/runtime', [], automatic_preflight=True)
 
     converter.preflight.assert_called_once_with(_quoted('T'), merged)
     converter.convert.assert_called_once_with(_quoted('T'), eventual='iceberg', writer_types=merged)
@@ -486,6 +505,21 @@ def test_gate_drives_the_real_converter(tmp_path):
 
     assert snowflake.formats == {'TABLE_NATIVE': 'native', 'TABLE': 'iceberg'}
     assert not list(tmp_path.glob('iceberg-recovery-*.json'))
+
+
+def test_default_gate_keeps_converter_representation_checks(tmp_path):
+    """Skipping the batch sweep still refuses lossy values before any conversion writes."""
+    snowflake = _lossy_snowflake()
+    with patch.object(native_to_iceberg, 'SnowflakeConversionQueryAdapter', return_value=snowflake), patch.object(
+        native_to_iceberg.SnowflakeNativeToIcebergConverter, 'preflight',
+    ) as preflight:
+        with pytest.raises(NativeToIcebergConversionException, match='would truncate'):
+            native_to_iceberg.convert_tap_tables({'dbname': 'database'}, str(tmp_path), [_target('TABLE')])
+
+    preflight.assert_not_called()
+    assert snowflake.formats == {'TABLE': 'native'}
+    assert not _manifest_files(tmp_path)
+    assert not _mutations(snowflake)
 
 
 def test_table_writer_classes_merge_streams_and_report_conflicts():
@@ -1035,7 +1069,7 @@ def test_gate_applies_the_column_classes_of_other_iceberg_taps():
     merged = {'DOC': 'VARIANT', 'NOTE': 'TEXT'}
 
     with _gate(first, [_classified('T', STATE_ICEBERG)]) as (converter, _, _):
-        native_to_iceberg.convert_tap_tables({}, '/runtime', [], other_writers=[writer])
+        native_to_iceberg.convert_tap_tables({}, '/runtime', [], other_writers=[writer], automatic_preflight=True)
 
     converter.preflight.assert_called_once_with(_quoted('T'), merged)
     converter.convert.assert_called_once_with(_quoted('T'), eventual='iceberg', writer_types=merged)
@@ -1090,9 +1124,9 @@ def test_transformed_mariadb_json_preflight_and_auto_conversion(tmp_path, physic
     with patch.object(native_to_iceberg, 'SnowflakeConversionQueryAdapter', return_value=snowflake):
         if physical_type != 'TEXT':
             with pytest.raises(NativeToIcebergConversionException, match='requires an existing TEXT column'):
-                native_to_iceberg.convert_tap_tables({}, str(tmp_path), targets)
+                native_to_iceberg.convert_tap_tables({}, str(tmp_path), targets, automatic_preflight=True)
         else:
-            native_to_iceberg.convert_tap_tables({}, str(tmp_path), targets)
+            native_to_iceberg.convert_tap_tables({}, str(tmp_path), targets, automatic_preflight=True)
     if physical_type != 'TEXT':
         assert not list(tmp_path.iterdir())
         with pytest.raises(NativeToIcebergConversionError, match='requires an existing TEXT column'):

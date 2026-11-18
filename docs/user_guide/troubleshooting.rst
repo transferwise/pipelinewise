@@ -785,7 +785,8 @@ message names each table and the reason:
 *How to fix:*
 
 1. Pause the tap's schedule until you have fixed the cause. Each scheduled run
-   preflights every native table again and restarts a copy that failed. The tap
+   retries a copy that failed; it first checks every native table only when
+   ``automatic_preflight: true``. Every conversion still checks its table. The tap
    never replicates into native tables, and tables that converted earlier stay
    converted. Keep ``native_to_iceberg_conversion`` enabled while you recover:
    with ``enabled: false``, ``run_tap`` does not resume a pending conversion. Do

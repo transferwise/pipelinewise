@@ -476,6 +476,7 @@ def _convert_tap_tables(
     action: str,
     writers: Sequence[OtherWriter],
     tap_refusals: Sequence[str],
+    automatic_preflight: bool,
 ) -> None:
     snowflake = SnowflakeConversionQueryAdapter(dict(target_config), conversion_warehouse)
     converter = SnowflakeNativeToIcebergConverter(snowflake, runtime_dir)
@@ -500,17 +501,18 @@ def _convert_tap_tables(
         _unique_tables([item for item in classified if item.state == STATE_NATIVE]),
         key=lambda item: (item.bytes is None, item.bytes or 0, item.target.table.key),
     )
-    _raise_if_any(
-        [
-            (item, blockers)
-            for item in candidates
-            if (blockers := converter.preflight(
-                item.target.table.quoted, writer_types.get(item.target.table.key, {}),
-            ))
-        ],
-        'cannot be converted',
-        action,
-    )
+    if automatic_preflight:
+        _raise_if_any(
+            [
+                (item, blockers)
+                for item in candidates
+                if (blockers := converter.preflight(
+                    item.target.table.quoted, writer_types.get(item.target.table.key, {}),
+                ))
+            ],
+            'cannot be converted',
+            action,
+        )
     for index, item in enumerate(candidates, start=1):
         error = _converted(
             converter, item, writer_types.get(item.target.table.key, {}),
@@ -538,6 +540,7 @@ def convert_tap_tables(
     targets: Sequence[ConversionTarget],
     conversion_warehouse: Optional[str] = None,
     *,
+    automatic_preflight: bool = False,
     other_writers: Sequence[OtherWriter] = (),
     tap_refusals: Sequence[str] = (),
     target_id: str = '<target_id>',
@@ -548,6 +551,7 @@ def convert_tap_tables(
     try:
         _convert_tap_tables(
             target_config, runtime_dir, targets, conversion_warehouse, action, other_writers, tap_refusals,
+            automatic_preflight,
         )
     except NativeToIcebergConversionException:
         raise

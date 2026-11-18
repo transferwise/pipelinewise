@@ -1,4 +1,4 @@
-0.103.0 (2026-11-17)
+0.103.0 (2026-11-18)
 --------------------
 
 - After `import_config` updates FastSync and Singer, map new MariaDB JSON columns
@@ -15,6 +15,10 @@
 - Allow conversion preflight before a tap is configured for Iceberg.
   MySQL/MariaDB taps first need a fresh `import_config`. Automatic conversion
   still requires imported Iceberg settings.
+- Default `native_to_iceberg_conversion.automatic_preflight` to `false`.
+  Run the feasibility report manually before enabling conversion, or set this
+  option to `true` to check all tables before new conversions start. Each
+  conversion still checks its own table and stops the tap if unsafe.
 - Remove NULL-primary-key data scans from preflight and both conversion paths.
   Keep primary-key metadata validation and time/timestamp precision checks.
 - Improve conversion errors with documentation links. Clarify the existing

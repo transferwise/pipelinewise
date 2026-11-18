@@ -29,6 +29,8 @@ def _tap(**settings):
     'settings',
     [
         {**ICEBERG, 'native_to_iceberg_conversion': {'enabled': True}},
+        {**ICEBERG, 'native_to_iceberg_conversion': {'enabled': True, 'automatic_preflight': False}},
+        {**ICEBERG, 'native_to_iceberg_conversion': {'enabled': True, 'automatic_preflight': True}},
         {**ICEBERG, 'native_to_iceberg_conversion': {'enabled': True, 'conversion_warehouse': 'CONVERSION_WH'}},
         {**ICEBERG, 'type': 'tap-mysql', 'native_to_iceberg_conversion': {'enabled': True}},
         {
@@ -95,6 +97,17 @@ def test_rejects_unsupported_conversion_settings(settings, message):
         Config.validate_native_to_iceberg_conversion(tap, _table_format_target())
 
 
+@pytest.mark.parametrize('value', [None, 'true', 0, 1, [], {}])
+def test_rejects_non_boolean_automatic_preflight(value):
+    """Only actual booleans can opt into the potentially expensive batch sweep."""
+    tap = _tap(**ICEBERG, native_to_iceberg_conversion={'enabled': True, 'automatic_preflight': value})
+
+    with pytest.raises(InvalidConfigException, match='automatic_preflight'):
+        Config.validate_native_to_iceberg_conversion(tap, _table_format_target())
+    with pytest.raises(InvalidConfigException):
+        cli.utils.validate(tap, cli.utils.load_schema('tap'))
+
+
 def test_import_and_validate_reject_conversion_on_a_native_tap(tmp_path):
     """Both commands load YAML through from_yamls, so no generated config enables a bad setting."""
     yaml_dir = tmp_path / 'yaml'
@@ -156,10 +169,11 @@ def test_schema_rejects_wrongly_typed_settings():
         )
 
 
-def test_setting_reaches_main_config_but_not_the_target(tmp_path):
+@pytest.mark.parametrize('settings', [{}, {'automatic_preflight': False}, {'automatic_preflight': True}])
+def test_setting_reaches_main_config_but_not_the_target(tmp_path, settings):
     """run_tap reads the setting from the main config; target-snowflake never sees it."""
     config = Config(str(tmp_path))
-    conversion = {'enabled': True, 'conversion_warehouse': 'CONVERSION_WH'}
+    conversion = {'enabled': True, 'conversion_warehouse': 'CONVERSION_WH', **settings}
     tap = _tap(**ICEBERG, native_to_iceberg_conversion=conversion)
     target = _table_format_target()
     target['taps'] = [tap]

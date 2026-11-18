@@ -396,6 +396,7 @@ pending. To clear a ``TEXT``/``VARIANT`` blocker, see
    iceberg_version: 3
    native_to_iceberg_conversion:
      enabled: true
+     automatic_preflight: false  # default; run the feasibility report manually first
      conversion_warehouse: CONVERSION_WH  # optional; defaults to the target's warehouse
 
 Every ``run_tap`` for the tap then runs a conversion step inside the tap's
@@ -408,12 +409,15 @@ pidfile, before FastSync or Singer writes anything:
    fails. If another check would stop a table, the resume restores its name and
    then stops before another cutover. A resumed attempt passes the same checks
    as a new one, including the tap catalog's column classes, before its cutover.
-3. It stops if any table needs an operator, then preflights every native table
-   and stops before converting anything if any table is blocked. When several
-   streams write one table, every stream's blockers and column classes count,
-   and streams that disagree on a column's class block the table.
+3. It stops if any table needs an operator. With ``automatic_preflight: true``,
+   it checks every native table and stops before starting new conversions if any
+   is blocked. This check is off by default. When several streams write one
+   table, every stream's blockers and column classes count, and streams that
+   disagree on a column's class block the table.
 4. It converts the native tables one at a time, smallest first, with the
-   same converter as ``copy_native_to_iceberg --eventual iceberg``.
+   same converter as ``copy_native_to_iceberg --eventual iceberg``. Every
+   conversion still checks that table before cutover, including data fidelity
+   checks that can scan the table.
 5. When it resumed or converted anything, it checks that every planned table is
    now new or Iceberg with no pending manifest. Then replication starts.
 
@@ -472,8 +476,9 @@ If any table cannot convert, the run fails before replication starts, sends the
 tap's alert, and exits 1. It never falls back to native tables. Tables converted
 earlier in the run stay converted, each validated with its native backup kept
 as ``<table>_NATIVE``. Pause the tap's schedule until you have fixed the cause:
-each scheduled run preflights every native table again and restarts a copy that
-failed. The next ``run_tap`` resumes a pending conversion; see
+each scheduled run retries the conversion. With ``automatic_preflight: true``,
+it checks every native table before starting new conversions. The next
+``run_tap`` resumes a pending conversion; see
 :ref:`troubleshooting_iceberg_auto_conversion`. While the tap is stopped, its
 source keeps accumulating changes, so watch PostgreSQL WAL and MySQL binlog
 retention.
@@ -557,6 +562,9 @@ Run ``copy_native_to_iceberg --preflight-only`` with ``--tap`` or ``--table``
 before converting anything. It takes no lock, writes no manifest, and runs no
 DDL, so it is safe to run beside the tap. It checks metadata and reads data from
 the existing native Snowflake tables, not the PostgreSQL or MariaDB/MySQL source.
+Run this report manually before enabling automatic conversion when
+``automatic_preflight`` is omitted or ``false``. A report can become stale if
+the table changes; conversion always repeats its per-table safety checks.
 For each table with ``TIME``, ``TIMESTAMP_NTZ``, or ``TIMESTAMP_LTZ`` columns,
 one aggregate query counts values with sub-microsecond precision. Their declared
 types alone cannot prove that Iceberg will preserve every value exactly.
