@@ -170,12 +170,12 @@ A whole-tap PostgreSQL resync still resets the shared WAL position, so ensure
 the configured ranges cover the changes that need rebuilding; retained rows
 outside those ranges are not revalidated or refreshed.
 
-For a managed Iceberg v3 target, an exactly compatible table uses
-``INSERT OVERWRITE`` and retains its object identity. A new nullable column is
-added before overwrite. Other mismatches require guarded replacement by the
-table's current owning account role; database-role ownership is not supported.
-Ownership is retained, but the new object resets history and can change its base
-location; visible unsupported dependencies stop the operation first. See
+For a managed Iceberg v3 target, PartialSync updates, inserts, and deletes rows
+within the selected range. It retains other rows outside the range and the
+table's object identity. It requires a primary key and can add compatible nullable columns
+before the merge. An incompatible retained table stops the operation. Set
+``drop_target_table: true`` only when you intend to replace the table with the
+selected range; that replacement resets table history. See
 :ref:`snowflake_iceberg`.
 
 
