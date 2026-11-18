@@ -1,4 +1,4 @@
-"""Schema models and exact validation for manual Iceberg conversion."""
+"""Schema models and projected-value validation for native-to-Iceberg conversion."""
 
 import hashlib
 import json
@@ -160,6 +160,9 @@ class NativeColumn:
     @property
     def projection(self) -> str:
         """Return the deterministic conversion projection for this column."""
+        if self.data_type in SUB_MICROSECOND_TYPES:
+            name = quote_identifier(self.name)
+            return f"CAST(DATE_TRUNC('MICROSECOND', {name}) AS {self.iceberg_type}) AS {name}"
         return self.iceberg_column.projection()
 
 

@@ -416,8 +416,9 @@ pidfile, before FastSync or Singer writes anything:
    disagree on a column's class block the table.
 4. It converts the native tables one at a time, smallest first, with the
    same converter as ``copy_native_to_iceberg --eventual iceberg``. Every
-   conversion still checks that table before cutover, including data fidelity
-   checks that can scan the table.
+   conversion still checks the table's structure and copied contents before
+   cutover. Conversion truncates excess ``TIME`` and timestamp precision to six
+   fractional digits.
 5. When it resumed or converted anything, it checks that every planned table is
    now new or Iceberg with no pending manifest. Then replication starts.
 
@@ -564,10 +565,16 @@ DDL, so it is safe to run beside the tap. It checks metadata and reads data from
 the existing native Snowflake tables, not the PostgreSQL or MariaDB/MySQL source.
 Run this report manually before enabling automatic conversion when
 ``automatic_preflight`` is omitted or ``false``. A report can become stale if
-the table changes; conversion always repeats its per-table safety checks.
+the table changes. Conversion repeats structural and copied-content checks,
+but does not repeat the temporal precision scan.
+
 For each table with ``TIME``, ``TIMESTAMP_NTZ``, or ``TIMESTAMP_LTZ`` columns,
 one aggregate query counts values with sub-microsecond precision. Their declared
-types alone cannot prove that Iceberg will preserve every value exactly.
+types alone cannot show whether conversion will truncate any values. Such values
+block the report and ``automatic_preflight: true`` before new conversions start.
+A report blocked only by sub-microsecond values can still be converted with
+deliberate truncation: leave automatic preflight off for ``run_tap``, or run a
+manual conversion. Other blockers still stop conversion.
 
 The query does not sample rows and may scan the relevant columns across the
 whole table, so preflight can take time and consume warehouse resources. Full-row
@@ -700,10 +707,14 @@ Before conversion:
 The command compares row count and ``HASH_AGG`` evidence before cutover. It
 copies every row through the required type projection, including duplicate-key
 and other representable flawed data, without filtering, deduplication, or
-repair. It preserves supported types, nullability, primary-key order, table and
-column comments, explicit non-ownership grants to account roles and qualified
-database roles, grant options, and direct table tags. The current account role
-must own the native source; database-role ownership is not supported.
+repair. ``TIME``, ``TIMESTAMP_NTZ``, and ``TIMESTAMP_LTZ`` values are explicitly
+truncated to six fractional digits before the Iceberg write. The evidence
+compares this projected source with the destination; the retained native backup
+keeps the original values. It preserves other supported types, nullability,
+primary-key order, table and column comments, explicit non-ownership grants to
+account roles and qualified database roles, grant options, and direct table
+tags. The current account role must own the native source; database-role
+ownership is not supported.
 
 Ownership, comments, and direct table tags must match exactly. Every native
 grant must also be present on the Iceberg table, so no reader loses access.
@@ -714,15 +725,11 @@ Conversion fails before copying when the table has visible dependent streams,
 policies, direct column tags, secondary constraints, inbound foreign keys,
 defaults, identity columns, a clustering key, or an
 unsupported Iceberg type. Account-wide stream inspection is limited to objects
-visible to the current role. It also fails before copying when the current
-PipelineWise mapping cannot hold the data exactly or the grants cannot be replayed:
+visible to the current role. It also fails before copying when a type cannot
+be represented by the conversion projection or grants cannot be replayed:
 
 * a ``TIMESTAMP_TZ`` column, because managed Iceberg stores ``TIMESTAMP_LTZ``
   and would drop each value's offset;
-* a ``TIME``, ``TIMESTAMP_NTZ``, or ``TIMESTAMP_LTZ`` value with sub-microsecond
-  digits, because PipelineWise currently creates these columns at precision 6.
-  The command counts such
-  values with one aggregate scan and reports only the count;
 * a grant of a privilege that Iceberg tables do not accept, or a grant to
   anything other than an account role or a qualified database role.
 
@@ -730,6 +737,9 @@ Snowflake now supports nanosecond ``TIMESTAMP_NTZ(9)`` and ``TIMESTAMP_LTZ(9)``
 columns in Iceberg v3, but PipelineWise still uses precision 6. ``TIME`` maps to
 ``TIME(6)``. See `Snowflake's supported Iceberg types
 <https://docs.snowflake.com/en/user-guide/tables-iceberg-data-types#iceberg-v3-data-types>`_.
+Without a passing preflight, conversion deliberately removes any
+sub-microsecond digits. For example, ``.123456999`` becomes ``.123456``;
+``.999999999`` becomes ``.999999`` without carrying into the next second.
 Snowflake ``VARIANT`` remains ``VARIANT``.
 
 Writes during the copy or cutover can be absent from the Iceberg result. The

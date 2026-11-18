@@ -41,9 +41,12 @@ converter restores the name, then refuses before another cutover.
 `automatic_preflight` defaults to false. When true, preflight every native
 candidate before starting a new conversion. Operators normally run the manual
 report before enabling conversion. Conversion always repeats per-table safety
-checks, including the sub-microsecond scan: projected-value parity cannot detect
-truncation, and manual evidence can become stale. Merge all streams' TEXT/VARIANT
-classes for each table; resumed attempts repeat these checks before cutover.
+checks, except the sub-microsecond scan. Preflight reports temporal values that
+would lose digits. Conversion explicitly truncates TIME/TIMESTAMP values to six
+fractional digits before the typed cast, and projected-value parity verifies
+that copied result. Manual evidence can become stale. Merge all streams'
+TEXT/VARIANT classes for each table; resumed attempts repeat these checks before
+cutover.
 Convert smallest first. Require every table to be new or Iceberg before writers
 start; any failure stops the tap. Keep conversions completed earlier in the run.
 

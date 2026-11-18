@@ -193,7 +193,10 @@ Tap configuration
        it replicates. Run ``copy_native_to_iceberg --preflight-only`` manually
        before enabling conversion. Set ``automatic_preflight: true`` to check
        all native tables before new conversions start; each conversion still
-       runs its own safety checks. ``enabled: true`` is valid only with
+       checks structure and copied contents. Conversion truncates
+       sub-microsecond ``TIME`` and timestamp values to six fractional digits;
+       preflight reports values that would lose precision. ``enabled: true`` is
+       valid only with
        ``target_table_format: iceberg``, ``iceberg_version: 3``, a
        ``target-snowflake`` target, and an effective
        ``data_flattening_max_level`` of ``0``. Any tap accepts

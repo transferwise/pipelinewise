@@ -17,10 +17,11 @@
   still requires imported Iceberg settings.
 - Default `native_to_iceberg_conversion.automatic_preflight` to `false`.
   Run the feasibility report manually before enabling conversion, or set this
-  option to `true` to check all tables before new conversions start. Each
-  conversion still checks its own table and stops the tap if unsafe.
+  option to `true` to check all tables before new conversions start. Without
+  preflight, conversion truncates sub-microsecond TIME/TIMESTAMP values to six
+  digits. Each conversion still checks structure and copied contents.
 - Remove NULL-primary-key data scans from preflight and both conversion paths.
-  Keep primary-key metadata validation and time/timestamp precision checks.
+  Keep primary-key metadata validation and preflight's temporal precision check.
 - Improve conversion errors with documentation links. Clarify the existing
   `--conversion-warehouse` option and remove outdated conversion-audit instructions.
 - Escape apostrophes in FastSync transformation conditions for PostgreSQL

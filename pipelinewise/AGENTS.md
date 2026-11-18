@@ -179,26 +179,28 @@ staging types, transformations, conversion and recovery.
   reserve tracebacks for unexpected errors.
 - Guarded replacement/conversion requires the owning account role; reject
   database-role ownership and unsafe dependencies/metadata. Conversion is
-  target-only and fidelity-first: exclude external writers for every copy;
-  `eventual=iceberg` also needs a reader/writer outage. Retain the native backup
-  and recover through the manifest. A promoted table with its backup and no
-  manifest is complete; rename a promoted table away only after re-proving that
-  its columns and rows equal the backup, never on drift or transient errors, and
-  never restore `_NATIVE` once a manifest is published. Every saved
-  conversion manifest must load. Copy/validate the whole row multiset,
+  target-only and preserves its documented projection. Exclude external writers
+  for every copy; `eventual=iceberg` also needs a reader/writer outage. Retain
+  the native backup and recover through the manifest. A promoted table with its
+  backup and no manifest is complete; rename a promoted table away only after
+  re-proving that its columns and rows equal the backup, never on drift or
+  transient errors, and never restore `_NATIVE` once a manifest is published.
+  Every saved conversion manifest must load. Copy/validate the whole row multiset,
   including duplicate keys and representable flaws, without filtering, repair,
-  or deduplication; fail before cutover if v3 cannot represent it exactly.
-  Evidence hashes projected values, so refuse `TIMESTAMP_TZ`, sub-microsecond
-  values, and unreplayable grants before any manifest or DDL. Ownership,
+  or deduplication; fail before cutover if the declared projection cannot
+  represent it. Preflight reports sub-microsecond TIME/TIMESTAMP values;
+  conversion deliberately truncates them to six digits before the typed cast
+  and compares projected source values with the destination. Refuse
+  `TIMESTAMP_TZ` and unreplayable grants before any manifest or DDL. Ownership,
   comments, and tags match exactly; source grants are a required subset, and
   extra Iceberg grants are logged, never rolled back.
 - Automatic conversion is tap-root/core-only, inside the PID lock and before
   writers. Resume pending attempts, restoring interrupted names before refusals;
   block unsafe names, stale catalogs, incompatible classes and uncoordinated
   shared writers. `automatic_preflight` defaults to false; when true, preflight
-  every native candidate before new conversions. Always keep per-table conversion
-  safety checks, including sub-microsecond scans. Preserve completed conversions
-  and stop replication on any failure.
+  every native candidate before new conversions. Always keep per-table structural
+  and copied-content checks; the temporal precision scan is preflight-only.
+  Preserve completed conversions and stop replication on any failure.
 - `--preflight-only` takes no lock, manifest or DDL. `fast_sync` never converts
   and refuses native targets before a slot reset, but may rebuild a missing
   target beside leftover companions. Before changing conversion, read

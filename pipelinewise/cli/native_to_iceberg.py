@@ -629,8 +629,11 @@ def render_preflight_report(
         rows,
         headers=['Stream', 'Table', 'State', 'Action', 'Rows', 'Bytes', 'Blockers'],
     ))
-    lines.append(
-        'Ready: no blockers found.' if ready
-        else 'Not ready: resolve every blocker before enabling native_to_iceberg_conversion.'
-    )
+    if ready:
+        lines.append('Ready: no blockers found.')
+    else:
+        lines.append(
+            'Not ready: resolve blockers. Sub-microsecond values may be accepted by '
+            'converting without preflight; other blockers must be fixed.'
+        )
     return '\n'.join(lines)

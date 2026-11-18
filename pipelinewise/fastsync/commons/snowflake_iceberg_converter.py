@@ -225,7 +225,9 @@ class SnowflakeNativeToIcebergConverter:
             metadata = self._inspect_source(table)
         except NativeToIcebergConversionError as exc:
             return (str(exc),)
-        return tuple(self._conversion_blockers(table, metadata))
+        blockers = self._conversion_blockers(table, metadata)
+        blockers.extend(self._sub_microsecond_blockers(table, metadata.columns))
+        return tuple(blockers)
 
     def _conversion_blockers(
         self,
@@ -234,7 +236,6 @@ class SnowflakeNativeToIcebergConverter:
     ) -> List[str]:
         blockers = representation_blockers(metadata.columns)
         blockers.extend(grant_replay_blockers(metadata.grants))
-        blockers.extend(self._sub_microsecond_blockers(table, metadata.columns))
         blockers.extend(text_variant_blockers(metadata.columns, self._writer_types))
         return blockers
 
@@ -243,7 +244,7 @@ class SnowflakeNativeToIcebergConverter:
         table: SnowflakeTableName,
         metadata: ConversionMetadata,
     ) -> None:
-        # Known refusals already stop the attempt, so the full-table probe is skipped.
+        # Caller refusals already block the table, so avoid duplicate checks.
         blockers = list(self._refusals) or self._conversion_blockers(table, metadata)
         if blockers:
             raise NativeToIcebergConversionError(
@@ -255,7 +256,7 @@ class SnowflakeNativeToIcebergConverter:
         table: SnowflakeTableName,
         columns: Tuple[NativeColumn, ...],
     ) -> List[str]:
-        # The content evidence compares projected values, so v3 truncation must be found first.
+        # The optional preflight reports values the conversion projection will truncate.
         temporal = [column for column in columns if column.data_type in SUB_MICROSECOND_TYPES]
         if not temporal:
             return []
@@ -276,7 +277,7 @@ class SnowflakeNativeToIcebergConverter:
             )
         return [
             f'Column {column.name} has {int(count)} value(s) with sub-microsecond '
-            'precision that managed Iceberg v3 would truncate'
+            'precision that this conversion would truncate'
             for column, count in zip(temporal, counts)
             if int(count) > 0
         ]
@@ -532,7 +533,7 @@ class SnowflakeNativeToIcebergConverter:
                 f'The schema of {table.quoted} changed after conversion started'
             )
         if resumed:
-            # A resumed attempt may predate these checks; its projected evidence cannot prove exactness.
+            # A resumed attempt may predate the current metadata and writer checks.
             self._assert_convertible(table, metadata)
 
         if state.staging == TABLE_FORMAT_MISSING:

@@ -657,7 +657,7 @@ def test_primary_key_is_not_null_in_iceberg(tmp_path):
 
 @pytest.mark.parametrize('operation', ['preflight', 'convert'])
 def test_does_not_probe_null_primary_keys(tmp_path, operation):
-    """Nullable key metadata requires no data scan, while temporal precision still does."""
+    """Nullable keys require no data scan; only preflight scans temporal precision."""
     snowflake = FakeSnowflake()
     snowflake.is_nullable = 'YES'
     temporal_column = {
@@ -678,7 +678,7 @@ def test_does_not_probe_null_primary_keys(tmp_path, operation):
         assert snowflake.formats == {'TABLE': 'native', 'TABLE_ICEBERG': 'iceberg'}
     statements = [sql for sql, _, _ in snowflake.queries]
     assert any(sql.startswith('SHOW PRIMARY KEYS') for sql in statements)
-    assert any('DATE_PART(NANOSECOND, "UPDATED_AT")' in sql for sql in statements)
+    assert any('DATE_PART(NANOSECOND, "UPDATED_AT")' in sql for sql in statements) == (operation == 'preflight')
     assert not any('NULL_KEY_COUNT' in sql or '"ID" IS NULL' in sql for sql in statements)
 
 

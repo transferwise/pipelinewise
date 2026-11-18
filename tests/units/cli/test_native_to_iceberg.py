@@ -152,6 +152,7 @@ def test_render_table_and_json():
     assert text.splitlines()[0] == 'Blocker: tap-wide reason'
     assert 'DB.S.ORDERS' in text and 'first reason' in text and 'second reason' in text
     assert text.splitlines()[-1].startswith('Not ready')
+    assert 'other blockers must be fixed' in text.splitlines()[-1]
     assert payload['ready'] is False
     assert payload['tables'][1]['blockers'] == ['first reason', 'second reason']
     assert json.loads(
@@ -507,19 +508,33 @@ def test_gate_drives_the_real_converter(tmp_path):
     assert not list(tmp_path.glob('iceberg-recovery-*.json'))
 
 
-def test_default_gate_keeps_converter_representation_checks(tmp_path):
-    """Skipping the batch sweep still refuses lossy values before any conversion writes."""
+@pytest.mark.parametrize('options', [{}, {'automatic_preflight': False}])
+def test_default_gate_converts_temporal_values_without_precision_scan(tmp_path, options):
+    """Skipping preflight permits the converter's explicit microsecond truncation."""
     snowflake = _lossy_snowflake()
-    with patch.object(native_to_iceberg, 'SnowflakeConversionQueryAdapter', return_value=snowflake), patch.object(
-        native_to_iceberg.SnowflakeNativeToIcebergConverter, 'preflight',
-    ) as preflight:
-        with pytest.raises(NativeToIcebergConversionException, match='would truncate'):
-            native_to_iceberg.convert_tap_tables({'dbname': 'database'}, str(tmp_path), [_target('TABLE')])
+    with patch.object(native_to_iceberg, 'SnowflakeConversionQueryAdapter', return_value=snowflake):
+        native_to_iceberg.convert_tap_tables(
+            {'dbname': 'database'}, str(tmp_path), [_target('TABLE')], **options,
+        )
 
-    preflight.assert_not_called()
+    assert snowflake.formats == {'TABLE_NATIVE': 'native', 'TABLE': 'iceberg'}
+    assert not _manifest_files(tmp_path)
+    assert not any('DATE_PART(NANOSECOND' in sql for sql, _, _ in snowflake.queries)
+
+
+def test_automatic_preflight_stops_temporal_truncation_before_any_conversion(tmp_path):
+    """The batch precision scan blocks conversion before any table changes."""
+    snowflake = _lossy_snowflake()
+    with patch.object(native_to_iceberg, 'SnowflakeConversionQueryAdapter', return_value=snowflake):
+        with pytest.raises(NativeToIcebergConversionException, match='would truncate'):
+            native_to_iceberg.convert_tap_tables(
+                {'dbname': 'database'}, str(tmp_path), [_target('TABLE')], automatic_preflight=True,
+            )
+
     assert snowflake.formats == {'TABLE': 'native'}
     assert not _manifest_files(tmp_path)
     assert not _mutations(snowflake)
+    assert any('DATE_PART(NANOSECOND' in sql for sql, _, _ in snowflake.queries)
 
 
 def test_table_writer_classes_merge_streams_and_report_conflicts():

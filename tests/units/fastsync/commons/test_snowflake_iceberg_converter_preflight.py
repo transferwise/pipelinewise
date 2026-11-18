@@ -58,6 +58,9 @@ def _lossy_snowflake():
         _native_column('UPDATED_AT', 'TIMESTAMP_NTZ'),
     ]
     snowflake.sub_microsecond_counts = {'UPDATED_AT': 3}
+    snowflake.companion_extra_columns = [
+        _native_column('UPDATED_AT', 'TIMESTAMP_NTZ', DATETIME_PRECISION=6),
+    ]
     return snowflake
 
 
@@ -97,8 +100,7 @@ def test_preflight_collects_every_conversion_blocker(tmp_path):
         'Iceberg v3 conversion',
         'The REBUILD grant to ROLE MAINTAINER cannot be replayed onto a managed Iceberg table',
         'The SELECT grant to SHARE PARTNER_SHARE cannot be replayed onto a managed Iceberg table',
-        'Column UPDATED_AT has 3 value(s) with sub-microsecond precision that managed '
-        'Iceberg v3 would truncate',
+        'Column UPDATED_AT has 3 value(s) with sub-microsecond precision that this conversion would truncate',
     )
     probes = [sql for sql, _, _ in snowflake.queries if sql.startswith(PROBE)]
     assert probes == [
@@ -153,16 +155,42 @@ def test_missing_probe_evidence_fails_closed(tmp_path):
 
 
 @pytest.mark.parametrize('eventual', ['native', EVENTUAL_ICEBERG])
-def test_convert_refuses_unrepresentable_values_before_any_change(tmp_path, eventual):
-    """A table v3 cannot hold exactly fails before a manifest or Iceberg table exists."""
+@pytest.mark.parametrize('data_type', ['TIME', 'TIMESTAMP_NTZ', 'TIMESTAMP_LTZ'])
+def test_convert_truncates_temporal_values_without_precision_probe(tmp_path, eventual, data_type):
+    """Conversion validates the same microsecond projection that it copies."""
     snowflake = _lossy_snowflake()
+    snowflake.native_extra_columns = [_native_column('UPDATED_AT', data_type)]
+    snowflake.companion_extra_columns = [_native_column('UPDATED_AT', data_type, DATETIME_PRECISION=6)]
 
-    with pytest.raises(NativeToIcebergConversionError, match='would truncate'):
-        _converter(tmp_path, snowflake).convert(TABLE, eventual=eventual)
+    _converter(tmp_path, snowflake).convert(TABLE, eventual=eventual)
 
-    assert snowflake.formats == {'TABLE': 'native'}
+    expected = (
+        {'TABLE': 'native', 'TABLE_ICEBERG': 'iceberg'} if eventual == 'native'
+        else {'TABLE_NATIVE': 'native', 'TABLE': 'iceberg'}
+    )
+    assert snowflake.formats == expected
+    statements = [sql for sql, _, _ in snowflake.queries]
+    assert not any(sql.startswith(PROBE) for sql in statements)
+    projection = (
+        f'CAST(DATE_TRUNC(\'MICROSECOND\', "UPDATED_AT") AS {data_type}(6)) AS "UPDATED_AT"'
+    )
+    create = next(sql for sql in statements if sql.startswith('CREATE'))
+    assert projection in create
+    source_evidence = [sql for sql in statements if 'HASH_AGG(*)' in sql and projection in sql]
+    assert source_evidence
     assert not _manifest_files(tmp_path)
+
+
+@pytest.mark.parametrize('data_type', ['TIME', 'TIMESTAMP_NTZ', 'TIMESTAMP_LTZ'])
+def test_preflight_refuses_sub_microsecond_values_without_changes(tmp_path, data_type):
+    snowflake = _lossy_snowflake()
+    snowflake.native_extra_columns = [_native_column('UPDATED_AT', data_type)]
+
+    blockers = _converter(tmp_path, snowflake).preflight(TABLE)
+
+    assert len(blockers) == 1 and 'would truncate' in blockers[0]
     assert not _mutations(snowflake)
+    assert not _manifest_files(tmp_path)
 
 
 def test_convert_refuses_unreplayable_grant_before_copy(tmp_path):
@@ -177,18 +205,21 @@ def test_convert_refuses_unreplayable_grant_before_copy(tmp_path):
     assert not _mutations(snowflake)
 
 
-def test_adoption_refuses_unrepresentable_source(tmp_path):
-    """An existing companion is never adopted from a source v3 cannot represent."""
+@pytest.mark.parametrize('mismatch', [False, True])
+def test_adoption_compares_projected_temporal_contents(tmp_path, mismatch):
+    """Adoption permits truncation while refusing a genuine projected-content mismatch."""
     snowflake = _lossy_snowflake()
     snowflake.formats['TABLE_ICEBERG'] = 'iceberg'
-
-    with pytest.raises(NativeToIcebergConversionError, match='would truncate'):
+    if mismatch:
+        snowflake.staging_evidence = (2, 54321)
+        with pytest.raises(NativeToIcebergConversionError, match='does not match'):
+            _converter(tmp_path, snowflake).convert(TABLE, eventual=EVENTUAL_ICEBERG)
+        assert snowflake.formats == {'TABLE': 'native', 'TABLE_ICEBERG': 'iceberg'}
+        assert not _mutations(snowflake)
+    else:
         _converter(tmp_path, snowflake).convert(TABLE, eventual=EVENTUAL_ICEBERG)
-
-    assert snowflake.formats == {'TABLE': 'native', 'TABLE_ICEBERG': 'iceberg'}
-    assert not _manifest_files(tmp_path)
-    assert not _mutations(snowflake)
-    assert not any(sql.startswith('SELECT COUNT(*) AS "ROW_COUNT"') for sql, _, _ in snowflake.queries)
+        assert snowflake.formats == {'TABLE_NATIVE': 'native', 'TABLE': 'iceberg'}
+    assert not any(sql.startswith(PROBE) for sql, _, _ in snowflake.queries)
 
 
 def test_resumed_attempt_rechecks_before_staging(tmp_path):
@@ -213,24 +244,6 @@ def test_resumed_attempt_rechecks_before_staging(tmp_path):
     assert not _mutations(snowflake, query_count)
 
 
-def test_convertible_temporal_column_is_probed_then_converted(tmp_path):
-    """Microsecond-exact temporal values pass the probe and convert normally."""
-    snowflake = FakeSnowflake()
-    snowflake.native_extra_columns = [_native_column('UPDATED_AT', 'TIMESTAMP_NTZ')]
-    snowflake.companion_extra_columns = [
-        _native_column('UPDATED_AT', 'TIMESTAMP_NTZ', DATETIME_PRECISION=6),
-    ]
-
-    _converter(tmp_path, snowflake).convert(TABLE, eventual=EVENTUAL_ICEBERG)
-
-    assert snowflake.formats == {'TABLE_NATIVE': 'native', 'TABLE': 'iceberg'}
-    sql = [statement for statement, _, _ in snowflake.queries]
-    probe = next(index for index, statement in enumerate(sql) if statement.startswith(PROBE))
-    create = next(index for index, statement in enumerate(sql) if statement.startswith('CREATE'))
-    assert probe < create
-    assert 'CAST("UPDATED_AT" AS TIMESTAMP_NTZ(6)) AS "UPDATED_AT"' in sql[create]
-
-
 def _submitted_attempt_over_temporal_column(tmp_path):
     """Leave a SUBMITTED manifest beside a validated companion, as a rejected promotion does."""
     snowflake = FakeSnowflake()
@@ -247,20 +260,19 @@ def _submitted_attempt_over_temporal_column(tmp_path):
 
 
 @pytest.mark.parametrize('companion', ['kept', 'dropped'])
-def test_resumed_submitted_attempt_rechecks_before_cutover(tmp_path, companion):
-    """A resumed attempt past staging is checked again, because its evidence is projected."""
+def test_resumed_submitted_attempt_allows_temporal_truncation(tmp_path, companion):
+    """Resumption validates projected contents without rescanning temporal precision."""
     snowflake = _submitted_attempt_over_temporal_column(tmp_path)
     if companion == 'dropped':
         del snowflake.formats['TABLE_ICEBERG']
     snowflake.sub_microsecond_counts = {'UPDATED_AT': 2}
     query_count = len(snowflake.queries)
 
-    with pytest.raises(NativeToIcebergConversionError, match='would truncate'):
-        _converter(tmp_path, snowflake).convert(TABLE, eventual=EVENTUAL_ICEBERG)
+    _converter(tmp_path, snowflake).convert(TABLE, eventual=EVENTUAL_ICEBERG)
 
-    assert len(_manifest_files(tmp_path)) == 1
-    assert not _mutations(snowflake, query_count)
-    assert snowflake.formats.get('TABLE') == 'native'
+    assert not _manifest_files(tmp_path)
+    assert snowflake.formats == {'TABLE_NATIVE': 'native', 'TABLE': 'iceberg'}
+    assert not any(sql.startswith(PROBE) for sql, _, _ in snowflake.queries[query_count:])
 
 
 def _text_column(name, **overrides):

@@ -770,8 +770,9 @@ message names each table and the reason:
   ``is also written by tap <tap_id>`` without managed Iceberg v3 and conversion
   enabled or from another target, or a companion name that another tap writes;
 * ``cannot be converted``: a preflight blocker, such as a policy, a stream, a
-  ``TIMESTAMP_TZ`` column, sub-microsecond values, a grant that Iceberg cannot
-  carry, or a ``TEXT``/``VARIANT`` mismatch with the tap catalog;
+  ``TIMESTAMP_TZ`` column, a grant that Iceberg cannot carry, or a
+  ``TEXT``/``VARIANT`` mismatch with the tap catalog. Sub-microsecond values
+  block only when ``automatic_preflight: true``;
 * ``failed``: the conversion itself raised an error, or a resumed attempt
   restored its table name and then stopped for one of the reasons above;
 * ``stopped before any Snowflake work``: the main configuration enables
@@ -786,7 +787,8 @@ message names each table and the reason:
 
 1. Pause the tap's schedule until you have fixed the cause. Each scheduled run
    retries a copy that failed; it first checks every native table only when
-   ``automatic_preflight: true``. Every conversion still checks its table. The tap
+   ``automatic_preflight: true``. Every conversion still checks table structure
+   and copied contents, but truncates excess temporal precision. The tap
    never replicates into native tables, and tables that converted earlier stay
    converted. Keep ``native_to_iceberg_conversion`` enabled while you recover:
    with ``enabled: false``, ``run_tap`` does not resume a pending conversion. Do
@@ -823,7 +825,7 @@ message names each table and the reason:
 
    A pending attempt that a conversion check now refuses, for example one
    started by an earlier release, keeps its manifest and companion table. A grant
-   or sub-microsecond values can be fixed in place, and the next ``run_tap``
+   can be fixed in place, and the next ``run_tap``
    resumes the attempt. A fix that changes the table's columns, such as replacing
    a ``TIMESTAMP_TZ`` column or changing a ``TEXT`` column to ``VARIANT``, makes
    every resume fail with ``The schema of <table> changed after conversion started``.

@@ -368,6 +368,53 @@ def test_default_then_promotes_copy(conversion_environment):
     assert not list(Path(runtime_dir).glob('iceberg-recovery-*.json'))
 
 
+def test_conversion_truncates_temporal_values_and_preserves_native_backup(conversion_environment):
+    """Real Snowflake values lose only their sub-microsecond digits during conversion."""
+    adapter, database, schema, config_dir, runtime_dir = conversion_environment
+    table = SnowflakeObjectName(database, schema, 'TEMPORAL_PRECISION')
+    adapter.query("ALTER SESSION SET TIMEZONE = 'UTC'")
+    adapter.query(
+        f'CREATE TABLE {table.quoted} ('
+        '"ID" NUMBER(19,0), "T" TIME(9), "N" TIMESTAMP_NTZ(9), "L" TIMESTAMP_LTZ(9))'
+    )
+    for row_id, value in enumerate(('23:59:59.999999999', '00:00:00.000000001', '12:34:56.123456000'), 1):
+        adapter.query(
+            f'INSERT INTO {table.quoted} SELECT %(id)s, TO_TIME(%(time)s), '
+            'TO_TIMESTAMP_NTZ(%(timestamp)s), TO_TIMESTAMP_LTZ(%(timestamp)s)',
+            {'id': row_id, 'time': value, 'timestamp': f'2024-01-02 {value}'},
+        )
+    adapter.query(f'INSERT INTO {table.quoted} VALUES (4, NULL, NULL, NULL)')
+
+    def formatted_rows(target):
+        return adapter.query(
+            'SELECT "ID", TO_CHAR("T", \'HH24:MI:SS.FF9\') AS "T", '
+            'TO_CHAR("N", \'YYYY-MM-DD HH24:MI:SS.FF9\') AS "N", '
+            'TO_CHAR("L", \'YYYY-MM-DD HH24:MI:SS.FF9\') AS "L" '
+            f'FROM {target.quoted} ORDER BY "ID"'
+        )
+
+    original = formatted_rows(table)
+    assert [row['T'] for row in original] == [
+        '23:59:59.999999999', '00:00:00.000000001', '12:34:56.123456000', None,
+    ]
+    expected = []
+    for row in original:
+        expected.append({
+            key: value[:-3] + '000' if key != 'ID' and value is not None else value
+            for key, value in row.items()
+        })
+
+    _run_conversion_cli(config_dir, table, EVENTUAL_ICEBERG)
+
+    assert formatted_rows(table) == expected
+    assert formatted_rows(table.with_suffix('_NATIVE')) == original
+    assert original != expected
+    assert _formats(adapter, runtime_dir, table) == (
+        TABLE_FORMAT_MANAGED_ICEBERG_V3, TABLE_FORMAT_MISSING, TABLE_FORMAT_NATIVE,
+    )
+    assert not list(Path(runtime_dir).glob('iceberg-recovery-*.json'))
+
+
 def test_cutover_recovers_lost_response(conversion_environment):
     """A committed promotion is reconciled and retains the native backup."""
     adapter, database, schema, config_dir, runtime_dir = conversion_environment
