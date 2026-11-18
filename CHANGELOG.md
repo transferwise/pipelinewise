@@ -1,32 +1,42 @@
 0.103.0 (2026-11-18)
 --------------------
 
-- After `import_config` updates FastSync and Singer, map new MariaDB JSON columns
-  to VARIANT in Snowflake native and Iceberg tables. Until then, resyncs keep
-  the earlier TEXT mapping. Retain existing TEXT columns and their hash/mask
-  rules during Singer replication and PartialSync. Preserve existing JSON
-  column types during manual or automatic native-to-Iceberg conversion.
+- Convert Snowflake native tables to Snowflake-managed Iceberg v3 automatically
+  before replication when `native_to_iceberg_conversion.enabled` is `true`.
+  Resume pending conversions before starting new ones, then run FastSync or
+  Singer. Require imported Iceberg settings and an effective
+  `data_flattening_max_level: 0` (the default for MariaDB/MySQL and PostgreSQL
+  taps; some other taps default differently).
+  Pause schedules and stop readers and external writers through cutover and
+  validation.
+  See [automatic conversion](docs/connectors/targets/snowflake_iceberg.rst#snowflake-iceberg-auto-conversion).
+- Allow conversion preflight while a tap still writes native tables, so blockers
+  can be resolved before enabling automatic conversion. MySQL/MariaDB taps first
+  need a fresh `import_config`. Automatic conversion still requires imported
+  Iceberg settings.
+- Default `native_to_iceberg_conversion.automatic_preflight` to `false`.
+  Run the feasibility report manually before enabling conversion, or set this
+  option to `true` to check all tables before new conversions start. Preflight
+  reports sub-microsecond TIME/TIMESTAMP values; conversion truncates them to six
+  fractional digits. Each conversion still checks structure and copied contents.
+- Remove NULL-primary-key data scans from preflight and both conversion paths.
+  Keep primary-key metadata validation and preflight's temporal precision check.
+- Preserve existing MariaDB JSON column types during manual or automatic
+  native-to-Iceberg conversion. After `import_config` updates FastSync and Singer,
+  map new MariaDB JSON columns to VARIANT in Snowflake native and Iceberg tables.
+  Until then, resyncs keep the earlier TEXT mapping. Retain existing TEXT columns
+  and their hash/mask rules during Singer replication and PartialSync.
 - Block native-to-Iceberg conversion when a MariaDB JSON transformation needs
   an existing TEXT column but that column is missing or has another type. Check
   every imported writer before copying the table.
 - Restore Singer's handling of NULL for nullable non-JSON transformation targets
   and regex conditions in rules involving MariaDB JSON. Invalid patterns still
   stop replication.
-- Allow conversion preflight before a tap is configured for Iceberg.
-  MySQL/MariaDB taps first need a fresh `import_config`. Automatic conversion
-  still requires imported Iceberg settings.
-- Default `native_to_iceberg_conversion.automatic_preflight` to `false`.
-  Run the feasibility report manually before enabling conversion, or set this
-  option to `true` to check all tables before new conversions start. Without
-  preflight, conversion truncates sub-microsecond TIME/TIMESTAMP values to six
-  digits. Each conversion still checks structure and copied contents.
-- Remove NULL-primary-key data scans from preflight and both conversion paths.
-  Keep primary-key metadata validation and preflight's temporal precision check.
-- Improve conversion errors with documentation links. Clarify the existing
-  `--conversion-warehouse` option and remove outdated conversion-audit instructions.
 - Escape apostrophes in FastSync transformation conditions for PostgreSQL
   targets and MongoDB-to-Snowflake loads. Also escape trailing backslashes on
   the Snowflake route so equality and regex rules cannot alter the predicate.
+- Improve conversion errors with documentation links. Clarify the existing
+  `--conversion-warehouse` option and remove outdated conversion-audit instructions.
 - Finish pending MariaDB Iceberg syncs that still need source re-export before
   upgrading. Already-staged attempts retain their saved types. After upgrading,
   run `import_config` to refresh JSON discovery. See

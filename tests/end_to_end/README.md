@@ -8,7 +8,7 @@ these recipes aligned when the matrix changes.
 ## Shard recipes
 
 These groups mirror `.github/workflows/e2e_tests.yml` in required-check order
-`e2e_tests_01` through `e2e_tests_24`; update both together. CI runs twenty-three
+`e2e_tests_01` through `e2e_tests_25`; update both together. CI runs twenty-four
 Snowflake groups concurrently on isolated runners; local groups share/reset
 fixtures/config and must run serially:
 
@@ -130,14 +130,15 @@ run_sf_decimal \
   tests/integration/test_runtime_contracts.py::test_rejects_managed_text_variant_changes_without_versioning \
   tests/integration/test_decimals.py::test_float_fallback_keys_preserve_distinct_rows_across_batches \
   tests/integration/test_runtime_contracts.py::test_rejects_managed_merge_on_read_before_schema_changes \
-  tests/integration/test_decimals.py::test_bounded_nan_retains_rows_in_copy_and_merge
+  tests/integration/test_decimals.py::test_bounded_nan_retains_rows_in_copy_and_merge \
+  tests/integration/test_runtime_contracts.py::test_rejects_managed_v2_before_schema_changes
 
 run_e2e \
-  tests/end_to_end/target_snowflake/test_native_to_iceberg_converter.py
+  tests/end_to_end/target_snowflake/test_native_to_iceberg_converter.py::test_default_then_promotes_copy \
+  tests/end_to_end/target_snowflake/test_native_to_iceberg_converter.py::test_conversion_truncates_temporal_values_and_preserves_native_backup
 
 run_sf_decimal \
-  tests/integration/test_decimals.py::test_legacy_text_binary_key_matches_uppercase_fastsync_hex \
-  tests/integration/test_runtime_contracts.py::test_rejects_managed_v2_before_schema_changes
+  tests/integration/test_decimals.py::test_legacy_text_binary_key_matches_uppercase_fastsync_hex
 
 run_e2e \
   tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_table_size_check.py \
@@ -193,10 +194,15 @@ run_sf_decimal \
   tests/integration/test_decimals.py::test_legacy_float_decimal_keys_coalesce_collisions_and_keep_last_patch_and_delete
 
 run_e2e \
-  tests/end_to_end/target_snowflake/tap_yugabyte/test_migrate_postgres_tap_to_yugabyte_sf.py
+  tests/end_to_end/target_snowflake/tap_yugabyte/test_migrate_postgres_tap_to_yugabyte_sf.py \
+  tests/end_to_end/target_snowflake/tap_mariadb/test_multiline_native_mariadb_to_sf.py
+
+run_e2e \
+  tests/end_to_end/target_snowflake/test_native_to_iceberg_converter.py::test_cutover_recovers_lost_response \
+  tests/end_to_end/target_snowflake/test_native_to_iceberg_converter.py::test_mariadb_json_catalog_conversion_preserves_physical_type
 ```
 
-Run all twenty-four only for a full suite; otherwise run every affected group. MariaDB,
+Run all twenty-five only for a full suite; otherwise run every affected group. MariaDB,
 PostgreSQL, and genuine MySQL cover native and explicit v3.
 Do not infer one format from another. `SHOW PRIMARY KEYS` does not prove Iceberg
 identifier fields; compare raw-metadata `identifier-field-ids` with current
