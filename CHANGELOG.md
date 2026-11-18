@@ -1,10 +1,11 @@
 0.103.0 (2026-11-18)
 --------------------
 
-- Convert Snowflake native tables to Snowflake-managed Iceberg v3 automatically
-  before replication when `native_to_iceberg_conversion.enabled` is `true`.
-  Resume pending conversions before starting new ones, then run FastSync or
-  Singer. Require imported Iceberg settings and an effective
+- Improve the existing opt-in automatic conversion from Snowflake native tables
+  to managed Iceberg v3, including its feasibility checks and compatibility with
+  existing column types. With `native_to_iceberg_conversion.enabled: true`,
+  `run_tap` still resumes pending conversions and converts before FastSync or
+  Singer. It requires imported Iceberg settings and an effective
   `data_flattening_max_level: 0` (the default for MariaDB/MySQL and PostgreSQL
   taps; some other taps default differently).
   Pause schedules and stop readers and external writers through cutover and
@@ -12,8 +13,7 @@
   See [automatic conversion](docs/connectors/targets/snowflake_iceberg.rst#snowflake-iceberg-auto-conversion).
 - Allow conversion preflight while a tap still writes native tables, so blockers
   can be resolved before enabling automatic conversion. MySQL/MariaDB taps first
-  need a fresh `import_config`. Automatic conversion still requires imported
-  Iceberg settings.
+  need a fresh `import_config` for JSON discovery.
 - Default `native_to_iceberg_conversion.automatic_preflight` to `false`.
   Run the feasibility report manually before enabling conversion, or set this
   option to `true` to check all tables before new conversions start. Preflight
