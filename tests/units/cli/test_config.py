@@ -561,6 +561,26 @@ class TestConfig:
             **expected_format_settings,
         }
 
+    @pytest.mark.parametrize('table_format', [None, 'native', 'iceberg'])
+    @pytest.mark.parametrize('target_type', ['target-snowflake', 'target-postgres', 'target-s3-csv', None])
+    @pytest.mark.parametrize('tap_type', ['tap-mysql', 'tap-postgres', 'tap-yugabyte', 'tap-mongodb'])
+    def test_json_discovery_target_is_derived_from_destination(self, table_format, target_type, tap_type):
+        tap = {
+            'type': tap_type,
+            'db_conn': {'host': 'source.example', 'json_target': 'snowflake'},
+        }
+        if table_format is not None:
+            tap['target_table_format'] = table_format
+        if table_format == 'iceberg':
+            tap['iceberg_version'] = 3
+
+        generated = Config.generate_tap_connection_config(tap, {'json_target': 'injected'}, target_type)
+
+        if tap_type == 'tap-mysql' and target_type == 'target-snowflake':
+            assert generated['json_target'] == 'snowflake'
+        else:
+            assert 'json_target' not in generated
+
     def test_from_yamls(self):
         """Test creating Config object using YAML configuration directory as the input"""
 
@@ -808,6 +828,7 @@ class TestConfig:
         }
         assert cli.utils.load_json(json_files['tap_config_json']) == {
             'decimal_target': 'snowflake',
+            'json_target': 'snowflake',
             'dbname': '<DB_NAME>',
             'host': '<HOST>',
             'port': 3306,
@@ -930,6 +951,7 @@ class TestConfig:
         }
         assert cli.utils.load_json(json_files['tap_config_json']) == {
             'decimal_target': 'snowflake',
+            'json_target': 'snowflake',
             'dbname': '<DB_NAME>',
             'host': '<HOST>',
             'port': 3306,

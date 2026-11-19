@@ -95,6 +95,8 @@ def assert_iceberg_partial_sync_workflow(
         target_table_format='iceberg',
         iceberg_version=3,
     )
+    if source_class_name == 'FastSyncTapMySql':
+        args.tap['json_target'] = 'snowflake'
     original_table = args.table
     table = ('foo', {
         'column': 'foo_column',

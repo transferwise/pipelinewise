@@ -1,6 +1,9 @@
 """Shared route ordering for Snowflake Iceberg publication attempts."""
 
+from collections.abc import Iterable
+
 from . import utils
+from .snowflake_iceberg_model import IcebergPublicationAttempt
 from .source_transformations import stream_name_for_table
 from .tap_mysql import (
     DEFAULT_CHARSET,
@@ -372,6 +375,16 @@ def validate_recovery_source_spec(
         raise TableCompatibilityError(
             'The current source primary key cannot resume the persisted Iceberg '
             'publication contract'
+        )
+
+
+def validate_recovery_mariadb_json_columns(attempt: IcebergPublicationAttempt, columns: Iterable[str]) -> None:
+    """Reject ambiguous alias recognition before restarting a source export."""
+    persisted = set(getattr(attempt.manifest_payload, 'mariadb_json_columns', None) or ())
+    if set(columns) != persisted:
+        raise RecoveryManifestError(
+            'MariaDB JSON alias mapping changed since staging was planned; '
+            'use the original PipelineWise version and configuration to finish or abort this attempt'
         )
 
 

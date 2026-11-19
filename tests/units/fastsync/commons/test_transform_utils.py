@@ -11,6 +11,90 @@ class TestTransformHelper(unittest.TestCase):
     Unit tests for TransformationHelper class
     """
 
+    def test_condition_literals_escape_apostrophes(self):
+        for flavor in SQLFlavor:
+            for operator in ('equals', 'regex_match'):
+                for value, escaped in (("O'Brien", "O''Brien"), ("'quoted'", "''quoted''"),
+                                       ("x' OR 1=1 --", "x'' OR 1=1 --")):
+                    with self.subTest(flavor=flavor, operator=operator, value=value):
+                        transformations = [{
+                            'tap_stream_name': 'public-people',
+                            'field_id': 'name',
+                            'type': 'SET-NULL',
+                            'when': [{'column': 'name', operator: value}],
+                        }]
+                        result = TransformationHelper.get_trans_in_sql_flavor(
+                            'public-people', transformations, flavor,
+                        )[0]
+                        column = 'NAME' if flavor == SQLFlavor.SNOWFLAKE else 'name'
+                        sql_operator = '=' if operator == 'equals' else (
+                            'REGEXP' if flavor == SQLFlavor.SNOWFLAKE else '~'
+                        )
+                        self.assertEqual(result['conditions'], f'("{column}" {sql_operator} \'{escaped}\')')
+
+    def test_condition_literals_preserve_backslash_semantics(self):
+        cases = (
+            (r"O\'Brien", r"O\'Brien", r"O\''Brien"),
+            (r"O\\'Brien", r"O\\''Brien", r"O\\''Brien"),
+            (r"O\\\'Brien", r"O\\\'Brien", r"O\\\''Brien"),
+            (r'a\n\t\\b', r'a\n\t\\b', r'a\n\t\\b'),
+        )
+        for flavor in SQLFlavor:
+            for operator in ('equals', 'regex_match'):
+                for value, snowflake_literal, postgres_literal in cases:
+                    with self.subTest(flavor=flavor, operator=operator, value=value):
+                        transformations = [{
+                            'tap_stream_name': 'public-people', 'field_id': 'name', 'type': 'SET-NULL',
+                            'when': [{'column': 'name', operator: value}],
+                        }]
+                        result = TransformationHelper.get_trans_in_sql_flavor(
+                            'public-people', transformations, flavor,
+                        )[0]
+                        is_snowflake = flavor == SQLFlavor.SNOWFLAKE
+                        column = 'NAME' if is_snowflake else 'name'
+                        literal = snowflake_literal if is_snowflake else postgres_literal
+                        sql_operator = '=' if operator == 'equals' else ('REGEXP' if is_snowflake else '~')
+                        self.assertEqual(result['conditions'], f'("{column}" {sql_operator} \'{literal}\')')
+
+    def test_condition_literals_escape_unpaired_trailing_backslashes(self):
+        for flavor in SQLFlavor:
+            for operator in ('equals', 'regex_match'):
+                for prefix in ('', 'value', r'line\n'):
+                    for count in range(6):
+                        with self.subTest(flavor=flavor, operator=operator, prefix=prefix, count=count):
+                            value = prefix + '\\' * count
+                            transformations = [{
+                                'tap_stream_name': 'public-people', 'field_id': 'name', 'type': 'SET-NULL',
+                                'when': [{'column': 'name', operator: value}],
+                            }]
+                            result = TransformationHelper.get_trans_in_sql_flavor(
+                                'public-people', transformations, flavor,
+                            )[0]
+                            is_snowflake = flavor == SQLFlavor.SNOWFLAKE
+                            column = 'NAME' if is_snowflake else 'name'
+                            literal = prefix + '\\' * (count + count % 2 if is_snowflake else count)
+                            sql_operator = '=' if operator == 'equals' else ('REGEXP' if is_snowflake else '~')
+                            self.assertEqual(result['conditions'], f'("{column}" {sql_operator} \'{literal}\')')
+
+    def test_snowflake_trailing_backslash_keeps_following_condition_value_quoted(self):
+        for operator in ('equals', 'regex_match'):
+            with self.subTest(operator=operator):
+                transformations = [{
+                    'tap_stream_name': 'public-people', 'field_id': 'name', 'type': 'SET-NULL',
+                    'when': [
+                        {'column': 'name', operator: '\\'},
+                        {'column': 'other', operator: ' OR 1=1 --'},
+                    ],
+                }]
+                result = TransformationHelper.get_trans_in_sql_flavor(
+                    'public-people', transformations, SQLFlavor.SNOWFLAKE,
+                )[0]
+                sql_operator = '=' if operator == 'equals' else 'REGEXP'
+                self.assertEqual(
+                    result['conditions'],
+                    f'("NAME" {sql_operator} \'\\\\\') AND ("OTHER" {sql_operator} \' OR 1=1 --\')',
+                )
+
     def test_get_trans_in_sql_case1(self):
         """
         Test obfuscation where given transformations are empty and sql is Snowflake

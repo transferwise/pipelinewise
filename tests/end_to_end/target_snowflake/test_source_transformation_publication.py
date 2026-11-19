@@ -99,6 +99,27 @@ def _connector_python(connector, program, payload):
 
 
 def _singer_schema(source_export):
+    if source_export.engine == 'mariadb':
+        config = {
+            **source_export.source.connection_config,
+            'decimal_target': 'snowflake', 'json_target': 'snowflake', 'filter_dbs': source_export.schema,
+            'target_table_format': 'iceberg' if source_export.iceberg else 'native',
+        }
+        if source_export.iceberg:
+            config['iceberg_version'] = 3
+        return json.loads(_connector_python('tap-mysql', '''
+import json
+import sys
+from tap_mysql import _discover_catalog
+from tap_mysql.connection import MySQLConnection
+
+payload = json.load(sys.stdin)
+config = payload['config']
+catalog = _discover_catalog(MySQLConnection(config), config)
+entry = next(entry for entry in catalog.streams if entry.table == payload['table'])
+print(json.dumps(entry.schema.to_dict()))
+''', {'config': config, 'table': source_export.table_name}))
+
     column_type = 'data_type' if source_export.engine == 'postgres' else 'column_type'
     rows = source_export.source.query(
         'SELECT column_name, data_type, character_maximum_length, numeric_precision, numeric_scale, '
@@ -121,8 +142,7 @@ for column in payload['columns']:
     column.update(
         is_primary_key=column['column_name'] == 'id', sql_data_type=column['data_type'],
         is_array=False, is_enum=False, column_key='PRI' if column['column_name'] == 'id' else '',
-        is_json_alias=payload['engine'] == 'mariadb' and payload['iceberg']
-            and column['column_name'] == 'null_variant',
+        is_json_alias=False,
     )
     schema = schema_for_column(SimpleNamespace(**column))
     properties[column['column_name']] = schema if isinstance(schema, dict) else schema.to_dict()
@@ -130,7 +150,7 @@ print(json.dumps({'type': 'object', 'properties': properties}))
 '''
     return json.loads(_connector_python(
         'tap-postgres' if source_export.engine == 'postgres' else 'tap-mysql',
-        program, {'engine': source_export.engine, 'iceberg': source_export.iceberg,
+        program, {'engine': source_export.engine,
                   'columns': [{key.lower(): value for key, value in dict(row).items()} for row in rows]},
     ))
 

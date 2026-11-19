@@ -555,6 +555,8 @@ class DbSync:
                 'json_element_name': json_element_name(name),
                 'trans': column_trans(schema, retained_type),
             }
+            if schema.get('format') == 'mariadb-json':
+                column['parse_json_in_copy'] = column['trans'] == 'parse_json'
             if is_decimal_schema(schema):
                 column.update(
                     decimal_type=self.decimal_load_type(name, schema),
@@ -758,6 +760,9 @@ class DbSync:
 
     def create_schema_if_not_exists(self):
         """Create target schema if not exists"""
+        # These streams require an existing table; sync_table validates it before any DDL.
+        if any(schema.get('format') == 'mariadb-json-text' for schema in self.flatten_schema.values()):
+            return
         schema_name = self.schema_name
         schema_rows = 0
 
@@ -897,8 +902,11 @@ class DbSync:
 
         # Later SCHEMA messages may replace DbSync while retaining the startup cache.
         # Decimal dimensions must be compared with the table after earlier DDL.
-        has_decimals = any(is_decimal_schema(schema) for schema in self.flatten_schema.values())
-        if self.table_cache and not has_decimals:
+        requires_live_columns = any(
+            is_decimal_schema(schema) or schema.get('format') == 'mariadb-json-text'
+            for schema in self.flatten_schema.values()
+        )
+        if self.table_cache and not requires_live_columns:
             all_table_columns = self.table_cache
         else:
             all_table_columns = self.get_table_columns(table_schemas=[self.schema_name])

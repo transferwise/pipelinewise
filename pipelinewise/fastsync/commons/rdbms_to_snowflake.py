@@ -240,6 +240,9 @@ def _plan_full_iceberg_export(run: _FullSyncRun) -> None:
         run.primary_key,
     )
     if run.attempt is not None:
+        iceberg_routes.validate_recovery_mariadb_json_columns(
+            run.attempt, snowflake_types.get('mariadb_json_columns', ()),
+        )
         iceberg_routes.validate_recovery_source_spec(run.spec, current_spec)
         run.bookmark = run.attempt.source_bookmark
         run.publisher.plan_full_sync(run.attempt, run.spec)
@@ -259,6 +262,8 @@ def _plan_full_iceberg_export(run: _FullSyncRun) -> None:
         recovery_identity=run.recovery_identity,
         staging_config=run.staging_config,
         resolved_source_engine=resolved_engine,
+        **({'mariadb_json_columns': snowflake_types['mariadb_json_columns']}
+           if snowflake_types.get('mariadb_json_columns') else {}),
     )
     run.publisher.plan_full_sync(run.attempt, run.spec)
 
@@ -266,6 +271,9 @@ def _plan_full_iceberg_export(run: _FullSyncRun) -> None:
 def _validate_full_export(run: _FullSyncRun, snowflake_types) -> None:
     if not run.iceberg_requested:
         return
+    iceberg_routes.validate_recovery_mariadb_json_columns(
+        run.attempt, snowflake_types.get('mariadb_json_columns', ()),
+    )
     exported_spec = iceberg_routes.create_spec(
         run.args,
         run.target_schema,

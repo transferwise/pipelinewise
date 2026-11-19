@@ -35,6 +35,7 @@ class TestTapMysql(unittest.TestCase):
             ANY,
             'source_db',
             detect_json_aliases=True,
+            json_discovery_engine='mariadb',
         )
         discovered.dump.assert_called_once_with()
 
@@ -67,9 +68,24 @@ class TestTapMysql(unittest.TestCase):
             mysql_conn,
             'source_db',
             detect_json_aliases=True,
+            json_discovery_engine='mariadb',
         )
         discovered.dump.assert_called_once_with()
         self.assertNotIn('engine', config)
+
+    def test_detected_engine_drives_native_snowflake_json_discovery(self):
+        for engine in ('mysql', 'mariadb'):
+            with self.subTest(engine=engine), patch('tap_mysql.discover_catalog') as discover:
+                mysql_conn = Mock(configured_engine=None, resolved_engine=engine)
+                config = {'json_target': 'snowflake', 'filter_dbs': 'source_db'}
+
+                do_discover(mysql_conn, _runtime_config(mysql_conn, config))
+
+                options = {'json_discovery_engine': engine}
+                if engine == 'mariadb':
+                    options['detect_json_aliases'] = True
+                discover.assert_called_once_with(mysql_conn, 'source_db', **options)
+                self.assertNotIn('engine', config)
 
     @patch('tap_mysql.connect_with_backoff')
     def test_runtime_engine_resolver_opens_closed_connection_when_detection_is_needed(

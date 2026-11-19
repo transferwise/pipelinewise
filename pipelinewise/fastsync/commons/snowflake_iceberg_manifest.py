@@ -23,6 +23,7 @@ _PUBLICATION_FIELDS = frozenset({
     'publication_query_type',
     'publication_submitted_at',
     'resolved_source_engine',
+    'mariadb_json_columns',
     'replacement_metadata',
     'schema_evolution_applied',
     'staging_config',
@@ -54,6 +55,14 @@ def _invalid_payload() -> RecoveryManifestError:
 
 def _validate_publication_fields(value: Dict[str, Any]) -> None:
     if 'resolved_source_engine' in value and value['resolved_source_engine'] not in ('mysql', 'mariadb'):
+        raise _invalid_payload()
+    mariadb_json_columns = value.get('mariadb_json_columns', [])
+    if (
+        not isinstance(mariadb_json_columns, list)
+        or any(not isinstance(name, str) or not name for name in mariadb_json_columns)
+        or len(mariadb_json_columns) != len(set(mariadb_json_columns))
+        or (mariadb_json_columns and value.get('resolved_source_engine') != 'mariadb')
+    ):
         raise _invalid_payload()
     for name in ('staging_config', 'replacement_metadata'):
         if name in value and not isinstance(value[name], dict):
@@ -212,6 +221,7 @@ class FullSyncManifestPayload:
     publication_query_type: Optional[str] = None
     publication_submitted_at: Optional[float] = None
     resolved_source_engine: Optional[str] = None
+    mariadb_json_columns: Optional[list[str]] = None
     extensions: Dict[str, Any] = field(default_factory=dict)
     present_fields: FrozenSet[str] = field(default_factory=frozenset)
 
@@ -227,6 +237,7 @@ class FullSyncManifestPayload:
             publication_query_type=_field(value, 'publication_query_type'),
             publication_submitted_at=_field(value, 'publication_submitted_at'),
             resolved_source_engine=_field(value, 'resolved_source_engine'),
+            mariadb_json_columns=_field(value, 'mariadb_json_columns'),
             extensions=_extensions(value, _PUBLICATION_FIELDS),
             present_fields=frozenset(value).intersection(_PUBLICATION_FIELDS),
         )
@@ -243,6 +254,7 @@ class FullSyncManifestPayload:
                 'publication_query_type': self.publication_query_type,
                 'publication_submitted_at': self.publication_submitted_at,
                 'resolved_source_engine': self.resolved_source_engine,
+                'mariadb_json_columns': self.mariadb_json_columns,
             },
             self.extensions,
         )
@@ -285,6 +297,7 @@ class PartialSyncManifestPayload(FullSyncManifestPayload):
             delete_mode=_field(value, 'delete_mode'),
             column_versions=_field(value, 'column_versions'),
             decimal_columns=_field(value, 'decimal_columns'),
+            mariadb_json_columns=_field(value, 'mariadb_json_columns'),
             historical_columns=_field(value, 'historical_columns'),
             version_legacy_float_columns=_field(value, 'version_legacy_float_columns'),
         )
@@ -309,6 +322,7 @@ class PartialSyncManifestPayload(FullSyncManifestPayload):
                 'delete_mode': self.delete_mode,
                 'column_versions': self.column_versions,
                 'decimal_columns': self.decimal_columns,
+                'mariadb_json_columns': self.mariadb_json_columns,
                 'historical_columns': self.historical_columns,
                 'version_legacy_float_columns': self.version_legacy_float_columns,
             },

@@ -398,8 +398,8 @@ def main():
         type=str,
         default=None,
         help=(
-            'Snowflake warehouse for copy_native_to_iceberg queries; overrides the tap setting '
-            'and defaults to the target warehouse'
+            'Snowflake warehouse for conversion and --preflight-only queries; '
+            'overrides the tap setting and defaults to the target warehouse'
         ),
     )
     parser.add_argument('--column', type=str, default='*', help='Name of the column to use as sync key in partial sync')

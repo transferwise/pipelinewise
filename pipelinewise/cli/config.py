@@ -359,15 +359,18 @@ class Config:
         Args:
             tap: tap config
             extra_config_keys:  extra keys to add to the db conn config
-            target_type: destination connector used to enable exact decimal transport
+            target_type: destination connector used to derive internal transport settings
         Returns: Dictionary of tap connection config
         """
         tap_config = {**tap.get('db_conn'), **extra_config_keys}
         tap_config.pop('decimal_target', None)
+        tap_config.pop('json_target', None)
         if tap.get('type') in ('tap-mysql', 'tap-postgres', 'tap-yugabyte') and target_type in (
             'target-snowflake', 'target-postgres',
         ):
             tap_config['decimal_target'] = target_type.removeprefix('target-')
+        if tap.get('type') == 'tap-mysql' and target_type == 'target-snowflake':
+            tap_config['json_target'] = 'snowflake'
         if (
             tap.get('type') == 'tap-mysql'
             and tap.get('target_table_format') == cls.TABLE_FORMAT_ICEBERG
@@ -870,11 +873,15 @@ class Config:
         if (
             not isinstance(conversion, dict)
             or not isinstance(conversion.get('enabled'), bool)
-            or set(conversion) - {'enabled', 'conversion_warehouse'}
+            or set(conversion) - {'enabled', 'conversion_warehouse', 'automatic_preflight'}
         ):
             raise InvalidConfigException(
                 f'Tap "{tap.get("id")}" {setting} must be an object with a Boolean '
-                '"enabled" and an optional "conversion_warehouse".'
+                '"enabled", an optional Boolean "automatic_preflight", and an optional "conversion_warehouse".'
+            )
+        if 'automatic_preflight' in conversion and not isinstance(conversion['automatic_preflight'], bool):
+            raise InvalidConfigException(
+                f'Tap "{tap.get("id")}" {setting} automatic_preflight must be a Boolean.'
             )
         conversion_warehouse = conversion.get('conversion_warehouse')
         if 'conversion_warehouse' in conversion and (

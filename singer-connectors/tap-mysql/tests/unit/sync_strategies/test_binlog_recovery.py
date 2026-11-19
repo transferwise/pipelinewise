@@ -909,7 +909,13 @@ def test_schema_ignores_are_scoped_to_the_source_stream(stream):
     assert records[1].record['added'] == 42
 
 
-def test_binlog_rediscovery_uses_resolved_mariadb_json_alias_setting(stream):
+@pytest.mark.parametrize('engine', ['mysql', 'mariadb'])
+@pytest.mark.parametrize('format_settings', [
+    {'target_table_format': 'iceberg', 'iceberg_version': 3},
+    {'json_target': 'snowflake', 'target_table_format': 'native'},
+    {'json_target': 'snowflake', 'target_table_format': 'iceberg', 'iceberg_version': 3},
+])
+def test_binlog_rediscovery_uses_resolved_snowflake_json_setting(stream, engine, format_settings):
     row_event = write_event()
     row_event.columns.append(SimpleNamespace(name='added', type=FIELD_TYPE.VARCHAR))
     row_event.rows[0]['values']['added'] = '{"key":"value"}'
@@ -926,9 +932,8 @@ def test_binlog_rediscovery_uses_resolved_mariadb_json_alias_setting(stream):
     reader = Reader([(100, row_event)])
     config = {
         'use_gtid': False,
-        'engine': 'mariadb',
-        'target_table_format': 'iceberg',
-        'iceberg_version': 3,
+        'engine': engine,
+        **format_settings,
     }
 
     with patch.object(binlog, 'should_run_discovery', return_value=True), \
@@ -937,11 +942,14 @@ def test_binlog_rediscovery_uses_resolved_mariadb_json_alias_setting(stream):
         binlog._run_binlog_sync(
             None, reader, streams, {}, config, reader.log_file, 1000)
 
+    options = {'json_discovery_engine': engine}
+    if engine == 'mariadb':
+        options['detect_json_aliases'] = True
     discovery.assert_called_once_with(
         None,
         'db',
         'items',
-        detect_json_aliases=True,
+        **options,
     )
 
 

@@ -225,7 +225,9 @@ class SnowflakeNativeToIcebergConverter:
             metadata = self._inspect_source(table)
         except NativeToIcebergConversionError as exc:
             return (str(exc),)
-        return tuple(self._conversion_blockers(table, metadata))
+        blockers = self._conversion_blockers(table, metadata)
+        blockers.extend(self._data_value_blockers(table, metadata))
+        return tuple(blockers)
 
     def _conversion_blockers(
         self,
@@ -234,7 +236,6 @@ class SnowflakeNativeToIcebergConverter:
     ) -> List[str]:
         blockers = representation_blockers(metadata.columns)
         blockers.extend(grant_replay_blockers(metadata.grants))
-        blockers.extend(self._sub_microsecond_blockers(table, metadata.columns))
         blockers.extend(text_variant_blockers(metadata.columns, self._writer_types))
         return blockers
 
@@ -243,43 +244,73 @@ class SnowflakeNativeToIcebergConverter:
         table: SnowflakeTableName,
         metadata: ConversionMetadata,
     ) -> None:
-        # Known refusals already stop the attempt, so the full-table probe is skipped.
+        # Caller refusals already block the table, so avoid duplicate checks.
         blockers = list(self._refusals) or self._conversion_blockers(table, metadata)
         if blockers:
             raise NativeToIcebergConversionError(
                 f'Cannot convert {table.quoted}: ' + '; '.join(blockers)
             )
 
-    def _sub_microsecond_blockers(
+    def _data_value_blockers(
         self,
         table: SnowflakeTableName,
-        columns: Tuple[NativeColumn, ...],
+        metadata: ConversionMetadata,
     ) -> List[str]:
-        # The content evidence compares projected values, so v3 truncation must be found first.
-        temporal = [column for column in columns if column.data_type in SUB_MICROSECOND_TYPES]
-        if not temporal:
+        """Probe nullable keys and temporal precision in one read of the native table."""
+        nullable_keys = [
+            column.name for column in metadata.columns
+            if column.name in metadata.primary_key and column.nullable
+        ]
+        temporal = [column for column in metadata.columns if column.data_type in SUB_MICROSECOND_TYPES]
+        if not nullable_keys and not temporal:
             return []
-        # COUNT_IF returns NULL for an empty table, where no value can be truncated.
-        probes = ', '.join(
+
+        probes = []
+        if nullable_keys:
+            null_predicate = ' OR '.join(f'{quote_identifier(key)} IS NULL' for key in nullable_keys)
+            probes.append(
+                f'COALESCE(COUNT_IF({null_predicate}), 0) AS "NULL_PRIMARY_KEY_COUNT"'
+            )
+        # COUNT_IF returns NULL for an empty table, where neither issue can occur.
+        probes.extend(
             f'COALESCE(COUNT_IF(MOD(DATE_PART(NANOSECOND, {quote_identifier(column.name)}), 1000) <> 0), 0) '
             f'AS "SUB_MICROSECOND_{index}"'
             for index, column in enumerate(temporal)
         )
-        rows = self._query(f'SELECT {probes} FROM {table.quoted}', phase='metadata')
+        rows = self._query(f'SELECT {", ".join(probes)} FROM {table.quoted}', phase='metadata')
+        if len(rows) != 1:
+            raise NativeToIcebergConversionError(
+                f'Snowflake did not return preflight value evidence for {table.quoted}'
+            )
+
+        blockers = []
+        if nullable_keys:
+            null_count = _row_value(rows[0], 'NULL_PRIMARY_KEY_COUNT')
+            if null_count is None:
+                raise NativeToIcebergConversionError(
+                    f'Snowflake did not return NULL primary-key evidence for {table.quoted}'
+                )
+            if int(null_count) > 0:
+                blockers.append(
+                    f'Primary key contains {int(null_count)} row(s) with NULL key values; '
+                    'correct the native table before converting to Iceberg'
+                )
+
         counts = [
-            _row_value(rows[0], f'SUB_MICROSECOND_{index}') if len(rows) == 1 else None
+            _row_value(rows[0], f'SUB_MICROSECOND_{index}')
             for index in range(len(temporal))
         ]
         if any(count is None for count in counts):
             raise NativeToIcebergConversionError(
                 f'Snowflake did not return sub-microsecond evidence for {table.quoted}'
             )
-        return [
+        blockers.extend(
             f'Column {column.name} has {int(count)} value(s) with sub-microsecond '
-            'precision that managed Iceberg v3 would truncate'
+            'precision that this conversion would truncate'
             for column, count in zip(temporal, counts)
             if int(count) > 0
-        ]
+        )
+        return blockers
 
     def _query(self, sql: str, params=None, phase: str = None):
         query_tag = {
@@ -532,7 +563,7 @@ class SnowflakeNativeToIcebergConverter:
                 f'The schema of {table.quoted} changed after conversion started'
             )
         if resumed:
-            # A resumed attempt may predate these checks; its projected evidence cannot prove exactness.
+            # A resumed attempt may predate the current metadata and writer checks.
             self._assert_convertible(table, metadata)
 
         if state.staging == TABLE_FORMAT_MISSING:
@@ -814,7 +845,7 @@ class SnowflakeNativeToIcebergConverter:
             phase='metadata',
         ))
         primary_key = self._primary_key(table)
-        self._assert_primary_key(columns, primary_key, table)
+        self._assert_primary_key_metadata(columns, primary_key)
         self._assert_no_other_constraints(table)
         self._assert_no_streams(table)
         self._assert_no_policies(table)
@@ -889,34 +920,15 @@ class SnowflakeNativeToIcebergConverter:
                 'foreign keys that manual conversion cannot preserve safely'
             )
 
-    def _assert_primary_key(
-        self,
+    @staticmethod
+    def _assert_primary_key_metadata(
         columns: Tuple[NativeColumn, ...],
         primary_key: Tuple[str, ...],
-        table: SnowflakeTableName,
     ) -> None:
         column_names = {column.name for column in columns}
         if any(not isinstance(column, str) or column not in column_names for column in primary_key):
             raise NativeToIcebergConversionError(
                 'Snowflake returned invalid primary-key metadata'
-            )
-        if not primary_key:
-            return
-        predicate = ' OR '.join(
-            f'{quote_identifier(column)} IS NULL' for column in primary_key
-        )
-        rows = self._query(
-            f'SELECT COUNT(*) AS "NULL_KEY_COUNT" FROM {table.quoted} WHERE {predicate}',
-            phase='metadata',
-        )
-        null_count = _row_value(rows[0], 'NULL_KEY_COUNT') if rows else None
-        if null_count is None:
-            raise NativeToIcebergConversionError(
-                'Snowflake did not return primary-key nullability evidence'
-            )
-        if int(null_count) > 0:
-            raise NativeToIcebergConversionError(
-                f'{table.quoted} contains NULL primary-key values'
             )
 
     def _table_metadata(

@@ -240,7 +240,7 @@ def test_snowflake_e2e_matrix_contract():
     assert job['name'] == '${{ matrix.check_name }}'
     assert strategy['fail-fast'] is False
     assert 'max-parallel' not in strategy
-    assert len(shards) == 23
+    assert len(shards) == 24
 
     expected_shards = {
         'conversion': (
@@ -316,7 +316,6 @@ def test_snowflake_e2e_matrix_contract():
             (
                 'tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_table_size_check.py',
                 'tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf.py',
-                'tests/end_to_end/target_snowflake/tap_mariadb/test_multiline_native_mariadb_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_mariadb/test_defined_partial_sync_mariadb_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_with_split_large_files.py',
                 'tests/end_to_end/test_numeric_replication.py::test_decimal_fallback_snowflake[mariadb-native]',
@@ -375,7 +374,8 @@ def test_snowflake_e2e_matrix_contract():
         'connector-keys': (
             'e2e_tests_16',
             (
-                'tests/end_to_end/target_snowflake/test_native_to_iceberg_converter.py',
+                'tests/end_to_end/target_snowflake/test_native_to_iceberg_converter.py::test_default_then_promotes_copy',
+                'tests/end_to_end/target_snowflake/test_native_to_iceberg_converter.py::test_conversion_truncates_temporal_values_and_preserves_native_backup',
             ),
         ),
         'postgres-maintenance': (
@@ -433,10 +433,18 @@ def test_snowflake_e2e_matrix_contract():
                 'tests/end_to_end/test_yugabyte_migration.py',
             ),
         ),
-        'yugabyte-migration': (
+        'migration-multiline': (
             'e2e_tests_24',
             (
                 'tests/end_to_end/target_snowflake/tap_yugabyte/test_migrate_postgres_tap_to_yugabyte_sf.py',
+                'tests/end_to_end/target_snowflake/tap_mariadb/test_multiline_native_mariadb_to_sf.py',
+            ),
+        ),
+        'conversion-json-recovery': (
+            'e2e_tests_25',
+            (
+                'tests/end_to_end/target_snowflake/test_native_to_iceberg_converter.py::test_cutover_recovers_lost_response',
+                'tests/end_to_end/target_snowflake/test_native_to_iceberg_converter.py::test_mariadb_json_catalog_conversion_preserves_physical_type',
             ),
         ),
     }
@@ -552,10 +560,10 @@ def test_snowflake_e2e_matrix_contract():
             'tests/integration/test_decimals.py::test_float_fallback_keys_preserve_distinct_rows_across_batches',
             'tests/integration/test_runtime_contracts.py::test_rejects_managed_merge_on_read_before_schema_changes',
             'tests/integration/test_decimals.py::test_bounded_nan_retains_rows_in_copy_and_merge',
+            'tests/integration/test_runtime_contracts.py::test_rejects_managed_v2_before_schema_changes',
         ),
         'connector-keys': (
             'tests/integration/test_decimals.py::test_legacy_text_binary_key_matches_uppercase_fastsync_hex',
-            'tests/integration/test_runtime_contracts.py::test_rejects_managed_v2_before_schema_changes',
         ),
         'decimal-fastsync-mysql-family': (
             'tests/integration/test_runtime_contracts.py::test_sparse_patch_batches_preserve_omitted_values_and_apply_null',
@@ -669,7 +677,7 @@ def test_required_e2e_status_contract():
 
     assert len(configured_names) == len(set(configured_names))
     assert expected_statuses == {
-        f'e2e_tests_{shard_number:02d}' for shard_number in range(1, 25)
+        f'e2e_tests_{shard_number:02d}' for shard_number in range(1, 26)
     }
     assert required_statuses == expected_statuses
     assert not {

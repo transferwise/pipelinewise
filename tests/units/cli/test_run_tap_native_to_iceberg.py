@@ -8,7 +8,7 @@ import pytest
 
 from pipelinewise.cli.errors import NativeToIcebergConversionException
 from pipelinewise.cli.pipelinewise import PipelineWise
-from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_plan import ConversionTarget
+from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_plan import EXISTING_TEXT, ConversionTarget
 from pipelinewise.fastsync.commons.snowflake_iceberg_model import SnowflakeObjectName
 from tests.units.cli.cli_args import CliArgs
 
@@ -45,8 +45,10 @@ def test_conversion_is_skipped_unless_enabled_with_streams(pipelinewise, convers
     run_child.assert_not_called()
 
 
-def test_enabled_conversion_runs_in_a_child_process(pipelinewise):
+@pytest.mark.parametrize('settings', [{}, {'automatic_preflight': False}, {'automatic_preflight': True}])
+def test_enabled_conversion_runs_in_a_child_process(pipelinewise, settings):
     """Conversion runs in a child so later FastSync forks inherit no Snowflake state."""
+    pipelinewise.tap['native_to_iceberg_conversion'].update(settings)
     with patch.object(pipelinewise, '_run_in_child_process') as run_child:
         pipelinewise._convert_native_tables_to_iceberg(STREAMS)
 
@@ -54,6 +56,7 @@ def test_enabled_conversion_runs_in_a_child_process(pipelinewise):
         pipelinewise._run_native_to_iceberg_conversion,
         STREAMS,
         'CONVERSION_WH',
+        settings.get('automatic_preflight', True),
     )
 
 
@@ -61,7 +64,7 @@ def test_a_stale_catalog_refuses_conversions(pipelinewise):
     """A catalog the last import did not rediscover stops new conversions, not finished tables."""
     pipelinewise._stale_catalog_reasons = lambda: ['stale catalog']
     with patch('pipelinewise.cli.native_to_iceberg.convert_tap_tables') as convert_tables:
-        pipelinewise._run_native_to_iceberg_conversion(STREAMS[:1], None)
+        pipelinewise._run_native_to_iceberg_conversion(STREAMS[:1], None, False)
 
     assert convert_tables.call_args.kwargs['tap_refusals'] == ['stale catalog']
 
@@ -78,14 +81,19 @@ def test_main_config_alone_never_converts_a_tap_imported_as_native():
     run_child.assert_not_called()
 
 
-def test_conversion_plans_the_selected_streams(pipelinewise):
+@pytest.mark.parametrize(
+    ('options', 'automatic_preflight'),
+    [({}, True), ({'automatic_preflight': False}, False), ({'automatic_preflight': True}, True)],
+)
+def test_conversion_plans_the_selected_streams(pipelinewise, options, automatic_preflight):
     """The child plans the run's streams with the tap's schema mapping and conversion warehouse."""
     with patch('pipelinewise.cli.native_to_iceberg.convert_tap_tables') as convert_tables:
-        pipelinewise._run_native_to_iceberg_conversion(STREAMS[:1], 'CONVERSION_WH')
+        pipelinewise._run_native_to_iceberg_conversion(STREAMS[:1], 'CONVERSION_WH', **options)
 
     target_config, runtime_dir, targets, conversion_warehouse = convert_tables.call_args.args
     assert convert_tables.call_args.kwargs == {
         'other_writers': [], 'tap_refusals': [], 'target_id': 'target_one', 'tap_id': 'tap_one',
+        'automatic_preflight': automatic_preflight,
     }
     assert target_config['dbname'] == 'my_db'
     assert target_config['schema_mapping']['db_test_mysql']['target_schema'] == 'db_test_mysql'
@@ -140,7 +148,7 @@ def test_run_tap_converts_before_fastsync_and_singer(pipelinewise, tmp_path):
 
     assert [entry[0] for entry in calls.mock_calls] == ['convert', 'fastsync', 'singer']
     assert calls.mock_calls[0] == call.convert(
-        pipelinewise._run_native_to_iceberg_conversion, STREAMS, 'CONVERSION_WH',
+        pipelinewise._run_native_to_iceberg_conversion, STREAMS, 'CONVERSION_WH', True,
     )
     send_alert.assert_not_called()
     assert summary.call_args.args[0] == PipelineWise.STATUS_SUCCESS
@@ -350,3 +358,36 @@ def test_writer_classes_skip_only_the_objects_a_flattening_tap_splits(tmp_path):
         {'DOC': 'VARIANT', 'ADDRESS': 'VARIANT'},  # mirror, at level 0
         {'DOC': 'VARIANT'},  # shadow, at level 10
     ]
+
+
+def test_conversion_entry_points_load_imported_transformation_requirements(tmp_path):
+    """Tap, manual and other-writer planning all use the same generated transformation file."""
+    instance = _project(tmp_path)
+    for tap_id in ('orders', 'mirror'):
+        tap_dir = tmp_path / 'snow' / tap_id
+        catalog = json.loads((tap_dir / 'properties.json').read_text())
+        for stream in catalog['streams']:
+            stream['schema']['properties']['doc']['format'] = 'mariadb-json'
+        _write_json(tap_dir / 'properties.json', catalog)
+        _write_json(tap_dir / 'transformation.json', {'transformations': [
+            {'tap_stream_name': 'public-items', 'field_id': 'doc', 'type': 'HASH'},
+        ]})
+
+    with patch('pipelinewise.cli.native_to_iceberg.convert_tap_tables') as convert:
+        instance._run_native_to_iceberg_conversion(['public-items'], None, False)
+    assert convert.call_args.args[2][0].writer_types['DOC'] == EXISTING_TEXT
+
+    imported = instance._imported_tap_targets({'dbname': 'analytics'})
+    assert [target.writer_types['DOC'] for target in imported if target.stream_id == 'public-items'] == [
+        EXISTING_TEXT, EXISTING_TEXT, 'VARIANT',
+    ]
+    writers = instance._other_writers({'account': 'ACC', 'dbname': 'analytics'}, PLANNED[1:])
+    mirror = next(writer for writer in writers if writer.target.stream_id == 'public-items of tap mirror')
+    assert mirror.target.writer_types['DOC'] == EXISTING_TEXT
+
+    instance.args.iceberg_version = 3
+    instance.args.output_format = 'json'
+    with patch('pipelinewise.cli.native_to_iceberg.preflight_report', return_value=[]) as preflight:
+        instance._native_to_iceberg_preflight({})
+    item = next(target for target in preflight.call_args.args[2] if target.stream_id == 'public-items')
+    assert item.writer_types['DOC'] == EXISTING_TEXT

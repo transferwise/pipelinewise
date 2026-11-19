@@ -1,4 +1,5 @@
 from enum import unique, Enum
+import re
 from typing import List, Dict, Optional
 
 
@@ -182,14 +183,14 @@ class TransformationHelper:
                 else:
                     operator = '='
                     value = (
-                        f"'{condition['equals']}'"
+                        cls.__string_literal(condition['equals'], sql_flavor)
                         if isinstance(condition['equals'], str)
                         else condition['equals']
                     )
 
             elif 'regex_match' in condition:
 
-                value = f"'{condition['regex_match']}'"
+                value = cls.__string_literal(condition['regex_match'], sql_flavor)
 
                 if sql_flavor == SQLFlavor.SNOWFLAKE:
                     operator = 'REGEXP'
@@ -211,6 +212,19 @@ class TransformationHelper:
             )
 
         return ' AND '.join(conditions)
+
+    @staticmethod
+    def __string_literal(value: str, sql_flavor: SQLFlavor) -> str:
+        if sql_flavor == SQLFlavor.SNOWFLAKE:
+            # Preserve complete escapes; double a trailing backslash so it cannot escape the closing quote.
+            escaped = re.sub(
+                r"\\[\s\S]|['\\]",
+                lambda match: match.group() * 2 if len(match.group()) == 1 else match.group(),
+                value,
+            )
+        else:
+            escaped = value.replace("'", "''")
+        return "'" + escaped + "'"
 
     @classmethod
     def __safe_column(cls, col: str, sql_flavor: SQLFlavor):

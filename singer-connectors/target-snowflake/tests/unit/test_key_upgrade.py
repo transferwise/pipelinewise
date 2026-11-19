@@ -1,9 +1,11 @@
 """Preserve live target identities when upgraded source schemas expose more types."""
 
+import csv as csv_module
 import gzip
+import io
 import json
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -233,4 +235,63 @@ def test_flush_serializes_retained_keys_with_same_transform_as_buffer(compressio
         str(tmp_path), not compression, None,
     )
     assert staged_lines == ['"9007199254740992.0","00FF"\n']
+    assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize('iceberg_version', [None, 3])
+@pytest.mark.parametrize('keyed', [False, True])
+def test_mariadb_json_upgrade_keeps_text_and_parses_new_variant_once(iceberg_version, keyed, tmp_path):
+    json_schema = {
+        'type': ['null', 'object', 'array', 'string', 'number', 'boolean'],
+        'format': 'mariadb-json',
+    }
+    properties = {'payload': json_schema, 'new_payload': json_schema}
+    sync = key_sync(properties, ['payload'] if keyed else [])
+    sync.connection_config['version_legacy_float_columns'] = True
+    width = 134217728 if iceberg_version else 64
+    sync.table_cache = [{
+        'SCHEMA_NAME': 'PUBLIC', 'TABLE_NAME': 'ITEMS', 'COLUMN_NAME': 'PAYLOAD',
+        'DATA_TYPE': 'TEXT', 'TYPE_LENGTH': width,
+    }]
+    sync.add_column = Mock()
+    sync.version_column = Mock()
+    sync.query = Mock()
+    sync.get_table_columns = Mock(return_value=sync.table_cache)
+    sync.update_columns(iceberg_version == 3, iceberg_version)
+
+    retained_type = f'TEXT({width})'
+    assert sync._retained_column_types == {'PAYLOAD': retained_type}
+    sync.version_column.assert_not_called()
+    sync.query.assert_not_called()
+    sync.add_column.assert_called_once_with('"NEW_PAYLOAD" variant', 'public-items', iceberg_version == 3)
+
+    roots = [
+        '  { "nested" : [null, {}], "unicode" : "初" }  ', '[ 1, null, {} ]',
+        '"text\\nwith\\\\escapes"', '""', '42', '1.5000', 'true', 'false', 'null', None,
+    ]
+    records = {str(index): {'payload': value, 'new_payload': value} for index, value in enumerate(roots)}
+    staged_lines = []
+
+    def inspect_staged_file(filename, *_args, **_kwargs):
+        staged_lines.append(Path(filename).read_text(encoding='utf-8'))
+        return 'rows.csv'
+
+    sync.put_to_stage = Mock(side_effect=inspect_staged_file)
+    sync.delete_from_stage = Mock()
+    sync.open_connection = MagicMock()
+    cursor = sync.open_connection.return_value.__enter__.return_value.cursor.return_value.__enter__.return_value
+    cursor.fetchall.return_value = []
+
+    target_snowflake.flush_record_group(
+        'public-items', records, sync, None, str(tmp_path), True, None,
+    )
+
+    fields = list(csv_module.reader(io.StringIO(staged_lines[0]), escapechar='\\', doublequote=False))
+    assert fields == [[value, value] if value is not None else ['', ''] for value in roots]
+    assert staged_lines[0].endswith('"null","null"\n,\n')
+    sql = cursor.execute.call_args.args[0]
+    assert sql.startswith('MERGE INTO' if keyed else 'COPY INTO')
+    assert f'CAST(($1) AS {retained_type})' in sql
+    assert sql.count('parse_json(') == 1
+    assert 'parse_json($2)' in sql
     assert not list(tmp_path.iterdir())

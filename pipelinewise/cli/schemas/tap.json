@@ -593,6 +593,10 @@
         "enabled": {
           "type": "boolean"
         },
+        "automatic_preflight": {
+          "type": "boolean",
+          "default": true
+        },
         "conversion_warehouse": {
           "type": "string"
         }

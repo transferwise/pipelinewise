@@ -128,7 +128,10 @@ invariants. Connector-specific rules follow:
   with any flattening, naming, or type-mapping change so both suites keep
   executing the same cases.
 - Detect MariaDB JSON aliases only from the exact generated `JSON_VALID`
-  constraint and explicit v3. Advertise object, array, string, number, Boolean,
+  constraint on Snowflake native/v3 routes. Preserve spaces inside quoted
+  identifiers. Advertise object, array, string, number, Boolean,
   and null roots. Carry non-SQL-null values as validated serialized JSON so
   `PARSE_JSON` restores roots and keeps JSON null distinct from SQL NULL;
-  preserve ordinary `LONGTEXT` and native mappings.
+  preserve ordinary `LONGTEXT` and other destinations. New columns use VARIANT;
+  existing TEXT stays raw text during Singer/PartialSync and conversion. FullSync
+  rebuilds use VARIANT. See the core [JSON contract](../pipelinewise/fastsync/commons/MARIADB_JSON.md).

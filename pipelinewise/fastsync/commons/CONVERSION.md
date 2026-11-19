@@ -38,11 +38,22 @@ converter restores the name, then refuses before another cutover.
 
 ## Preflight, convert and release writers
 
-Preflight every native candidate before starting a new conversion. Merge all
-streams' TEXT/VARIANT classes for each table; resumed attempts repeat these
-checks before cutover. Convert smallest first. Require every table to be new
-or Iceberg before writers start; any failure stops the tap. Keep conversions
-completed earlier in the run.
+`automatic_preflight` defaults to true. Preflight every native candidate before
+starting a new conversion unless explicitly disabled. Operators normally run the
+manual report before enabling conversion. Conversion always repeats per-table safety
+checks, except the primary-key NULL and sub-microsecond scans. Preflight scans
+nullable native primary-key columns for SQL NULL and blocks readiness if any
+component contains NULL. Correct or reload the affected native data and rerun
+the report; conversion does not repair or discard rows. Preflight also reports
+temporal values that would lose digits. Both data checks share one aggregate
+query per table and can scan all relevant columns, consuming warehouse resources;
+metadata checks use separate queries. Conversion explicitly truncates
+TIME/TIMESTAMP values to six fractional digits before the typed cast, and
+projected-value parity verifies that copied result. Manual evidence can become stale. Merge all streams'
+TEXT/VARIANT classes for each table; resumed attempts repeat these checks before
+cutover.
+Convert smallest first. Require every table to be new or Iceberg before writers
+start; any failure stops the tap. Keep conversions completed earlier in the run.
 
 ## Imported writers and manual conversion
 
@@ -60,3 +71,15 @@ imported tap splits into child columns.
 `--preflight-only` takes no lock, manifest or DDL. `fast_sync` never converts;
 it refuses native targets before resetting a source slot, but may rebuild a
 missing primary beside leftover companions.
+
+Preflight treats a native tap's Iceberg configuration as next steps, without
+requiring `native_to_iceberg_conversion`. Native `tap-mysql` catalogs still block
+readiness until every selected stream has current JSON-discovery evidence.
+Discovery can run with native settings. Recognized MariaDB JSON writers accept
+existing TEXT or VARIANT unless an imported transformation requires TEXT.
+Intersect the permitted classes of every writer and preserve the physical class
+through conversion. A transformed MariaDB JSON field must already exist as TEXT;
+keep that requirement when merging writers and block its absence before copying.
+Generic class conflicts remain blockers. See
+[the JSON contract](MARIADB_JSON.md).
+Automatic conversion retains the imported-configuration and catalog-freshness gates.

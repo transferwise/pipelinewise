@@ -280,16 +280,17 @@ class SnowflakeIcebergPublisher:
         """Delete recovery state after the bookmark is durable."""
         return self.finalization_service.complete_state_handoff(attempt)
 
-    def _full_method(self, spec, snapshot, iceberg_version):
+    def _full_method(self, spec, snapshot, iceberg_version, mariadb_json_columns=()):
         return self.publication_service._full_method(
             spec,
             snapshot,
             iceberg_version,
+            mariadb_json_columns=mariadb_json_columns,
         )
 
     def _partial_method(
         self, spec, snapshot, drop_target, iceberg_version, decimal_columns=(),
-        version_legacy_float_columns=False,
+        version_legacy_float_columns=False, mariadb_json_columns=(),
     ):
         return self.publication_service._partial_method(
             spec,
@@ -298,6 +299,7 @@ class SnowflakeIcebergPublisher:
             iceberg_version,
             decimal_columns=decimal_columns,
             version_legacy_float_columns=version_legacy_float_columns,
+            mariadb_json_columns=mariadb_json_columns,
         )
 
     def _preflight_replacement(self, target, destination_spec=None):
@@ -497,6 +499,7 @@ class SnowflakeIcebergPublisher:
         recovery_identity: Dict[str, Any],
         staging_config: Optional[Dict[str, Any]] = None,
         resolved_source_engine: Optional[str] = None,
+        mariadb_json_columns: Iterable[str] = (),
     ) -> IcebergPublicationAttempt:
         """Persist a FullSync boundary and immutable publication decision."""
         payload_context = {}
@@ -504,6 +507,8 @@ class SnowflakeIcebergPublisher:
             payload_context['staging_config'] = dict(staging_config)
         if resolved_source_engine is not None:
             payload_context['resolved_source_engine'] = resolved_source_engine
+        if mariadb_json_columns:
+            payload_context['mariadb_json_columns'] = sorted(set(mariadb_json_columns))
         return self._prepare(
             'full',
             spec,
@@ -524,6 +529,7 @@ class SnowflakeIcebergPublisher:
         resolved_source_engine: Optional[str] = None,
         decimal_columns: Iterable[str] = (),
         version_legacy_float_columns: bool = False,
+        mariadb_json_columns: Iterable[str] = (),
     ) -> IcebergPublicationAttempt:
         """Persist a PartialSync boundary, range evidence, and publication decision."""
         if not spec.primary_key:
@@ -535,6 +541,8 @@ class SnowflakeIcebergPublisher:
         if resolved_source_engine is not None:
             payload_context['resolved_source_engine'] = resolved_source_engine
         payload_context['decimal_columns'] = list(decimal_columns)
+        if mariadb_json_columns:
+            payload_context['mariadb_json_columns'] = sorted(set(mariadb_json_columns))
         payload_context['version_legacy_float_columns'] = version_legacy_float_columns
         return self._prepare(
             'partial',
@@ -613,7 +621,9 @@ class SnowflakeIcebergPublisher:
         version_legacy_float_columns=False,
     ):
         if kind == 'full':
-            method, _ = self._full_method(spec, snapshot, iceberg_version)
+            method, _ = self._full_method(
+                spec, snapshot, iceberg_version, mariadb_json_columns=payload.mariadb_json_columns or (),
+            )
         else:
             method, _ = self._partial_method(
                 spec,
@@ -622,6 +632,7 @@ class SnowflakeIcebergPublisher:
                 iceberg_version,
                 decimal_columns=decimal_columns,
                 version_legacy_float_columns=version_legacy_float_columns,
+                mariadb_json_columns=payload.mariadb_json_columns or (),
             )
             if method == PUBLICATION_PARTIAL_MERGE:
                 from .snowflake_decimal_evolution import plan_column_versions

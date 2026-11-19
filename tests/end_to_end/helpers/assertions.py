@@ -671,10 +671,14 @@ def _map_tap_to_target_functions(
 
     # Merge the keys into one dict by tap and target query runner names
     if tap_query_runner_fn:
-        return {
+        functions = {
             **f_map[tap_query_runner_fn.__name__],
             **f_map[target_query_runner_fn.__name__],
         }
+        if (tap_query_runner_fn.__name__ in ('run_query_tap_mysql', 'run_query_tap_mysql_2')
+                and target_query_runner_fn.__name__ == 'run_query_target_snowflake'):
+            functions['source_sql_get_cols_fn'] = db.sql_get_columns_mariadb_to_snowflake
+        return functions
     return {**f_map[target_query_runner_fn.__name__]}
 
 

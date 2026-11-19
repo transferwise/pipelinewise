@@ -139,6 +139,9 @@ def source_export(request):
     config = {field.lower(): os.environ[f'{prefix}_{field}'] for field in fields}
     config['dbname'] = config.pop('db')
     config['engine'] = engine
+    if engine in ('mysql', 'mariadb'):
+        # The real Snowflake import writes this into the generated tap config.
+        config['json_target'] = 'snowflake'
     route = {'postgres': postgres_to_snowflake, 'yugabyte': yugabyte_to_snowflake}.get(engine, mysql_to_snowflake)
     adapter = route._source_adapter()
     target = (

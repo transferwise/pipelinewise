@@ -13,7 +13,9 @@ from pipelinewise.fastsync.commons.partial_sync_boundary import (
     PartialSyncBoundary,
     PartialSyncBoundaryError,
 )
-from pipelinewise.fastsync.commons.snowflake_decimal_evolution import with_retained_decimal_types
+from pipelinewise.fastsync.commons.snowflake_decimal_evolution import (
+    with_retained_decimal_types, with_retained_mariadb_json_types,
+)
 from pipelinewise.fastsync.partialsync import utils
 
 
@@ -46,6 +48,7 @@ class _PartialSyncRun:
     where_clause_sql: Optional[str] = None
     source_columns: Any = None
     decimal_columns: Any = ()
+    mariadb_json_columns: tuple[str, ...] | list[str] = ()
     binary_lengths: Dict[str, int] = field(default_factory=dict)
     primary_keys: Any = None
     file_parts: List[str] = field(default_factory=list)
@@ -273,6 +276,7 @@ def _prepare_iceberg_partial_export(run: _PartialSyncRun) -> bool:
     snowflake_types = run.source.map_column_types_to_target(run.table_name)
     run.source_columns = snowflake_types.get('columns', [])
     run.decimal_columns = snowflake_types.get('decimal_columns', ())
+    run.mariadb_json_columns = snowflake_types.get('mariadb_json_columns', ())
     run.primary_keys = snowflake_types.get('primary_key')
     current_spec = iceberg_routes.create_spec(
         run.args,
@@ -282,19 +286,23 @@ def _prepare_iceberg_partial_export(run: _PartialSyncRun) -> bool:
         run.primary_keys,
     )
     if (
-        run.decimal_columns
+        (run.decimal_columns or run.mariadb_json_columns)
         and not run.args.drop_target_table
     ):
+        actual_spec = run.publisher.inspect_table(current_spec.name).spec
+        current_spec = with_retained_mariadb_json_types(current_spec, actual_spec, run.mariadb_json_columns)
         current_spec = with_retained_decimal_types(
             current_spec,
-            run.publisher.inspect_table(current_spec.name).spec,
+            actual_spec,
             decimal_columns=run.decimal_columns,
             version_legacy_float_columns=run.args.target.get(
                 'version_legacy_float_columns', False
             ),
         )
         run.source_columns = _source_column_definitions(current_spec)
+    _retain_source_json_text_types(run)
     if run.attempt is not None:
+        iceberg_routes.validate_recovery_mariadb_json_columns(run.attempt, run.mariadb_json_columns)
         run.spec = run.attempt.table_spec
         iceberg_routes.validate_recovery_source_spec(run.spec, current_spec)
         run.bookmark = run.attempt.source_bookmark
@@ -335,6 +343,7 @@ def _prepare_iceberg_partial_export(run: _PartialSyncRun) -> bool:
         version_legacy_float_columns=run.args.target.get(
             'version_legacy_float_columns', False
         ),
+        **({'mariadb_json_columns': run.mariadb_json_columns} if run.mariadb_json_columns else {}),
     )
     run.publisher.plan_partial_sync(run.attempt, run.spec)
     return True
@@ -348,6 +357,7 @@ def _prepare_native_partial_export(run: _PartialSyncRun) -> bool:
     snowflake_types = run.source.map_column_types_to_target(run.table_name)
     run.source_columns = snowflake_types.get('columns', [])
     run.decimal_columns = snowflake_types.get('decimal_columns', ())
+    run.mariadb_json_columns = snowflake_types.get('mariadb_json_columns', ())
     run.binary_lengths = snowflake_types.get('binary_lengths', {})
     run.primary_keys = snowflake_types.get('primary_key')
     run.boundary = _resolved_boundary(
@@ -370,12 +380,28 @@ def _prepare_native_partial_export(run: _PartialSyncRun) -> bool:
                 'version_legacy_float_columns', False
             ),
             binary_lengths=run.binary_lengths,
+            mariadb_json_columns=run.mariadb_json_columns,
         )
         run.source_columns = columns_diff['staging_columns']
+
+    _retain_source_json_text_types(run)
 
     run.bookmark = _fetch_partial_bookmark(run)
     run.where_clause_sql = run.boundary.snowflake_where_clause()
     return True
+
+
+def _retain_source_json_text_types(run: _PartialSyncRun) -> None:
+    """Compile established MariaDB JSON text transformations using their retained type."""
+    if not run.mariadb_json_columns:
+        return
+    source_types = utils._get_source_columns_dict(run.source_columns)
+    run.source.retained_column_types = {
+        name[1:-1].replace('""', '"').upper(): data_type.removesuffix(' NOT NULL')
+        for name, data_type in source_types.items()
+        if name[1:-1].replace('""', '"').upper() in run.mariadb_json_columns
+        and data_type.upper().startswith('VARCHAR(')
+    }
 
 
 def _fetch_partial_bookmark(run: _PartialSyncRun) -> Dict:
@@ -412,6 +438,9 @@ def _resolve_partial_boundary(run: _PartialSyncRun):
 
 def _validate_partial_export(run: _PartialSyncRun) -> None:
     exported_types = run.source.map_column_types_to_target(run.table_name)
+    iceberg_routes.validate_recovery_mariadb_json_columns(
+        run.attempt, exported_types.get('mariadb_json_columns', ()),
+    )
     run.boundary.require_exact_column(_source_column_names(exported_types))
     exported_spec = iceberg_routes.create_spec(
         run.args,
@@ -420,6 +449,7 @@ def _validate_partial_export(run: _PartialSyncRun) -> None:
         exported_types.get('columns', []),
         exported_types.get('primary_key'),
     )
+    exported_spec = with_retained_mariadb_json_types(exported_spec, run.spec, run.mariadb_json_columns)
     if run.decimal_columns:
         exported_spec = with_retained_decimal_types(
             exported_spec,

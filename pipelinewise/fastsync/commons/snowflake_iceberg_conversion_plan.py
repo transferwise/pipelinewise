@@ -31,6 +31,9 @@ STATE_PENDING = 'pending'
 STATE_BLOCKED = 'blocked'
 TEXT = 'TEXT'
 VARIANT = 'VARIANT'
+MARIADB_JSON = 'MARIADB_JSON'
+EXISTING_TEXT = 'EXISTING_TEXT'
+CONVERSION_DOCS_URL = 'https://transferwise.github.io/pipelinewise/connectors/targets/snowflake_iceberg.html'
 
 _MISSING = 'missing'
 _PREFERRED_SCHEMA_TYPES = ('string', 'array', 'object')
@@ -110,6 +113,8 @@ def _level_zero_schema(schema_property: Any) -> Mapping[str, Any]:
 def singer_text_variant_class(schema_property: Any) -> Optional[str]:
     """Return TEXT or VARIANT when target-snowflake maps a level-0 property to that class."""
     schema = _level_zero_schema(schema_property)
+    if schema.get('format') == 'mariadb-json':
+        return VARIANT
     if schema.get('format') == 'singer.year' or is_decimal_schema(schema):
         return None
     property_type = schema.get('type', [])
@@ -156,13 +161,29 @@ def native_text_variant_class(data_type: str) -> Optional[str]:
 def text_variant_blockers(columns: Iterable[Any], writer_types: Mapping[str, str]) -> List[str]:
     """Return native columns whose TEXT/VARIANT class differs from the current tap catalog."""
     blockers = []
+    existing_columns = set()
     for column in columns:
+        existing_columns.add(column.name)
         expected = writer_types.get(column.name)
         actual = native_text_variant_class(column.data_type)
-        if expected is not None and actual is not None and expected != actual:
+        if expected == EXISTING_TEXT:
+            if actual != TEXT:
+                blockers.append(
+                    f'Column {column.name} is {column.data_type} but its MariaDB JSON transformation requires '
+                    f'an existing TEXT column. See {CONVERSION_DOCS_URL}#clear-a-text-variant-blocker'
+                )
+            continue
+        if expected is not None and actual is not None and expected not in (actual, MARIADB_JSON):
             blockers.append(
                 f'Column {column.name} is {column.data_type} but the tap catalog maps it to '
-                f'{expected}; the Iceberg writers would refuse the converted table'
+                f'{expected}; the Iceberg writers would refuse the converted table. '
+                f'See {CONVERSION_DOCS_URL}#clear-a-text-variant-blocker'
+            )
+    for name, expected in writer_types.items():
+        if expected == EXISTING_TEXT and name not in existing_columns:
+            blockers.append(
+                f'Column {name} is missing but its MariaDB JSON transformation requires an existing TEXT column. '
+                f'See {CONVERSION_DOCS_URL}#clear-a-text-variant-blocker'
             )
     return blockers
 
@@ -225,11 +246,33 @@ def fastsync_target_table(
     )
 
 
-def _writer_types(stream: Mapping[str, Any], max_level: Any = 0) -> Dict[str, str]:
+def _transformation_text_fields(stream_id: str, transformation_config: Mapping[str, Any] | None) -> set[str]:
+    """Mirror transform-field's runtime TEXT requirements before conversion mutates tables."""
+    fields = set()
+    for rule in (transformation_config or {}).get('transformations', []):
+        if rule.get('tap_stream_name') != stream_id:
+            continue
+        kind = rule.get('type', '')
+        if kind in {'HASH', 'MASK-HIDDEN'} or kind.startswith(('HASH-SKIP-FIRST', 'MASK-STRING-SKIP-ENDS')):
+            fields.add(rule['field_id'])
+        for condition in rule.get('when') or []:
+            if 'regex_match' in condition or condition.get('equals') is not None:
+                fields.add(condition['column'])
+    return fields
+
+
+def _writer_types(
+    stream: Mapping[str, Any], max_level: Any = 0,
+    transformation_config: Mapping[str, Any] | None = None,
+) -> Dict[str, str]:
     """Predict the top-level TEXT/VARIANT columns; objects split into child columns are skipped."""
     properties = (stream.get('schema') or {}).get('properties') or {}
+    text_fields = _transformation_text_fields(stream.get('tap_stream_id', ''), transformation_config)
     return {
-        level_zero_column_name(name): column_class
+        level_zero_column_name(name): (
+            (EXISTING_TEXT if name in text_fields else MARIADB_JSON)
+            if _level_zero_schema(schema_property).get('format') == 'mariadb-json' else column_class
+        )
         for name, schema_property in properties.items()
         if not splits_into_child_columns(schema_property, max_level)
         and (column_class := singer_text_variant_class(schema_property)) is not None
@@ -263,6 +306,7 @@ def plan_conversion_targets(
     target_config: Mapping[str, Any],
     stream_ids: Iterable[str],
     fastsync_capable: bool,
+    transformation_config: Mapping[str, Any] | None = None,
 ) -> List[ConversionTarget]:
     """Map selected streams to the tables both writers use, refusing any disagreement."""
     streams = {stream.get('tap_stream_id'): stream for stream in catalog.get('streams', [])}
@@ -282,7 +326,10 @@ def plan_conversion_targets(
         targets.append(ConversionTarget(
             stream_id,
             table,
-            _writer_types(streams.get(stream_id) or {}, target_config.get('data_flattening_max_level') or 0),
+            _writer_types(
+                streams.get(stream_id) or {}, target_config.get('data_flattening_max_level') or 0,
+                transformation_config,
+            ),
             tuple(blockers),
         ))
     return targets
@@ -293,6 +340,7 @@ def plan_written_tables(
     target_config: Mapping[str, Any],
     stream_ids: Iterable[str],
     fastsync_capable: bool,
+    transformation_config: Mapping[str, Any] | None = None,
 ) -> List[ConversionTarget]:
     """Map another tap's streams to every table its writers use, FastSync names included."""
     streams = {stream.get('tap_stream_id'): stream for stream in catalog.get('streams', [])}
@@ -303,7 +351,10 @@ def plan_written_tables(
             table for table in _resolved_tables(stream_id, target_config, fastsync_capable)[:2]
             if table is not None
         }
-        writer_types = _writer_types(streams.get(stream_id) or {}, target_config.get('data_flattening_max_level') or 0)
+        writer_types = _writer_types(
+            streams.get(stream_id) or {}, target_config.get('data_flattening_max_level') or 0,
+            transformation_config,
+        )
         targets.extend(
             ConversionTarget(stream_id, table, writer_types)
             for table in sorted(tables, key=lambda table: table.key)

@@ -87,7 +87,7 @@ def delete_s3_objects(
 
 def diff_source_target_columns(
     target_sf: dict, source_columns: list, primary_keys=(), boundary_column=None, decimal_columns=(),
-    version_legacy_float_columns=False, binary_lengths=None,
+    version_legacy_float_columns=False, binary_lengths=None, mariadb_json_columns=(),
 ) -> dict:
     """Finding the diff between source and target columns"""
     target_column = target_sf['sf_object'].query(
@@ -108,6 +108,7 @@ def diff_source_target_columns(
     versions = _validate_existing_column_types(
         target_sf, source_columns_dict, target_columns_info, primary_keys, boundary_column, decimal_columns,
         version_legacy_float_columns, binary_lengths,
+        mariadb_json_columns,
     )
     staging_columns = _staging_source_columns(
         source_columns_dict,
@@ -116,6 +117,7 @@ def diff_source_target_columns(
         decimal_columns,
         version_legacy_float_columns,
         binary_lengths,
+        mariadb_json_columns,
     )
 
     return {
@@ -131,7 +133,7 @@ def diff_source_target_columns(
 
 def report_source_target_columns(
     target_sf: dict, source_columns: list, target_columns: list, primary_keys=(), boundary_column=None,
-    decimal_columns=(), version_legacy_float_columns=False, binary_lengths=None,
+    decimal_columns=(), version_legacy_float_columns=False, binary_lengths=None, mariadb_json_columns=(),
 ) -> list:
     """Report every mapped column using the same checks as native PartialSync."""
     rows_by_name = {}
@@ -165,6 +167,7 @@ def report_source_target_columns(
                 versions = _validate_existing_column_types(
                     target_sf, {name: source_type}, metadata, primary_keys, boundary_column, decimal_columns,
                     version_legacy_float_columns, binary_lengths,
+                    mariadb_json_columns,
                 )
                 result['status'] = 'would_version' if versions else 'would_widen' if widening else 'compatible'
             except (NativePartialSyncCompatibilityError, ValueError, TypeError, KeyError) as exc:
@@ -502,12 +505,13 @@ def _native_target_name(target_sf):
 
 def _validate_existing_column_types(
     target_sf, source_columns_dict, target_columns_info, primary_keys=(), boundary_column=None, decimal_columns=(),
-    version_legacy_float_columns=False, binary_lengths=None,
+    version_legacy_float_columns=False, binary_lengths=None, mariadb_json_columns=(),
 ):
     versions = {}
     primary_keys = {str(key).strip('"').upper() for key in primary_keys or ()}
     decimal_columns = {str(name).strip('"').upper() for name in decimal_columns or ()}
     binary_lengths = binary_lengths or {}
+    mariadb_json_columns = set(mariadb_json_columns)
     for name, source_type in source_columns_dict.items():
         metadata = target_columns_info['type_metadata'].get(name)
         if metadata is None:
@@ -520,6 +524,8 @@ def _validate_existing_column_types(
                 f'Native PartialSync cannot verify the type of {_native_target_name(target_sf)}.{name}: {exc}'
             ) from exc
         column_name = name[1:-1].replace('""', '"').upper()
+        if column_name in mariadb_json_columns and expected == 'VARIANT' and actual.startswith('VARCHAR('):
+            continue
         if column_name in decimal_columns and actual != expected:
             if (
                 (not version_legacy_float_columns or column_name in primary_keys)
@@ -548,18 +554,23 @@ def _validate_existing_column_types(
 
 def _staging_source_columns(
     source_columns_dict, target_columns_info, primary_keys=(), decimal_columns=(), version_legacy_float_columns=False,
-    binary_lengths=None,
+    binary_lengths=None, mariadb_json_columns=(),
 ):
-    """Match retained legacy decimal FLOAT and BINARY widths in the PartialSync staging table."""
+    """Match retained decimal, MariaDB JSON text and binary types in staging."""
     primary_keys = {str(key).strip('"').upper() for key in primary_keys or ()}
     decimal_columns = {str(name).strip('"').upper() for name in decimal_columns or ()}
     binary_lengths = binary_lengths or {}
+    mariadb_json_columns = set(mariadb_json_columns)
     staging_columns = []
     for name, source_type in source_columns_dict.items():
         data_type = source_type
         metadata = target_columns_info['type_metadata'].get(name)
         column_name = name[1:-1].replace('""', '"').upper()
-        if metadata is not None and column_name in decimal_columns:
+        if metadata is not None and column_name in mariadb_json_columns:
+            actual = canonical_native_metadata_type(metadata)
+            if canonical_native_type(source_type) == 'VARIANT' and actual.startswith('VARCHAR('):
+                data_type = actual
+        elif metadata is not None and column_name in decimal_columns:
             expected = canonical_native_type(source_type)
             actual = canonical_native_metadata_type(metadata)
             if (

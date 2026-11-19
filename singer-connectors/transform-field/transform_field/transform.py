@@ -8,8 +8,36 @@ from singer import get_logger
 from singer.decimal_support import decimal_to_string, is_decimal_schema
 from dateutil import parser
 
+from transform_field.errors import InvalidTransformationException
+
 LOGGER = get_logger('transform_field')
 JSON_TEXT_FORMAT = 'singer.json'
+MARIADB_JSON_TEXT_FORMAT = 'mariadb-json-text'
+
+
+def is_mariadb_json_schema(schema: Any) -> bool:
+    """Recognize MariaDB's serialized JSON transport and its retained-TEXT requirement."""
+    if hasattr(schema, 'to_dict'):
+        schema = schema.to_dict()
+    return isinstance(schema, dict) and schema.get('format') in {'mariadb-json', MARIADB_JSON_TEXT_FORMAT}
+
+
+def is_string_transformation(trans_type: str) -> bool:
+    """Return whether a transformation preserves the legacy whole-string contract."""
+    return trans_type in {'HASH', 'MASK-HIDDEN'} or trans_type.startswith(
+        ('HASH-SKIP-FIRST', 'MASK-STRING-SKIP-ENDS')
+    )
+
+
+def condition_requires_text(condition: dict) -> bool:
+    """Null equality can inspect JSON transport without requiring a physical TEXT column."""
+    return 'regex_match' in condition or condition.get('equals') is not None
+
+
+def _mariadb_json_fields(field: str, when: list[dict] | None, schema: dict | None) -> set[str]:
+    properties = (schema or {}).get('properties', {})
+    names = {field, *(condition['column'] for condition in when or [])}
+    return {name for name in names if is_mariadb_json_schema(properties.get(name))}
 
 
 def is_json_text_schema(schema: Any) -> bool:
@@ -152,7 +180,7 @@ def __is_condition_met(condition_type: str, condition_value: Any, value: Any) ->
 
     if condition_type == 'regex':
         matcher = re.compile(condition_value)
-        return bool(matcher.search(value))
+        return value is not None and bool(matcher.search(value))
 
     raise NotImplementedError(f'__is_condition_met is not implemented for condition type "{condition_type}"', )
 
@@ -169,11 +197,15 @@ def do_transform(record: Dict,
     values of the record"""
 
     return_value = value = record.get(field)
+    mariadb_json_fields = _mariadb_json_fields(field, when, schema)
 
     try:
+        for name in mariadb_json_fields:
+            if record.get(name) is not None and not isinstance(record[name], str):
+                raise ValueError('MariaDB JSON transport must be serialized text')
+
         # Do transformation only if required
         if is_transform_required(record, when, schema):
-
             # transforming fields nested in value dictionary
             if isinstance(value, dict) and field_paths:
                 for field_path in field_paths:
@@ -196,6 +228,10 @@ def do_transform(record: Dict,
 
     # Return the original value if cannot transform
     except Exception:
+        if mariadb_json_fields:
+            raise InvalidTransformationException(
+                f'Cannot safely apply `{trans_type}` transformation to field `{field}` with MariaDB JSON transport'
+            ) from None
         return return_value
 
 
@@ -209,6 +245,11 @@ def _transform_value(value: Any, trans_type: str) -> Any:
     Returns:
         transformed value
     """
+    # Hashing and parsing NULL retain NULL, including nested fields; MASK-HIDDEN intentionally replaces it.
+    if value is None and (trans_type == 'MASK-DATE' or
+                          (is_string_transformation(trans_type) and trans_type != 'MASK-HIDDEN')):
+        return None
+
     # Transforms any input to NULL
     if trans_type == "SET-NULL":
         return_value = None

@@ -213,6 +213,8 @@ class FakeSnowflake:
         self.native_extra_columns = []
         self.sub_microsecond_counts = {}
         self.source_rows = 2
+        self.null_key_count = 0
+        self.source_primary_key = ('ID',)
         self.companion_primary_key = ('ID',)
         self.clustering_key = None
         self.owner = 'OWNER_ROLE'
@@ -222,7 +224,6 @@ class FakeSnowflake:
         self.current_role = 'OWNER_ROLE'
         self.table_comment = 'source table'
         self.companion_table_comment = None
-        self.null_keys = 0
         self.fail_promotion = None
         self.interrupt_after_native_rename = False
         self.commit_before_promotion_error = False
@@ -290,22 +291,25 @@ class FakeSnowflake:
                 row.update(self.companion_column_overrides)
                 return [row, *self.companion_extra_columns]
             return [row, *self.native_extra_columns]
-        if 'COUNT_IF(MOD(DATE_PART(NANOSECOND' in sql:
+        if 'COUNT_IF(MOD(DATE_PART(NANOSECOND' in sql or 'NULL_PRIMARY_KEY_COUNT' in sql:
             columns = re.findall(r'DATE_PART\(NANOSECOND, "([^"]+)"\)', sql)
             # Like Snowflake, COUNT_IF over an empty table is NULL unless the query coalesces it.
             empty_count = 0 if 'COALESCE(COUNT_IF' in sql else None
-            return [{
+            evidence = {
                 f'SUB_MICROSECOND_{index}': (
                     self.sub_microsecond_counts.get(column, 0) if self.source_rows else empty_count
                 )
                 for index, column in enumerate(columns)
-            }]
+            }
+            if 'NULL_PRIMARY_KEY_COUNT' in sql:
+                evidence['NULL_PRIMARY_KEY_COUNT'] = self.null_key_count if self.source_rows else empty_count
+            return [evidence]
         if sql.startswith('SHOW PRIMARY KEYS'):
             is_companion = any(
                 f'"{name}"' in sql and table_format == 'iceberg'
                 for name, table_format in self.formats.items()
             )
-            keys = self.companion_primary_key if is_companion else ('ID',)
+            keys = self.companion_primary_key if is_companion else self.source_primary_key
             return [
                 {'COLUMN_NAME': column, 'KEY_SEQUENCE': sequence}
                 for sequence, column in enumerate(keys, start=1)
@@ -314,8 +318,6 @@ class FakeSnowflake:
             return self.other_constraints
         if sql.startswith('SHOW EXPORTED KEYS IN TABLE'):
             return self.exported_keys
-        if 'NULL_KEY_COUNT' in sql:
-            return [{'NULL_KEY_COUNT': self.null_keys}]
         if sql.startswith('SHOW STREAMS'):
             return self.stream_rows
         if 'POLICY_REFERENCES' in sql:
@@ -645,7 +647,7 @@ def test_companion_promotion_recovers(tmp_path):
 
 
 def test_primary_key_is_not_null_in_iceberg(tmp_path):
-    """A data-valid native key becomes an Iceberg identifier field."""
+    """A nullable native key becomes a required Iceberg identifier field."""
     snowflake = FakeSnowflake()
     snowflake.is_nullable = 'YES'
 
@@ -656,6 +658,61 @@ def test_primary_key_is_not_null_in_iceberg(tmp_path):
 
     create_sql = next(sql for sql, _, _ in snowflake.queries if sql.startswith('CREATE'))
     assert '"ID" NUMBER(19,0) NOT NULL' in create_sql
+
+
+def test_conversion_does_not_probe_null_primary_keys(tmp_path):
+    """Data-value scans remain optional and confined to preflight."""
+    snowflake = FakeSnowflake()
+    snowflake.is_nullable = 'YES'
+    temporal_column = {
+        'COLUMN_NAME': 'UPDATED_AT',
+        'DATA_TYPE': 'TIMESTAMP_NTZ',
+        'IS_NULLABLE': 'YES',
+        'DATETIME_PRECISION': 9,
+        'COMMENT': None,
+    }
+    snowflake.native_extra_columns = [temporal_column]
+    snowflake.companion_extra_columns = [{**temporal_column, 'DATETIME_PRECISION': 6}]
+
+    _converter(tmp_path, snowflake).convert('database.schema.table')
+
+    assert snowflake.formats == {'TABLE': 'native', 'TABLE_ICEBERG': 'iceberg'}
+    statements = [sql for sql, _, _ in snowflake.queries]
+    assert any(sql.startswith('SHOW PRIMARY KEYS') for sql in statements)
+    assert not any('DATE_PART(NANOSECOND, "UPDATED_AT")' in sql for sql in statements)
+    assert not any('NULL_PRIMARY_KEY_COUNT' in sql or '"ID" IS NULL' in sql for sql in statements)
+
+
+@pytest.mark.parametrize('operation', ['preflight', 'convert'])
+@pytest.mark.parametrize(
+    ('primary_key', 'message'),
+    [
+        ({'COLUMN_NAME': 'MISSING', 'KEY_SEQUENCE': 1}, 'invalid primary-key metadata'),
+        ({'COLUMN_NAME': None, 'KEY_SEQUENCE': 1}, 'invalid primary-key metadata'),
+        ({'COLUMN_NAME': 'ID', 'KEY_SEQUENCE': 'invalid'}, 'invalid primary-key ordering metadata'),
+    ],
+)
+def test_rejects_invalid_primary_key_metadata(tmp_path, operation, primary_key, message):
+    """Both entry points refuse unknown key columns and unusable key ordering."""
+    snowflake = FakeSnowflake()
+    original_query = snowflake.query
+
+    def query(sql, params=None, query_tag_props=None):
+        if sql.startswith('SHOW PRIMARY KEYS'):
+            return [primary_key]
+        return original_query(sql, params, query_tag_props)
+
+    with patch.object(snowflake, 'query', side_effect=query):
+        action = getattr(_converter(tmp_path, snowflake), operation)
+        if operation == 'preflight':
+            assert action('database.schema.table') == (f'Snowflake returned {message}',)
+        else:
+            with pytest.raises(NativeToIcebergConversionError, match=message):
+                action('database.schema.table')
+
+    assert snowflake.formats == {'TABLE': 'native'}
+    assert not _manifest_files(tmp_path)
+    assert not any(sql.startswith('CREATE') for sql, _, _ in snowflake.queries)
 
 
 def test_iceberg_mode_retains_native_backup(tmp_path):
@@ -934,7 +991,6 @@ def test_mismatch_stops_before_cutover(tmp_path):
         ('column_default', 'CURRENT_TIMESTAMP()', 'has a default'),
         ('is_identity', 'YES', 'identity column'),
         ('clustering_key', 'LINEAR(ID)', 'clustering key'),
-        ('null_keys', 1, 'NULL primary-key values'),
     ],
 )
 def test_preflight_rejects_unsafe_tables(tmp_path, attribute, value, message):

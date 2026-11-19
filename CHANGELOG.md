@@ -1,3 +1,48 @@
+0.103.0 (2026-11-19)
+--------------------
+
+- Improve the existing opt-in automatic conversion from Snowflake native tables
+  to managed Iceberg v3, including its feasibility checks and compatibility with
+  existing column types. With `native_to_iceberg_conversion.enabled: true`,
+  `run_tap` still resumes pending conversions and converts before FastSync or
+  Singer. It requires imported Iceberg settings and an effective
+  `data_flattening_max_level: 0` (the default for MariaDB/MySQL and PostgreSQL
+  taps; some other taps default differently).
+  Pause schedules and stop readers and external writers through cutover and
+  validation.
+  See [automatic conversion](docs/connectors/targets/snowflake_iceberg.rst#snowflake-iceberg-auto-conversion).
+- Allow conversion preflight while a tap still writes native tables, so blockers
+  can be resolved before enabling automatic conversion. MySQL/MariaDB taps first
+  need a fresh `import_config` for JSON discovery.
+- Default `native_to_iceberg_conversion.automatic_preflight` to `true`.
+  New conversions check all native tables before copying them. Preflight
+  checks nullable primary keys for NULL and reports sub-microsecond
+  TIME/TIMESTAMP values in one data query per table. Correct NULL keys before
+  conversion; conversion truncates temporal values to six fractional digits.
+  Set `automatic_preflight: false` to skip automatic checks after a manual report.
+  Direct conversion skips these scans but still checks structure and copied contents.
+- Preserve existing MariaDB JSON column types during manual or automatic
+  native-to-Iceberg conversion. After `import_config` updates FastSync and Singer,
+  map new MariaDB JSON columns to VARIANT in Snowflake native and Iceberg tables.
+  Until native Snowflake taps are reimported, their resyncs keep the earlier TEXT
+  mapping. Existing Iceberg v3 configs retain their JSON mapping. Retain existing
+  TEXT columns and their hash/mask rules during Singer replication and PartialSync.
+- Block native-to-Iceberg conversion when a MariaDB JSON transformation needs
+  an existing TEXT column but that column is missing or has another type. Check
+  every imported writer before copying the table.
+- Restore Singer's handling of NULL for nullable non-JSON transformation targets
+  and regex conditions in rules involving MariaDB JSON. Invalid patterns still
+  stop replication.
+- Escape apostrophes in FastSync transformation conditions for PostgreSQL
+  targets and MongoDB-to-Snowflake loads. Also escape trailing backslashes on
+  the Snowflake route so equality and regex rules cannot alter the predicate.
+- Improve conversion errors with documentation links. Clarify the existing
+  `--conversion-warehouse` option and remove outdated conversion-audit instructions.
+- Finish pending MariaDB Iceberg syncs that still need source re-export before
+  upgrading. Already-staged attempts retain their saved types. After upgrading,
+  run `import_config` to refresh JSON discovery. See
+  [recovery](docs/connectors/targets/snowflake_iceberg.rst#snowflake-iceberg-recovery).
+
 0.102.4 (2026-11-12)
 --------------------
 - Fixed an issue in `tap-postgres` with replication slot names exceeding 63 characters, 

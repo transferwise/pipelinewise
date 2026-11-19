@@ -1,4 +1,5 @@
 import io
+import copy
 import sys
 import time
 import singer
@@ -52,8 +53,13 @@ def _declared_property(stream_schema, field_id):
 def _validate_condition_types(stream_id, stream_schema, transformation):
     for condition in transformation.when or []:
         condition_field = condition.get('column')
+        condition_schema = _declared_property(stream_schema, condition_field)
+        if transform.is_mariadb_json_schema(condition_schema) and condition.get('field_path') is not None:
+            raise InvalidTransformationException(
+                f'Cannot use `field_path` on MariaDB JSON field `{condition_field}` in stream `{stream_id}`'
+            )
         if transform.is_unsupported_json_text_condition(condition) and \
-                transform.is_json_text_schema(_declared_property(stream_schema, condition_field)):
+                transform.is_json_text_schema(condition_schema):
             raise InvalidTransformationException(
                 f'Conditions on JSON text field `{condition_field}` in stream `{stream_id}` cannot use '
                 '`field_path`, `regex_match` or a non-null `equals`'
@@ -65,6 +71,42 @@ def _validate_condition_types(stream_id, stream_schema, transformation):
                 f'Cannot apply a `regex_match` condition to decimal field `{condition_field}` '
                 f'in stream `{stream_id}`'
             )
+
+
+def _validate_mariadb_json_transformation(stream_id: str, transformation: TransMeta, field_schema: dict) -> bool:
+    """Accept legacy text rules provisionally; the target must verify its retained TEXT column."""
+    if not transform.is_mariadb_json_schema(field_schema):
+        return False
+    field_id, trans_type = transformation.field_id, transformation.type
+    if transformation.field_paths is not None:
+        raise InvalidTransformationException(
+            f'Cannot use `field_paths` on MariaDB JSON field `{field_id}` in stream `{stream_id}`'
+        )
+    if transform.is_string_transformation(trans_type) or trans_type == 'SET-NULL':
+        return True
+    raise InvalidTransformationException(
+        f'Cannot apply `{trans_type}` transformation type to MariaDB JSON field `{field_id}` in stream `{stream_id}`'
+    )
+
+
+def _output_schema(stream_schema: dict, transformations: list[TransMeta]) -> dict:
+    """Declare physical TEXT requirements without changing the source's transport schema."""
+    properties = stream_schema.get('properties', {})
+    required_text = set()
+    for transformation in transformations:
+        if transform.is_string_transformation(transformation.type) and \
+                transform.is_mariadb_json_schema(properties.get(transformation.field_id)):
+            required_text.add(transformation.field_id)
+        for condition in transformation.when or []:
+            name = condition['column']
+            if transform.condition_requires_text(condition) and transform.is_mariadb_json_schema(properties.get(name)):
+                required_text.add(name)
+    if not required_text:
+        return stream_schema
+    result = copy.deepcopy(stream_schema)
+    for name in required_text:
+        result['properties'][name]['format'] = transform.MARIADB_JSON_TEXT_FORMAT
+    return result
 
 
 @unique
@@ -230,6 +272,7 @@ class TransformField:
             self.__validate_stream_trans(message.stream, message.schema)
 
             # Write the transformed message
+            message.schema = _output_schema(message.schema, self.trans_meta.get(message.stream, []))
             singer.write_message(message)
 
         elif isinstance(message, (singer.RecordMessage, singer.ActivateVersionMessage)):
@@ -303,6 +346,8 @@ class TransformField:
             field_format = field_schema.get('format')
 
             _validate_condition_types(stream_id, stream_schema, transformation)
+            if _validate_mariadb_json_transformation(stream_id, transformation, field_schema):
+                continue
 
             # JSON text arrives as one string, so field paths would transform the whole serialized value.
             if transformation.field_paths is not None and trans_type != TransformationTypes.SET_NULL.value and \

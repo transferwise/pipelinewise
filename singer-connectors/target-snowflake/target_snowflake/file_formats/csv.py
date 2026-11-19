@@ -37,7 +37,10 @@ def create_copy_sql(table_name: str,
     """Generate a CSV compatible snowflake COPY INTO command"""
     p_columns = ', '.join([c['name'] for c in columns])
 
-    if any(column.get('decimal_type') for column in columns):
+    if any(
+        column.get('parse_json_in_copy') or column.get('decimal_type') or column.get('retained_type')
+        for column in columns
+    ):
         expressions = ', '.join(
             _stage_column_expression(column, position) for position, column in enumerate(columns, start=1)
         )

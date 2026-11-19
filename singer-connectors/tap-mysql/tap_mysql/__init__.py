@@ -23,7 +23,7 @@ from tap_mysql.connection import (
 )
 from tap_mysql.discover_utils import (
     discover_catalog,
-    mariadb_json_aliases_enabled,
+    json_discovery_options,
     resolve_catalog,
 )
 from tap_mysql.stream_utils import write_schema_message
@@ -43,11 +43,7 @@ REQUIRED_CONFIG_KEYS = [
 
 
 def _discover_catalog(mysql_conn, config):
-    discovery_options = (
-        {'detect_json_aliases': True}
-        if mariadb_json_aliases_enabled(config)
-        else {}
-    )
+    discovery_options = json_discovery_options(config)
     if config.get('decimal_target'):
         discovery_options['decimal_target'] = config['decimal_target']
     return discover_catalog(

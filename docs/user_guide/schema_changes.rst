@@ -67,6 +67,60 @@ After the change, verify the new target schema and representative values. Use
 required merely because an old target column remains.
 
 
+.. _mariadb_json_mapping:
+
+MariaDB JSON mapping
+--------------------
+
+MariaDB represents its ``JSON`` type as ``LONGTEXT`` with a generated
+``JSON_VALID`` constraint. PipelineWise recognizes that exact constraint and
+creates new JSON columns as ``VARIANT`` in Snowflake native and managed Iceberg
+v3 tables. Ordinary ``LONGTEXT`` stays text. Other destinations keep their
+existing mapping.
+
+Run ``import_config`` after upgrading to refresh MariaDB discovery and enable
+this mapping for native Snowflake taps. Until then, both FastSync and Singer
+keep the earlier text mapping, including during a resync. Older Iceberg v3
+configs without the new setting keep their existing JSON mapping.
+Existing columns follow these rules:
+
+.. list-table:: MariaDB JSON columns in Snowflake
+   :header-rows: 1
+   :widths: 35 65
+
+   * - Operation
+     - Column type
+   * - Create a table or add a JSON column
+     - Create ``VARIANT``.
+   * - Singer replication or PartialSync into an existing table
+     - Keep an existing ``TEXT`` or ``VARIANT`` column. Do not version it.
+   * - FullSync rebuild
+     - Create the replacement with ``VARIANT``.
+   * - Convert a native table to Iceberg
+     - Preserve each existing JSON column's ``TEXT`` or ``VARIANT`` class when
+       imported transformations accept it.
+
+Retained text columns keep the serialized JSON, including whitespace and
+numeric spelling. VARIANT columns hold the parsed JSON value. JSON ``null``
+remains distinct from SQL ``NULL``. ``version_legacy_float_columns`` does not
+control JSON columns.
+
+Existing TEXT columns keep their ``HASH``, ``MASK-HIDDEN``, and string
+hash/mask variants after ``import_config`` refreshes discovery. They operate
+on the original serialized JSON, including whitespace and numeric spelling.
+Singer verifies that these columns still exist as TEXT before writing.
+New or existing VARIANT columns cannot use these string rules. FullSync
+rebuilds therefore need a compatible transformation such as ``SET-NULL``.
+
+MariaDB JSON columns used by ``regex_match`` or non-NULL ``equals`` conditions
+also need existing TEXT columns, even when the rule transforms a different
+column. A condition comparing with SQL NULL does not impose this requirement.
+
+Import validation does not query Snowflake. Singer checks the existing column
+before writing. Conversion preflight also checks whether imported transformations
+require an existing TEXT column; a missing column also blocks conversion. Nested
+JSON paths are not supported for these serialized text values.
+
 .. _exact_decimal_mapping:
 
 Decimal mapping

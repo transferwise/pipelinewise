@@ -11,14 +11,18 @@ and `dev-project/`; connector-source work also follows connector guidance.
   from successful jobs; read failed-job logs to diagnose failures. Confirm the
   intended named steps ran, not just that an aggregate is green. Report actual
   counts when available and identify skipped/unavailable coverage.
+- If an individual E2E job is still running 30 minutes after it started, notify
+  the user once with its name, elapsed time, active step, and status. Keep
+  polling status; do not inspect live logs unless the job fails or the user
+  explicitly asks.
 - Target under 15 minutes per shard. Rebalance from measured durations after
   relevant changes or failures; preserve coverage and isolation. Do not repeat
   successful runs without a new reason.
-- `.github/workflows/e2e_tests.yml` is authoritative for `e2e_tests_01`–`24`.
+- `.github/workflows/e2e_tests.yml` is authoritative for `e2e_tests_01`–`25`.
   [README.md](README.md) preserves the corresponding local recipes; update it
-  with matrix changes. Run all twenty-four only for a full-suite request; otherwise
+  with matrix changes. Run all twenty-five only for a full-suite request; otherwise
   select every affected group within the authorised scope.
-- CI's twenty-three Snowflake groups use isolated runners. Local groups share/reset
+- CI's twenty-four Snowflake groups use isolated runners. Local groups share/reset
   fixtures and must run serially. Do not reset another session's fixtures or
   recreate its services; coordinate or isolate work first.
 

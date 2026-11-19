@@ -37,7 +37,7 @@ from tap_mysql.discover_utils import (
     Column,
     discover_catalog,
     desired_columns,
-    mariadb_json_aliases_enabled,
+    json_discovery_options,
     schema_for_column,
     should_run_discovery,
 )
@@ -1293,11 +1293,7 @@ def _run_binlog_sync(  # noqa: C901
                         LOGGER.info('Stream `%s`: Running discovery ... ', tap_stream_id)
 
                         # run discovery for the current table only
-                        discovery_options = (
-                            {'detect_json_aliases': True}
-                            if mariadb_json_aliases_enabled(config)
-                            else {}
-                        )
+                        discovery_options = json_discovery_options(config)
                         if config.get('decimal_target'):
                             discovery_options['decimal_target'] = config['decimal_target']
                         new_catalog_entry = discover_catalog(
