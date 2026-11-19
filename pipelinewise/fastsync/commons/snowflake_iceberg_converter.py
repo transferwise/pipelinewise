@@ -226,7 +226,7 @@ class SnowflakeNativeToIcebergConverter:
         except NativeToIcebergConversionError as exc:
             return (str(exc),)
         blockers = self._conversion_blockers(table, metadata)
-        blockers.extend(self._sub_microsecond_blockers(table, metadata.columns))
+        blockers.extend(self._data_value_blockers(table, metadata))
         return tuple(blockers)
 
     def _conversion_blockers(
@@ -251,36 +251,66 @@ class SnowflakeNativeToIcebergConverter:
                 f'Cannot convert {table.quoted}: ' + '; '.join(blockers)
             )
 
-    def _sub_microsecond_blockers(
+    def _data_value_blockers(
         self,
         table: SnowflakeTableName,
-        columns: Tuple[NativeColumn, ...],
+        metadata: ConversionMetadata,
     ) -> List[str]:
-        # The optional preflight reports values the conversion projection will truncate.
-        temporal = [column for column in columns if column.data_type in SUB_MICROSECOND_TYPES]
-        if not temporal:
+        """Probe nullable keys and temporal precision in one read of the native table."""
+        nullable_keys = [
+            column.name for column in metadata.columns
+            if column.name in metadata.primary_key and column.nullable
+        ]
+        temporal = [column for column in metadata.columns if column.data_type in SUB_MICROSECOND_TYPES]
+        if not nullable_keys and not temporal:
             return []
-        # COUNT_IF returns NULL for an empty table, where no value can be truncated.
-        probes = ', '.join(
+
+        probes = []
+        if nullable_keys:
+            null_predicate = ' OR '.join(f'{quote_identifier(key)} IS NULL' for key in nullable_keys)
+            probes.append(
+                f'COALESCE(COUNT_IF({null_predicate}), 0) AS "NULL_PRIMARY_KEY_COUNT"'
+            )
+        # COUNT_IF returns NULL for an empty table, where neither issue can occur.
+        probes.extend(
             f'COALESCE(COUNT_IF(MOD(DATE_PART(NANOSECOND, {quote_identifier(column.name)}), 1000) <> 0), 0) '
             f'AS "SUB_MICROSECOND_{index}"'
             for index, column in enumerate(temporal)
         )
-        rows = self._query(f'SELECT {probes} FROM {table.quoted}', phase='metadata')
+        rows = self._query(f'SELECT {", ".join(probes)} FROM {table.quoted}', phase='metadata')
+        if len(rows) != 1:
+            raise NativeToIcebergConversionError(
+                f'Snowflake did not return preflight value evidence for {table.quoted}'
+            )
+
+        blockers = []
+        if nullable_keys:
+            null_count = _row_value(rows[0], 'NULL_PRIMARY_KEY_COUNT')
+            if null_count is None:
+                raise NativeToIcebergConversionError(
+                    f'Snowflake did not return NULL primary-key evidence for {table.quoted}'
+                )
+            if int(null_count) > 0:
+                blockers.append(
+                    f'Primary key contains {int(null_count)} row(s) with NULL key values; '
+                    'correct the native table before converting to Iceberg'
+                )
+
         counts = [
-            _row_value(rows[0], f'SUB_MICROSECOND_{index}') if len(rows) == 1 else None
+            _row_value(rows[0], f'SUB_MICROSECOND_{index}')
             for index in range(len(temporal))
         ]
         if any(count is None for count in counts):
             raise NativeToIcebergConversionError(
                 f'Snowflake did not return sub-microsecond evidence for {table.quoted}'
             )
-        return [
+        blockers.extend(
             f'Column {column.name} has {int(count)} value(s) with sub-microsecond '
             'precision that this conversion would truncate'
             for column, count in zip(temporal, counts)
             if int(count) > 0
-        ]
+        )
+        return blockers
 
     def _query(self, sql: str, params=None, phase: str = None):
         query_tag = {

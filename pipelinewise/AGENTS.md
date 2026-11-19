@@ -197,9 +197,10 @@ staging types, transformations, conversion and recovery.
 - Automatic conversion is tap-root/core-only, inside the PID lock and before
   writers. Resume pending attempts, restoring interrupted names before refusals;
   block unsafe names, stale catalogs, incompatible classes and uncoordinated
-  shared writers. `automatic_preflight` defaults to false; when true, preflight
+  shared writers. `automatic_preflight` defaults to true; when enabled, preflight
   every native candidate before new conversions. Always keep per-table structural
-  and copied-content checks; the temporal precision scan is preflight-only.
+  and copied-content checks; the NULL primary-key and temporal precision scans
+  are preflight-only and share one aggregate query per table.
   Preserve completed conversions and stop replication on any failure.
 - `--preflight-only` takes no lock, manifest or DDL. `fast_sync` never converts
   and refuses native targets before a slot reset, but may rebuild a missing

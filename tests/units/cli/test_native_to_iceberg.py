@@ -228,7 +228,8 @@ def _quoted(table):
     return f'"DATABASE"."SCHEMA"."{table}"'
 
 
-def test_gate_resumes_pending_first_then_converts_smallest_first():
+@pytest.mark.parametrize('options', [{}, {'automatic_preflight': True}])
+def test_gate_resumes_pending_first_then_converts_smallest_first(options):
     """Interrupted cutovers close first; native tables convert from smallest to unknown size."""
     first = [
         _classified('DONE', STATE_ICEBERG),
@@ -242,7 +243,7 @@ def test_gate_resumes_pending_first_then_converts_smallest_first():
 
     with _gate(first, final) as (converter, adapter, classify):
         native_to_iceberg.convert_tap_tables(
-            {'dbname': 'database'}, '/runtime', ['targets'], 'WH', automatic_preflight=True,
+            {'dbname': 'database'}, '/runtime', ['targets'], 'WH', **options,
         )
 
     adapter.assert_called_once_with({'dbname': 'database'}, 'WH')
@@ -256,14 +257,13 @@ def test_gate_resumes_pending_first_then_converts_smallest_first():
     assert classify.call_count == 2
 
 
-@pytest.mark.parametrize('options', [{}, {'automatic_preflight': False}])
-def test_gate_skips_batch_preflight_but_converts_and_checks_readiness(options):
-    """Omitted or false preflight still converts with catalog types and verifies the result."""
+def test_gate_skips_batch_preflight_but_converts_and_checks_readiness():
+    """Explicit false skips preflight, converts with catalog types, and verifies the result."""
     first = [_classified('T', STATE_NATIVE, 1, writer_types={'DOC': 'VARIANT'})]
     final = [_classified('T', STATE_ICEBERG)]
 
     with _gate(first, final, preflight=lambda *_: ('must not run',)) as (converter, _, classify):
-        native_to_iceberg.convert_tap_tables({}, '/runtime', [], **options)
+        native_to_iceberg.convert_tap_tables({}, '/runtime', [], automatic_preflight=False)
 
     converter.preflight.assert_not_called()
     converter.convert.assert_called_once_with(_quoted('T'), eventual='iceberg', writer_types={'DOC': 'VARIANT'})
@@ -508,13 +508,12 @@ def test_gate_drives_the_real_converter(tmp_path):
     assert not list(tmp_path.glob('iceberg-recovery-*.json'))
 
 
-@pytest.mark.parametrize('options', [{}, {'automatic_preflight': False}])
-def test_default_gate_converts_temporal_values_without_precision_scan(tmp_path, options):
+def test_disabled_preflight_converts_temporal_values_without_precision_scan(tmp_path):
     """Skipping preflight permits the converter's explicit microsecond truncation."""
     snowflake = _lossy_snowflake()
     with patch.object(native_to_iceberg, 'SnowflakeConversionQueryAdapter', return_value=snowflake):
         native_to_iceberg.convert_tap_tables(
-            {'dbname': 'database'}, str(tmp_path), [_target('TABLE')], **options,
+            {'dbname': 'database'}, str(tmp_path), [_target('TABLE')], automatic_preflight=False,
         )
 
     assert snowflake.formats == {'TABLE_NATIVE': 'native', 'TABLE': 'iceberg'}
@@ -522,13 +521,14 @@ def test_default_gate_converts_temporal_values_without_precision_scan(tmp_path, 
     assert not any('DATE_PART(NANOSECOND' in sql for sql, _, _ in snowflake.queries)
 
 
-def test_automatic_preflight_stops_temporal_truncation_before_any_conversion(tmp_path):
+@pytest.mark.parametrize('options', [{}, {'automatic_preflight': True}])
+def test_automatic_preflight_stops_temporal_truncation_before_any_conversion(tmp_path, options):
     """The batch precision scan blocks conversion before any table changes."""
     snowflake = _lossy_snowflake()
     with patch.object(native_to_iceberg, 'SnowflakeConversionQueryAdapter', return_value=snowflake):
         with pytest.raises(NativeToIcebergConversionException, match='would truncate'):
             native_to_iceberg.convert_tap_tables(
-                {'dbname': 'database'}, str(tmp_path), [_target('TABLE')], automatic_preflight=True,
+                {'dbname': 'database'}, str(tmp_path), [_target('TABLE')], **options,
             )
 
     assert snowflake.formats == {'TABLE': 'native'}

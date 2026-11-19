@@ -771,8 +771,9 @@ message names each table and the reason:
   enabled or from another target, or a companion name that another tap writes;
 * ``cannot be converted``: a preflight blocker, such as a policy, a stream, a
   ``TIMESTAMP_TZ`` column, a grant that Iceberg cannot carry, or a
-  ``TEXT``/``VARIANT`` mismatch with the tap catalog. Sub-microsecond values
-  block only when ``automatic_preflight: true``;
+  ``TEXT``/``VARIANT`` mismatch with the tap catalog. SQL ``NULL`` in nullable
+  primary-key columns and sub-microsecond temporal values block when
+  ``automatic_preflight: true``, which is the default;
 * ``failed``: the conversion itself raised an error, or a resumed attempt
   restored its table name and then stopped for one of the reasons above;
 * ``stopped before any Snowflake work``: the main configuration enables
@@ -785,12 +786,13 @@ message names each table and the reason:
 
 *How to fix:*
 
-1. Pause the tap's schedule until you have fixed the cause. Each scheduled run
-   retries a copy that failed; it first checks every native table only when
-   ``automatic_preflight: true``. Every conversion still checks table structure
-   and copied contents, but truncates excess temporal precision. The tap
-   never replicates into native tables, and tables that converted earlier stay
-   converted. Keep ``native_to_iceberg_conversion`` enabled while you recover:
+1. Pause the tap's schedule until you have fixed the cause. Pending attempts
+   resume before automatic preflight, so a failed copy can retry without a fresh
+   preflight. Use the manual report in step 2 to diagnose data blockers. By
+   default, ``automatic_preflight: true`` then checks every native table before
+   starting new conversions. Every conversion still checks table structure and
+   copied contents, but truncates excess temporal precision. The tap never
+   replicates into native tables, and tables that converted earlier stay converted. Keep ``native_to_iceberg_conversion`` enabled while you recover:
    with ``enabled: false``, ``run_tap`` does not resume a pending conversion. Do
    not deselect a stream or change its schema mapping to unblock the tap while
    its table has a pending conversion. Finish that conversion first with

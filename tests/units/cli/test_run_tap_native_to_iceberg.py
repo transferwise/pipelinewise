@@ -56,7 +56,7 @@ def test_enabled_conversion_runs_in_a_child_process(pipelinewise, settings):
         pipelinewise._run_native_to_iceberg_conversion,
         STREAMS,
         'CONVERSION_WH',
-        settings.get('automatic_preflight', False),
+        settings.get('automatic_preflight', True),
     )
 
 
@@ -81,11 +81,14 @@ def test_main_config_alone_never_converts_a_tap_imported_as_native():
     run_child.assert_not_called()
 
 
-@pytest.mark.parametrize('automatic_preflight', [False, True])
-def test_conversion_plans_the_selected_streams(pipelinewise, automatic_preflight):
+@pytest.mark.parametrize(
+    ('options', 'automatic_preflight'),
+    [({}, True), ({'automatic_preflight': False}, False), ({'automatic_preflight': True}, True)],
+)
+def test_conversion_plans_the_selected_streams(pipelinewise, options, automatic_preflight):
     """The child plans the run's streams with the tap's schema mapping and conversion warehouse."""
     with patch('pipelinewise.cli.native_to_iceberg.convert_tap_tables') as convert_tables:
-        pipelinewise._run_native_to_iceberg_conversion(STREAMS[:1], 'CONVERSION_WH', automatic_preflight)
+        pipelinewise._run_native_to_iceberg_conversion(STREAMS[:1], 'CONVERSION_WH', **options)
 
     target_config, runtime_dir, targets, conversion_warehouse = convert_tables.call_args.args
     assert convert_tables.call_args.kwargs == {
@@ -145,7 +148,7 @@ def test_run_tap_converts_before_fastsync_and_singer(pipelinewise, tmp_path):
 
     assert [entry[0] for entry in calls.mock_calls] == ['convert', 'fastsync', 'singer']
     assert calls.mock_calls[0] == call.convert(
-        pipelinewise._run_native_to_iceberg_conversion, STREAMS, 'CONVERSION_WH', False,
+        pipelinewise._run_native_to_iceberg_conversion, STREAMS, 'CONVERSION_WH', True,
     )
     send_alert.assert_not_called()
     assert summary.call_args.args[0] == PipelineWise.STATUS_SUCCESS

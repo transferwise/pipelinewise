@@ -75,9 +75,73 @@ def test_preflight_accepts_convertible_table_without_side_effects(tmp_path):
     assert not any(sql.startswith(PROBE) for sql, _, _ in snowflake.queries)
 
 
-def test_preflight_collects_every_conversion_blocker(tmp_path):
-    """Representation, grant, and precision blockers are reported together."""
+@pytest.mark.parametrize('null_key_count', [0, 2])
+def test_preflight_checks_nullable_primary_key_values(tmp_path, null_key_count):
+    """Only actual NULL key values block a nullable native primary key."""
     snowflake = FakeSnowflake()
+    snowflake.is_nullable = 'YES'
+    snowflake.null_key_count = null_key_count
+
+    blockers = _converter(tmp_path, snowflake).preflight(TABLE)
+
+    if null_key_count:
+        assert len(blockers) == 1
+        assert 'row(s) with NULL key values' in blockers[0]
+    else:
+        assert blockers == ()
+    statements = [sql for sql, _, _ in snowflake.queries]
+    assert any('NULL_PRIMARY_KEY_COUNT' in sql and '"ID" IS NULL' in sql for sql in statements)
+    assert snowflake.formats == {'TABLE': 'native'}
+    assert not _manifest_files(tmp_path)
+    assert not any(sql.startswith(('CREATE', 'ALTER', 'INSERT')) for sql in statements)
+
+
+@pytest.mark.parametrize('source_primary_key', [(), ('ID',)])
+def test_preflight_skips_null_probe_without_nullable_primary_key(tmp_path, source_primary_key):
+    """Tables with no key or an enforced NOT NULL key need no NULL scan."""
+    snowflake = FakeSnowflake()
+    snowflake.source_primary_key = source_primary_key
+    snowflake.is_nullable = 'YES' if not source_primary_key else 'NO'
+
+    assert _converter(tmp_path, snowflake).preflight(TABLE) == ()
+
+    assert not any('NULL_PRIMARY_KEY_COUNT' in sql for sql, _, _ in snowflake.queries)
+
+
+@pytest.mark.parametrize('first_key_nullable', ['YES', 'NO'])
+def test_preflight_checks_nullable_component_of_composite_primary_key(tmp_path, first_key_nullable):
+    """A NULL in any nullable key component blocks the whole composite key."""
+    snowflake = FakeSnowflake()
+    snowflake.is_nullable = first_key_nullable
+    snowflake.source_primary_key = ('ID', 'SECOND_ID')
+    snowflake.native_extra_columns = [{
+        'COLUMN_NAME': 'SECOND_ID',
+        'DATA_TYPE': 'NUMBER',
+        'IS_NULLABLE': 'YES',
+        'NUMERIC_PRECISION': 19,
+        'NUMERIC_SCALE': 0,
+        'COMMENT': None,
+    }]
+    snowflake.null_key_count = 1
+
+    blockers = _converter(tmp_path, snowflake).preflight(TABLE)
+
+    assert len(blockers) == 1
+    assert 'row(s) with NULL key values' in blockers[0]
+    probes = [sql for sql, _, _ in snowflake.queries if 'NULL_PRIMARY_KEY_COUNT' in sql]
+    assert len(probes) == 1
+    assert '"SECOND_ID" IS NULL' in probes[0]
+    if first_key_nullable == 'YES':
+        assert '"ID" IS NULL OR "SECOND_ID" IS NULL' in probes[0]
+    else:
+        assert '"ID" IS NULL' not in probes[0]
+
+
+def test_preflight_collects_every_conversion_blocker(tmp_path):
+    """Representation, grant, NULL-key, and precision blockers are reported together."""
+    snowflake = FakeSnowflake()
+    snowflake.is_nullable = 'YES'
+    snowflake.null_key_count = 2
     snowflake.native_extra_columns = [
         _native_column('CREATED_TZ', 'TIMESTAMP_TZ'),
         _native_column('LOCATION', 'GEOGRAPHY', DATETIME_PRECISION=None),
@@ -100,11 +164,16 @@ def test_preflight_collects_every_conversion_blocker(tmp_path):
         'Iceberg v3 conversion',
         'The REBUILD grant to ROLE MAINTAINER cannot be replayed onto a managed Iceberg table',
         'The SELECT grant to SHARE PARTNER_SHARE cannot be replayed onto a managed Iceberg table',
+        'Primary key contains 2 row(s) with NULL key values; correct the native table before converting to Iceberg',
         'Column UPDATED_AT has 3 value(s) with sub-microsecond precision that this conversion would truncate',
     )
-    probes = [sql for sql, _, _ in snowflake.queries if sql.startswith(PROBE)]
+    probes = [
+        sql for sql, _, _ in snowflake.queries
+        if 'NULL_PRIMARY_KEY_COUNT' in sql or 'SUB_MICROSECOND_' in sql
+    ]
     assert probes == [
-        'SELECT COALESCE(COUNT_IF(MOD(DATE_PART(NANOSECOND, "UPDATED_AT"), 1000) <> 0), 0) '
+        'SELECT COALESCE(COUNT_IF("ID" IS NULL), 0) AS "NULL_PRIMARY_KEY_COUNT", '
+        'COALESCE(COUNT_IF(MOD(DATE_PART(NANOSECOND, "UPDATED_AT"), 1000) <> 0), 0) '
         'AS "SUB_MICROSECOND_0", '
         'COALESCE(COUNT_IF(MOD(DATE_PART(NANOSECOND, "OPENS_AT"), 1000) <> 0), 0) '
         'AS "SUB_MICROSECOND_1" '
@@ -137,7 +206,11 @@ def test_preflight_rejects_other_database_before_queries(tmp_path):
     assert snowflake.queries == []
 
 
-def test_missing_probe_evidence_fails_closed(tmp_path):
+@pytest.mark.parametrize(
+    ('rows', 'message'),
+    [([], 'preflight value evidence'), ([{}], 'sub-microsecond evidence')],
+)
+def test_missing_probe_evidence_fails_closed(tmp_path, rows, message):
     """An incomplete precision probe is an error rather than a clean report."""
     snowflake = _lossy_snowflake()
     original_query = snowflake.query
@@ -145,13 +218,35 @@ def test_missing_probe_evidence_fails_closed(tmp_path):
     def query(sql, params=None, query_tag_props=None):
         if sql.startswith(PROBE):
             snowflake.queries.append((sql, params, query_tag_props))
-            return []
+            return rows
         return original_query(sql, params, query_tag_props)
 
     snowflake.query = query
 
-    with pytest.raises(NativeToIcebergConversionError, match='sub-microsecond evidence'):
+    with pytest.raises(NativeToIcebergConversionError, match=message):
         _converter(tmp_path, snowflake).preflight(TABLE)
+
+
+@pytest.mark.parametrize('rows', [[{}], [{'NULL_PRIMARY_KEY_COUNT': None}]])
+def test_missing_primary_key_probe_evidence_fails_closed(tmp_path, rows):
+    """A missing NULL-key count cannot produce a clean preflight report."""
+    snowflake = FakeSnowflake()
+    snowflake.is_nullable = 'YES'
+    original_query = snowflake.query
+
+    def query(sql, params=None, query_tag_props=None):
+        if 'NULL_PRIMARY_KEY_COUNT' in sql:
+            snowflake.queries.append((sql, params, query_tag_props))
+            return rows
+        return original_query(sql, params, query_tag_props)
+
+    snowflake.query = query
+
+    with pytest.raises(NativeToIcebergConversionError, match='NULL primary-key evidence'):
+        _converter(tmp_path, snowflake).preflight(TABLE)
+
+    assert not list(tmp_path.iterdir())
+    assert not _mutations(snowflake)
 
 
 @pytest.mark.parametrize('eventual', ['native', EVENTUAL_ICEBERG])
@@ -280,8 +375,9 @@ def _text_column(name, **overrides):
 
 
 def test_empty_temporal_table_is_convertible(tmp_path):
-    """COUNT_IF is NULL over an empty table, which has no value to truncate."""
+    """Empty tables have neither NULL keys nor temporal values to truncate."""
     snowflake = FakeSnowflake()
+    snowflake.is_nullable = 'YES'
     snowflake.source_rows = 0
     snowflake.source_evidence = (0, 0)
     snowflake.staging_evidence = (0, 0)

@@ -1720,7 +1720,7 @@ class PipelineWise:
                 self._run_native_to_iceberg_conversion,
                 list(stream_ids),
                 conversion.get('conversion_warehouse'),
-                conversion.get('automatic_preflight', False),
+                conversion.get('automatic_preflight', True),
             )
         except ChildProcessError as exc:
             raise NativeToIcebergConversionException(
@@ -1729,7 +1729,7 @@ class PipelineWise:
             ) from exc
 
     def _run_native_to_iceberg_conversion(
-        self, stream_ids, conversion_warehouse, automatic_preflight: bool = False,
+        self, stream_ids, conversion_warehouse, automatic_preflight: bool = True,
     ) -> None:
         from pipelinewise.cli import native_to_iceberg
 

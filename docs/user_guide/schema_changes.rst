@@ -112,6 +112,10 @@ Singer verifies that these columns still exist as TEXT before writing.
 New or existing VARIANT columns cannot use these string rules. FullSync
 rebuilds therefore need a compatible transformation such as ``SET-NULL``.
 
+MariaDB JSON columns used by ``regex_match`` or non-NULL ``equals`` conditions
+also need existing TEXT columns, even when the rule transforms a different
+column. A condition comparing with SQL NULL does not impose this requirement.
+
 Import validation does not query Snowflake. Singer checks the existing column
 before writing. Conversion preflight also checks whether imported transformations
 require an existing TEXT column; a missing column also blocks conversion. Nested

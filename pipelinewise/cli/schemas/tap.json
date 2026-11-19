@@ -595,7 +595,7 @@
         },
         "automatic_preflight": {
           "type": "boolean",
-          "default": false
+          "default": true
         },
         "conversion_warehouse": {
           "type": "string"

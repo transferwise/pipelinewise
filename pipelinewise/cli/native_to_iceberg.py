@@ -540,7 +540,7 @@ def convert_tap_tables(
     targets: Sequence[ConversionTarget],
     conversion_warehouse: Optional[str] = None,
     *,
-    automatic_preflight: bool = False,
+    automatic_preflight: bool = True,
     other_writers: Sequence[OtherWriter] = (),
     tap_refusals: Sequence[str] = (),
     target_id: str = '<target_id>',

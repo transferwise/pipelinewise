@@ -1,4 +1,4 @@
-0.103.0 (2026-11-18)
+0.103.0 (2026-11-19)
 --------------------
 
 - Improve the existing opt-in automatic conversion from Snowflake native tables
@@ -14,18 +14,19 @@
 - Allow conversion preflight while a tap still writes native tables, so blockers
   can be resolved before enabling automatic conversion. MySQL/MariaDB taps first
   need a fresh `import_config` for JSON discovery.
-- Default `native_to_iceberg_conversion.automatic_preflight` to `false`.
-  Run the feasibility report manually before enabling conversion, or set this
-  option to `true` to check all tables before new conversions start. Preflight
-  reports sub-microsecond TIME/TIMESTAMP values; conversion truncates them to six
-  fractional digits. Each conversion still checks structure and copied contents.
-- Remove NULL-primary-key data scans from preflight and both conversion paths.
-  Keep primary-key metadata validation and preflight's temporal precision check.
+- Default `native_to_iceberg_conversion.automatic_preflight` to `true`.
+  New conversions check all native tables before copying them. Preflight
+  checks nullable primary keys for NULL and reports sub-microsecond
+  TIME/TIMESTAMP values in one data query per table. Correct NULL keys before
+  conversion; conversion truncates temporal values to six fractional digits.
+  Set `automatic_preflight: false` to skip automatic checks after a manual report.
+  Direct conversion skips these scans but still checks structure and copied contents.
 - Preserve existing MariaDB JSON column types during manual or automatic
   native-to-Iceberg conversion. After `import_config` updates FastSync and Singer,
   map new MariaDB JSON columns to VARIANT in Snowflake native and Iceberg tables.
-  Until then, resyncs keep the earlier TEXT mapping. Retain existing TEXT columns
-  and their hash/mask rules during Singer replication and PartialSync.
+  Until native Snowflake taps are reimported, their resyncs keep the earlier TEXT
+  mapping. Existing Iceberg v3 configs retain their JSON mapping. Retain existing
+  TEXT columns and their hash/mask rules during Singer replication and PartialSync.
 - Block native-to-Iceberg conversion when a MariaDB JSON transformation needs
   an existing TEXT column but that column is missing or has another type. Check
   every imported writer before copying the table.

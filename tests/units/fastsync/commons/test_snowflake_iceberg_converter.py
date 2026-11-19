@@ -213,6 +213,8 @@ class FakeSnowflake:
         self.native_extra_columns = []
         self.sub_microsecond_counts = {}
         self.source_rows = 2
+        self.null_key_count = 0
+        self.source_primary_key = ('ID',)
         self.companion_primary_key = ('ID',)
         self.clustering_key = None
         self.owner = 'OWNER_ROLE'
@@ -289,22 +291,25 @@ class FakeSnowflake:
                 row.update(self.companion_column_overrides)
                 return [row, *self.companion_extra_columns]
             return [row, *self.native_extra_columns]
-        if 'COUNT_IF(MOD(DATE_PART(NANOSECOND' in sql:
+        if 'COUNT_IF(MOD(DATE_PART(NANOSECOND' in sql or 'NULL_PRIMARY_KEY_COUNT' in sql:
             columns = re.findall(r'DATE_PART\(NANOSECOND, "([^"]+)"\)', sql)
             # Like Snowflake, COUNT_IF over an empty table is NULL unless the query coalesces it.
             empty_count = 0 if 'COALESCE(COUNT_IF' in sql else None
-            return [{
+            evidence = {
                 f'SUB_MICROSECOND_{index}': (
                     self.sub_microsecond_counts.get(column, 0) if self.source_rows else empty_count
                 )
                 for index, column in enumerate(columns)
-            }]
+            }
+            if 'NULL_PRIMARY_KEY_COUNT' in sql:
+                evidence['NULL_PRIMARY_KEY_COUNT'] = self.null_key_count if self.source_rows else empty_count
+            return [evidence]
         if sql.startswith('SHOW PRIMARY KEYS'):
             is_companion = any(
                 f'"{name}"' in sql and table_format == 'iceberg'
                 for name, table_format in self.formats.items()
             )
-            keys = self.companion_primary_key if is_companion else ('ID',)
+            keys = self.companion_primary_key if is_companion else self.source_primary_key
             return [
                 {'COLUMN_NAME': column, 'KEY_SEQUENCE': sequence}
                 for sequence, column in enumerate(keys, start=1)
@@ -655,9 +660,8 @@ def test_primary_key_is_not_null_in_iceberg(tmp_path):
     assert '"ID" NUMBER(19,0) NOT NULL' in create_sql
 
 
-@pytest.mark.parametrize('operation', ['preflight', 'convert'])
-def test_does_not_probe_null_primary_keys(tmp_path, operation):
-    """Nullable keys require no data scan; only preflight scans temporal precision."""
+def test_conversion_does_not_probe_null_primary_keys(tmp_path):
+    """Data-value scans remain optional and confined to preflight."""
     snowflake = FakeSnowflake()
     snowflake.is_nullable = 'YES'
     temporal_column = {
@@ -670,16 +674,13 @@ def test_does_not_probe_null_primary_keys(tmp_path, operation):
     snowflake.native_extra_columns = [temporal_column]
     snowflake.companion_extra_columns = [{**temporal_column, 'DATETIME_PRECISION': 6}]
 
-    result = getattr(_converter(tmp_path, snowflake), operation)('database.schema.table')
+    _converter(tmp_path, snowflake).convert('database.schema.table')
 
-    if operation == 'preflight':
-        assert result == ()
-    else:
-        assert snowflake.formats == {'TABLE': 'native', 'TABLE_ICEBERG': 'iceberg'}
+    assert snowflake.formats == {'TABLE': 'native', 'TABLE_ICEBERG': 'iceberg'}
     statements = [sql for sql, _, _ in snowflake.queries]
     assert any(sql.startswith('SHOW PRIMARY KEYS') for sql in statements)
-    assert any('DATE_PART(NANOSECOND, "UPDATED_AT")' in sql for sql in statements) == (operation == 'preflight')
-    assert not any('NULL_KEY_COUNT' in sql or '"ID" IS NULL' in sql for sql in statements)
+    assert not any('DATE_PART(NANOSECOND, "UPDATED_AT")' in sql for sql in statements)
+    assert not any('NULL_PRIMARY_KEY_COUNT' in sql or '"ID" IS NULL' in sql for sql in statements)
 
 
 @pytest.mark.parametrize('operation', ['preflight', 'convert'])

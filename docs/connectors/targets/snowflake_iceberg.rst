@@ -373,8 +373,8 @@ To move a tap that already replicates into native tables:
    writers refuse native tables under the Iceberg format. Keep the pause short:
    the source keeps accumulating changes.
 3. Resolve the report's blockers. If only sub-microsecond values block it, you
-   may accept the documented truncation and leave ``automatic_preflight: false``.
-   Stop readers and external writers of every table being converted. Set
+   may accept the documented truncation and set ``automatic_preflight: false``
+   explicitly. Stop readers and external writers of every table being converted. Set
    ``enabled: true`` and run ``import_config``. While the schedule stays paused,
    run ``pipelinewise run_tap --target <target_id> --tap <tap_id>`` under
    supervision. Conversion runs first, then replication starts in the same
@@ -408,7 +408,7 @@ converted and no conversion is pending. To clear a ``TEXT``/``VARIANT`` blocker,
    data_flattening_max_level: 0
    native_to_iceberg_conversion:
      enabled: true
-     automatic_preflight: false  # default; run the feasibility report manually first
+     automatic_preflight: true  # default; check all native tables before new conversions
      conversion_warehouse: CONVERSION_WH  # optional; defaults to the target's warehouse
 
 Every ``run_tap`` for the tap then runs a conversion step inside the tap's
@@ -421,11 +421,14 @@ pidfile, before FastSync or Singer writes anything:
    fails. If another check would stop a table, the resume restores its name and
    then stops before another cutover. A resumed attempt passes the same checks
    as a new one, including the tap catalog's column classes, before its cutover.
-3. It stops if any table needs an operator. With ``automatic_preflight: true``,
-   it checks every native table and stops before starting new conversions if any
-   is blocked. This check is off by default. When several streams write one
-   table, every stream's blockers and column classes count, and streams that
-   disagree on a column's class block the table.
+3. It stops if any table needs an operator. By default,
+   ``automatic_preflight: true`` checks every native table and stops before
+   starting new conversions if any is blocked. This includes nullable primary-key
+   columns containing SQL ``NULL`` and temporal values with sub-microsecond
+   precision. These scans can read the whole table and consume warehouse
+   resources. Set ``automatic_preflight: false`` explicitly to skip preflight.
+   When several streams write one table, every stream's blockers and column
+   classes count. Streams that disagree on a column's class block the table.
 4. It converts the native tables one at a time, smallest first, with the
    same converter as ``copy_native_to_iceberg --eventual iceberg``. Every
    conversion still checks the table's structure and copied contents before
@@ -489,9 +492,10 @@ If any table cannot convert, the run fails before replication starts, sends the
 tap's alert, and exits 1. It never falls back to native tables. Tables converted
 earlier in the run stay converted, each validated with its native backup kept
 as ``<table>_NATIVE``. Pause the tap's schedule until you have fixed the cause:
-each scheduled run retries the conversion. With ``automatic_preflight: true``,
-it checks every native table before starting new conversions. The next
-``run_tap`` resumes a pending conversion; see
+each scheduled run retries the conversion. By default,
+``automatic_preflight: true`` checks every native table before starting new
+conversions. Pending attempts resume first, so a failed copy can retry without
+a fresh preflight. Use the manual feasibility report to diagnose data blockers; see
 :ref:`troubleshooting_iceberg_auto_conversion`. While the tap is stopped, its
 source keeps accumulating changes, so watch PostgreSQL WAL and MySQL binlog
 retention.
@@ -575,22 +579,32 @@ Run ``copy_native_to_iceberg --preflight-only`` with ``--tap`` or ``--table``
 before converting anything. It takes no lock, writes no manifest, and runs no
 DDL, so it is safe to run beside the tap. It checks metadata and reads data from
 the existing native Snowflake tables, not the PostgreSQL or MariaDB/MySQL source.
-Run this report manually before enabling automatic conversion when
-``automatic_preflight`` is omitted or ``false``. A report can become stale if
-the table changes. Conversion repeats structural and copied-content checks,
-but does not repeat the temporal precision scan.
+Run this report manually before enabling automatic conversion to plan the work
+and resolve blockers. Automatic conversion repeats preflight by default before
+starting new conversions. Set ``automatic_preflight: false`` explicitly to skip
+that preflight. A manual report can become stale if the table changes. Each
+conversion repeats structural and copied-content checks, but does not repeat the
+primary-key NULL or temporal precision scans itself.
+
+For each native table with a primary key, preflight scans its nullable key
+columns for SQL ``NULL``. A row with ``NULL`` in any component of a composite key
+blocks readiness and ``automatic_preflight: true`` before new conversions start.
+Correct the affected native data or reload the table from a corrected source,
+then run the report again. Conversion does not repair or discard these rows.
 
 For each table with ``TIME``, ``TIMESTAMP_NTZ``, or ``TIMESTAMP_LTZ`` columns,
-one aggregate query counts values with sub-microsecond precision. Their declared
+preflight also counts values with sub-microsecond precision. Their declared
 types alone cannot show whether conversion will truncate any values. Such values
 block the report and ``automatic_preflight: true`` before new conversions start.
 A report blocked only by sub-microsecond values can still be converted with
-deliberate truncation: leave automatic preflight off for ``run_tap``, or run a
-manual conversion. Other blockers still stop conversion.
+deliberate truncation: set ``automatic_preflight: false`` explicitly for
+``run_tap``, or run a manual conversion. Structural blockers still stop conversion.
 
-The query does not sample rows and may scan the relevant columns across the
-whole table, so preflight can take time and consume warehouse resources. Full-row
-content comparisons happen later, during conversion. Preflight queries run on
+The primary-key NULL and temporal precision checks share one aggregate query
+per table. Metadata checks use separate queries. The data query does not sample
+rows and may scan the relevant columns across the whole table, so preflight can
+take time and consume warehouse resources. Full-row content comparisons happen
+later, during conversion. Preflight queries run on
 ``--conversion-warehouse`` when you give one. Otherwise ``--tap`` uses the tap's
 ``conversion_warehouse``, and ``--table`` uses the target's warehouse. It uses
 the same table planning and checks as conversion. Each table gets one state:

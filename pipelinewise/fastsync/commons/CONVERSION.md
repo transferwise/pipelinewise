@@ -38,13 +38,18 @@ converter restores the name, then refuses before another cutover.
 
 ## Preflight, convert and release writers
 
-`automatic_preflight` defaults to false. When true, preflight every native
-candidate before starting a new conversion. Operators normally run the manual
-report before enabling conversion. Conversion always repeats per-table safety
-checks, except the sub-microsecond scan. Preflight reports temporal values that
-would lose digits. Conversion explicitly truncates TIME/TIMESTAMP values to six
-fractional digits before the typed cast, and projected-value parity verifies
-that copied result. Manual evidence can become stale. Merge all streams'
+`automatic_preflight` defaults to true. Preflight every native candidate before
+starting a new conversion unless explicitly disabled. Operators normally run the
+manual report before enabling conversion. Conversion always repeats per-table safety
+checks, except the primary-key NULL and sub-microsecond scans. Preflight scans
+nullable native primary-key columns for SQL NULL and blocks readiness if any
+component contains NULL. Correct or reload the affected native data and rerun
+the report; conversion does not repair or discard rows. Preflight also reports
+temporal values that would lose digits. Both data checks share one aggregate
+query per table and can scan all relevant columns, consuming warehouse resources;
+metadata checks use separate queries. Conversion explicitly truncates
+TIME/TIMESTAMP values to six fractional digits before the typed cast, and
+projected-value parity verifies that copied result. Manual evidence can become stale. Merge all streams'
 TEXT/VARIANT classes for each table; resumed attempts repeat these checks before
 cutover.
 Convert smallest first. Require every table to be new or Iceberg before writers
