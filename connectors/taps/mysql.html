@@ -250,6 +250,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#change-outcomes">Change outcomes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#column-versioning">Column versioning</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#operational-procedure">Operational procedure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#mariadb-json-mapping">MariaDB JSON mapping</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#decimal-mapping">Decimal mapping</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#floating-point-values">Floating-point values</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#postgresql-and-yugabytedb-arrays">PostgreSQL and YugabyteDB arrays</a></li>
@@ -557,7 +558,7 @@ required to reconstruct a target row.</p></li>
 <li><p>Singer, FullSync, and PartialSync use an explicit <code class="docutils literal notranslate"><span class="pre">engine</span></code> value when
 present and otherwise detect the connected server. The resolved engine is
 used consistently for session defaults, GTID handling, binlog status, and
-managed Iceberg v3 JSON aliases. MariaDB sessions set
+Snowflake JSON-alias mapping. MariaDB sessions set
 <code class="docutils literal notranslate"><span class="pre">max_statement_time=0</span></code>; MySQL uses
 <code class="docutils literal notranslate"><span class="pre">max_execution_time=0</span></code> instead. MySQL’s limit is in milliseconds and
 applies to read-only SELECT statements; MariaDB’s is in seconds.
@@ -654,12 +655,13 @@ staging does not reconnect to the source or recheck its engine. Resolve
 pending recovery before replacing or repointing the source server.</p></li>
 <li><p>Snowflake Singer, FullSync, and PartialSync can target managed Iceberg v3 with
 explicit tap-level configuration. See <a class="reference internal" href="../targets/snowflake_iceberg.html#snowflake-iceberg"><span class="std std-ref">Snowflake Iceberg tables</span></a>.</p></li>
-<li><p>On a v3 route, MariaDB’s generated <code class="docutils literal notranslate"><span class="pre">JSON_VALID</span></code> constraint identifies its
-<code class="docutils literal notranslate"><span class="pre">JSON</span></code>-alias <code class="docutils literal notranslate"><span class="pre">LONGTEXT</span></code> columns for <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> loading. Plain
-<code class="docutils literal notranslate"><span class="pre">LONGTEXT</span></code> and native routes remain strings.
-Object, array, string, number, Boolean, and null JSON roots are carried as
-validated JSON text and restored as <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code>. JSON null remains distinct
-from SQL <code class="docutils literal notranslate"><span class="pre">NULL</span></code>.</p></li>
+<li><p>MariaDB’s generated <code class="docutils literal notranslate"><span class="pre">JSON_VALID</span></code> constraint identifies its <code class="docutils literal notranslate"><span class="pre">JSON</span></code>-alias
+<code class="docutils literal notranslate"><span class="pre">LONGTEXT</span></code> columns. After <code class="docutils literal notranslate"><span class="pre">import_config</span></code>, new Snowflake native and Iceberg
+JSON columns use <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code>; existing TEXT columns keep their type during
+Singer replication, PartialSync, and native-to-Iceberg conversion. FullSync
+rebuilds then use VARIANT.
+Plain <code class="docutils literal notranslate"><span class="pre">LONGTEXT</span></code> stays text. See <a class="reference internal" href="../../user_guide/schema_changes.html#mariadb-json-mapping"><span class="std std-ref">MariaDB JSON mapping</span></a> for discovery
+refresh and compatibility rules.</p></li>
 <li><p>Use <a class="reference internal" href="../../user_guide/troubleshooting.html#troubleshooting"><span class="std std-ref">Troubleshooting</span></a> for missing-binlog and packet-size failures.</p></li>
 <li><p>Primary-key value changes are replicated as deletion of the previous key and
 insertion of the new key. After changing the primary-key definition itself,

@@ -250,6 +250,7 @@
 <li class="toctree-l2"><a class="reference internal" href="schema_changes.html#change-outcomes">Change outcomes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="schema_changes.html#column-versioning">Column versioning</a></li>
 <li class="toctree-l2"><a class="reference internal" href="schema_changes.html#operational-procedure">Operational procedure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="schema_changes.html#mariadb-json-mapping">MariaDB JSON mapping</a></li>
 <li class="toctree-l2"><a class="reference internal" href="schema_changes.html#decimal-mapping">Decimal mapping</a></li>
 <li class="toctree-l2"><a class="reference internal" href="schema_changes.html#floating-point-values">Floating-point values</a></li>
 <li class="toctree-l2"><a class="reference internal" href="schema_changes.html#postgresql-and-yugabytedb-arrays">PostgreSQL and YugabyteDB arrays</a></li>
@@ -608,10 +609,20 @@ See <a class="reference internal" href="data_diff.html#data-diff-initial-scan"><
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">native_to_iceberg_conversion</span></code></p></td>
 <td><p>No</p></td>
 <td><p>Omitted</p></td>
-<td><p>Object with a Boolean <code class="docutils literal notranslate"><span class="pre">enabled</span></code> and an optional
+<td><p>Object with a Boolean <code class="docutils literal notranslate"><span class="pre">enabled</span></code>, optional Boolean
+<code class="docutils literal notranslate"><span class="pre">automatic_preflight</span></code> (default <code class="docutils literal notranslate"><span class="pre">true</span></code>), and optional
 <code class="docutils literal notranslate"><span class="pre">conversion_warehouse</span></code>. With <code class="docutils literal notranslate"><span class="pre">enabled:</span> <span class="pre">true</span></code>, <code class="docutils literal notranslate"><span class="pre">run_tap</span></code> converts
 the tap’s existing native Snowflake tables to managed Iceberg v3 before
-it replicates. <code class="docutils literal notranslate"><span class="pre">enabled:</span> <span class="pre">true</span></code> is valid only with
+it replicates. Run <code class="docutils literal notranslate"><span class="pre">copy_native_to_iceberg</span> <span class="pre">--preflight-only</span></code> manually
+before enabling conversion. By default, preflight checks all native tables
+before new conversions start. It scans nullable primary-key columns for
+SQL <code class="docutils literal notranslate"><span class="pre">NULL</span></code> and temporal columns for sub-microsecond values; either
+blocks conversion. These scans can read the whole table and consume
+warehouse resources. Set <code class="docutils literal notranslate"><span class="pre">automatic_preflight:</span> <span class="pre">false</span></code> explicitly to
+skip preflight. Each conversion still checks structure and copied contents.
+Conversion truncates sub-microsecond <code class="docutils literal notranslate"><span class="pre">TIME</span></code> and timestamp values to six
+fractional digits; preflight reports values that would lose precision. <code class="docutils literal notranslate"><span class="pre">enabled:</span> <span class="pre">true</span></code> is
+valid only with
 <code class="docutils literal notranslate"><span class="pre">target_table_format:</span> <span class="pre">iceberg</span></code>, <code class="docutils literal notranslate"><span class="pre">iceberg_version:</span> <span class="pre">3</span></code>, a
 <code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code> target, and an effective
 <code class="docutils literal notranslate"><span class="pre">data_flattening_max_level</span></code> of <code class="docutils literal notranslate"><span class="pre">0</span></code>. Any tap accepts

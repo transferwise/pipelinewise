@@ -250,6 +250,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#change-outcomes">Change outcomes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#column-versioning">Column versioning</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#operational-procedure">Operational procedure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#mariadb-json-mapping">MariaDB JSON mapping</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#decimal-mapping">Decimal mapping</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#floating-point-values">Floating-point values</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#postgresql-and-yugabytedb-arrays">PostgreSQL and YugabyteDB arrays</a></li>
@@ -414,6 +415,10 @@ to that type. Use FullSync to recreate the key with the current mapping.
 Singer also keeps a nonempty legacy MariaDB/MySQL primary-key subset and groups
 retained floating-point decimal keys by their loaded target value. See
 <a class="reference internal" href="../../user_guide/schema_changes.html#exact-decimal-mapping"><span class="std std-ref">Decimal mapping</span></a> for the compatibility rules and their limits.</p>
+<p>After <code class="docutils literal notranslate"><span class="pre">import_config</span></code>, new MariaDB JSON columns use <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> in native and
+Iceberg tables. Existing TEXT columns keep their type during Singer replication
+and PartialSync. See <a class="reference internal" href="../../user_guide/schema_changes.html#mariadb-json-mapping"><span class="std std-ref">MariaDB JSON mapping</span></a> for FullSync and conversion
+behaviour.</p>
 <p>Source-delete markers always physically remove rows before Singer state is
 acknowledged. Metadata columns are enabled automatically; see
 <a class="reference internal" href="../../user_guide/metadata_columns.html#metadata-columns"><span class="std std-ref">Metadata columns</span></a> for deletion processing.</p>

@@ -250,6 +250,7 @@
 <li class="toctree-l2"><a class="reference internal" href="schema_changes.html#change-outcomes">Change outcomes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="schema_changes.html#column-versioning">Column versioning</a></li>
 <li class="toctree-l2"><a class="reference internal" href="schema_changes.html#operational-procedure">Operational procedure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="schema_changes.html#mariadb-json-mapping">MariaDB JSON mapping</a></li>
 <li class="toctree-l2"><a class="reference internal" href="schema_changes.html#decimal-mapping">Decimal mapping</a></li>
 <li class="toctree-l2"><a class="reference internal" href="schema_changes.html#floating-point-values">Floating-point values</a></li>
 <li class="toctree-l2"><a class="reference internal" href="schema_changes.html#postgresql-and-yugabytedb-arrays">PostgreSQL and YugabyteDB arrays</a></li>
@@ -1020,8 +1021,10 @@ map one column to <code class="docutils literal notranslate"><span class="pre">T
 <code class="docutils literal notranslate"><span class="pre">is</span> <span class="pre">also</span> <span class="pre">written</span> <span class="pre">by</span> <span class="pre">tap</span> <span class="pre">&lt;tap_id&gt;</span></code> without managed Iceberg v3 and conversion
 enabled or from another target, or a companion name that another tap writes;</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">cannot</span> <span class="pre">be</span> <span class="pre">converted</span></code>: a preflight blocker, such as a policy, a stream, a
-<code class="docutils literal notranslate"><span class="pre">TIMESTAMP_TZ</span></code> column, sub-microsecond values, a grant that Iceberg cannot
-carry, or a <code class="docutils literal notranslate"><span class="pre">TEXT</span></code>/<code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> mismatch with the tap catalog;</p></li>
+<code class="docutils literal notranslate"><span class="pre">TIMESTAMP_TZ</span></code> column, a grant that Iceberg cannot carry, or a
+<code class="docutils literal notranslate"><span class="pre">TEXT</span></code>/<code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> mismatch with the tap catalog. SQL <code class="docutils literal notranslate"><span class="pre">NULL</span></code> in nullable
+primary-key columns and sub-microsecond temporal values block when
+<code class="docutils literal notranslate"><span class="pre">automatic_preflight:</span> <span class="pre">true</span></code>, which is the default;</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">failed</span></code>: the conversion itself raised an error, or a resumed attempt
 restored its table name and then stopped for one of the reasons above;</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">stopped</span> <span class="pre">before</span> <span class="pre">any</span> <span class="pre">Snowflake</span> <span class="pre">work</span></code>: the main configuration enables
@@ -1034,10 +1037,13 @@ and run <code class="docutils literal notranslate"><span class="pre">import_conf
 </ul>
 <p><em>How to fix:</em></p>
 <ol class="arabic">
-<li><p>Pause the tap’s schedule until you have fixed the cause. Each scheduled run
-preflights every native table again and restarts a copy that failed. The tap
-never replicates into native tables, and tables that converted earlier stay
-converted. Keep <code class="docutils literal notranslate"><span class="pre">native_to_iceberg_conversion</span></code> enabled while you recover:
+<li><p>Pause the tap’s schedule until you have fixed the cause. Pending attempts
+resume before automatic preflight, so a failed copy can retry without a fresh
+preflight. Use the manual report in step 2 to diagnose data blockers. By
+default, <code class="docutils literal notranslate"><span class="pre">automatic_preflight:</span> <span class="pre">true</span></code> then checks every native table before
+starting new conversions. Every conversion still checks table structure and
+copied contents, but truncates excess temporal precision. The tap never
+replicates into native tables, and tables that converted earlier stay converted. Keep <code class="docutils literal notranslate"><span class="pre">native_to_iceberg_conversion</span></code> enabled while you recover:
 with <code class="docutils literal notranslate"><span class="pre">enabled:</span> <span class="pre">false</span></code>, <code class="docutils literal notranslate"><span class="pre">run_tap</span></code> does not resume a pending conversion. Do
 not deselect a stream or change its schema mapping to unblock the tap while
 its table has a pending conversion. Finish that conversion first with
@@ -1069,7 +1075,7 @@ Stop every writer to it and drop <code class="docutils literal notranslate"><spa
 next <code class="docutils literal notranslate"><span class="pre">run_tap</span></code> copies the table again.</p>
 <p>A pending attempt that a conversion check now refuses, for example one
 started by an earlier release, keeps its manifest and companion table. A grant
-or sub-microsecond values can be fixed in place, and the next <code class="docutils literal notranslate"><span class="pre">run_tap</span></code>
+can be fixed in place, and the next <code class="docutils literal notranslate"><span class="pre">run_tap</span></code>
 resumes the attempt. A fix that changes the table’s columns, such as replacing
 a <code class="docutils literal notranslate"><span class="pre">TIMESTAMP_TZ</span></code> column or changing a <code class="docutils literal notranslate"><span class="pre">TEXT</span></code> column to <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code>, makes
 every resume fail with <code class="docutils literal notranslate"><span class="pre">The</span> <span class="pre">schema</span> <span class="pre">of</span> <span class="pre">&lt;table&gt;</span> <span class="pre">changed</span> <span class="pre">after</span> <span class="pre">conversion</span> <span class="pre">started</span></code>.

@@ -184,7 +184,7 @@ const runMermaid = async (rerun) => {
                                     // Apply zoom to the now-rendered diagram, matching
                                     // the decoration visible diagrams receive.
                                     if (true) {
-                                        addZoomToSvgs(d3.selectAll(".mermaid[data-zoom-id=id-b2ba1165-03dd-44ed-bcda-87c0b1bee4c6]").select(function() {
+                                        addZoomToSvgs(d3.selectAll(".mermaid[data-zoom-id=id-4dd74246-0aa3-4dc6-ab9e-1c3d5eea2dd5]").select(function() {
                                             return this.querySelector("svg");
                                         }));
                                     }
@@ -210,7 +210,7 @@ const runMermaid = async (rerun) => {
     if (true) {
         const mermaids_to_add_zoom = 1 === -1 ? mermaids_active.length : 1;
         if(mermaids_to_add_zoom > 0) {
-            var svgs = d3.selectAll(".mermaid[data-zoom-id=id-b2ba1165-03dd-44ed-bcda-87c0b1bee4c6]").select(function() {
+            var svgs = d3.selectAll(".mermaid[data-zoom-id=id-4dd74246-0aa3-4dc6-ab9e-1c3d5eea2dd5]").select(function() {
                 return this.querySelector("svg");
             });
             // Wait until every active (visible) diagram has rendered. Deferred
@@ -609,6 +609,7 @@ window.runMermaid = runMermaid;</script>
 <li class="toctree-l2"><a class="reference internal" href="schema_changes.html#change-outcomes">Change outcomes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="schema_changes.html#column-versioning">Column versioning</a></li>
 <li class="toctree-l2"><a class="reference internal" href="schema_changes.html#operational-procedure">Operational procedure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="schema_changes.html#mariadb-json-mapping">MariaDB JSON mapping</a></li>
 <li class="toctree-l2"><a class="reference internal" href="schema_changes.html#decimal-mapping">Decimal mapping</a></li>
 <li class="toctree-l2"><a class="reference internal" href="schema_changes.html#floating-point-values">Floating-point values</a></li>
 <li class="toctree-l2"><a class="reference internal" href="schema_changes.html#postgresql-and-yugabytedb-arrays">PostgreSQL and YugabyteDB arrays</a></li>
@@ -784,7 +785,7 @@ To share one role, set both credential pairs to that role.</p>
 <section id="schema">
 <h2>Schema<a class="headerlink" href="#schema" title="Link to this heading"></a></h2>
 <figure class="align-center" id="id1">
-<pre data-zoom-id="id-b2ba1165-03dd-44ed-bcda-87c0b1bee4c6" class="mermaid">
+<pre data-zoom-id="id-4dd74246-0aa3-4dc6-ab9e-1c3d5eea2dd5" class="mermaid">
         %%{init: {&quot;er&quot;: {&quot;diagramPadding&quot;: 8, &quot;entityPadding&quot;: 8}}}%%
 erDiagram
     direction LR

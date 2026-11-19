@@ -250,6 +250,7 @@
 <li class="toctree-l2"><a class="reference internal" href="schema_changes.html#change-outcomes">Change outcomes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="schema_changes.html#column-versioning">Column versioning</a></li>
 <li class="toctree-l2"><a class="reference internal" href="schema_changes.html#operational-procedure">Operational procedure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="schema_changes.html#mariadb-json-mapping">MariaDB JSON mapping</a></li>
 <li class="toctree-l2"><a class="reference internal" href="schema_changes.html#decimal-mapping">Decimal mapping</a></li>
 <li class="toctree-l2"><a class="reference internal" href="schema_changes.html#floating-point-values">Floating-point values</a></li>
 <li class="toctree-l2"><a class="reference internal" href="schema_changes.html#postgresql-and-yugabytedb-arrays">PostgreSQL and YugabyteDB arrays</a></li>
@@ -695,7 +696,8 @@ positions. Back up state and verify target continuity after the first run.</p>
 <span class="w">  </span>--target<span class="w"> </span>&lt;target_id&gt;<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--table<span class="w"> </span>&lt;database.schema.table&gt;<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--eventual<span class="w"> </span>native<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iceberg-version<span class="w"> </span><span class="m">3</span>
+<span class="w">  </span>--iceberg-version<span class="w"> </span><span class="m">3</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--conversion-warehouse<span class="w"> </span>CONVERSION_WH
 </pre></div>
 </div>
 <p>Creates and validates a managed Iceberg v3 copy using an imported
@@ -717,28 +719,36 @@ native table name before it validates anything. A rerun after a completed
 <code class="docutils literal notranslate"><span class="pre">--eventual</span> <span class="pre">iceberg</span></code> conversion changes nothing. Do not delete its recovery
 manifest or companion tables. See <a class="reference internal" href="../connectors/targets/snowflake_iceberg.html#snowflake-iceberg"><span class="std std-ref">Snowflake Iceberg tables</span></a> for preflight,
 unsupported metadata, and rollback behaviour.</p>
-<p>The command and its report run on the target’s warehouse by default.
-<code class="docutils literal notranslate"><span class="pre">--conversion-warehouse</span> <span class="pre">&lt;warehouse&gt;</span></code> runs them on another warehouse, which the
+<p>The optional <code class="docutils literal notranslate"><span class="pre">--conversion-warehouse</span> <span class="pre">&lt;warehouse&gt;</span></code> applies to both conversion
+and preflight. It runs all their Snowflake queries on another warehouse, which the
 target role must be able to use. For a <code class="docutils literal notranslate"><span class="pre">--tap</span></code> report, the tap’s
-<code class="docutils literal notranslate"><span class="pre">conversion_warehouse</span></code> applies when you give no option. Other commands reject
-<code class="docutils literal notranslate"><span class="pre">--conversion-warehouse</span></code>.</p>
+<code class="docutils literal notranslate"><span class="pre">conversion_warehouse</span></code> applies when you give no option. Otherwise the target’s
+warehouse is used. This option does not change the warehouse used by replication.
+Other commands reject <code class="docutils literal notranslate"><span class="pre">--conversion-warehouse</span></code>.</p>
 <p>Check feasibility first with <code class="docutils literal notranslate"><span class="pre">--preflight-only</span></code>:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pipelinewise<span class="w"> </span>copy_native_to_iceberg<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--target<span class="w"> </span>&lt;target_id&gt;<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--tap<span class="w"> </span>&lt;tap_id&gt;<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--preflight-only<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iceberg-version<span class="w"> </span><span class="m">3</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--conversion-warehouse<span class="w"> </span>CONVERSION_WH<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--output-format<span class="w"> </span>table
 </pre></div>
 </div>
 <p>The report changes nothing. It takes no lock, writes no manifest, and runs no
 DDL, so it can run beside the tap. <code class="docutils literal notranslate"><span class="pre">--tap</span></code> reports every table that the tap’s
 selected streams write; <code class="docutils literal notranslate"><span class="pre">--table</span></code> reports one table, checked against the
-catalogs of the imported taps that write it. Each row shows the table’s state,
-the action conversion would take, Snowflake’s row and byte counts, and its
+catalogs of the imported taps that write it. PostgreSQL taps can be checked
+before importing Iceberg settings, without configuring
+<code class="docutils literal notranslate"><span class="pre">native_to_iceberg_conversion</span></code>. Configuration next steps do not block readiness.
+MySQL/MariaDB catalogs need a fresh <code class="docutils literal notranslate"><span class="pre">import_config</span></code> to establish JSON mappings.
+They can remain native for the report.</p>
+<p>Each row shows the table’s state, the action conversion would take,
+Snowflake’s row and byte counts, and its
 blockers: the first metadata refusal, or every conversion blocker when there is
 no refusal. <code class="docutils literal notranslate"><span class="pre">--output-format</span> <span class="pre">json</span></code> prints only the report on stdout,
-with a top-level <code class="docutils literal notranslate"><span class="pre">ready</span></code> flag; log messages go to stderr. The command exits 0
+with a top-level <code class="docutils literal notranslate"><span class="pre">ready</span></code> flag and <code class="docutils literal notranslate"><span class="pre">next_steps</span></code> when configuration is needed;
+log messages go to stderr. The command exits 0
 whenever it produces a report, so check <code class="docutils literal notranslate"><span class="pre">ready</span></code> or the final line. Other
 commands reject <code class="docutils literal notranslate"><span class="pre">--preflight-only</span></code>, and this command accepts <code class="docutils literal notranslate"><span class="pre">--tap</span></code> only
 with <code class="docutils literal notranslate"><span class="pre">--preflight-only</span></code>. See <a class="reference internal" href="../connectors/targets/snowflake_iceberg.html#snowflake-iceberg-conversion-report"><span class="std std-ref">Conversion feasibility report</span></a>.</p>

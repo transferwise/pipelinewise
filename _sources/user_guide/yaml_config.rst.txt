@@ -186,10 +186,20 @@ Tap configuration
    * - ``native_to_iceberg_conversion``
      - No
      - Omitted
-     - Object with a Boolean ``enabled`` and an optional
+     - Object with a Boolean ``enabled``, optional Boolean
+       ``automatic_preflight`` (default ``true``), and optional
        ``conversion_warehouse``. With ``enabled: true``, ``run_tap`` converts
        the tap's existing native Snowflake tables to managed Iceberg v3 before
-       it replicates. ``enabled: true`` is valid only with
+       it replicates. Run ``copy_native_to_iceberg --preflight-only`` manually
+       before enabling conversion. By default, preflight checks all native tables
+       before new conversions start. It scans nullable primary-key columns for
+       SQL ``NULL`` and temporal columns for sub-microsecond values; either
+       blocks conversion. These scans can read the whole table and consume
+       warehouse resources. Set ``automatic_preflight: false`` explicitly to
+       skip preflight. Each conversion still checks structure and copied contents.
+       Conversion truncates sub-microsecond ``TIME`` and timestamp values to six
+       fractional digits; preflight reports values that would lose precision. ``enabled: true`` is
+       valid only with
        ``target_table_format: iceberg``, ``iceberg_version: 3``, a
        ``target-snowflake`` target, and an effective
        ``data_flattening_max_level`` of ``0``. Any tap accepts

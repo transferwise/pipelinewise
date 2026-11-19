@@ -24,6 +24,11 @@ Singer also keeps a nonempty legacy MariaDB/MySQL primary-key subset and groups
 retained floating-point decimal keys by their loaded target value. See
 :ref:`exact_decimal_mapping` for the compatibility rules and their limits.
 
+After ``import_config``, new MariaDB JSON columns use ``VARIANT`` in native and
+Iceberg tables. Existing TEXT columns keep their type during Singer replication
+and PartialSync. See :ref:`mariadb_json_mapping` for FullSync and conversion
+behaviour.
+
 Source-delete markers always physically remove rows before Singer state is
 acknowledged. Metadata columns are enabled automatically; see
 :ref:`metadata_columns` for deletion processing.

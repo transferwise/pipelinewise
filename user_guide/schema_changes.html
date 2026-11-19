@@ -250,6 +250,7 @@
 <li class="toctree-l2"><a class="reference internal" href="#change-outcomes">Change outcomes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#column-versioning">Column versioning</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#operational-procedure">Operational procedure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mariadb-json-mapping">MariaDB JSON mapping</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#decimal-mapping">Decimal mapping</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#floating-point-values">Floating-point values</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#postgresql-and-yugabytedb-arrays">PostgreSQL and YugabyteDB arrays</a></li>
@@ -456,6 +457,63 @@ resynced or migrated.</p>
 <a class="reference internal" href="resync.html#resync"><span class="std std-ref">Resync and repair</span></a> only when its source and target cost is acceptable; a resync is not
 required merely because an old target column remains.</p>
 </section>
+<section id="mariadb-json-mapping">
+<span id="id2"></span><h2>MariaDB JSON mapping<a class="headerlink" href="#mariadb-json-mapping" title="Link to this heading"></a></h2>
+<p>MariaDB represents its <code class="docutils literal notranslate"><span class="pre">JSON</span></code> type as <code class="docutils literal notranslate"><span class="pre">LONGTEXT</span></code> with a generated
+<code class="docutils literal notranslate"><span class="pre">JSON_VALID</span></code> constraint. PipelineWise recognizes that exact constraint and
+creates new JSON columns as <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> in Snowflake native and managed Iceberg
+v3 tables. Ordinary <code class="docutils literal notranslate"><span class="pre">LONGTEXT</span></code> stays text. Other destinations keep their
+existing mapping.</p>
+<p>Run <code class="docutils literal notranslate"><span class="pre">import_config</span></code> after upgrading to refresh MariaDB discovery and enable
+this mapping for native Snowflake taps. Until then, both FastSync and Singer
+keep the earlier text mapping, including during a resync. Older Iceberg v3
+configs without the new setting keep their existing JSON mapping.
+Existing columns follow these rules:</p>
+<table class="docutils align-default" id="id4">
+<caption><span class="caption-text">MariaDB JSON columns in Snowflake</span><a class="headerlink" href="#id4" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 35.0%" />
+<col style="width: 65.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Operation</p></th>
+<th class="head"><p>Column type</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Create a table or add a JSON column</p></td>
+<td><p>Create <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Singer replication or PartialSync into an existing table</p></td>
+<td><p>Keep an existing <code class="docutils literal notranslate"><span class="pre">TEXT</span></code> or <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> column. Do not version it.</p></td>
+</tr>
+<tr class="row-even"><td><p>FullSync rebuild</p></td>
+<td><p>Create the replacement with <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Convert a native table to Iceberg</p></td>
+<td><p>Preserve each existing JSON column’s <code class="docutils literal notranslate"><span class="pre">TEXT</span></code> or <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> class when
+imported transformations accept it.</p></td>
+</tr>
+</tbody>
+</table>
+<p>Retained text columns keep the serialized JSON, including whitespace and
+numeric spelling. VARIANT columns hold the parsed JSON value. JSON <code class="docutils literal notranslate"><span class="pre">null</span></code>
+remains distinct from SQL <code class="docutils literal notranslate"><span class="pre">NULL</span></code>. <code class="docutils literal notranslate"><span class="pre">version_legacy_float_columns</span></code> does not
+control JSON columns.</p>
+<p>Existing TEXT columns keep their <code class="docutils literal notranslate"><span class="pre">HASH</span></code>, <code class="docutils literal notranslate"><span class="pre">MASK-HIDDEN</span></code>, and string
+hash/mask variants after <code class="docutils literal notranslate"><span class="pre">import_config</span></code> refreshes discovery. They operate
+on the original serialized JSON, including whitespace and numeric spelling.
+Singer verifies that these columns still exist as TEXT before writing.
+New or existing VARIANT columns cannot use these string rules. FullSync
+rebuilds therefore need a compatible transformation such as <code class="docutils literal notranslate"><span class="pre">SET-NULL</span></code>.</p>
+<p>MariaDB JSON columns used by <code class="docutils literal notranslate"><span class="pre">regex_match</span></code> or non-NULL <code class="docutils literal notranslate"><span class="pre">equals</span></code> conditions
+also need existing TEXT columns, even when the rule transforms a different
+column. A condition comparing with SQL NULL does not impose this requirement.</p>
+<p>Import validation does not query Snowflake. Singer checks the existing column
+before writing. Conversion preflight also checks whether imported transformations
+require an existing TEXT column; a missing column also blocks conversion. Nested
+JSON paths are not supported for these serialized text values.</p>
+</section>
 <section id="decimal-mapping">
 <span id="exact-decimal-mapping"></span><h2>Decimal mapping<a class="headerlink" href="#decimal-mapping" title="Link to this heading"></a></h2>
 <p>MariaDB/MySQL <code class="docutils literal notranslate"><span class="pre">DECIMAL(p,s)</span></code> or <code class="docutils literal notranslate"><span class="pre">NUMERIC(p,s)</span></code> and PostgreSQL
@@ -594,7 +652,7 @@ the planned archive names and expected historical column types so retries betwee
 rename and add do not rename twice and publication detects unexpected schema drift.</p>
 </section>
 <section id="floating-point-values">
-<span id="id2"></span><h2>Floating-point values<a class="headerlink" href="#floating-point-values" title="Link to this heading"></a></h2>
+<span id="id3"></span><h2>Floating-point values<a class="headerlink" href="#floating-point-values" title="Link to this heading"></a></h2>
 <p>PostgreSQL and YugabyteDB <code class="docutils literal notranslate"><span class="pre">REAL</span></code> and <code class="docutils literal notranslate"><span class="pre">DOUBLE</span> <span class="pre">PRECISION</span></code> columns keep
 <code class="docutils literal notranslate"><span class="pre">NaN</span></code>, <code class="docutils literal notranslate"><span class="pre">Infinity</span></code>, and <code class="docutils literal notranslate"><span class="pre">-Infinity</span></code> on Snowflake and PostgreSQL targets.
 This includes arrays of these types. FullSync, PartialSync, and every Singer

@@ -770,8 +770,10 @@ message names each table and the reason:
   ``is also written by tap <tap_id>`` without managed Iceberg v3 and conversion
   enabled or from another target, or a companion name that another tap writes;
 * ``cannot be converted``: a preflight blocker, such as a policy, a stream, a
-  ``TIMESTAMP_TZ`` column, sub-microsecond values, a grant that Iceberg cannot
-  carry, or a ``TEXT``/``VARIANT`` mismatch with the tap catalog;
+  ``TIMESTAMP_TZ`` column, a grant that Iceberg cannot carry, or a
+  ``TEXT``/``VARIANT`` mismatch with the tap catalog. SQL ``NULL`` in nullable
+  primary-key columns and sub-microsecond temporal values block when
+  ``automatic_preflight: true``, which is the default;
 * ``failed``: the conversion itself raised an error, or a resumed attempt
   restored its table name and then stopped for one of the reasons above;
 * ``stopped before any Snowflake work``: the main configuration enables
@@ -784,10 +786,13 @@ message names each table and the reason:
 
 *How to fix:*
 
-1. Pause the tap's schedule until you have fixed the cause. Each scheduled run
-   preflights every native table again and restarts a copy that failed. The tap
-   never replicates into native tables, and tables that converted earlier stay
-   converted. Keep ``native_to_iceberg_conversion`` enabled while you recover:
+1. Pause the tap's schedule until you have fixed the cause. Pending attempts
+   resume before automatic preflight, so a failed copy can retry without a fresh
+   preflight. Use the manual report in step 2 to diagnose data blockers. By
+   default, ``automatic_preflight: true`` then checks every native table before
+   starting new conversions. Every conversion still checks table structure and
+   copied contents, but truncates excess temporal precision. The tap never
+   replicates into native tables, and tables that converted earlier stay converted. Keep ``native_to_iceberg_conversion`` enabled while you recover:
    with ``enabled: false``, ``run_tap`` does not resume a pending conversion. Do
    not deselect a stream or change its schema mapping to unblock the tap while
    its table has a pending conversion. Finish that conversion first with
@@ -822,7 +827,7 @@ message names each table and the reason:
 
    A pending attempt that a conversion check now refuses, for example one
    started by an earlier release, keeps its manifest and companion table. A grant
-   or sub-microsecond values can be fixed in place, and the next ``run_tap``
+   can be fixed in place, and the next ``run_tap``
    resumes the attempt. A fix that changes the table's columns, such as replacing
    a ``TIMESTAMP_TZ`` column or changing a ``TEXT`` column to ``VARIANT``, makes
    every resume fail with ``The schema of <table> changed after conversion started``.
