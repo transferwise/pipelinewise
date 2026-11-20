@@ -14,12 +14,13 @@ from contextlib import ExitStack, contextmanager
 import psutil
 import pidfile
 
-from datetime import datetime
+from datetime import UTC, datetime
 from time import sleep, time
 from uuid import uuid4
 from typing import Dict, Optional, List, Any, NoReturn, Tuple
 from joblib import Parallel, delayed, parallel_backend
 from tabulate import tabulate
+from singer.logger import configure_log_redaction
 
 from . import utils
 from . import fastsync_capabilities as fastsync_capability_policy
@@ -1712,47 +1713,96 @@ class PipelineWise:
         conversion = self.tap.get(Config.NATIVE_TO_ICEBERG_CONVERSION) or {}
         if conversion.get('enabled') is not True or not stream_ids:
             return
-        # The main config enables conversion, but the writers and the catalog follow the tap's own files.
-        native_to_iceberg.assert_imported_for_conversion(self._iceberg_target_config(), self.tap['id'])
-        self.logger.info('Checking %s selected streams for native Snowflake tables', len(stream_ids))
+        with self._native_to_iceberg_log():
+            target_config = self._iceberg_target_config()
+            configure_log_redaction(target_config)
+            # The main config enables conversion, but writers follow the tap's generated files.
+            native_to_iceberg.assert_imported_for_conversion(target_config, self.tap['id'])
+            self.logger.info('Checking %s selected streams for native Snowflake tables', len(stream_ids))
+            try:
+                self._run_in_child_process(
+                    self._run_native_to_iceberg_conversion,
+                    list(stream_ids),
+                    conversion.get('conversion_warehouse'),
+                    conversion.get('automatic_preflight', True),
+                )
+            except ChildProcessError as exc:
+                raise NativeToIcebergConversionException(
+                    f'Automatic native-to-Iceberg conversion stopped: {exc}. '
+                    f'{native_to_iceberg.next_action(self.target["id"], self.tap["id"])}'
+                ) from exc
+            self.logger.info('Native-to-Iceberg conversion checks completed')
+
+    @contextmanager
+    def _native_to_iceberg_log(self):
+        """Persist parent and forked-child conversion messages using the tap log lifecycle."""
+        log_dir = self.get_tap_log_dir(self.target['id'], self.tap['id'])
+        os.makedirs(log_dir, exist_ok=True)
+        previous_log_file = self.tap_run_log_file
+        timestamp = datetime.now(UTC).strftime('%Y%m%d_%H%M%S')
+        self.tap_run_log_file = os.path.join(
+            log_dir, f'{self.target["id"]}-{self.tap["id"]}-{timestamp}.conversion.log',
+        )
+        running_log = f'{self.tap_run_log_file}.running'
+        logger = logging.getLogger('pipelinewise')
+        handler = logging.FileHandler(running_log, encoding='utf-8')
+        if logger.handlers:
+            handler.setFormatter(logger.handlers[0].formatter)
+        logger.addHandler(handler)
+        status = commands.STATUS_FAILED
         try:
-            self._run_in_child_process(
-                self._run_native_to_iceberg_conversion,
-                list(stream_ids),
-                conversion.get('conversion_warehouse'),
-                conversion.get('automatic_preflight', True),
-            )
-        except ChildProcessError as exc:
-            raise NativeToIcebergConversionException(
-                f'Automatic native-to-Iceberg conversion stopped: {exc}. '
-                f'{native_to_iceberg.next_action(self.target["id"], self.tap["id"])}'
-            ) from exc
+            yield
+            status = commands.STATUS_SUCCESS
+        except (SystemExit, KeyboardInterrupt):
+            status = 'terminated'
+            self.logger.info('Native-to-Iceberg conversion interrupted')
+            raise
+        except (NativeToIcebergConversionException, PreRunChecksException) as exc:
+            self.logger.error('Native-to-Iceberg conversion failed: %s', exc)
+            raise
+        except Exception:
+            self.logger.exception('Native-to-Iceberg conversion failed unexpectedly')
+            raise
+        finally:
+            logger.removeHandler(handler)
+            handler.close()
+            # stop_tap may already have renamed the active log during signal handling.
+            if os.path.isfile(running_log):
+                os.rename(running_log, f'{self.tap_run_log_file}.{status}')
+            self.tap_run_log_file = previous_log_file
 
     def _run_native_to_iceberg_conversion(
         self, stream_ids, conversion_warehouse, automatic_preflight: bool = True,
     ) -> None:
         from pipelinewise.cli import native_to_iceberg
 
-        target_config = self._iceberg_target_config()
-        catalog = self._load_required_json_object(self.tap['files']['properties'], 'tap catalog')
-        fastsync_capable = resolve_fastsync_capabilities(
-            self.tap['type'], self.target['type'], Config.TABLE_FORMAT_ICEBERG,
-        ).full_sync
-        targets = native_to_iceberg.tap_targets(
-            catalog, target_config, fastsync_capable, stream_ids,
-            transformation_config=utils.load_json(self.tap['files']['transformation']),
-        )
-        native_to_iceberg.convert_tap_tables(
-            target_config,
-            self.get_target_dir(self.target['id']),
-            targets,
-            conversion_warehouse,
-            automatic_preflight=automatic_preflight,
-            other_writers=self._other_writers(target_config, targets),
-            tap_refusals=self._stale_catalog_reasons(),
-            target_id=self.target['id'],
-            tap_id=self.tap['id'],
-        )
+        try:
+            target_config = self._iceberg_target_config()
+            catalog = self._load_required_json_object(self.tap['files']['properties'], 'tap catalog')
+            fastsync_capable = resolve_fastsync_capabilities(
+                self.tap['type'], self.target['type'], Config.TABLE_FORMAT_ICEBERG,
+            ).full_sync
+            targets = native_to_iceberg.tap_targets(
+                catalog, target_config, fastsync_capable, stream_ids,
+                transformation_config=utils.load_json(self.tap['files']['transformation']),
+            )
+            native_to_iceberg.convert_tap_tables(
+                target_config,
+                self.get_target_dir(self.target['id']),
+                targets,
+                conversion_warehouse,
+                automatic_preflight=automatic_preflight,
+                other_writers=self._other_writers(target_config, targets),
+                tap_refusals=self._stale_catalog_reasons(),
+                target_id=self.target['id'],
+                tap_id=self.tap['id'],
+            )
+        except (NativeToIcebergConversionException, PreRunChecksException):
+            raise
+        except Exception:
+            # Log before multiprocessing can replace an exception that cannot be rebuilt.
+            self.logger.exception('Native-to-Iceberg conversion child failed unexpectedly')
+            raise
 
     @staticmethod
     def _file_mtime_ns(path: str) -> Optional[int]:
