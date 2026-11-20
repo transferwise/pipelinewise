@@ -24,7 +24,7 @@ Filename fields
    * - Field
      - Values
    * - ``engine``
-     - ``singer`` or ``fastsync``.
+     - ``singer``, ``fastsync``, or ``conversion``.
    * - ``status``
      - ``running``, ``success``, ``failed``, or ``terminated``.
    * - Timestamp
@@ -32,6 +32,16 @@ Filename fields
 
 FastSync and Singer portions of one ``run_tap`` can write separate files. Keep
 both when diagnosing an initial-load failure.
+
+When automatic native-to-Iceberg conversion is enabled, ``run_tap`` first writes
+a separate ``.conversion.log.running`` file in the same directory. It records
+conversion checks, each table's conversion or resumption, elapsed time, and
+failures. Unexpected failures include tracebacks with credentials redacted;
+expected check refusals show their reason without a traceback.
+The suffix changes to ``success``, ``failed``, or ``terminated`` when
+that step ends. These messages are saved even when the scheduler discards
+command output. A successful conversion log covers that step; check the later
+FastSync or Singer log for the replication result.
 
 
 Observe a run

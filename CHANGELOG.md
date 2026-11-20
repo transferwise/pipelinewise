@@ -1,3 +1,12 @@
+0.103.1 (2026-11-20)
+--------------------
+
+- Save automatic native-to-Iceberg conversion messages in the tap's log directory,
+  including conversion checks, table progress, and failures. Use the usual
+  running, success, failed, and terminated log suffixes so scheduled runs retain
+  these messages even when command output is discarded. Include redacted
+  tracebacks for unexpected failures, including child setup and planning errors.
+
 0.103.0 (2026-11-19)
 --------------------
 

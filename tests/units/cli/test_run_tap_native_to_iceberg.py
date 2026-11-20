@@ -1,12 +1,15 @@
 """run_tap converts a tap's native Snowflake tables before any writer runs."""
 
 import json
+import logging
+import os
+import signal
 from unittest.mock import MagicMock, call, patch
 
 import pidfile
 import pytest
 
-from pipelinewise.cli.errors import NativeToIcebergConversionException
+from pipelinewise.cli.errors import NativeToIcebergConversionException, PreRunChecksException
 from pipelinewise.cli.pipelinewise import PipelineWise
 from pipelinewise.fastsync.commons.snowflake_iceberg_conversion_plan import EXISTING_TEXT, ConversionTarget
 from pipelinewise.fastsync.commons.snowflake_iceberg_model import SnowflakeObjectName
@@ -19,7 +22,7 @@ STREAMS = ['db_test_mysql-table_one', 'db_test_mysql-table_two']
 
 
 @pytest.fixture(name='pipelinewise')
-def _pipelinewise():
+def _pipelinewise(tmp_path):
     instance = PipelineWise(CliArgs(target='target_one', tap='tap_one'), CONFIG_DIR, VIRTUALENVS_DIR)
     instance.tap['target_table_format'] = 'iceberg'
     instance.tap['iceberg_version'] = 3
@@ -28,6 +31,7 @@ def _pipelinewise():
     imported = instance._iceberg_target_config
     instance._iceberg_target_config = lambda: {**imported(), 'target_table_format': 'iceberg', 'iceberg_version': 3}
     instance._stale_catalog_reasons = lambda: []
+    instance.get_tap_log_dir = lambda *_: str(tmp_path / 'log')
     return instance
 
 
@@ -35,7 +39,7 @@ def _pipelinewise():
     ('conversion', 'stream_ids'),
     [(None, STREAMS), ({'enabled': False}, STREAMS), ({'enabled': True}, [])],
 )
-def test_conversion_is_skipped_unless_enabled_with_streams(pipelinewise, conversion, stream_ids):
+def test_conversion_is_skipped_unless_enabled_with_streams(pipelinewise, conversion, stream_ids, tmp_path):
     """Taps without the setting, or with nothing selected, never touch Snowflake here."""
     pipelinewise.tap['native_to_iceberg_conversion'] = conversion
 
@@ -43,6 +47,7 @@ def test_conversion_is_skipped_unless_enabled_with_streams(pipelinewise, convers
         pipelinewise._convert_native_tables_to_iceberg(stream_ids)
 
     run_child.assert_not_called()
+    assert not (tmp_path / 'log').exists()
 
 
 @pytest.mark.parametrize('settings', [{}, {'automatic_preflight': False}, {'automatic_preflight': True}])
@@ -69,16 +74,173 @@ def test_a_stale_catalog_refuses_conversions(pipelinewise):
     assert convert_tables.call_args.kwargs['tap_refusals'] == ['stale catalog']
 
 
-def test_main_config_alone_never_converts_a_tap_imported_as_native():
+def test_main_config_alone_never_converts_a_tap_imported_as_native(tmp_path):
     """A tap whose generated files lack its Iceberg settings stops before any Snowflake work."""
     instance = PipelineWise(CliArgs(target='target_one', tap='tap_one'), CONFIG_DIR, VIRTUALENVS_DIR)
     instance.tap['native_to_iceberg_conversion'] = {'enabled': True}
+    instance.get_tap_log_dir = lambda *_: str(tmp_path / 'log')
 
     with patch.object(instance, '_run_in_child_process') as run_child:
         with pytest.raises(NativeToIcebergConversionException, match='imported configuration of tap tap_one'):
             instance._convert_native_tables_to_iceberg(STREAMS)
 
     run_child.assert_not_called()
+    log_file, = (tmp_path / 'log').glob('*.conversion.log.failed')
+    assert 'imported configuration of tap tap_one' in log_file.read_text()
+
+
+def _log_conversion_in_child(*_):
+    logging.getLogger('pipelinewise.cli.native_to_iceberg').info('Converted DATABASE.SCHEMA.TABLE in 12 seconds')
+
+
+def _kill_conversion_child(*_):
+    os.kill(os.getpid(), signal.SIGKILL)
+
+
+def test_conversion_child_logs_are_saved_and_handler_is_removed(pipelinewise, tmp_path, caplog):
+    """The real forked child writes the tap log; later writers cannot append to it."""
+    caplog.set_level(logging.INFO)
+    logger = logging.getLogger('pipelinewise')
+    original_handlers = list(logger.handlers)
+    pipelinewise._run_native_to_iceberg_conversion = _log_conversion_in_child
+
+    pipelinewise._convert_native_tables_to_iceberg(STREAMS)
+
+    log_file, = (tmp_path / 'log').glob('*.conversion.log.success')
+    content = log_file.read_text()
+    assert 'Checking 2 selected streams' in content
+    assert 'Converted DATABASE.SCHEMA.TABLE in 12 seconds' in content
+    assert 'Native-to-Iceberg conversion checks completed' in content
+    assert logger.handlers == original_handlers
+    assert pipelinewise.tap_run_log_file is None
+    logger.info('Subsequent replication')
+    assert log_file.read_text() == content
+    assert pipelinewise.detect_tap_status('target_one', 'tap_one')['lastStatus'] == 'success'
+
+
+@pytest.mark.parametrize('error_type', [NativeToIcebergConversionException, PreRunChecksException])
+def test_conversion_failure_is_saved_with_redaction(pipelinewise, tmp_path, caplog, error_type):
+    """A preflight refusal survives stdout being discarded without exposing target credentials."""
+    caplog.set_level(logging.INFO)
+    imported = pipelinewise._iceberg_target_config
+    pipelinewise._iceberg_target_config = lambda: {**imported(), 'password': 'conversion-private-password'}
+
+    def refuse(*_):
+        assert pipelinewise.detect_tap_status('target_one', 'tap_one')['currentStatus'] == 'running'
+        raise error_type('preflight blocked; password=conversion-private-password')
+
+    with patch.object(pipelinewise, '_run_in_child_process', side_effect=refuse):
+        with pytest.raises(error_type):
+            pipelinewise._convert_native_tables_to_iceberg(STREAMS)
+
+    log_file, = (tmp_path / 'log').glob('*.conversion.log.failed')
+    content = log_file.read_text()
+    assert 'preflight blocked; password=[REDACTED]' in content
+    assert 'conversion-private-password' not in content
+    assert 'Traceback (most recent call last)' not in content
+    assert not list((tmp_path / 'log').glob('*.running'))
+    assert pipelinewise.detect_tap_status('target_one', 'tap_one')['lastStatus'] == 'failed'
+
+
+class _KeywordOnlyConversionError(Exception):
+    def __init__(self, *, detail):
+        super().__init__(detail)
+
+
+def _raise_conversion_planning_error(error):
+    raise error
+
+
+@pytest.mark.parametrize(
+    ('error', 'received_type'),
+    [
+        (KeyError('conversion-private-password'), KeyError),
+        (_KeywordOnlyConversionError(detail='conversion-private-password'), RuntimeError),
+    ],
+)
+def test_unexpected_child_planning_failure_saves_original_traceback(
+    pipelinewise, tmp_path, caplog, error, received_type,
+):
+    """The original child frames survive even when multiprocessing replaces the exception."""
+    caplog.set_level(logging.INFO)
+    imported = pipelinewise._iceberg_target_config
+    pipelinewise._iceberg_target_config = lambda: {**imported(), 'password': 'conversion-private-password'}
+
+    with patch(
+        'pipelinewise.cli.native_to_iceberg.tap_targets',
+        side_effect=lambda *_args, **_kwargs: _raise_conversion_planning_error(error),
+    ):
+        with pytest.raises(received_type):
+            pipelinewise._convert_native_tables_to_iceberg(STREAMS)
+
+    log_file, = (tmp_path / 'log').glob('*.conversion.log.failed')
+    content = log_file.read_text()
+    assert 'conversion child failed unexpectedly' in content
+    assert 'Traceback (most recent call last)' in content
+    assert '_raise_conversion_planning_error' in content
+    assert type(error).__name__ in content
+    assert '[REDACTED]' in content
+    assert 'conversion-private-password' not in content
+
+
+@pytest.mark.parametrize('error_type', [NativeToIcebergConversionException, PreRunChecksException])
+def test_child_planning_refusal_has_no_traceback(pipelinewise, tmp_path, caplog, error_type):
+    """Expected checks remain concise when raised by the real child process."""
+    caplog.set_level(logging.INFO)
+    with patch('pipelinewise.cli.native_to_iceberg.tap_targets', side_effect=error_type('expected refusal')):
+        with pytest.raises(error_type):
+            pipelinewise._convert_native_tables_to_iceberg(STREAMS)
+
+    log_file, = (tmp_path / 'log').glob('*.conversion.log.failed')
+    content = log_file.read_text()
+    assert 'expected refusal' in content
+    assert 'Traceback (most recent call last)' not in content
+
+
+def test_unexpected_parent_failure_has_a_traceback(pipelinewise, tmp_path, caplog):
+    """Failures before the conversion child starts also retain their diagnostic frames."""
+    caplog.set_level(logging.INFO)
+    with patch.object(pipelinewise, '_iceberg_target_config', side_effect=KeyError('broken config')):
+        with pytest.raises(KeyError):
+            pipelinewise._convert_native_tables_to_iceberg(STREAMS)
+
+    log_file, = (tmp_path / 'log').glob('*.conversion.log.failed')
+    content = log_file.read_text()
+    assert 'conversion failed unexpectedly' in content
+    assert 'Traceback (most recent call last)' in content
+    assert 'KeyError' in content
+
+
+def test_killed_conversion_child_leaves_a_failed_log(pipelinewise, tmp_path, caplog):
+    """A child without an exception result still produces a persistent failure reason."""
+    caplog.set_level(logging.INFO)
+    pipelinewise._run_native_to_iceberg_conversion = _kill_conversion_child
+
+    with pytest.raises(NativeToIcebergConversionException, match='exited with status -9'):
+        pipelinewise._convert_native_tables_to_iceberg(STREAMS)
+
+    log_file, = (tmp_path / 'log').glob('*.conversion.log.failed')
+    assert 'exited with status -9' in log_file.read_text()
+
+
+def test_stop_tap_finalizes_conversion_log_on_sigterm(pipelinewise, tmp_path, caplog):
+    """A real signal runs stop_tap's rename without the logging cleanup renaming it again."""
+    caplog.set_level(logging.INFO)
+    logger = logging.getLogger('pipelinewise')
+    original_handlers = list(logger.handlers)
+    signal.signal(signal.SIGTERM, pipelinewise.stop_tap)
+
+    with patch.object(pipelinewise, '_terminate_process_tree'), patch.object(
+        pipelinewise, '_run_in_child_process', side_effect=lambda *_: os.kill(os.getpid(), signal.SIGTERM),
+    ):
+        with pytest.raises(SystemExit):
+            pipelinewise._convert_native_tables_to_iceberg(STREAMS)
+
+    log_file, = (tmp_path / 'log').glob('*.conversion.log.terminated')
+    assert 'Native-to-Iceberg conversion interrupted' in log_file.read_text()
+    assert not list((tmp_path / 'log').glob('*.running'))
+    assert logger.handlers == original_handlers
+    assert pipelinewise.tap_run_log_file is None
 
 
 @pytest.mark.parametrize(
