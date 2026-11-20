@@ -415,7 +415,7 @@
 </thead>
 <tbody>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">engine</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">singer</span></code> or <code class="docutils literal notranslate"><span class="pre">fastsync</span></code>.</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">singer</span></code>, <code class="docutils literal notranslate"><span class="pre">fastsync</span></code>, or <code class="docutils literal notranslate"><span class="pre">conversion</span></code>.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">status</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">running</span></code>, <code class="docutils literal notranslate"><span class="pre">success</span></code>, <code class="docutils literal notranslate"><span class="pre">failed</span></code>, or <code class="docutils literal notranslate"><span class="pre">terminated</span></code>.</p></td>
@@ -427,6 +427,15 @@
 </table>
 <p>FastSync and Singer portions of one <code class="docutils literal notranslate"><span class="pre">run_tap</span></code> can write separate files. Keep
 both when diagnosing an initial-load failure.</p>
+<p>When automatic native-to-Iceberg conversion is enabled, <code class="docutils literal notranslate"><span class="pre">run_tap</span></code> first writes
+a separate <code class="docutils literal notranslate"><span class="pre">.conversion.log.running</span></code> file in the same directory. It records
+conversion checks, each table’s conversion or resumption, elapsed time, and
+failures. Unexpected failures include tracebacks with credentials redacted;
+expected check refusals show their reason without a traceback.
+The suffix changes to <code class="docutils literal notranslate"><span class="pre">success</span></code>, <code class="docutils literal notranslate"><span class="pre">failed</span></code>, or <code class="docutils literal notranslate"><span class="pre">terminated</span></code> when
+that step ends. These messages are saved even when the scheduler discards
+command output. A successful conversion log covers that step; check the later
+FastSync or Singer log for the replication result.</p>
 </section>
 <section id="observe-a-run">
 <h2>Observe a run<a class="headerlink" href="#observe-a-run" title="Link to this heading"></a></h2>
