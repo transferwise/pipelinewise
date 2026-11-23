@@ -698,7 +698,7 @@ def test_required_connector_status_contract():
 
     assert aggregate['name'] == 'connector_tests'
     assert set(aggregate['needs']) == {
-        'test_connector_units', 'test_shared_singer', 'test_tap_yugabyte_index_check'}
+        'test_connector_units', 'test_github_requests', 'test_shared_singer', 'test_tap_yugabyte_index_check'}
     assert aggregate['if'] == '${{ always() }}'
     assert 'connector_tests' in configured_names
 
