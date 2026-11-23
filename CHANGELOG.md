@@ -1,3 +1,9 @@
+0.103.2 (2026-11-23)
+--------------------
+
+- Retry transient GitHub API and connection failures up to four times per request with exponential backoff and jitter.
+- Report the original HTTP status for empty GitHub error responses instead of a `NoneType` error.
+
 0.103.1 (2026-11-20)
 --------------------
 
