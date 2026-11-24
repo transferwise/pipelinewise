@@ -1,3 +1,11 @@
+0.103.3 (2026-11-24)
+--------------------
+
+- Document that every YB-TServer needs `cdc_enable_intra_transactional_before_image=true` when any table in a YugabyteDB source database uses `REPLICA IDENTITY DEFAULT` or `FULL`. This includes every PostgreSQL target. See [replica identity](docs/connectors/taps/yugabyte.rst#replica-identity).
+- Explain why the flag matters: without it, a transaction that inserts a row and then updates it, or deletes it on `FULL`, stops LOG_BASED replication for the whole database.
+- Recover a stopped tap by setting the flag with a rolling YB-TServer restart and rerunning the tap. It resumes from its bookmark without a resync.
+- Report this stop as `BeforeImageUnavailableError`, and an expired replication slot as `ReplicationSlotExpiredError`, with the operator action in the message.
+
 0.103.2 (2026-11-23)
 --------------------
 

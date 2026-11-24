@@ -159,6 +159,11 @@ to the tap for the next sync.
   target writes `NULL` into the rest. Set `REPLICA IDENTITY DEFAULT` or `FULL`. FastSync to PostgreSQL checks the
   same before it creates the slot. The slot fixes each table's identity when it is created, so after a change
   rerun the unfiltered fast_sync to recreate the slot.
+* **Intra-transaction before image**: if any table in the database uses `REPLICA IDENTITY DEFAULT` or `FULL`, set
+  `cdc_enable_intra_transactional_before_image=true` on every YB-TServer (rolling restart). Without it, a
+  transaction that inserts a row and then updates it (or, on `FULL`, deletes it) stops the stream for every tap on
+  the database with `BeforeImageUnavailableError`. After setting the flag, rerun the tap; no resync is needed. See
+  [Replica identity](../../docs/connectors/taps/yugabyte.rst#replica-identity).
 * **Port**: Log based replication works only on port 5433. The current YugabyteDB psycopg2 drivers
   (`psycopg2-yugabytedb-binary` 2.9.3.5 and 2.9.3.5.post1) ignore the configured `port` on replication
   connections and always connect to 5433. The tap stops before reading any data if LOG_BASED streams are
