@@ -78,6 +78,24 @@ jobs:
         run: make ${{ matrix.test_target }}
         working-directory: singer-connectors/${{ matrix.connector }}
 
+  test_github_requests:
+    name: GitHub request recovery
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Install GitHub tap test dependencies
+        run: |
+          python -m venv singer-connectors/tap-github/venv
+          singer-connectors/tap-github/venv/bin/pip install ./singer-connectors/singer-python './singer-connectors/tap-github[test]'
+      - name: Check request recovery regressions
+        run: |
+          singer-connectors/tap-github/venv/bin/ruff check --no-force-exclude singer-connectors/tap-github/tests/unittests/test_request_retries.py
+          singer-connectors/tap-github/venv/bin/pytest -v singer-connectors/tap-github/tests/unittests/test_request_retries.py singer-connectors/tap-github/tests/unittests/test_exception_handling.py
+
   test_shared_singer:
     runs-on: ubuntu-24.04
     steps:
@@ -152,6 +170,7 @@ jobs:
     if: ${{ always() }}
     needs:
       - test_connector_units
+      - test_github_requests
       - test_shared_singer
       - test_tap_yugabyte_index_check
     runs-on: ubuntu-24.04
@@ -159,9 +178,11 @@ jobs:
       - name: Require connector test success
         env:
           CONNECTOR_UNITS_RESULT: ${{ needs.test_connector_units.result }}
+          GITHUB_REQUESTS_RESULT: ${{ needs.test_github_requests.result }}
           SHARED_SINGER_RESULT: ${{ needs.test_shared_singer.result }}
           YUGABYTE_INDEX_CHECK_RESULT: ${{ needs.test_tap_yugabyte_index_check.result }}
         run: |
           test "$CONNECTOR_UNITS_RESULT" = success
+          test "$GITHUB_REQUESTS_RESULT" = success
           test "$SHARED_SINGER_RESULT" = success
           test "$YUGABYTE_INDEX_CHECK_RESULT" = success

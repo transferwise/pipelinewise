@@ -3,6 +3,7 @@ import datetime
 import fnmatch
 import json
 import os
+import random
 import time
 from email.utils import parsedate_to_datetime
 
@@ -21,6 +22,8 @@ REQUIRED_CONFIG_KEYS = ['start_date', 'access_token']
 MAX_RATE_LIMIT_WAIT_SECONDS = 600
 RATE_THROTTLING_EXTRA_WAITING_TIME = 60
 MAX_RATE_LIMIT_RETRIES_PER_REQUEST = 3
+MAX_TRANSIENT_RETRIES_PER_REQUEST = 4
+TRANSIENT_HTTP_STATUS_CODES = {500, 502, 503, 504}
 
 KEY_PROPERTIES = {
     'commits': ['sha'],
@@ -193,16 +196,13 @@ def get_bookmark(state, repo, stream_name, bookmark_key, start_date):
 
 def raise_for_error(resp, source):
 
-    content_length = len(resp.content)
-    if content_length == 0:
-        # There is nothing we can do here since Github has neither sent
-        # us a 2xx response nor a response content.
-        return
-
     error_code = resp.status_code
     try:
         response_json = resp.json()
-    except Exception:
+    except ValueError:
+        response_json = {}
+
+    if not isinstance(response_json, dict):
         response_json = {}
 
     if error_code == 404:
@@ -290,10 +290,37 @@ def rate_throttling(response):
     return False
 
 
+def request_with_retries(source: str, url: str) -> requests.Response:
+    """Fetch a page, retrying transient failures before any records are emitted."""
+    for retry_count in range(MAX_TRANSIENT_RETRIES_PER_REQUEST + 1):
+        try:
+            response = session.request(method='get', url=url)
+        except requests.exceptions.SSLError:
+            raise
+        except (requests.ConnectionError, requests.Timeout) as error:
+            if retry_count == MAX_TRANSIENT_RETRIES_PER_REQUEST:
+                raise
+            failure = type(error).__name__
+        else:
+            if response.status_code not in TRANSIENT_HTTP_STATUS_CODES:
+                return response
+            if retry_count == MAX_TRANSIENT_RETRIES_PER_REQUEST:
+                return response
+            failure = f'HTTP {response.status_code}'
+            response.close()
+
+        seconds_to_sleep = 2 ** retry_count + random.uniform(0, 1)
+        logger.warning(
+            'Transient failure fetching %s (%s). Retrying in %.1f seconds (%s/%s).',
+            source, failure, seconds_to_sleep, retry_count + 1, MAX_TRANSIENT_RETRIES_PER_REQUEST,
+        )
+        time.sleep(seconds_to_sleep)
+
+
 def authed_get(source, url, headers={}, do_rate_throttling=True, rate_limit_retry_count=0):
     with metrics.http_request_timer(source) as timer:
         session.headers.update(headers)
-        resp = session.request(method='get', url=url)
+        resp = request_with_retries(source, url)
         if resp.status_code != 200:
             if do_rate_throttling and resp.status_code == 403:
                 # Check retry limit before attempting rate throttling to prevent infinite recursion
@@ -304,7 +331,6 @@ def authed_get(source, url, headers={}, do_rate_throttling=True, rate_limit_retr
                 else:
                     logger.error(f"Max rate limit retries ({MAX_RATE_LIMIT_RETRIES_PER_REQUEST}) exceeded for {url}")
             raise_for_error(resp, source)
-            return None
         else:
             timer.tags[metrics.Tag.http_status_code] = resp.status_code
             if do_rate_throttling:

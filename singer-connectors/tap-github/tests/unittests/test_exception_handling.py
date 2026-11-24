@@ -20,6 +20,9 @@ class Mockresponse:
     def json(self):
         return self.text
 
+    def close(self):
+        pass
+
 def get_response(status_code, json={}, raise_error=False):
     return Mockresponse(status_code, json, raise_error)
 
@@ -66,7 +69,8 @@ class TestExceptionHandling(unittest.TestCase):
         except tap_github.NotFoundException as e:
             self.assertEqual(str(e), "HTTP-error-code: 404, Error: The resource you have specified cannot be found or it is a personal account repository. Please refer '{}' for more details.".format(json.get("documentation_url")))
 
-    def test_500_error(self, mocked_request):
+    @mock.patch('tap_github.time.sleep')
+    def test_500_error(self, mocked_sleep, mocked_request):
         mocked_request.return_value = get_response(500, raise_error = True)
 
         try:
