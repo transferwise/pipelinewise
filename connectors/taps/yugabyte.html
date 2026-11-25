@@ -447,7 +447,12 @@ replication slot;</p></li>
 initial snapshot to the slot’s start point. Without it, the first sync fails
 with <code class="docutils literal notranslate"><span class="pre">permission</span> <span class="pre">denied</span> <span class="pre">to</span> <span class="pre">set</span> <span class="pre">parameter</span> <span class="pre">&quot;yb_read_time&quot;</span></code>; and</p></li>
 <li><p>a replica identity other than <code class="docutils literal notranslate"><span class="pre">NOTHING</span></code> on every table. PostgreSQL targets
-need <code class="docutils literal notranslate"><span class="pre">DEFAULT</span></code> or <code class="docutils literal notranslate"><span class="pre">FULL</span></code>. See <a class="reference internal" href="#yugabyte-replica-identity"><span class="std std-ref">Replica identity</span></a>.</p></li>
+need <code class="docutils literal notranslate"><span class="pre">DEFAULT</span></code> or <code class="docutils literal notranslate"><span class="pre">FULL</span></code>. See <a class="reference internal" href="#yugabyte-replica-identity"><span class="std std-ref">Replica identity</span></a>; and</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">cdc_enable_intra_transactional_before_image=true</span></code> on every YB-TServer if
+any table in the database uses <code class="docutils literal notranslate"><span class="pre">REPLICA</span> <span class="pre">IDENTITY</span> <span class="pre">DEFAULT</span></code> or <code class="docutils literal notranslate"><span class="pre">FULL</span></code>. This
+includes every database replicated to a PostgreSQL target. The flag defaults
+to <code class="docutils literal notranslate"><span class="pre">false</span></code> and needs a rolling restart. See
+<a class="reference internal" href="#yugabyte-replica-identity"><span class="std std-ref">Replica identity</span></a>.</p></li>
 </ul>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
@@ -758,8 +763,12 @@ saves that point as the table’s bookmark. The next run replays every later
 change, including deletes and key changes, so the target ends up matching the
 source. The export reads history at the restart point. YugabyteDB keeps that
 history while the slot exists, even past
-<code class="docutils literal notranslate"><span class="pre">timestamp_history_retention_interval_sec</span></code>. A slot that nothing consumes for
-<code class="docutils literal notranslate"><span class="pre">cdc_intent_retention_ms</span></code> (default eight hours) expires. Then run the
+<code class="docutils literal notranslate"><span class="pre">timestamp_history_retention_interval_sec</span></code>. It also keeps the table
+definitions the slot needs, so changes made before a schema change still stream
+after a consumer outage. <code class="docutils literal notranslate"><span class="pre">timestamp_syscatalog_history_retention_interval_sec</span></code>
+does not need changing for slots created on YugabyteDB 2026.1 or later. A slot
+that nothing consumes for <code class="docutils literal notranslate"><span class="pre">cdc_intent_retention_ms</span></code> (default eight hours)
+expires, and the tap raises <code class="docutils literal notranslate"><span class="pre">ReplicationSlotExpiredError</span></code>. Then run the
 unfiltered <code class="docutils literal notranslate"><span class="pre">fast_sync</span></code> to create a new slot.</p>
 <section id="large-initial-loads">
 <span id="yugabyte-large-initial-loads"></span><h3>Large initial loads<a class="headerlink" href="#large-initial-loads" title="Link to this heading"></a></h3>
@@ -826,9 +835,22 @@ target, every <code class="docutils literal notranslate"><span class="pre">LOG_B
 <code class="docutils literal notranslate"><span class="pre">FULL</span></code>. PipelineWise checks this before FastSync creates or resets the slot,
 and the tap checks it again at the start of every run. Either check stops with
 the names of the tables to fix. Set <code class="docutils literal notranslate"><span class="pre">DEFAULT</span></code> before the first <code class="docutils literal notranslate"><span class="pre">fast_sync</span></code>.</p>
-<p>Prefer <code class="docutils literal notranslate"><span class="pre">DEFAULT</span></code>. With <code class="docutils literal notranslate"><span class="pre">FULL</span></code>, a transaction that inserts a row and then
-updates it can stop the change stream for every table, with the error
-<code class="docutils literal notranslate"><span class="pre">Failed</span> <span class="pre">to</span> <span class="pre">get</span> <span class="pre">the</span> <span class="pre">beforeimage</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">DEFAULT</span></code> and <code class="docutils literal notranslate"><span class="pre">FULL</span></code> need <code class="docutils literal notranslate"><span class="pre">cdc_enable_intra_transactional_before_image=true</span></code>
+on every YB-TServer. Without it, the change stream stops with the error
+<code class="docutils literal notranslate"><span class="pre">Failed</span> <span class="pre">to</span> <span class="pre">get</span> <span class="pre">the</span> <span class="pre">beforeimage</span></code> when one transaction inserts a row and then
+changes it:</p>
+<ul class="simple">
+<li><p>on a <code class="docutils literal notranslate"><span class="pre">DEFAULT</span></code> table, when the transaction then updates the row; and</p></li>
+<li><p>on a <code class="docutils literal notranslate"><span class="pre">FULL</span></code> table, when the transaction then updates or deletes the row,
+including a primary key update.</p></li>
+</ul>
+<p>The stop affects every tap that reads the database, even if the table is not
+replicated. Each rerun stops at the same transaction, and the tap raises
+<code class="docutils literal notranslate"><span class="pre">BeforeImageUnavailableError</span></code>. Changes to rows that existed before the
+transaction are not affected, and neither are <code class="docutils literal notranslate"><span class="pre">CHANGE</span></code> tables.</p>
+<p>To recover, set the flag on every YB-TServer with a rolling restart, then rerun
+the tap. It resumes from its bookmark without a resync. The flag cannot be
+changed at runtime.</p>
 <p>Changing the replica identity of a replicated table has no effect until the slot
 is recreated. The checks read the table’s current setting, so they cannot see
 the identity an existing slot holds. Stop replication, run <code class="docutils literal notranslate"><span class="pre">ALTER</span> <span class="pre">TABLE</span>
