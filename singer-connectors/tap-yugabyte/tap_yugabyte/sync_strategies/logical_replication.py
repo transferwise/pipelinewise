@@ -48,6 +48,19 @@ class UnsupportedReplicationPortError(Exception):
     """Custom exception when LOG_BASED replication is configured on a port the driver cannot use"""
 
 
+class BeforeImageUnavailableError(Exception):
+    """YugabyteDB cannot stream a row inserted and then changed in one transaction."""
+
+
+class ReplicationSlotExpiredError(Exception):
+    """YugabyteDB no longer streams part of the database for the replication slot."""
+
+
+# Substrings of YugabyteDB 2026.1 replication errors, matched to explain the operator action.
+BEFORE_IMAGE_ERROR_TEXT = 'Failed to get the beforeimage'
+SLOT_EXPIRED_ERROR_TEXT = 'unqualified for stream'
+
+
 class UnsupportedPayloadKindError(Exception):
     """Custom exception when waljson payload is not insert, update nor delete"""
 
@@ -756,6 +769,27 @@ def _send_slot_feedback(cur, acknowledged_lsn):
     cur.send_feedback(write_lsn=slot_lsn, flush_lsn=slot_lsn, reply=True, force=True)
 
 
+def _replication_error(exc: Exception, slot: str) -> Exception | None:
+    """Return an actionable error for known YugabyteDB slot failures, or None for any other error."""
+    if not isinstance(exc, psycopg2.Error):
+        return None
+    message = str(exc).strip()
+    if BEFORE_IMAGE_ERROR_TEXT in message:
+        # Without the flag, YugabyteDB fails on any REPLICA IDENTITY DEFAULT or FULL table in the database,
+        # selected or not, and every rerun stops at the same transaction until the flag is set.
+        return BeforeImageUnavailableError(
+            f'Replication slot {slot} is stuck: YugabyteDB cannot stream a row that one transaction inserted and '
+            'then updated or deleted. Set cdc_enable_intra_transactional_before_image=true on every YB-TServer '
+            '(it needs a rolling restart), then rerun the tap; no resync is needed. Any table in the database '
+            f'with REPLICA IDENTITY DEFAULT or FULL can cause this, selected or not. YugabyteDB error: {message}')
+    if SLOT_EXPIRED_ERROR_TEXT in message:
+        return ReplicationSlotExpiredError(
+            f'Replication slot {slot} can no longer stream the database, usually because nothing read it for '
+            'longer than cdc_intent_retention_ms (default eight hours). Run the unfiltered fast_sync to recreate '
+            f'the slot. YugabyteDB error: {message}')
+    return None
+
+
 def wal2json_options(logical_streams, conn_info):
     """Build wal2json options; decimal routes need typmods and exact numeric text."""
     decimal_target = conn_info.get('decimal_target')
@@ -818,8 +852,12 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):  # noqa
                               status_interval=poll_interval,
                               options=wal2json_options(logical_streams, conn_info))
 
-    except psycopg2.ProgrammingError as ex:
-        raise Exception(f"Unable to start replication with logical replication (slot {ex})") from ex
+    except psycopg2.Error as ex:
+        if (replication_error := _replication_error(ex, slot)) is not None:
+            raise replication_error from ex
+        if isinstance(ex, psycopg2.ProgrammingError):
+            raise Exception(f"Unable to start replication with logical replication (slot {ex})") from ex
+        raise
 
     lsn_received_timestamp = datetime.datetime.now(datetime.UTC)
     poll_timestamp = datetime.datetime.now(datetime.UTC)
@@ -840,6 +878,9 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):  # noqa
             try:
                 msg = cur.read_message()
             except Exception as e:
+                if (replication_error := _replication_error(e, slot)) is not None:
+                    LOGGER.error(replication_error)
+                    raise replication_error from e
                 LOGGER.error(e)
                 raise
 

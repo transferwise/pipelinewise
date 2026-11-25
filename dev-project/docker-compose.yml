@@ -134,6 +134,7 @@ services:
     container_name: pipelinewise-yugabyte-source
     command: >
       bin/yugabyted start --background=false
+      --tserver_flags=cdc_enable_intra_transactional_before_image=true
     ports:
       - ${TAP_YUGABYTE_PORT_ON_HOST}:${TAP_YUGABYTE_PORT}
     healthcheck:

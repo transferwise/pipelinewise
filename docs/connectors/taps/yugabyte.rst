@@ -52,7 +52,12 @@ LOG_BASED replication also requires:
   initial snapshot to the slot's start point. Without it, the first sync fails
   with ``permission denied to set parameter "yb_read_time"``; and
 - a replica identity other than ``NOTHING`` on every table. PostgreSQL targets
-  need ``DEFAULT`` or ``FULL``. See :ref:`yugabyte_replica_identity`.
+  need ``DEFAULT`` or ``FULL``. See :ref:`yugabyte_replica_identity`; and
+- ``cdc_enable_intra_transactional_before_image=true`` on every YB-TServer if
+  any table in the database uses ``REPLICA IDENTITY DEFAULT`` or ``FULL``. This
+  includes every database replicated to a PostgreSQL target. The flag defaults
+  to ``false`` and needs a rolling restart. See
+  :ref:`yugabyte_replica_identity`.
 
 .. warning::
 
@@ -364,8 +369,12 @@ saves that point as the table's bookmark. The next run replays every later
 change, including deletes and key changes, so the target ends up matching the
 source. The export reads history at the restart point. YugabyteDB keeps that
 history while the slot exists, even past
-``timestamp_history_retention_interval_sec``. A slot that nothing consumes for
-``cdc_intent_retention_ms`` (default eight hours) expires. Then run the
+``timestamp_history_retention_interval_sec``. It also keeps the table
+definitions the slot needs, so changes made before a schema change still stream
+after a consumer outage. ``timestamp_syscatalog_history_retention_interval_sec``
+does not need changing for slots created on YugabyteDB 2026.1 or later. A slot
+that nothing consumes for ``cdc_intent_retention_ms`` (default eight hours)
+expires, and the tap raises ``ReplicationSlotExpiredError``. Then run the
 unfiltered ``fast_sync`` to create a new slot.
 
 .. _yugabyte_large_initial_loads:
@@ -435,9 +444,23 @@ target, every ``LOG_BASED`` table needs ``REPLICA IDENTITY DEFAULT`` or
 and the tap checks it again at the start of every run. Either check stops with
 the names of the tables to fix. Set ``DEFAULT`` before the first ``fast_sync``.
 
-Prefer ``DEFAULT``. With ``FULL``, a transaction that inserts a row and then
-updates it can stop the change stream for every table, with the error
-``Failed to get the beforeimage``.
+``DEFAULT`` and ``FULL`` need ``cdc_enable_intra_transactional_before_image=true``
+on every YB-TServer. Without it, the change stream stops with the error
+``Failed to get the beforeimage`` when one transaction inserts a row and then
+changes it:
+
+- on a ``DEFAULT`` table, when the transaction then updates the row; and
+- on a ``FULL`` table, when the transaction then updates or deletes the row,
+  including a primary key update.
+
+The stop affects every tap that reads the database, even if the table is not
+replicated. Each rerun stops at the same transaction, and the tap raises
+``BeforeImageUnavailableError``. Changes to rows that existed before the
+transaction are not affected, and neither are ``CHANGE`` tables.
+
+To recover, set the flag on every YB-TServer with a rolling restart, then rerun
+the tap. It resumes from its bookmark without a resync. The flag cannot be
+changed at runtime.
 
 Changing the replica identity of a replicated table has no effect until the slot
 is recreated. The checks read the table's current setting, so they cannot see

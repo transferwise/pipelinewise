@@ -1173,6 +1173,91 @@ class TestLogicalReplication(unittest.TestCase):
             logical_replication.sync_tables(self.conn_info, self.logical_streams, state, end_lsn, state_file)
         self.assertEqual(expected_message, str(exp.exception))
 
+    def _sync_tables_failing_with(self, mocked_connect, error, on='read_message'):
+        """Run sync_tables with the replication cursor raising error; return the raised exception.
+
+        Asserts that the failure neither acknowledges the slot nor advances any emitted bookmark.
+        """
+        cursor = mocked_connect.return_value.cursor.return_value
+        getattr(cursor, on).side_effect = error
+        state = {'bookmarks': {'foo-bar': {'foo': 'bar', 'lsn': 4}}}
+        with patch('tap_yugabyte.sync_strategies.logical_replication.singer.write_message') as write_message, \
+                self.assertRaises(Exception) as exp:
+            logical_replication.sync_tables(self.conn_info, self.logical_streams, state, 8, 'state.json')
+        cursor.send_feedback.assert_not_called()
+        emitted_states = [c.args[0].value for c in write_message.call_args_list
+                          if isinstance(c.args[0], singer.StateMessage)]
+        for emitted in emitted_states:
+            self.assertEqual(4, emitted['bookmarks']['foo-bar']['lsn'])
+        self.assertEqual(4, state['bookmarks']['foo-bar']['lsn'])
+        return exp.exception
+
+    @patch('tap_yugabyte.sync_strategies.logical_replication.locate_replication_slot', return_value='foo_slot')
+    @patch('psycopg2.connect')
+    def test_sync_tables_explains_missing_intra_transaction_before_image(self, mocked_connect, _):
+        """YugabyteDB's before-image failure names the TServer flag and says no resync is needed."""
+        error = psycopg2.errors.InternalError_('Failed to get the beforeimage for tablet_id: 4bc1e196b001\n')
+
+        raised = self._sync_tables_failing_with(mocked_connect, error)
+
+        self.assertIsInstance(raised, logical_replication.BeforeImageUnavailableError)
+        self.assertIs(error, raised.__cause__)
+        self.assertIn('foo_slot', str(raised))
+        self.assertIn('cdc_enable_intra_transactional_before_image=true', str(raised))
+        self.assertIn('no resync is needed', str(raised))
+        self.assertIn('tablet_id: 4bc1e196b001', str(raised))
+
+    @patch('tap_yugabyte.sync_strategies.logical_replication.locate_replication_slot', return_value='foo_slot')
+    @patch('psycopg2.connect')
+    def test_sync_tables_explains_before_image_failure_when_starting_replication(self, mocked_connect, _):
+        """The same failure raised by START_REPLICATION is explained too."""
+        error = psycopg2.errors.InternalError_('Failed to get the beforeimage for tablet_id: abc')
+
+        raised = self._sync_tables_failing_with(mocked_connect, error, on='start_replication')
+
+        self.assertIsInstance(raised, logical_replication.BeforeImageUnavailableError)
+        self.assertIs(error, raised.__cause__)
+
+    @patch('tap_yugabyte.sync_strategies.logical_replication.locate_replication_slot', return_value='foo_slot')
+    @patch('psycopg2.connect')
+    def test_sync_tables_explains_expired_slot(self, mocked_connect, _):
+        """An expired slot's VirtualWAL failure points to the unfiltered fast_sync."""
+        error = psycopg2.errors.InternalError_(
+            'VirtualWAL initialisation failed for stream_id: 14e1 & session_id: 49: Error fetching tablet list & '
+            'checkpoints for table_id 0000: : Cannot add tablet: 0000 to the polling list as it has been '
+            'unqualified for stream: 14e1. To skip adding this tablet and proceed enable the flag '
+            'cdc_skip_unqualified_tables_for_polling.')
+
+        raised = self._sync_tables_failing_with(mocked_connect, error)
+
+        self.assertIsInstance(raised, logical_replication.ReplicationSlotExpiredError)
+        self.assertIs(error, raised.__cause__)
+        self.assertIn('unfiltered fast_sync', str(raised))
+        self.assertIn('cdc_intent_retention_ms', str(raised))
+
+    @patch('tap_yugabyte.sync_strategies.logical_replication.locate_replication_slot', return_value='foo_slot')
+    @patch('psycopg2.connect')
+    def test_sync_tables_reraises_other_replication_errors_unchanged(self, mocked_connect, _):
+        """Unrecognised database errors from either replication call keep their original type and object."""
+        for on in ('read_message', 'start_replication'):
+            with self.subTest(on=on):
+                error = psycopg2.errors.InternalError_('some other YugabyteDB failure')
+                mocked_connect.reset_mock()
+                cursor = mocked_connect.return_value.cursor.return_value
+                cursor.read_message.side_effect = None
+                cursor.start_replication.side_effect = None
+
+                raised = self._sync_tables_failing_with(mocked_connect, error, on=on)
+
+                self.assertIs(error, raised)
+
+    def test_replication_error_ignores_non_database_errors(self):
+        """Only psycopg2 errors are translated, whatever their text."""
+        self.assertIsNone(logical_replication._replication_error(
+            RuntimeError('Failed to get the beforeimage'), 'foo_slot'))
+        self.assertIsNone(logical_replication._replication_error(
+            psycopg2.errors.InternalError_('unrelated'), 'foo_slot'))
+
     @patch('tap_yugabyte.sync_strategies.logical_replication.locate_replication_slot')
     @patch("psycopg2.connect")
     def test_sync_tables_if_break_at_end_lsn_and_msg_data_start_greater_than_end_lsn(self,
