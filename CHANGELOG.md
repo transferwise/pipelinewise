@@ -1,3 +1,12 @@
+0.104.0 (2026-11-27)
+--------------------
+
+- Add `sync_data_diff_checks --target <id> --tap <id>`. It persists one tap's data-diff definitions from the tap's generated `data_diff.json`, without discovery or `import_config`. Use it where runtime config is generated another way. See [sharing a backend](docs/user_guide/data_diff.rst#sharing-a-backend-between-installations).
+- Add `import_config --exclude-data-diff-taps <id,id>`. Import leaves those taps' definitions unchanged, because another installation sharing the backend manages them. Without it, importing all taps deactivates the definitions of every tap missing from the YAML.
+- Write `data_diff.json` beside the generated config of each tap with data-diff checks, and remove it when the tap has none. It holds only check settings, and no credentials.
+- Render `{{ env_var['NAME'] }}` secret lookups in generated connector configs when data-diff connects to the source and target, as replication does.
+- Upgrade without a backend migration. A tap that moves between installations keeps its definitions and coverage only when both run versions with the same definition rules.
+
 0.103.3 (2026-11-24)
 --------------------
 

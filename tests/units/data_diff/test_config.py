@@ -9,6 +9,8 @@ import pytest
 
 from pipelinewise.data_diff.config import (
     DataDiffConfigError,
+    definition_input,
+    definitions_from_input,
     extract_check_definitions,
     parse_duration,
 )
@@ -304,3 +306,90 @@ def test_rejects_window_end_further_from_fire_than_window_start(tmp_path):
 
     with pytest.raises(DataDiffConfigError, match="window_end must be closer to fire time"):
         _definitions(config)
+
+
+def _target_and_tap(config):
+    target = config.targets["snowflake"]
+    return target, target["taps"][0]
+
+
+def _round_trip(config):
+    """Definitions built the way another installation builds them: from the saved JSON input."""
+    target, tap = _target_and_tap(config)
+    document = json.loads(json.dumps(definition_input(target, tap)))
+    return definitions_from_input(config.global_config, document)
+
+
+def test_definition_input_rebuilds_identical_definitions_and_hashes(tmp_path):
+    config = _config(tmp_path)
+    expected = _definitions(config)
+
+    rebuilt = _round_trip(config)
+
+    assert rebuilt == expected
+    assert [d.config_hash for d in rebuilt] == [d.config_hash for d in expected]
+
+
+def test_definition_input_inherits_tap_defaults_like_project_yaml(tmp_path):
+    config = _config(tmp_path)
+    _, tap = _target_and_tap(config)
+    table_check = tap["schemas"][0]["tables"][0]["data_diff"]
+    tap["data_diff_defaults"] = {
+        "frequency": table_check.pop("frequency"),
+        "window_start": table_check.pop("window_start"),
+        "initial_full_scan": True,
+    }
+
+    assert _round_trip(config) == _definitions(config)
+    assert _round_trip(config)[0].initial_full_scan is True
+
+
+def test_definition_input_keeps_only_checked_tables_and_no_credentials(tmp_path):
+    config = _config(tmp_path)
+    target, tap = _target_and_tap(config)
+    tables = tap["schemas"][0]["tables"]
+    tables[0]["transformations"] = [{"column": "note", "type": "MASK-HIDDEN"}]
+    tables.append({"table_name": "audit", "replication_method": "FULL_TABLE"})
+
+    document = definition_input(target, tap)
+
+    assert document["tap"]["db_conn"] == {"dbname": "payments"}
+    assert document["target"] == {"id": "snowflake", "type": "target-snowflake", "db_conn": {"dbname": "analytics"}}
+    assert [t["table_name"] for t in document["tap"]["schemas"][0]["tables"]] == ["transfers-v2"]
+    assert document["tap"]["schemas"][0]["tables"][0]["transformations"] == [{"column": "note"}]
+    assert "source-secret" not in json.dumps(document)
+    assert "replication_method" not in json.dumps(document)
+
+
+def test_definition_input_is_none_without_checks(tmp_path):
+    config = _config(tmp_path)
+    target, tap = _target_and_tap(config)
+    del tap["schemas"][0]["tables"][0]["data_diff"]
+
+    assert definition_input(target, tap) is None
+
+
+def test_definition_input_fails_validation_the_same_way(tmp_path):
+    transformed = _config(tmp_path, transformed=True)
+    with pytest.raises(DataDiffConfigError, match="cannot be transformed"):
+        _definitions(transformed)
+    with pytest.raises(DataDiffConfigError, match="cannot be transformed"):
+        _round_trip(transformed)
+
+    without_dbname = _config(tmp_path)
+    del _target_and_tap(without_dbname)[1]["db_conn"]["dbname"]
+    with pytest.raises(KeyError, match="dbname"):
+        _definitions(without_dbname)
+    with pytest.raises(KeyError, match="dbname"):
+        _round_trip(without_dbname)
+
+
+def test_definitions_from_input_builds_only_that_tap(tmp_path):
+    config = _config(tmp_path)
+    target, tap = _target_and_tap(config)
+    document = definition_input(target, tap)
+
+    definitions = definitions_from_input(config.global_config, document)
+
+    assert {d.tap_id for d in definitions} == {"payments"}
+    assert definitions_from_input({}, document) == [], "no backend_db means no definitions, as with YAML"

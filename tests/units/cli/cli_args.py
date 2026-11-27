@@ -35,6 +35,7 @@ class CliArgs:
         iceberg_version=None,
         preflight_only=False,
         conversion_warehouse=None,
+        exclude_data_diff_taps=None,
         command=None,
     ):
         self.target = target
@@ -64,6 +65,7 @@ class CliArgs:
         self.iceberg_version = iceberg_version
         self.preflight_only = preflight_only
         self.conversion_warehouse = conversion_warehouse
+        self.exclude_data_diff_taps = exclude_data_diff_taps
         self.command = command
 
     # "log" Getters and setters

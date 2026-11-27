@@ -8,7 +8,8 @@ import json
 
 from typing import Dict, List, Union
 
-from pipelinewise.data_diff.config import extract_check_definitions
+from pipelinewise.data_diff.config import definition_input, extract_check_definitions
+from pipelinewise.data_diff.runtime import DEFINITION_INPUT_FILE
 from pipelinewise.fastsync.commons.source_transformations import (
     UnsupportedSourceTransformation,
     validate_bookmark_column,
@@ -317,6 +318,8 @@ class Config:
                                                         pipelinewise will pass at run time
             6. transformation.json     :(Pipelinewise): Column transformations between the
                                                         tap and target
+            7. data_diff.json          :(Pipelinewise): Input for the tap's data-diff definitions,
+                                                        only when it has checks
         """
         if extra_config_keys is None:
             extra_config_keys = {}
@@ -351,6 +354,21 @@ class Config:
         utils.save_json(tap_inheritable_config, tap_inheritable_config_path)
         utils.save_json(tap_transformation, tap_transformation_path)
         utils.save_json(tap_selection, tap_selection_path)
+        self.save_data_diff_definition_input(target, tap, tap_dir)
+
+    @staticmethod
+    def save_data_diff_definition_input(target: Dict, tap: Dict, tap_dir: str) -> None:
+        """Write the tap's data-diff definition input, or remove a stale one when it has no checks.
+
+        sync_data_diff_checks builds definitions from this file where project YAML is not available.
+        """
+        path = os.path.join(tap_dir, DEFINITION_INPUT_FILE)
+        document = definition_input(target, tap)
+        if document is None:
+            if os.path.exists(path):
+                os.remove(path)
+            return
+        utils.save_json(document, path)
 
     @classmethod
     def generate_tap_connection_config(cls, tap: Dict, extra_config_keys: Dict, target_type=None) -> Dict:

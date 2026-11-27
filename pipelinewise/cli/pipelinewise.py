@@ -46,11 +46,12 @@ from pipelinewise.fastsync.commons.tap_postgres import FastSyncTapPostgres
 from pipelinewise.fastsync.commons.tap_yugabyte import FastSyncTapYugabyte
 from pipelinewise.fastsync.commons import utils as fastsync_utils
 from pipelinewise.cli.multiprocess import Process
+from pipelinewise.data_diff.config import definitions_from_input
 from pipelinewise.data_diff.coverage import FAILED_STATUSES
 from pipelinewise.data_diff.alerts import format_data_diff_alert, format_data_diff_index_warning
 from pipelinewise.data_diff.repository import DataDiffRepository, index_warning_id
 from pipelinewise.data_diff.runner import rerun_failed_check, run_due_checks
-from pipelinewise.data_diff.runtime import RuntimeConnectorConfigLoader
+from pipelinewise.data_diff.runtime import RuntimeConnectorConfigLoader, load_definition_input
 
 
 # Deprecated Python API compatibility views; policy remains in the resolver.
@@ -2371,7 +2372,7 @@ class PipelineWise:
                     sync_stats = repository.sync_definitions(
                         data_diff_definitions,
                         selected_taps=selected_taps_id,
-                        excluded_taps=failed_tap_ids,
+                        excluded_taps=failed_tap_ids | self._data_diff_excluded_taps(),
                     )
             except Exception as exc:
                 data_diff_sync_failed = True
@@ -2567,6 +2568,28 @@ class PipelineWise:
             except Exception as exc:
                 self.logger.warning('Cannot send data-diff index warning for %s: %s', check['full_check_name'], exc)
 
+    def _data_diff_excluded_taps(self) -> set[str]:
+        """Taps whose definitions another installation sharing the backend keeps; import leaves them alone."""
+        raw = getattr(self.args, 'exclude_data_diff_taps', None) or ''
+        excluded = {tap_id.strip() for tap_id in raw.split(',') if tap_id.strip()}
+        if excluded:
+            self.logger.info('Leaving data-diff definitions of %s to another installation', sorted(excluded))
+        return excluded
+
+    def sync_data_diff_checks(self):
+        """Persist one tap's data-diff definitions from its generated definition input.
+
+        This is import_config's definition step without discovery or connector generation, for an
+        installation that generates runtime config another way. Only this tap's definitions change.
+        """
+        document = load_definition_input(self.config_dir, self.args.target, self.args.tap)
+        definitions = definitions_from_input(self.config, document)
+        with self._data_diff_repository() as repository:
+            stats = repository.sync_definitions(definitions, selected_taps=[self.args.tap])
+        self.logger.info(
+            'Persisted data-diff definitions for %s in %s: %s', self.args.tap, self.args.target, stats
+        )
+
     def list_data_diff_checks(self):
         """List persisted definitions, schedule state, and timestamp coverage."""
         with self._data_diff_repository() as repository:
@@ -2624,7 +2647,7 @@ class PipelineWise:
         with self._data_diff_repository() as repository:
             summaries = run_due_checks(
                 repository,
-                RuntimeConnectorConfigLoader(self.config_dir),
+                RuntimeConnectorConfigLoader(self.config_dir, utils.render_env_var_lookups),
                 target_id=target_id,
                 tap_id=tap_id,
                 check_filter=self.args.check,
@@ -2641,7 +2664,7 @@ class PipelineWise:
         with self._data_diff_repository() as repository:
             summary = rerun_failed_check(
                 repository,
-                RuntimeConnectorConfigLoader(self.config_dir),
+                RuntimeConnectorConfigLoader(self.config_dir, utils.render_env_var_lookups),
                 self.args.run_id,
                 self.args.remediation_ref,
             )

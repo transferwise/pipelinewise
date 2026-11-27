@@ -35,8 +35,11 @@ Read root `AGENTS.md` first, then relevant connector, test, E2E, and docs guides
   Ownership: `adapters.py` dialects; `engine.py` execution; `repository.py`
   persistence; `runner.py` scheduling/remediation; `config.py`,
   `comparison.py`, `coverage.py` their named concerns; `runtime.py` generated
-  connector JSON; `credentials.py` private keys. `import_config` persists
-  definitions only after connector generation/discovery. Add database types at
+  connector JSON and `data_diff.json` definition input; `credentials.py` private
+  keys. `import_config` persists definitions only after connector
+  generation/discovery; `sync_data_diff_checks` persists one tap's from its
+  definition input. Keep both paths hash-identical and tap-scoped per the
+  [definition sync design](data_diff/DEFINITION_SYNC.md). Add database types at
   the adapter boundary and AST coverage for new dependency seams. See the
   [FLOAT checksum design](data_diff/FLOAT_CHECKSUM.md) before changing its casts or normalization.
 

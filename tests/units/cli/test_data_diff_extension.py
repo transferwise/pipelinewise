@@ -7,6 +7,7 @@ import pytest
 from pipelinewise.cli import utils
 from pipelinewise.cli.config import Config
 from pipelinewise.cli.errors import InvalidConfigException
+from pipelinewise.data_diff.config import definitions_from_input
 
 
 def _config(tmp_path):
@@ -133,17 +134,39 @@ def test_main_schema_rejects_unused_data_diff_name(tmp_path):
         utils.validate(tap, utils.load_schema("tap"))
 
 
-def test_main_json_excludes_data_diff_extension(tmp_path):
+def test_connector_json_excludes_data_diff_extension(tmp_path):
     config = _config(tmp_path)
     config.save()
 
     generated = [
         json.loads(path.read_text(encoding="utf-8"))
         for path in Path(tmp_path).rglob("*.json")
+        if path.name != "data_diff.json"
     ]
 
     assert generated
     assert all(not _contains_data_diff(document) for document in generated)
+
+
+def test_save_writes_the_data_diff_definition_input_for_taps_with_checks(tmp_path):
+    config = _config(tmp_path)
+    config.save()
+
+    path = Path(tmp_path) / "postgres" / "payments" / "data_diff.json"
+    saved = json.loads(path.read_text(encoding="utf-8"))
+
+    assert saved["tap"]["schemas"][0]["tables"][0]["data_diff"]["checks"] == ["row_count"]
+    assert definitions_from_input(config.global_config, saved) == config.get_data_diff_definitions()
+
+
+def test_save_removes_a_stale_definition_input_when_checks_are_removed(tmp_path):
+    config = _config(tmp_path)
+    config.save()
+    del config.targets["postgres"]["taps"][0]["schemas"][0]["tables"][0]["data_diff"]
+
+    config.save()
+
+    assert not (Path(tmp_path) / "postgres" / "payments" / "data_diff.json").exists()
 
 
 def test_main_config_builds_data_diff_definitions(tmp_path):
