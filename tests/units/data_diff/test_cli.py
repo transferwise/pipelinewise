@@ -7,7 +7,10 @@ from uuid import uuid4
 
 import pytest
 
+from pipelinewise import cli
+from pipelinewise.cli import utils
 from pipelinewise.cli.alert_sender import AlertSender
+from pipelinewise.cli.errors import CommandSpecificArgumentsException
 from pipelinewise.cli.pipelinewise import PipelineWise
 from pipelinewise.data_diff.repository import index_warning_id
 from tests.units.cli.cli_args import CliArgs
@@ -998,3 +1001,145 @@ def test_passing_or_deferred_summaries_alert_nobody(status):
 
     assert pipelinewise._alert_data_diff_failures([_summary(status)]) == []
     pipelinewise.alert_sender.send_to_all_handlers.assert_not_called()
+
+
+# Definition sync for installations without project YAML, and imports that share the backend
+
+def _write_definition_input(config_dir, *, checks=True):
+    table = {
+        "table_name": "payments",
+        "transformations": [],
+        "data_diff": {
+            "checks": ["row_count"],
+            "key_column": "id",
+            "timestamp_column": "updated_at",
+            "frequency": "0 */6 * * *",
+            "window_start": "-15h",
+            "window_end": "-3h",
+        },
+    }
+    document = {
+        "target": {"id": "snowflake", "type": "target-snowflake", "db_conn": {"dbname": "analytics"}},
+        "tap": {
+            "id": "tap",
+            "type": "tap-postgres",
+            "db_conn": {"dbname": "source"},
+            "schemas": [{"source_schema": "public", "target_schema": "repl", "tables": [table]}] if checks else [],
+        },
+    }
+    tap_dir = config_dir / "snowflake" / "tap"
+    tap_dir.mkdir(parents=True)
+    (tap_dir / "data_diff.json").write_text(json.dumps(document), encoding="utf-8")
+
+
+def _sync(tmp_path, repository):
+    pipelinewise = _pipelinewise(target="snowflake", tap="tap")
+    pipelinewise.config_dir = str(tmp_path)
+    with patch(
+        "pipelinewise.cli.pipelinewise.DataDiffRepository.from_backend_config",
+        return_value=repository,
+    ) as from_backend:
+        pipelinewise.sync_data_diff_checks()
+    return from_backend
+
+
+def test_sync_persists_only_the_selected_taps_definitions(tmp_path):
+    _write_definition_input(tmp_path)
+    repository = RepositoryContext()
+
+    from_backend = _sync(tmp_path, repository)
+
+    definitions, selected_taps, excluded_taps = repository.synced
+    assert [d.full_check_name for d in definitions] == ["snowflake/tap/public/payments"]
+    assert selected_taps == ["tap"]
+    assert excluded_taps is None
+    from_backend.assert_called_once_with({"host": "backend"})
+
+
+def test_sync_with_an_empty_input_deactivates_the_taps_definitions(tmp_path):
+    _write_definition_input(tmp_path, checks=False)
+    repository = RepositoryContext()
+
+    _sync(tmp_path, repository)
+
+    assert repository.synced == ([], ["tap"], None)
+
+
+def test_sync_without_definition_input_changes_nothing(tmp_path):
+    repository = RepositoryContext()
+
+    with pytest.raises(ValueError, match="does not exist"):
+        _sync(tmp_path, repository)
+
+    assert repository.synced is None
+
+
+def test_sync_requires_a_backend(tmp_path):
+    _write_definition_input(tmp_path)
+    pipelinewise = _pipelinewise(target="snowflake", tap="tap")
+    pipelinewise.config_dir = str(tmp_path)
+    pipelinewise.config = {}
+
+    with pytest.raises(ValueError, match="backend_db"):
+        pipelinewise.sync_data_diff_checks()
+
+
+def test_import_leaves_definitions_of_excluded_taps_alone():
+    definition = Mock(tap_id="ec2_tap")
+    imported = Mock()
+    imported.global_config = {"backend_db": {"host": "backend"}}
+    imported.targets = {"target": {"taps": [{"id": "ec2_tap"}]}}
+    imported.get_data_diff_definitions.return_value = [definition]
+    repository = RepositoryContext()
+    pipelinewise = _pipelinewise(taps="*", exclude_data_diff_taps=" k8s_one,k8s_two ,")
+    pipelinewise.config = {}
+    pipelinewise._discover_tap = Mock(return_value=None)
+    pipelinewise.load_config = Mock()
+    pipelinewise.cleanup_after_deleted_config = Mock(return_value=0)
+
+    with patch(
+        "pipelinewise.cli.pipelinewise.Config.from_yamls",
+        return_value=imported,
+    ), patch(
+        "pipelinewise.cli.pipelinewise.DataDiffRepository.from_backend_config",
+        return_value=repository,
+    ):
+        pipelinewise.import_project()
+
+    assert repository.synced == ([definition], ["*"], {"k8s_one", "k8s_two"})
+
+
+@pytest.mark.parametrize("command", ["run_data_diff_checks", "rerun_data_diff_check"])
+def test_checks_render_secret_lookups_in_generated_connector_configs(command):
+    pipelinewise = _pipelinewise(target="target", tap="tap", run_id=str(uuid4()), remediation_ref="INC-1")
+    runner = "run_due_checks" if command == "run_data_diff_checks" else "rerun_failed_check"
+    returned = [] if command == "run_data_diff_checks" else _summary()
+
+    with patch(
+        "pipelinewise.cli.pipelinewise.DataDiffRepository.from_backend_config",
+        return_value=RepositoryContext(),
+    ), patch(f"pipelinewise.cli.pipelinewise.{runner}", return_value=returned) as run:
+        getattr(pipelinewise, command)()
+
+    loader = run.call_args.args[1]
+    assert loader.render is utils.render_env_var_lookups
+
+
+@pytest.mark.parametrize(
+    "overrides, message",
+    [
+        ({"command": "sync_data_diff_checks", "target": "snowflake"}, "--target and --tap"),
+        ({"command": "sync_data_diff_checks", "tap": "tap"}, "--target and --tap"),
+        ({"command": "run_data_diff_checks", "target": "t", "tap": "x", "exclude_data_diff_taps": "a"},
+         "only valid with import_config"),
+    ],
+)
+def test_cli_rejects_incomplete_or_misplaced_data_diff_arguments(overrides, message):
+    with pytest.raises(CommandSpecificArgumentsException, match=message):
+        cli._validate_command_specific_arguments(CliArgs(**overrides))
+
+
+def test_cli_accepts_sync_and_import_exclusions():
+    cli._validate_command_specific_arguments(CliArgs(command="sync_data_diff_checks", target="t", tap="x"))
+    cli._validate_command_specific_arguments(CliArgs(command="import_project", dir="project",
+                                                     exclude_data_diff_taps="a,b"))

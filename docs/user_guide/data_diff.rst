@@ -316,6 +316,9 @@ CLI commands
     # Remediate a specific failed run; both arguments are required
     pipelinewise rerun_data_diff_check --run-id <uuid> --remediation-ref <ticket>
 
+    # Persist one tap's definitions from generated config, without import_config
+    pipelinewise sync_data_diff_checks --target snowflake --tap payments
+
 ``import_config`` versions changed definitions and deactivates removed ones.
 It keeps unchanged definitions and reports pending initial scans. See
 :ref:`cli_import_config` for import failures and the pending count.
@@ -329,6 +332,75 @@ earlier run. See :ref:`data_diff_retries` for timing and limits.
 Failed checks exit non-zero and include a reason. See :ref:`data_diff_alerts`.
 Skipped results explain why the check did not run and show any known status and
 window. A skipped result does not verify data. Unknown bounds remain blank.
+
+
+.. _data_diff_shared_backend:
+
+Sharing a backend between installations
+---------------------------------------
+
+Two PipelineWise installations can use one backend. For example, taps can move
+from one runtime to another one at a time. Each tap's checks must belong to
+exactly one installation.
+
+- **The installation that imports project YAML** runs ``import_config`` with
+  ``--exclude-data-diff-taps <id,id>``, listing the taps the other installation
+  manages. Import neither creates nor deactivates their definitions. Without
+  the option, importing all taps deactivates the definitions of every tap
+  missing from the YAML.
+- **An installation that generates runtime config another way** writes each
+  tap's definition input, described below. It runs ``sync_data_diff_checks``
+  for the tap before ``run_data_diff_checks``. The command changes only that
+  tap's definitions.
+
+A tap that moves keeps its definitions, revisions and coverage when both
+installations build the same definition. That needs the same target and tap
+IDs, the same check settings, and PipelineWise versions with the same
+definition rules. Any difference creates a new revision, as an edit does.
+
+Generated connector configs may keep secrets as ``{{ env_var['NAME'] }}``
+lookups. Data-diff renders them from the environment, as replication does. A
+missing variable stops the check with an error.
+
+Definition input
+''''''''''''''''
+
+``import_config`` writes ``<target_id>/<tap_id>/data_diff.json`` in the runtime
+directory for each tap with checks. It removes the file when the tap has no
+checks. The file holds only the settings definitions are built from, and no
+credentials or connection details:
+
+.. code-block:: json
+
+    {
+      "target": {"id": "snowflake", "type": "target-snowflake", "db_conn": {"dbname": "ANALYTICS"}},
+      "tap": {
+        "id": "payments",
+        "type": "tap-postgres",
+        "db_conn": {"dbname": "payments"},
+        "data_diff_defaults": {"frequency": "0 */6 * * *", "window_start": "-15h", "window_end": "-3h"},
+        "schemas": [
+          {
+            "source_schema": "public",
+            "target_schema": "repl_payments",
+            "tables": [
+              {
+                "table_name": "transfers",
+                "transformations": [],
+                "data_diff": {"checks": ["row_count"], "key_column": "transfer_id", "timestamp_column": "updated_at"}
+              }
+            ]
+          }
+        ]
+      }
+    }
+
+Only tables with a ``data_diff`` block appear, and each transformation keeps
+only its ``column``. Definitions are validated exactly as from YAML.
+
+``sync_data_diff_checks`` fails without changing the backend when the file is
+missing, or describes another tap or target. A file whose tap lists no checked
+tables deactivates that tap's definitions.
 
 
 .. _data_diff_alerts:

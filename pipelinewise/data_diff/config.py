@@ -323,3 +323,51 @@ def extract_check_definitions(
         raise DataDiffConfigError("Data-diff check names must be unique for each table")
 
     return sorted(definitions, key=lambda definition: definition.full_check_name)
+
+
+def definition_input(target: dict, tap: dict) -> dict | None:
+    """Return the configuration a tap's definitions are built from, or None when it has no checks.
+
+    It keeps only the keys extract_check_definitions reads, and no credentials. Another
+    installation sharing the backend can then build identical definitions, with identical
+    hashes, from generated files instead of project YAML. Keys absent from the config stay
+    absent, so validation fails the same way on both paths.
+    """
+    schemas = []
+    for schema in tap.get("schemas", []):
+        tables = [
+            {
+                **_present(table, "table_name", "data_diff"),
+                "transformations": [
+                    _present(transformation, "column")
+                    for transformation in table.get("transformations", [])
+                ],
+            }
+            for table in schema.get("tables", [])
+            if table.get("data_diff") is not None
+        ]
+        if tables:
+            schemas.append({**_present(schema, "source_schema", "target_schema"), "tables": tables})
+    if not schemas:
+        return None
+
+    tap_input = {
+        **_present(tap, "id", "type", "data_diff_defaults"),
+        "db_conn": _present(tap.get("db_conn", {}), "dbname"),
+        "schemas": schemas,
+    }
+    target_input = {
+        **_present(target, "id", "type"),
+        "db_conn": _present(target.get("db_conn", {}), "dbname"),
+    }
+    return {"target": target_input, "tap": tap_input}
+
+
+def definitions_from_input(global_config: dict, document: dict) -> List[CheckDefinition]:
+    """Build one tap's definitions from its definition input (see definition_input)."""
+    target, tap = document["target"], document["tap"]
+    return extract_check_definitions(global_config, {target["id"]: {**target, "taps": [tap]}}, [tap["id"]])
+
+
+def _present(mapping: dict, *keys: str) -> dict:
+    return {key: mapping[key] for key in keys if key in mapping}

@@ -45,6 +45,7 @@ COMMANDS = [
     'copy_native_to_iceberg',
     'reset_state',
     'list_data_diff_checks',
+    'sync_data_diff_checks',
     'run_data_diff_checks',
     'rerun_data_diff_check',
     'tap_info'
@@ -270,7 +271,16 @@ def _validate_iceberg_copy_arguments(args):
 
 
 def _validate_data_diff_arguments(args):
-    """Validate filters and remediation evidence."""
+    """Validate filters, definition sync scope and remediation evidence."""
+    if args.command == 'sync_data_diff_checks':
+        if args.tap == '*' or args.target == '*':
+            raise CommandSpecificArgumentsException(
+                'You must specify the tap to sync using --target and --tap'
+            )
+
+    if getattr(args, 'exclude_data_diff_taps', None) and args.command != 'import_project':
+        raise CommandSpecificArgumentsException('--exclude-data-diff-taps is only valid with import_config')
+
     if args.command in [
         'list_data_diff_checks',
         'run_data_diff_checks',
@@ -425,6 +435,9 @@ def main():
     parser.add_argument('--all', default=False, required=False,
                         help='Run data-diff checks for all definitions across all taps and targets',
                         action='store_true')
+    parser.add_argument('--exclude-data-diff-taps', default=None,
+                        help='Comma separated tap IDs whose data-diff definitions import_config leaves '
+                             'unchanged, because another installation sharing the backend manages them')
     args = parser.parse_args()
 
     # import_config and import commands are synonyms

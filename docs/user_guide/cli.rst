@@ -67,6 +67,9 @@ Command summary
    * - ``list_data_diff_checks``
      - Inspect persisted data-diff definitions and coverage.
      - No.
+   * - ``sync_data_diff_checks``
+     - Persist one tap's data-diff definitions from generated config.
+     - Creates, revises and deactivates that tap's definitions.
    * - ``run_data_diff_checks``
      - Run due data-diff checks.
      - Persists attempts and coverage.
@@ -129,11 +132,18 @@ Useful options:
      - Imports only the named tap IDs and their targets.
    * - ``--secret <file>``
      - Reads the Ansible Vault password needed by encrypted YAML values.
+   * - ``--exclude-data-diff-taps <id,id>``
+     - Leaves the data-diff definitions of these taps unchanged, because another
+       installation sharing the backend manages them. See
+       :ref:`data_diff_shared_backend`.
 
 The command validates config, discovers source tables, and writes runtime files
 below ``~/.pipelinewise``. It updates each tap's data-diff definitions after
 connector generation and discovery succeed. Failed taps keep their definitions.
 An explicitly selected tap missing from YAML has its definitions deactivated.
+So does every tap missing from YAML when all taps are imported, unless
+``--exclude-data-diff-taps`` names it. Each tap with data-diff checks also gets
+a ``data_diff.json`` definition input in its runtime directory.
 
 The summary counts pending initial scans for current checks on successfully
 imported taps. It includes ``DEFERRED`` scans. It excludes scans already
@@ -422,6 +432,25 @@ Options include ``--output-format table|json`` and ``--include-versioned``.
   historical comparison. Includes ``DEFERRED`` scans, but excludes running or
   failed scans. A pending scan has no verified coverage.
 - ``Verified start`` (``verified_start``): the start of verified coverage.
+
+
+.. _cli_sync_data_diff_checks:
+
+``sync_data_diff_checks``
+'''''''''''''''''''''''''
+
+.. code-block:: bash
+
+   pipelinewise sync_data_diff_checks --target <target_id> --tap <tap_id>
+
+Both options are required. The command reads the tap's generated
+``data_diff.json`` and updates only that tap's definitions, as
+``import_config`` would. It does not discover the source or generate connector
+config. Use it where runtime config is generated without ``import_config``. See
+:ref:`data_diff_shared_backend`.
+
+A missing ``data_diff.json`` fails without changing the backend. A file with no
+checked tables deactivates the tap's definitions.
 
 
 .. _cli_run_data_diff_checks:
